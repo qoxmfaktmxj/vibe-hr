@@ -1,3 +1,8 @@
+import "server-only";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
 import type { DashboardSummary } from "@/types/dashboard";
 
 const API_BASE_URL =
@@ -13,16 +18,31 @@ const fallbackSummary: DashboardSummary = {
 };
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("vibe_hr_token")?.value;
+
+  if (!accessToken) {
+    redirect("/login");
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/summary`, {
       cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
+
+    if (response.status === 401) {
+      redirect("/login");
+    }
+
     if (!response.ok) {
       return fallbackSummary;
     }
+
     return (await response.json()) as DashboardSummary;
   } catch {
     return fallbackSummary;
   }
 }
-

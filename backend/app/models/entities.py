@@ -13,6 +13,7 @@ class AuthUser(SQLModel, table=True):
     __tablename__ = "auth_users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    login_id: str = Field(index=True, unique=True, max_length=50)
     email: str = Field(index=True, unique=True, max_length=320)
     password_hash: str
     display_name: str = Field(max_length=100)
@@ -122,4 +123,3 @@ class HrLeaveRequest(SQLModel, table=True):
     approved_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-

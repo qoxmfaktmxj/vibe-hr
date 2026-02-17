@@ -1,16 +1,16 @@
 from typing import List
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    login_id: str = Field(min_length=2, max_length=50)
+    password: str = Field(min_length=4, max_length=128)
 
 
 class LoginUser(BaseModel):
     id: int
-    email: EmailStr
+    email: str
     display_name: str
     roles: List[str]
 
@@ -19,4 +19,3 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: LoginUser
-

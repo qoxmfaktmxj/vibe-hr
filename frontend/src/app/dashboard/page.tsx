@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/logout-button";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { SurveyMeter } from "@/components/dashboard/survey-meter";
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
               <PlusCircle className="h-4 w-4" aria-hidden="true" />
               Create Survey
             </Button>
+            <LogoutButton />
           </div>
         </header>
 
@@ -279,4 +281,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-
