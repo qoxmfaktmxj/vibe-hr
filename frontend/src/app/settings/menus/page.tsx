@@ -1,9 +1,9 @@
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
-import { LogoutButton } from "@/components/auth/logout-button";
 import { MenuAdminManager } from "@/components/settings/menu-admin-manager";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { requireMenuAccess } from "@/lib/guard";
 
-export default async function MenuSettingsPage() {
+export default async function SettingsMenusPage() {
   await requireMenuAccess("/settings/menus");
 
   return (
@@ -13,11 +13,10 @@ export default async function MenuSettingsPage() {
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">
           <div>
             <h1 className="text-xl font-bold text-gray-800">메뉴 관리</h1>
-            <p className="text-sm text-gray-500">메뉴 트리와 역할 권한을 관리합니다.</p>
+            <p className="text-sm text-gray-500">메뉴 CRUD 및 역할 매핑 관리</p>
           </div>
           <LogoutButton />
         </header>
-
         <MenuAdminManager />
       </main>
     </div>
