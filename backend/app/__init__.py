@@ -1,0 +1,2 @@
+"""Vibe-HR backend package."""
+
