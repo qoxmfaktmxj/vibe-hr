@@ -46,7 +46,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <div className="flex min-h-screen bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
+    <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
       <DashboardSidebar />
       <main className="flex-1 overflow-y-auto">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">

@@ -5,6 +5,8 @@ from sqlmodel import Session, select
 
 from app.core.security import hash_password
 from app.models import (
+    AppMenu,
+    AppMenuRole,
     AuthRole,
     AuthUser,
     AuthUserRole,
@@ -53,6 +55,7 @@ def ensure_roles(session: Session) -> None:
     role_map = {
         "admin": "관리자",
         "hr_manager": "인사담당자",
+        "payroll_mgr": "급여담당자",
         "employee": "일반직원",
     }
     for code, name in role_map.items():
@@ -184,6 +187,170 @@ def ensure_sample_records(session: Session, employee: HrEmployee) -> None:
     session.commit()
 
 
+def _get_or_create_menu(
+    session: Session,
+    *,
+    code: str,
+    name: str,
+    parent_id: int | None = None,
+    path: str | None = None,
+    icon: str | None = None,
+    sort_order: int = 0,
+) -> AppMenu:
+    menu = session.exec(select(AppMenu).where(AppMenu.code == code)).first()
+    if menu is None:
+        menu = AppMenu(
+            code=code,
+            name=name,
+            parent_id=parent_id,
+            path=path,
+            icon=icon,
+            sort_order=sort_order,
+        )
+        session.add(menu)
+        session.commit()
+        session.refresh(menu)
+    return menu
+
+
+def _link_menu_roles(session: Session, menu: AppMenu, role_codes: list[str]) -> None:
+    roles = session.exec(select(AuthRole).where(AuthRole.code.in_(role_codes))).all()
+    existing = session.exec(
+        select(AppMenuRole).where(AppMenuRole.menu_id == menu.id)
+    ).all()
+    existing_role_ids = {link.role_id for link in existing}
+
+    for role in roles:
+        if role.id not in existing_role_ids:
+            session.add(AppMenuRole(menu_id=menu.id, role_id=role.id))
+    session.commit()
+
+
+# ── 메뉴 구조 정의 ──
+_MENU_TREE: list[dict] = [
+    {
+        "code": "dashboard",
+        "name": "대시보드",
+        "path": "/dashboard",
+        "icon": "LayoutDashboard",
+        "sort_order": 100,
+        "roles": ["employee", "hr_manager", "payroll_mgr", "admin"],
+        "children": [],
+    },
+    {
+        "code": "hr",
+        "name": "인사관리",
+        "path": None,
+        "icon": "UsersRound",
+        "sort_order": 200,
+        "roles": ["hr_manager", "admin"],
+        "children": [
+            {
+                "code": "hr.employee",
+                "name": "사원관리",
+                "path": "/hr/employee",
+                "icon": "UserRound",
+                "sort_order": 210,
+                "roles": ["hr_manager", "admin"],
+            },
+            {
+                "code": "hr.attendance",
+                "name": "근태관리",
+                "path": "/hr/attendance",
+                "icon": "Clock",
+                "sort_order": 220,
+                "roles": ["employee", "hr_manager", "admin"],
+            },
+            {
+                "code": "hr.leave",
+                "name": "휴가관리",
+                "path": "/hr/leave",
+                "icon": "CalendarDays",
+                "sort_order": 230,
+                "roles": ["employee", "hr_manager", "admin"],
+            },
+        ],
+    },
+    {
+        "code": "payroll",
+        "name": "급여관리",
+        "path": None,
+        "icon": "Wallet",
+        "sort_order": 300,
+        "roles": ["payroll_mgr", "admin"],
+        "children": [
+            {
+                "code": "payroll.calc",
+                "name": "급여계산",
+                "path": "/payroll/calc",
+                "icon": "Calculator",
+                "sort_order": 310,
+                "roles": ["payroll_mgr", "admin"],
+            },
+            {
+                "code": "payroll.slip",
+                "name": "급여명세서",
+                "path": "/payroll/slip",
+                "icon": "FileText",
+                "sort_order": 320,
+                "roles": ["employee", "payroll_mgr", "admin"],
+            },
+        ],
+    },
+    {
+        "code": "settings",
+        "name": "설정",
+        "path": None,
+        "icon": "Settings",
+        "sort_order": 900,
+        "roles": ["admin"],
+        "children": [
+            {
+                "code": "settings.roles",
+                "name": "권한관리",
+                "path": "/settings/roles",
+                "icon": "Shield",
+                "sort_order": 910,
+                "roles": ["admin"],
+            },
+            {
+                "code": "settings.menus",
+                "name": "메뉴관리",
+                "path": "/settings/menus",
+                "icon": "Menu",
+                "sort_order": 920,
+                "roles": ["admin"],
+            },
+        ],
+    },
+]
+
+
+def ensure_menus(session: Session) -> None:
+    for top in _MENU_TREE:
+        parent_menu = _get_or_create_menu(
+            session,
+            code=top["code"],
+            name=top["name"],
+            path=top.get("path"),
+            icon=top.get("icon"),
+            sort_order=top.get("sort_order", 0),
+        )
+        _link_menu_roles(session, parent_menu, top["roles"])
+
+        for child in top.get("children", []):
+            child_menu = _get_or_create_menu(
+                session,
+                code=child["code"],
+                name=child["name"],
+                parent_id=parent_menu.id,
+                path=child.get("path"),
+                icon=child.get("icon"),
+                sort_order=child.get("sort_order", 0),
+            )
+            _link_menu_roles(session, child_menu, child["roles"])
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -224,3 +391,6 @@ def seed_initial_data(session: Session) -> None:
     )
 
     ensure_sample_records(session, admin_local_employee)
+
+    # 메뉴 및 메뉴-역할 매핑 시드
+    ensure_menus(session)

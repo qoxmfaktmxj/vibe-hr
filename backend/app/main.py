@@ -6,6 +6,7 @@ from sqlmodel import Session
 
 from app.api.auth import router as auth_router
 from app.api.dashboard import router as dashboard_router
+from app.api.menu import router as menu_router
 from app.bootstrap import seed_initial_data
 from app.core.config import settings
 from app.core.database import engine, init_db
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(menu_router, prefix="/api/v1")
 
 
 @app.get("/health")

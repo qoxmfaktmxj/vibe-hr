@@ -1,4 +1,6 @@
 from app.models.entities import (
+    AppMenu,
+    AppMenuRole,
     AuthRole,
     AuthUser,
     AuthUserRole,
@@ -9,6 +11,8 @@ from app.models.entities import (
 )
 
 __all__ = [
+    "AppMenu",
+    "AppMenuRole",
     "AuthRole",
     "AuthUser",
     "AuthUserRole",

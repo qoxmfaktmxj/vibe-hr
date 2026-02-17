@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 
 import { Providers } from "@/components/providers";
 import type { AuthUser } from "@/types/auth";
+import type { MenuNode, MenuTreeResponse } from "@/types/menu";
 
 import "./globals.css";
 
@@ -48,17 +49,49 @@ async function getInitialAuthUser(): Promise<AuthUser | null> {
   }
 }
 
+async function getInitialMenus(): Promise<MenuNode[]> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+
+  if (!accessToken) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/menus/tree`, {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as MenuTreeResponse;
+    return data.menus;
+  } catch {
+    return [];
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const initialUser = await getInitialAuthUser();
+  const [initialUser, initialMenus] = await Promise.all([
+    getInitialAuthUser(),
+    getInitialMenus(),
+  ]);
 
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <Providers initialUser={initialUser}>{children}</Providers>
+        <Providers initialUser={initialUser} initialMenus={initialMenus}>
+          {children}
+        </Providers>
       </body>
     </html>
   );

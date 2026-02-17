@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { DashboardSummary } from "@/types/dashboard";
+import type { MenuNode, MenuTreeResponse } from "@/types/menu";
 
 const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -44,5 +45,32 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     return (await response.json()) as DashboardSummary;
   } catch {
     return fallbackSummary;
+  }
+}
+
+export async function getMenuTree(): Promise<MenuNode[]> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("vibe_hr_token")?.value;
+
+  if (!accessToken) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/menus/tree`, {
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as MenuTreeResponse;
+    return data.menus;
+  } catch {
+    return [];
   }
 }

@@ -98,6 +98,32 @@ class HrAttendanceDaily(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class AppMenu(SQLModel, table=True):
+    """화면/메뉴 마스터 (계층형 트리)"""
+
+    __tablename__ = "app_menus"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(index=True, unique=True, max_length=60)
+    name: str = Field(max_length=100)
+    parent_id: Optional[int] = Field(default=None, foreign_key="app_menus.id")
+    path: Optional[str] = Field(default=None, max_length=200)
+    icon: Optional[str] = Field(default=None, max_length=60)
+    sort_order: int = Field(default=0)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AppMenuRole(SQLModel, table=True):
+    """메뉴-역할 매핑 (N:M)"""
+
+    __tablename__ = "app_menu_roles"
+
+    menu_id: int = Field(foreign_key="app_menus.id", primary_key=True)
+    role_id: int = Field(foreign_key="auth_roles.id", primary_key=True)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "hr_leave_requests"
     __table_args__ = (
