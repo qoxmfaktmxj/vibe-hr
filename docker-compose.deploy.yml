@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: vibehr-backend
+    restart: unless-stopped
+    env_file:
+      - ./.env.deploy
+    environment:
+      - DATABASE_URL
+      - CORS_ORIGINS
+      - APP_NAME
+      - ENVIRONMENT
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: vibehr-frontend
+    restart: unless-stopped
+    env_file:
+      - ./.env.deploy
+    environment:
+      - API_BASE_URL
+      - NEXT_PUBLIC_API_BASE_URL
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
