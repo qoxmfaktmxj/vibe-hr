@@ -99,6 +99,8 @@ export function MenuAdminManager() {
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
   const flatMenus = useMemo(() => flattenMenus(menus), [menus]);
   const selectedMenu = useMemo(
@@ -185,8 +187,12 @@ export function MenuAdminManager() {
 
       await loadBase();
       setSelectedMenuId(selectedMenuId);
+      setNoticeType("success");
+      setNotice("저장이 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "저장 실패");
+      setNoticeType("error");
+      setNotice("저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -215,8 +221,12 @@ export function MenuAdminManager() {
       setShowCreate(false);
       setForm(initialForm);
       await loadBase();
+      setNoticeType("success");
+      setNotice("생성이 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "생성 실패");
+      setNoticeType("error");
+      setNotice("생성에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -238,8 +248,12 @@ export function MenuAdminManager() {
       }
       setSelectedMenuId(null);
       await loadBase();
+      setNoticeType("success");
+      setNotice("삭제가 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "삭제 실패");
+      setNoticeType("error");
+      setNotice("삭제에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -257,8 +271,12 @@ export function MenuAdminManager() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.detail ?? "권한 저장 실패");
+      setNoticeType("success");
+      setNotice("접근 권한 저장이 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "권한 저장 실패");
+      setNoticeType("error");
+      setNotice("접근 권한 저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -271,7 +289,7 @@ export function MenuAdminManager() {
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>메뉴 트리</CardTitle>
-          <Button size="sm" onClick={() => { setShowCreate(true); setForm(initialForm); }}>
+          <Button size="sm" onClick={() => { setShowCreate(true); setForm(initialForm); setError(null); setNotice(null); setNoticeType(null); }}>
             새 메뉴
           </Button>
         </CardHeader>
@@ -281,6 +299,8 @@ export function MenuAdminManager() {
             selectedId={selectedMenuId}
             onSelect={(id) => {
               setError(null);
+              setNotice(null);
+              setNoticeType(null);
               setSelectedMenuId(id);
             }}
           />
@@ -292,7 +312,12 @@ export function MenuAdminManager() {
           <CardTitle>메뉴 상세 / 권한</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          {notice ? (
+            <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>
+              {notice}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-red-500">상세: {error}</p> : null}
 
           {selectedMenu ? (
             <>

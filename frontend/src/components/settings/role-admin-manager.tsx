@@ -42,6 +42,8 @@ export function RoleAdminManager() {
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
   const flatMenus = useMemo(() => flattenMenus(menus), [menus]);
   const selectedRole = useMemo(
@@ -107,6 +109,8 @@ export function RoleAdminManager() {
     setName("");
     setSelectedMenuIds([]);
     setError(null);
+    setNotice(null);
+    setNoticeType(null);
   }
 
   async function saveRole() {
@@ -135,8 +139,12 @@ export function RoleAdminManager() {
         await loadBase();
         if (data?.role?.id) setSelectedRoleId(data.role.id);
       }
+      setNoticeType("success");
+      setNotice("저장이 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "역할 저장 실패");
+      setNoticeType("error");
+      setNotice("저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -161,8 +169,12 @@ export function RoleAdminManager() {
       setSelectedRoleId(null);
       setSelectedMenuIds([]);
       await loadBase();
+      setNoticeType("success");
+      setNotice("삭제가 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "역할 삭제 실패");
+      setNoticeType("error");
+      setNotice("삭제에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -180,8 +192,12 @@ export function RoleAdminManager() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.detail ?? "메뉴 권한 저장 실패");
+      setNoticeType("success");
+      setNotice("메뉴 권한 저장이 완료되었습니다.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "메뉴 권한 저장 실패");
+      setNoticeType("error");
+      setNotice("메뉴 권한 저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -201,7 +217,12 @@ export function RoleAdminManager() {
             <button
               key={role.id}
               type="button"
-              onClick={() => setSelectedRoleId(role.id)}
+              onClick={() => {
+                setError(null);
+                setNotice(null);
+                setNoticeType(null);
+                setSelectedRoleId(role.id);
+              }}
               className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
                 selectedRoleId === role.id ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
               }`}
@@ -218,7 +239,12 @@ export function RoleAdminManager() {
           <CardTitle>권한 관리</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          {notice ? (
+            <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>
+              {notice}
+            </p>
+          ) : null}
+          {error ? <p className="text-sm text-red-500">상세: {error}</p> : null}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
