@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "ag-grid-community/styles/ag-grid.css";
-@import "ag-grid-community/styles/ag-theme-alpine.css";
+@import "ag-grid-community/styles/ag-theme-quartz.css";
 
 @custom-variant dark (&:is(.dark *));
 

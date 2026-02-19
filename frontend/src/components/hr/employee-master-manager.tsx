@@ -885,7 +885,7 @@ export function EmployeeMasterManager() {
             </div>
           </div>
 
-          <div className="ag-theme-alpine h-[68vh] w-full rounded-md border">
+          <div className="ag-theme-quartz h-[68vh] w-full rounded-md border">
             <AgGridReact<EmployeeGridRow>
               rowData={rows}
               columnDefs={columnDefs}
