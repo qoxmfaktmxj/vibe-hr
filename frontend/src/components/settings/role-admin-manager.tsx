@@ -4,40 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { MenuAdminItem, RoleItem } from "@/types/menu-admin";
-
-type FlatMenu = {
-  id: number;
-  label: string;
-};
-
-function flattenMenus(nodes: MenuAdminItem[], depth = 0): FlatMenu[] {
-  return nodes.flatMap((node) => [
-    { id: node.id, label: `${"-".repeat(depth)} ${node.name} (${node.code})` },
-    ...flattenMenus(node.children, depth + 1),
-  ]);
-}
-
-function collectMenuIds(nodes: MenuAdminItem[]): number[] {
-  const ids: number[] = [];
-  const walk = (items: MenuAdminItem[]) => {
-    for (const item of items) {
-      ids.push(item.id);
-      if (item.children.length > 0) walk(item.children);
-    }
-  };
-  walk(nodes);
-  return ids;
-}
+import type { RoleItem } from "@/types/menu-admin";
 
 export function RoleAdminManager() {
   const [roles, setRoles] = useState<RoleItem[]>([]);
-  const [menus, setMenus] = useState<MenuAdminItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-  const [selectedMenuIds, setSelectedMenuIds] = useState<number[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [saving, setSaving] = useState(false);
@@ -45,45 +18,25 @@ export function RoleAdminManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
-  const flatMenus = useMemo(() => flattenMenus(menus), [menus]);
   const selectedRole = useMemo(
     () => roles.find((role) => role.id === selectedRoleId) ?? null,
     [roles, selectedRoleId]
   );
 
-  async function loadBase() {
+  async function loadRoles() {
     setError(null);
-    const [rolesRes, menusRes] = await Promise.all([
-      fetch("/api/menus/admin/roles", { cache: "no-store" }),
-      fetch("/api/menus/admin/tree", { cache: "no-store" }),
-    ]);
-
+    const rolesRes = await fetch("/api/menus/admin/roles", { cache: "no-store" });
     if (!rolesRes.ok) throw new Error("역할 목록을 불러오지 못했습니다.");
-    if (!menusRes.ok) throw new Error("메뉴 목록을 불러오지 못했습니다.");
 
     const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
-    const menusJson = (await menusRes.json()) as { menus: MenuAdminItem[] };
-
     setRoles(rolesJson.roles);
-    setMenus(menusJson.menus);
     setSelectedRoleId((prev) => prev ?? rolesJson.roles[0]?.id ?? null);
-  }
-
-  async function loadRoleMenus(roleId: number) {
-    const res = await fetch(`/api/menus/admin/roles/${roleId}/menus`, { cache: "no-store" });
-    if (!res.ok) {
-      setSelectedMenuIds([]);
-      return;
-    }
-
-    const data = (await res.json()) as { role_id: number; menus: MenuAdminItem[] };
-    setSelectedMenuIds(collectMenuIds(data.menus));
   }
 
   useEffect(() => {
     void (async () => {
       try {
-        await loadBase();
+        await loadRoles();
       } catch (e) {
         setError(e instanceof Error ? e.message : "초기화 실패");
       }
@@ -94,20 +47,17 @@ export function RoleAdminManager() {
     if (!selectedRoleId) {
       setCode("");
       setName("");
-      setSelectedMenuIds([]);
       return;
     }
 
     setName(selectedRole?.name ?? "");
     setCode(selectedRole?.code ?? "");
-    void loadRoleMenus(selectedRoleId);
   }, [selectedRoleId, selectedRole]);
 
   function startCreateMode() {
     setSelectedRoleId(null);
     setCode("");
     setName("");
-    setSelectedMenuIds([]);
     setError(null);
     setNotice(null);
     setNoticeType(null);
@@ -125,7 +75,7 @@ export function RoleAdminManager() {
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.detail ?? "역할 저장 실패");
-        await loadBase();
+        await loadRoles();
         setSelectedRoleId(selectedRoleId);
       } else {
         const res = await fetch("/api/menus/admin/roles", {
@@ -136,7 +86,7 @@ export function RoleAdminManager() {
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.detail ?? "역할 저장 실패");
 
-        await loadBase();
+        await loadRoles();
         if (data?.role?.id) setSelectedRoleId(data.role.id);
       }
       setNoticeType("success");
@@ -167,8 +117,7 @@ export function RoleAdminManager() {
       }
 
       setSelectedRoleId(null);
-      setSelectedMenuIds([]);
-      await loadBase();
+      await loadRoles();
       setNoticeType("success");
       setNotice("삭제가 완료되었습니다.");
     } catch (e) {
@@ -180,36 +129,13 @@ export function RoleAdminManager() {
     }
   }
 
-  async function saveRoleMenus() {
-    if (!selectedRoleId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/menus/admin/roles/${selectedRoleId}/menus`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ menu_ids: selectedMenuIds }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.detail ?? "메뉴 권한 저장 실패");
-      setNoticeType("success");
-      setNotice("메뉴 권한 저장이 완료되었습니다.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "메뉴 권한 저장 실패");
-      setNoticeType("error");
-      setNotice("메뉴 권한 저장에 실패했습니다.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>역할 목록</CardTitle>
+          <CardTitle>권한 목록</CardTitle>
           <Button size="sm" variant="outline" onClick={startCreateMode}>
-            새 역할
+            새 권한
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -236,7 +162,7 @@ export function RoleAdminManager() {
 
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>권한 관리</CardTitle>
+          <CardTitle>권한 상세</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {notice ? (
@@ -248,7 +174,7 @@ export function RoleAdminManager() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>역할 코드</Label>
+              <Label>권한 코드</Label>
               <Input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
@@ -257,49 +183,17 @@ export function RoleAdminManager() {
               />
             </div>
             <div className="space-y-2">
-              <Label>역할 이름</Label>
+              <Label>권한 이름</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 검토자" />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={saveRole}
-              disabled={saving || !name || (!selectedRoleId && !code)}
-            >
+            <Button onClick={saveRole} disabled={saving || !name || (!selectedRoleId && !code)}>
               저장
             </Button>
             <Button onClick={deleteRole} variant="destructive" disabled={saving || !selectedRoleId}>
-              역할 삭제
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            <Label>메뉴 접근 권한 ({selectedRole ? `${selectedRole.name} / ${selectedRole.code}` : "역할 선택 필요"})</Label>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {flatMenus.map((menu) => {
-                const checked = selectedMenuIds.includes(menu.id);
-                return (
-                  <label key={menu.id} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(v) => {
-                        setSelectedMenuIds((prev) =>
-                          v ? [...new Set([...prev, menu.id])] : prev.filter((id) => id !== menu.id)
-                        );
-                      }}
-                      disabled={!selectedRoleId}
-                    />
-                    {menu.label}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <Button onClick={saveRoleMenus} disabled={saving || !selectedRoleId}>
-              메뉴 권한 저장
+              권한 삭제
             </Button>
           </div>
         </CardContent>

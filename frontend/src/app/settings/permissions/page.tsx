@@ -1,10 +1,10 @@
 import { LogoutButton } from "@/components/auth/logout-button";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
-import { RoleAdminManager } from "@/components/settings/role-admin-manager";
+import { PermissionMatrixManager } from "@/components/settings/permission-matrix-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export default async function SettingsRolesPage() {
-  await requireMenuAccess("/settings/roles");
+export default async function SettingsPermissionsPage() {
+  await requireMenuAccess("/settings/permissions");
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
@@ -12,12 +12,12 @@ export default async function SettingsRolesPage() {
       <main className="flex-1 overflow-y-auto">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">
           <div>
-            <h1 className="text-xl font-bold text-gray-800">권한 관리</h1>
-            <p className="text-sm text-gray-500">권한(역할) CRUD 전용 화면</p>
+            <h1 className="text-xl font-bold text-gray-800">메뉴 권한 관리</h1>
+            <p className="text-sm text-gray-500">권한별 메뉴 접근 매핑 전용 화면</p>
           </div>
           <LogoutButton />
         </header>
-        <RoleAdminManager />
+        <PermissionMatrixManager />
       </main>
     </div>
   );

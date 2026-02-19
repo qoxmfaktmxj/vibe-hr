@@ -366,6 +366,14 @@ _MENU_TREE: list[dict] = [
                 "roles": ["admin"],
             },
             {
+                "code": "settings.permissions",
+                "name": "메뉴권한관리",
+                "path": "/settings/permissions",
+                "icon": "Shield",
+                "sort_order": 915,
+                "roles": ["admin"],
+            },
+            {
                 "code": "settings.menus",
                 "name": "메뉴관리",
                 "path": "/settings/menus",
