@@ -1,11 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
-import { AgGridReact } from "ag-grid-react";
-
-import { ensureAgGridRegistered } from "@/lib/ag-grid";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,53 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { RoleItem } from "@/types/menu-admin";
 
-ensureAgGridRegistered();
-
 export function RoleAdminManager() {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
-  const gridApiRef = useRef<GridApi<RoleItem> | null>(null);
-
   const selectedRole = useMemo(
     () => roles.find((role) => role.id === selectedRoleId) ?? null,
-    [roles, selectedRoleId],
+    [roles, selectedRoleId]
   );
 
-  const columnDefs = useMemo<ColDef<RoleItem>[]>(
-    () => [
-      {
-        headerName: "코드",
-        field: "code",
-        width: 180,
-      },
-      {
-        headerName: "권한명",
-        field: "name",
-        flex: 1,
-        minWidth: 180,
-      },
-    ],
-    [],
-  );
-
-  const defaultColDef = useMemo<ColDef<RoleItem>>(
-    () => ({
-      sortable: true,
-      filter: true,
-      resizable: true,
-    }),
-    [],
-  );
-
-  const loadRoles = useCallback(async () => {
+  async function loadRoles() {
     setError(null);
     const rolesRes = await fetch("/api/menus/admin/roles", { cache: "no-store" });
     if (!rolesRes.ok) throw new Error("역할 목록을 불러오지 못했습니다.");
@@ -67,7 +31,7 @@ export function RoleAdminManager() {
     const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
     setRoles(rolesJson.roles);
     setSelectedRoleId((prev) => prev ?? rolesJson.roles[0]?.id ?? null);
-  }, []);
+  }
 
   useEffect(() => {
     void (async () => {
@@ -77,7 +41,7 @@ export function RoleAdminManager() {
         setError(e instanceof Error ? e.message : "초기화 실패");
       }
     })();
-  }, [loadRoles]);
+  }, []);
 
   useEffect(() => {
     if (!selectedRoleId) {
@@ -90,25 +54,6 @@ export function RoleAdminManager() {
     setCode(selectedRole?.code ?? "");
   }, [selectedRoleId, selectedRole]);
 
-  useEffect(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.forEachNode((node) => {
-      node.setSelected(node.data?.id === selectedRoleId);
-    });
-  }, [roles, selectedRoleId]);
-
-  const onGridReady = useCallback((event: GridReadyEvent<RoleItem>) => {
-    gridApiRef.current = event.api;
-  }, []);
-
-  const onRowClicked = useCallback((event: RowClickedEvent<RoleItem>) => {
-    if (!event.data) return;
-    setError(null);
-    setNotice(null);
-    setNoticeType(null);
-    setSelectedRoleId(event.data.id);
-  }, []);
-
   function startCreateMode() {
     setSelectedRoleId(null);
     setCode("");
@@ -116,7 +61,6 @@ export function RoleAdminManager() {
     setError(null);
     setNotice(null);
     setNoticeType(null);
-    gridApiRef.current?.deselectAll();
   }
 
   async function saveRole() {
@@ -188,34 +132,31 @@ export function RoleAdminManager() {
   return (
     <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
       <Card className="lg:col-span-1">
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <CardTitle>권한 목록</CardTitle>
-            <Button size="sm" variant="outline" onClick={startCreateMode}>
-              새 권한
-            </Button>
-          </div>
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="권한명/코드 검색"
-          />
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>권한 목록</CardTitle>
+          <Button size="sm" variant="outline" onClick={startCreateMode}>
+            새 권한
+          </Button>
         </CardHeader>
-        <CardContent>
-          <div className="ag-theme-alpine h-[420px] w-full rounded-md border">
-            <AgGridReact<RoleItem>
-              rowData={roles}
-              columnDefs={columnDefs}
-              defaultColDef={defaultColDef}
-              quickFilterText={search}
-              rowSelection="single"
-              suppressRowClickSelection={false}
-              getRowId={(params) => String(params.data.id)}
-              onGridReady={onGridReady}
-              onRowClicked={onRowClicked}
-              overlayNoRowsTemplate="<span>권한이 없습니다.</span>"
-            />
-          </div>
+        <CardContent className="space-y-2">
+          {roles.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => {
+                setError(null);
+                setNotice(null);
+                setNoticeType(null);
+                setSelectedRoleId(role.id);
+              }}
+              className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
+                selectedRoleId === role.id ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
+              }`}
+            >
+              <span className="font-medium">{role.name}</span>
+              <span className="ml-2 text-xs text-gray-500">({role.code})</span>
+            </button>
+          ))}
         </CardContent>
       </Card>
 
