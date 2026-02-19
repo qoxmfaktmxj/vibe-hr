@@ -1,6 +1,16 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type {
+  ColDef,
+  GridApi,
+  GridReadyEvent,
+  RowClickedEvent,
+} from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
+
+import { ensureAgGridRegistered } from "@/lib/ag-grid";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,40 +26,42 @@ import type {
   CodeListResponse,
 } from "@/types/common-code";
 
+ensureAgGridRegistered();
+
 const T = {
-  loading: "\uacf5\ud1b5\ucf54\ub4dc\ub97c \ubd88\ub7ec\uc624\ub294 \uc911...",
-  loadGroupsError: "\ucf54\ub4dc \uadf8\ub8f9\uc744 \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
-  initLoadError: "\ucd08\uae30 \ub85c\ub529\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  saveFailed: "\uc800\uc7a5\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  deleteFailed: "\uc0ad\uc81c\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  groupSaved: "\uadf8\ub8f9\ucf54\ub4dc \uc800\uc7a5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  groupDeleted: "\uadf8\ub8f9\ucf54\ub4dc \uc0ad\uc81c\uac00 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  codeSaved: "\uc138\ubd80\ucf54\ub4dc \uc800\uc7a5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  codeDeleted: "\uc138\ubd80\ucf54\ub4dc \uc0ad\uc81c\uac00 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
+  loading: "공통코드를 불러오는 중...",
+  loadGroupsError: "코드 그룹을 불러오지 못했습니다.",
+  initLoadError: "초기 로딩에 실패했습니다.",
+  saveFailed: "저장에 실패했습니다.",
+  deleteFailed: "삭제에 실패했습니다.",
+  groupSaved: "그룹코드 저장이 완료되었습니다.",
+  groupDeleted: "그룹코드 삭제가 완료되었습니다.",
+  codeSaved: "세부코드 저장이 완료되었습니다.",
+  codeDeleted: "세부코드 삭제가 완료되었습니다.",
   askDeleteGroup:
-    "\uc120\ud0dd\ud55c \uadf8\ub8f9\ucf54\ub4dc\ub97c \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c? \ud558\uc704 \uc138\ubd80\ucf54\ub4dc\ub3c4 \ud568\uaed8 \uc0ad\uc81c\ub429\ub2c8\ub2e4.",
-  askDeleteCode: "\uc120\ud0dd\ud55c \uc138\ubd80\ucf54\ub4dc\ub97c \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?",
-  copySuffix: " \ubcf5\uc0ac",
-  groupCode: "\uadf8\ub8f9\ucf54\ub4dc",
-  groupName: "\uadf8\ub8f9\ucf54\ub4dc\uba85",
-  query: "\uc870\ud68c",
-  groupManage: "\uadf8\ub8f9\ucf54\ub4dc \uad00\ub9ac",
-  codeName: "\ucf54\ub4dc\uba85",
-  codeDesc: "\ucf54\ub4dc\uc124\uba85",
-  use: "\uc0ac\uc6a9",
-  order: "\uc21c\uc11c",
-  sortOrder: "\uc815\ub82c\uc21c\uc11c",
-  download: "\ub2e4\uc6b4\ub85c\ub4dc",
-  copy: "\ubcf5\uc0ac",
-  input: "\uc785\ub825",
-  save: "\uc800\uc7a5",
-  delete: "\uc0ad\uc81c",
-  detailCode: "\uc138\ubd80\ucf54\ub4dc",
-  detailCodeName: "\uc138\ubd80\ucf54\ub4dc\uba85",
-  detailManage: "\uc138\ubd80\ucf54\ub4dc \uad00\ub9ac",
-  engName: "\uc601\ubb38\uba85",
-  note1: "\ube44\uace01",
-  note2: "\ube44\uace02",
+    "선택한 그룹코드를 삭제하시겠습니까? 하위 세부코드도 함께 삭제됩니다.",
+  askDeleteCode: "선택한 세부코드를 삭제하시겠습니까?",
+  copySuffix: " 복사",
+  groupCode: "그룹코드",
+  groupName: "그룹코드명",
+  query: "조회",
+  groupManage: "그룹코드 관리",
+  codeName: "코드명",
+  codeDesc: "코드설명",
+  use: "사용",
+  order: "순서",
+  sortOrder: "정렬순서",
+  download: "다운로드",
+  copy: "복사",
+  input: "입력",
+  save: "저장",
+  delete: "삭제",
+  detailCode: "세부코드",
+  detailCodeName: "세부코드명",
+  detailManage: "세부코드 관리",
+  engName: "영문명",
+  note1: "비고1",
+  note2: "비고2",
 };
 
 const EMPTY_GROUP = {
@@ -111,6 +123,9 @@ export function CommonCodeManager() {
   const [detailCodeQuery, setDetailCodeQuery] = useState("");
   const [detailNameQuery, setDetailNameQuery] = useState("");
 
+  const groupGridApiRef = useRef<GridApi<CodeGroupItem> | null>(null);
+  const detailGridApiRef = useRef<GridApi<CodeItem> | null>(null);
+
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
     [groups, selectedGroupId],
@@ -141,6 +156,93 @@ export function CommonCodeManager() {
       return byCode && byName;
     });
   }, [codes, detailCodeQuery, detailNameQuery]);
+
+  const groupColumnDefs = useMemo<ColDef<CodeGroupItem>[]>(
+    () => [
+      {
+        headerName: "No",
+        width: 72,
+        sortable: false,
+        filter: false,
+        valueGetter: (params) => (params.node?.rowIndex ?? 0) + 1,
+      },
+      {
+        headerName: T.groupCode,
+        field: "code",
+        width: 170,
+      },
+      {
+        headerName: T.codeName,
+        field: "name",
+        width: 200,
+      },
+      {
+        headerName: T.codeDesc,
+        field: "description",
+        flex: 1,
+        minWidth: 220,
+      },
+      {
+        headerName: T.use,
+        field: "is_active",
+        width: 100,
+        valueFormatter: (params) => (params.value ? "Y" : "N"),
+      },
+      {
+        headerName: T.order,
+        field: "sort_order",
+        width: 100,
+      },
+    ],
+    [],
+  );
+
+  const detailColumnDefs = useMemo<ColDef<CodeItem>[]>(
+    () => [
+      {
+        headerName: "No",
+        width: 72,
+        sortable: false,
+        filter: false,
+        valueGetter: (params) => (params.node?.rowIndex ?? 0) + 1,
+      },
+      {
+        headerName: T.detailCode,
+        field: "code",
+        width: 170,
+      },
+      {
+        headerName: T.detailCodeName,
+        field: "name",
+        width: 220,
+      },
+      {
+        headerName: T.order,
+        field: "sort_order",
+        width: 100,
+      },
+      {
+        headerName: T.use,
+        field: "is_active",
+        width: 100,
+        valueFormatter: (params) => (params.value ? "Y" : "N"),
+      },
+      {
+        headerName: T.note1,
+        field: "extra_value1",
+        width: 180,
+      },
+      {
+        headerName: T.note2,
+        field: "extra_value2",
+        flex: 1,
+        minWidth: 180,
+      },
+    ],
+    [],
+  );
+
+  const defaultColDef = useMemo<ColDef>(() => ({ sortable: true, filter: true, resizable: true }), []);
 
   async function loadGroups() {
     const res = await fetch("/api/codes/groups", { cache: "no-store" });
@@ -214,6 +316,41 @@ export function CommonCodeManager() {
       extra_value2: selectedCode.extra_value2 ?? "",
     });
   }, [codeCreateMode, selectedCode]);
+
+  useEffect(() => {
+    if (!groupGridApiRef.current) return;
+    groupGridApiRef.current.forEachNode((node) => {
+      node.setSelected(!groupCreateMode && node.data?.id === selectedGroupId);
+    });
+  }, [filteredGroups, groupCreateMode, selectedGroupId]);
+
+  useEffect(() => {
+    if (!detailGridApiRef.current) return;
+    detailGridApiRef.current.forEachNode((node) => {
+      node.setSelected(!codeCreateMode && node.data?.id === selectedCodeId);
+    });
+  }, [codeCreateMode, filteredCodes, selectedCodeId]);
+
+  const onGroupGridReady = useCallback((event: GridReadyEvent<CodeGroupItem>) => {
+    groupGridApiRef.current = event.api;
+  }, []);
+
+  const onDetailGridReady = useCallback((event: GridReadyEvent<CodeItem>) => {
+    detailGridApiRef.current = event.api;
+  }, []);
+
+  const onGroupRowClicked = useCallback((event: RowClickedEvent<CodeGroupItem>) => {
+    if (!event.data) return;
+    setGroupCreateMode(false);
+    setSelectedGroupId(event.data.id);
+    setNotice(null);
+  }, []);
+
+  const onDetailRowClicked = useCallback((event: RowClickedEvent<CodeItem>) => {
+    if (!event.data) return;
+    setCodeCreateMode(false);
+    setSelectedCodeId(event.data.id);
+  }, []);
 
   function copyGroup() {
     if (!selectedGroup) return;
@@ -383,11 +520,19 @@ export function CommonCodeManager() {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
             <div className="space-y-1">
               <Label className="text-xs">{T.groupCode}</Label>
-              <Input placeholder={`${T.groupCode} ${T.input}`} value={groupCodeQuery} onChange={(e) => setGroupCodeQuery(e.target.value)} />
+              <Input
+                placeholder={`${T.groupCode} ${T.input}`}
+                value={groupCodeQuery}
+                onChange={(e) => setGroupCodeQuery(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{T.groupName}</Label>
-              <Input placeholder={`${T.groupName} ${T.input}`} value={groupNameQuery} onChange={(e) => setGroupNameQuery(e.target.value)} />
+              <Input
+                placeholder={`${T.groupName} ${T.input}`}
+                value={groupNameQuery}
+                onChange={(e) => setGroupNameQuery(e.target.value)}
+              />
             </div>
             <div className="flex items-end">
               <Button type="button">{T.query}</Button>
@@ -422,53 +567,54 @@ export function CommonCodeManager() {
             <Button size="sm" variant="outline" onClick={copyGroup} disabled={!selectedGroup}>
               {T.copy}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => { setGroupCreateMode(true); setSelectedGroupId(null); setNotice(null); }}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setGroupCreateMode(true);
+                setSelectedGroupId(null);
+                setNotice(null);
+              }}
+            >
               {T.input}
             </Button>
-            <Button size="sm" onClick={saveGroup} disabled={saving}>{T.save}</Button>
-            <Button size="sm" variant="destructive" onClick={deleteGroup} disabled={saving || !selectedGroupId || groupCreateMode}>{T.delete}</Button>
+            <Button size="sm" onClick={saveGroup} disabled={saving}>
+              {T.save}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={deleteGroup}
+              disabled={saving || !selectedGroupId || groupCreateMode}
+            >
+              {T.delete}
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="max-h-[300px] overflow-auto rounded-md border">
-            <table className="w-full min-w-[960px] border-collapse text-sm">
-              <thead className="sticky top-0 bg-slate-100">
-                <tr>
-                  <th className="border px-2 py-2 text-center">No</th>
-                  <th className="border px-2 py-2 text-left">{T.groupCode}</th>
-                  <th className="border px-2 py-2 text-left">{T.codeName}</th>
-                  <th className="border px-2 py-2 text-left">{T.codeDesc}</th>
-                  <th className="border px-2 py-2 text-center">{T.use}</th>
-                  <th className="border px-2 py-2 text-right">{T.order}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredGroups.map((group, index) => (
-                  <tr
-                    key={group.id}
-                    className={`cursor-pointer ${!groupCreateMode && selectedGroupId === group.id ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
-                    onClick={() => {
-                      setGroupCreateMode(false);
-                      setSelectedGroupId(group.id);
-                      setNotice(null);
-                    }}
-                  >
-                    <td className="border px-2 py-2 text-center">{index + 1}</td>
-                    <td className="border px-2 py-2">{group.code}</td>
-                    <td className="border px-2 py-2">{group.name}</td>
-                    <td className="border px-2 py-2">{group.description}</td>
-                    <td className="border px-2 py-2 text-center">{group.is_active ? "Y" : "N"}</td>
-                    <td className="border px-2 py-2 text-right">{group.sort_order}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="ag-theme-alpine h-[300px] w-full rounded-md border">
+            <AgGridReact<CodeGroupItem>
+              rowData={filteredGroups}
+              columnDefs={groupColumnDefs}
+              defaultColDef={defaultColDef}
+              rowSelection="single"
+              getRowId={(params) => String(params.data.id)}
+              onGridReady={onGroupGridReady}
+              onRowClicked={onGroupRowClicked}
+              overlayNoRowsTemplate="<span>조회된 그룹코드가 없습니다.</span>"
+            />
           </div>
-          <div className="text-right text-xs text-slate-500">[{filteredGroups.length} / {groups.length}]</div>
+          <div className="text-right text-xs text-slate-500">
+            [{filteredGroups.length} / {groups.length}]
+          </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <div className="space-y-1">
               <Label>{T.groupCode}</Label>
-              <Input value={groupForm.code} onChange={(e) => setGroupForm((p) => ({ ...p, code: e.target.value }))} disabled={!groupCreateMode} />
+              <Input
+                value={groupForm.code}
+                onChange={(e) => setGroupForm((p) => ({ ...p, code: e.target.value }))}
+                disabled={!groupCreateMode}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.groupName}</Label>
@@ -476,15 +622,25 @@ export function CommonCodeManager() {
             </div>
             <div className="space-y-1">
               <Label>{T.codeDesc}</Label>
-              <Input value={groupForm.description} onChange={(e) => setGroupForm((p) => ({ ...p, description: e.target.value }))} />
+              <Input
+                value={groupForm.description}
+                onChange={(e) => setGroupForm((p) => ({ ...p, description: e.target.value }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.sortOrder}</Label>
-              <Input type="number" value={groupForm.sort_order} onChange={(e) => setGroupForm((p) => ({ ...p, sort_order: e.target.value }))} />
+              <Input
+                type="number"
+                value={groupForm.sort_order}
+                onChange={(e) => setGroupForm((p) => ({ ...p, sort_order: e.target.value }))}
+              />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={groupForm.is_active} onCheckedChange={(value) => setGroupForm((p) => ({ ...p, is_active: Boolean(value) }))} />
+            <Checkbox
+              checked={groupForm.is_active}
+              onCheckedChange={(value) => setGroupForm((p) => ({ ...p, is_active: Boolean(value) }))}
+            />
             {T.use}
           </label>
         </CardContent>
@@ -495,11 +651,19 @@ export function CommonCodeManager() {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
             <div className="space-y-1">
               <Label className="text-xs">{T.detailCode}</Label>
-              <Input placeholder={`${T.detailCode} ${T.input}`} value={detailCodeQuery} onChange={(e) => setDetailCodeQuery(e.target.value)} />
+              <Input
+                placeholder={`${T.detailCode} ${T.input}`}
+                value={detailCodeQuery}
+                onChange={(e) => setDetailCodeQuery(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{T.detailCodeName}</Label>
-              <Input placeholder={`${T.detailCodeName} ${T.input}`} value={detailNameQuery} onChange={(e) => setDetailNameQuery(e.target.value)} />
+              <Input
+                placeholder={`${T.detailCodeName} ${T.input}`}
+                value={detailNameQuery}
+                onChange={(e) => setDetailNameQuery(e.target.value)}
+              />
             </div>
             <div className="flex items-end">
               <Button type="button">{T.query}</Button>
@@ -510,7 +674,9 @@ export function CommonCodeManager() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{T.detailManage} {selectedGroup ? `(${selectedGroup.name})` : ""}</CardTitle>
+          <CardTitle>
+            {T.detailManage} {selectedGroup ? `(${selectedGroup.name})` : ""}
+          </CardTitle>
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -526,49 +692,57 @@ export function CommonCodeManager() {
             >
               {T.download}
             </Button>
-            <Button size="sm" variant="outline" onClick={copyCode} disabled={!selectedCode}>{T.copy}</Button>
-            <Button size="sm" variant="outline" onClick={() => { setCodeCreateMode(true); setSelectedCodeId(null); }} disabled={!selectedGroupId}>{T.input}</Button>
-            <Button size="sm" onClick={saveCode} disabled={saving || !selectedGroupId}>{T.save}</Button>
-            <Button size="sm" variant="destructive" onClick={deleteCode} disabled={saving || !selectedCodeId || codeCreateMode}>{T.delete}</Button>
+            <Button size="sm" variant="outline" onClick={copyCode} disabled={!selectedCode}>
+              {T.copy}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCodeCreateMode(true);
+                setSelectedCodeId(null);
+              }}
+              disabled={!selectedGroupId}
+            >
+              {T.input}
+            </Button>
+            <Button size="sm" onClick={saveCode} disabled={saving || !selectedGroupId}>
+              {T.save}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={deleteCode}
+              disabled={saving || !selectedCodeId || codeCreateMode}
+            >
+              {T.delete}
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="max-h-[320px] overflow-auto rounded-md border">
-            <table className="w-full min-w-[960px] border-collapse text-sm">
-              <thead className="sticky top-0 bg-slate-100">
-                <tr>
-                  <th className="border px-2 py-2 text-center">No</th>
-                  <th className="border px-2 py-2 text-left">{T.detailCode}</th>
-                  <th className="border px-2 py-2 text-left">{T.detailCodeName}</th>
-                  <th className="border px-2 py-2 text-right">{T.order}</th>
-                  <th className="border px-2 py-2 text-center">{T.use}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCodes.map((code, index) => (
-                  <tr
-                    key={code.id}
-                    className={`cursor-pointer ${!codeCreateMode && selectedCodeId === code.id ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
-                    onClick={() => {
-                      setCodeCreateMode(false);
-                      setSelectedCodeId(code.id);
-                    }}
-                  >
-                    <td className="border px-2 py-2 text-center">{index + 1}</td>
-                    <td className="border px-2 py-2">{code.code}</td>
-                    <td className="border px-2 py-2">{code.name}</td>
-                    <td className="border px-2 py-2 text-right">{code.sort_order}</td>
-                    <td className="border px-2 py-2 text-center">{code.is_active ? "Y" : "N"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="ag-theme-alpine h-[320px] w-full rounded-md border">
+            <AgGridReact<CodeItem>
+              rowData={filteredCodes}
+              columnDefs={detailColumnDefs}
+              defaultColDef={defaultColDef}
+              rowSelection="single"
+              getRowId={(params) => String(params.data.id)}
+              onGridReady={onDetailGridReady}
+              onRowClicked={onDetailRowClicked}
+              overlayNoRowsTemplate="<span>선택한 그룹코드의 세부코드가 없습니다.</span>"
+            />
           </div>
-          <div className="text-right text-xs text-slate-500">[{filteredCodes.length} / {codes.length}]</div>
+          <div className="text-right text-xs text-slate-500">
+            [{filteredCodes.length} / {codes.length}]
+          </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <div className="space-y-1">
               <Label>{T.detailCode}</Label>
-              <Input value={codeForm.code} onChange={(e) => setCodeForm((p) => ({ ...p, code: e.target.value }))} disabled={!codeCreateMode} />
+              <Input
+                value={codeForm.code}
+                onChange={(e) => setCodeForm((p) => ({ ...p, code: e.target.value }))}
+                disabled={!codeCreateMode}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.detailCodeName}</Label>
@@ -576,23 +750,39 @@ export function CommonCodeManager() {
             </div>
             <div className="space-y-1">
               <Label>{T.sortOrder}</Label>
-              <Input type="number" value={codeForm.sort_order} onChange={(e) => setCodeForm((p) => ({ ...p, sort_order: e.target.value }))} />
+              <Input
+                type="number"
+                value={codeForm.sort_order}
+                onChange={(e) => setCodeForm((p) => ({ ...p, sort_order: e.target.value }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.engName}</Label>
-              <Input value={codeForm.extra_value1} onChange={(e) => setCodeForm((p) => ({ ...p, extra_value1: e.target.value }))} />
+              <Input
+                value={codeForm.extra_value1}
+                onChange={(e) => setCodeForm((p) => ({ ...p, extra_value1: e.target.value }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.note1}</Label>
-              <Input value={codeForm.extra_value2} onChange={(e) => setCodeForm((p) => ({ ...p, extra_value2: e.target.value }))} />
+              <Input
+                value={codeForm.extra_value2}
+                onChange={(e) => setCodeForm((p) => ({ ...p, extra_value2: e.target.value }))}
+              />
             </div>
             <div className="space-y-1">
               <Label>{T.note2}</Label>
-              <Input value={codeForm.description} onChange={(e) => setCodeForm((p) => ({ ...p, description: e.target.value }))} />
+              <Input
+                value={codeForm.description}
+                onChange={(e) => setCodeForm((p) => ({ ...p, description: e.target.value }))}
+              />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={codeForm.is_active} onCheckedChange={(value) => setCodeForm((p) => ({ ...p, is_active: Boolean(value) }))} />
+            <Checkbox
+              checked={codeForm.is_active}
+              onCheckedChange={(value) => setCodeForm((p) => ({ ...p, is_active: Boolean(value) }))}
+            />
             {T.use}
           </label>
         </CardContent>

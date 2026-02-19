@@ -1,6 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import type { ColDef } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
+
+import { ensureAgGridRegistered } from "@/lib/ag-grid";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +16,8 @@ import type {
   RoleItem,
   RoleMenuPermissionMatrixResponse,
 } from "@/types/menu-admin";
+
+ensureAgGridRegistered();
 
 type FlatMenu = {
   id: number;
@@ -63,6 +70,108 @@ export function PermissionMatrixManager() {
     return map;
   }, [menus]);
 
+  const visibleRoles = useMemo(
+    () => roles.filter((role) => selectedRoleIds.includes(role.id)),
+    [roles, selectedRoleIds],
+  );
+
+  const getCellState = useCallback(
+    (roleId: number, menuId: number): boolean | "indeterminate" => {
+      const set = matrix[roleId] ?? new Set<number>();
+      const selfChecked = set.has(menuId);
+      const descendants = descendantsMap[menuId] ?? [];
+
+      if (descendants.length === 0) {
+        return selfChecked;
+      }
+
+      const checkedChildren = descendants.filter((id) => set.has(id)).length;
+      if (checkedChildren === 0) {
+        return selfChecked;
+      }
+
+      if (selfChecked && checkedChildren === descendants.length) {
+        return true;
+      }
+
+      return "indeterminate";
+    },
+    [descendantsMap, matrix],
+  );
+
+  const toggleCell = useCallback(
+    (roleId: number, menuId: number, checked: boolean) => {
+      setMatrix((prev) => {
+        const next = { ...prev };
+        const set = new Set(next[roleId] ?? []);
+        const targets = applyToChildren ? [menuId, ...(descendantsMap[menuId] ?? [])] : [menuId];
+
+        if (checked) {
+          for (const id of targets) set.add(id);
+        } else {
+          for (const id of targets) set.delete(id);
+        }
+
+        next[roleId] = set;
+        return next;
+      });
+    },
+    [applyToChildren, descendantsMap],
+  );
+
+  const columnDefs = useMemo<ColDef<FlatMenu>[]>(() => {
+    const roleColumns: ColDef<FlatMenu>[] = visibleRoles.map((role) => ({
+      headerName: role.name,
+      colId: `role_${role.id}`,
+      width: 120,
+      sortable: false,
+      filter: false,
+      suppressMenu: true,
+      cellRenderer: (params: { data: FlatMenu | undefined }) => {
+        if (!params.data) return null;
+        const menuId = params.data.id;
+        const state = getCellState(role.id, menuId);
+        return (
+          <div className="flex h-full items-center justify-center" onClick={(event) => event.stopPropagation()}>
+            <Checkbox
+              checked={state}
+              onCheckedChange={(value) => toggleCell(role.id, menuId, value === true)}
+            />
+          </div>
+        );
+      },
+    }));
+
+    return [
+      {
+        headerName: "메뉴",
+        field: "name",
+        pinned: "left",
+        minWidth: 320,
+        flex: 1,
+        cellRenderer: (params: { data: FlatMenu | undefined }) => {
+          if (!params.data) return null;
+          return (
+            <span style={{ paddingLeft: `${params.data.depth * 14}px` }}>
+              {params.data.depth > 0 ? "- " : ""}
+              {params.data.name} ({params.data.code})
+            </span>
+          );
+        },
+      },
+      ...roleColumns,
+    ];
+  }, [getCellState, toggleCell, visibleRoles]);
+
+  const defaultColDef = useMemo<ColDef<FlatMenu>>(
+    () => ({
+      resizable: true,
+      sortable: true,
+      filter: true,
+    }),
+    [],
+  );
+
   async function loadBase() {
     setLoading(true);
     const [rolesRes, menusRes, permissionsRes] = await Promise.all([
@@ -110,44 +219,6 @@ export function PermissionMatrixManager() {
     setSelectedRoleIds((prev) =>
       prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
     );
-  }
-
-  function toggleCell(roleId: number, menuId: number, checked: boolean) {
-    setMatrix((prev) => {
-      const next = { ...prev };
-      const set = new Set(next[roleId] ?? []);
-      const targets = applyToChildren ? [menuId, ...(descendantsMap[menuId] ?? [])] : [menuId];
-
-      if (checked) {
-        for (const id of targets) set.add(id);
-      } else {
-        for (const id of targets) set.delete(id);
-      }
-
-      next[roleId] = set;
-      return next;
-    });
-  }
-
-  function getCellState(roleId: number, menuId: number): boolean | "indeterminate" {
-    const set = matrix[roleId] ?? new Set<number>();
-    const selfChecked = set.has(menuId);
-    const descendants = descendantsMap[menuId] ?? [];
-
-    if (descendants.length === 0) {
-      return selfChecked;
-    }
-
-    const checkedChildren = descendants.filter((id) => set.has(id)).length;
-    if (checkedChildren === 0) {
-      return selfChecked;
-    }
-
-    if (selfChecked && checkedChildren === descendants.length) {
-      return true;
-    }
-
-    return "indeterminate";
   }
 
   async function saveAll() {
@@ -226,10 +297,7 @@ export function PermissionMatrixManager() {
               {roles.map((role) => {
                 const checked = selectedRoleIds.includes(role.id);
                 return (
-                  <label
-                    key={role.id}
-                    className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm"
-                  >
+                  <label key={role.id} className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm">
                     <Checkbox checked={checked} onCheckedChange={() => toggleRole(role.id)} />
                     {role.name} ({role.code})
                   </label>
@@ -244,46 +312,16 @@ export function PermissionMatrixManager() {
             </p>
           ) : null}
 
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full min-w-[900px] border-collapse text-sm">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="border px-2 py-2 text-left">메뉴</th>
-                  {roles
-                    .filter((r) => selectedRoleIds.includes(r.id))
-                    .map((role) => (
-                      <th key={role.id} className="border px-2 py-2 text-center">
-                        {role.name}
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleMenus.map((menu) => (
-                  <tr key={menu.id} className="odd:bg-white even:bg-slate-50">
-                    <td className="border px-2 py-2">
-                      <span style={{ paddingLeft: `${menu.depth * 14}px` }}>
-                        {menu.depth > 0 ? "- " : ""}
-                        {menu.name} ({menu.code})
-                      </span>
-                    </td>
-                    {roles
-                      .filter((r) => selectedRoleIds.includes(r.id))
-                      .map((role) => {
-                        const state = getCellState(role.id, menu.id);
-                        return (
-                          <td key={`${menu.id}-${role.id}`} className="border px-2 py-2 text-center">
-                            <Checkbox
-                              checked={state}
-                              onCheckedChange={(v) => toggleCell(role.id, menu.id, v === true)}
-                            />
-                          </td>
-                        );
-                      })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="ag-theme-alpine h-[68vh] w-full rounded-md border">
+            <AgGridReact<FlatMenu>
+              rowData={visibleMenus}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              getRowId={(params) => String(params.data.id)}
+              overlayNoRowsTemplate="<span>조회된 메뉴가 없습니다.</span>"
+              suppressRowClickSelection={true}
+              animateRows={true}
+            />
           </div>
         </CardContent>
       </Card>

@@ -1,7 +1,12 @@
-"use client";
+﻿"use client";
 
 import { Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
+
+import { ensureAgGridRegistered } from "@/lib/ag-grid";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +18,8 @@ import type {
   OrganizationDepartmentItem,
   OrganizationDepartmentListResponse,
 } from "@/types/organization";
+
+ensureAgGridRegistered();
 
 type DepartmentFormState = {
   code: string;
@@ -42,6 +49,59 @@ export function OrganizationManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
+  const gridApiRef = useRef<GridApi<OrganizationDepartmentItem> | null>(null);
+
+  const columnDefs = useMemo<ColDef<OrganizationDepartmentItem>[]>(
+    () => [
+      {
+        headerName: "No",
+        width: 72,
+        sortable: false,
+        filter: false,
+        valueGetter: (params) => (params.node?.rowIndex ?? 0) + 1,
+      },
+      {
+        headerName: "상태",
+        field: "is_active",
+        width: 110,
+        valueFormatter: (params) => (params.value ? "사용" : "미사용"),
+      },
+      {
+        headerName: "조직코드",
+        field: "code",
+        width: 150,
+      },
+      {
+        headerName: "조직명",
+        field: "name",
+        flex: 1,
+        minWidth: 180,
+      },
+      {
+        headerName: "상위조직",
+        field: "parent_name",
+        width: 170,
+        valueFormatter: (params) => params.value || "-",
+      },
+      {
+        headerName: "사용여부",
+        field: "is_active",
+        width: 110,
+        valueFormatter: (params) => (params.value ? "Y" : "N"),
+      },
+    ],
+    [],
+  );
+
+  const defaultColDef = useMemo<ColDef<OrganizationDepartmentItem>>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+    }),
+    [],
+  );
+
   const selectedDepartment = useMemo(
     () => allDepartments.find((department) => department.id === selectedDepartmentId) ?? null,
     [allDepartments, selectedDepartmentId],
@@ -51,24 +111,25 @@ export function OrganizationManager() {
     return allDepartments.filter((department) => department.id !== selectedDepartmentId);
   }, [allDepartments, selectedDepartmentId]);
 
-  const fetchDepartments = useCallback(async (filtered: boolean) => {
-    const params = new URLSearchParams();
-    if (filtered && searchCode.trim()) params.set("code", searchCode.trim());
-    if (filtered && searchName.trim()) params.set("name", searchName.trim());
-    if (referenceDate.trim()) params.set("reference_date", referenceDate.trim());
+  const fetchDepartments = useCallback(
+    async (filtered: boolean) => {
+      const params = new URLSearchParams();
+      if (filtered && searchCode.trim()) params.set("code", searchCode.trim());
+      if (filtered && searchName.trim()) params.set("name", searchName.trim());
+      if (referenceDate.trim()) params.set("reference_date", referenceDate.trim());
 
-    const endpoint = params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
-    const res = await fetch(endpoint, { cache: "no-store" });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(
-        data?.detail ?? "\uC870\uC9C1 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
-      );
-    }
+      const endpoint = params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(data?.detail ?? "조직 목록을 불러오지 못했습니다.");
+      }
 
-    const data = (await res.json()) as OrganizationDepartmentListResponse;
-    return data.departments;
-  }, [referenceDate, searchCode, searchName]);
+      const data = (await res.json()) as OrganizationDepartmentListResponse;
+      return data.departments;
+    },
+    [referenceDate, searchCode, searchName],
+  );
 
   const loadBase = useCallback(async () => {
     setLoading(true);
@@ -95,15 +156,18 @@ export function OrganizationManager() {
         await loadBase();
       } catch (error) {
         setNoticeType("error");
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "\uCD08\uAE30 \uB85C\uB529\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
-        );
+        setNotice(error instanceof Error ? error.message : "초기 로딩에 실패했습니다.");
         setLoading(false);
       }
     })();
   }, [loadBase]);
+
+  useEffect(() => {
+    if (!gridApiRef.current) return;
+    gridApiRef.current.forEachNode((node) => {
+      node.setSelected(!isCreateMode && node.data?.id === selectedDepartmentId);
+    });
+  }, [departments, isCreateMode, selectedDepartmentId]);
 
   useEffect(() => {
     if (isCreateMode) {
@@ -128,11 +192,10 @@ export function OrganizationManager() {
         const filteredDepartments = await fetchDepartments(true);
         setDepartments(filteredDepartments);
         setSelectedDepartmentId(filteredDepartments[0]?.id ?? null);
+        setIsCreateMode(false);
       } catch (error) {
         setNoticeType("error");
-        setNotice(
-          error instanceof Error ? error.message : "\uC870\uD68C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
-        );
+        setNotice(error instanceof Error ? error.message : "조회에 실패했습니다.");
       } finally {
         setLoading(false);
       }
@@ -144,17 +207,30 @@ export function OrganizationManager() {
     setSelectedDepartmentId(null);
     setNotice(null);
     setNoticeType(null);
+    gridApiRef.current?.deselectAll();
   }
+
+  const onGridReady = useCallback((event: GridReadyEvent<OrganizationDepartmentItem>) => {
+    gridApiRef.current = event.api;
+  }, []);
+
+  const onRowClicked = useCallback((event: RowClickedEvent<OrganizationDepartmentItem>) => {
+    if (!event.data) return;
+    setIsCreateMode(false);
+    setSelectedDepartmentId(event.data.id);
+    setNotice(null);
+    setNoticeType(null);
+  }, []);
 
   async function saveDepartment() {
     if (!form.code.trim()) {
       setNoticeType("error");
-      setNotice("\uC870\uC9C1\uCF54\uB4DC\uB97C \uC785\uB825\uD558\uC138\uC694.");
+      setNotice("조직코드를 입력하세요.");
       return;
     }
     if (!form.name.trim()) {
       setNoticeType("error");
-      setNotice("\uC870\uC9C1\uBA85\uC744 \uC785\uB825\uD558\uC138\uC694.");
+      setNotice("조직명을 입력하세요.");
       return;
     }
 
@@ -180,7 +256,7 @@ export function OrganizationManager() {
         | null;
 
       if (!res.ok) {
-        throw new Error((data as { detail?: string } | null)?.detail ?? "\uC800\uC7A5 \uC2E4\uD328");
+        throw new Error((data as { detail?: string } | null)?.detail ?? "저장 실패");
       }
 
       await loadBase();
@@ -189,12 +265,10 @@ export function OrganizationManager() {
       }
       setIsCreateMode(false);
       setNoticeType("success");
-      setNotice("\uC800\uC7A5\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+      setNotice("저장이 완료되었습니다.");
     } catch (error) {
       setNoticeType("error");
-      setNotice(
-        error instanceof Error ? error.message : "\uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
-      );
+      setNotice(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -202,7 +276,7 @@ export function OrganizationManager() {
 
   async function removeDepartment() {
     if (!selectedDepartmentId || isCreateMode) return;
-    if (!confirm("\uC120\uD0DD\uD55C \uC870\uC9C1\uC744 \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?")) return;
+    if (!confirm("선택한 조직을 삭제하시겠습니까?")) return;
 
     setSaving(true);
     setNotice(null);
@@ -210,26 +284,24 @@ export function OrganizationManager() {
       const res = await fetch(`/api/org/departments/${selectedDepartmentId}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(data?.detail ?? "\uC0AD\uC81C \uC2E4\uD328");
+        throw new Error(data?.detail ?? "삭제 실패");
       }
 
       await loadBase();
       setIsCreateMode(false);
       setSelectedDepartmentId(null);
       setNoticeType("success");
-      setNotice("\uC0AD\uC81C\uAC00 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+      setNotice("삭제가 완료되었습니다.");
     } catch (error) {
       setNoticeType("error");
-      setNotice(
-        error instanceof Error ? error.message : "\uC0AD\uC81C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.",
-      );
+      setNotice(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return <div className="p-6">{"\uBD88\uB7EC\uC624\uB294 \uC911..."}</div>;
+    return <div className="p-6">불러오는 중...</div>;
   }
 
   return (
@@ -242,23 +314,15 @@ export function OrganizationManager() {
               Search
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"\uC870\uC9C1\uCF54\uB4DC"}</Label>
-              <Input
-                className="h-9 w-36"
-                value={searchCode}
-                onChange={(event) => setSearchCode(event.target.value)}
-              />
+              <Label className="text-xs">조직코드</Label>
+              <Input className="h-9 w-36" value={searchCode} onChange={(event) => setSearchCode(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"\uC870\uC9C1\uBA85"}</Label>
-              <Input
-                className="h-9 w-44"
-                value={searchName}
-                onChange={(event) => setSearchName(event.target.value)}
-              />
+              <Label className="text-xs">조직명</Label>
+              <Input className="h-9 w-44" value={searchName} onChange={(event) => setSearchName(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"\uAE30\uC900\uC77C\uC790"}</Label>
+              <Label className="text-xs">기준일자</Label>
               <Input
                 type="date"
                 className="h-9 w-40"
@@ -267,7 +331,7 @@ export function OrganizationManager() {
               />
             </div>
             <Button className="h-9 px-5" onClick={runSearch}>
-              {"\uC870\uD68C"}
+              조회
             </Button>
           </div>
         </CardContent>
@@ -275,16 +339,16 @@ export function OrganizationManager() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{"\uC870\uC9C1\uCF54\uB4DC\uAD00\uB9AC"}</CardTitle>
+          <CardTitle>조직코드관리</CardTitle>
           <div className="flex gap-2">
             <Button variant="outline" onClick={startCreate} disabled={saving}>
-              {"\uC785\uB825"}
+              입력
             </Button>
             <Button onClick={saveDepartment} disabled={saving}>
-              {"\uC800\uC7A5"}
+              저장
             </Button>
             <Button variant="destructive" onClick={removeDepartment} disabled={saving || !selectedDepartmentId}>
-              {"\uC0AD\uC81C"}
+              삭제
             </Button>
           </div>
         </CardHeader>
@@ -297,89 +361,43 @@ export function OrganizationManager() {
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
             <div className="xl:col-span-3">
-              <div className="max-h-[560px] overflow-auto rounded-md border">
-                <table className="w-full min-w-[760px] border-collapse text-sm">
-                  <thead className="sticky top-0 bg-slate-100">
-                    <tr>
-                      <th className="border px-2 py-2 text-center">No</th>
-                      <th className="border px-2 py-2 text-center">{"\uC0C1\uD0DC"}</th>
-                      <th className="border px-2 py-2 text-left">{"\uC870\uC9C1\uCF54\uB4DC"}</th>
-                      <th className="border px-2 py-2 text-left">{"\uC870\uC9C1\uBA85"}</th>
-                      <th className="border px-2 py-2 text-left">{"\uC0C1\uC704\uC870\uC9C1"}</th>
-                      <th className="border px-2 py-2 text-center">{"\uC0AC\uC6A9\uC5EC\uBD80"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {departments.map((department, index) => {
-                      const selected = !isCreateMode && department.id === selectedDepartmentId;
-                      return (
-                        <tr
-                          key={department.id}
-                          className={`cursor-pointer ${selected ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
-                          onClick={() => {
-                            setIsCreateMode(false);
-                            setSelectedDepartmentId(department.id);
-                            setNotice(null);
-                            setNoticeType(null);
-                          }}
-                        >
-                          <td className="border px-2 py-2 text-center">{index + 1}</td>
-                          <td className="border px-2 py-2 text-center">
-                            {department.is_active
-                              ? "\uC0AC\uC6A9"
-                              : "\uBBF8\uC0AC\uC6A9"}
-                          </td>
-                          <td className="border px-2 py-2">{department.code}</td>
-                          <td className="border px-2 py-2">{department.name}</td>
-                          <td className="border px-2 py-2">{department.parent_name ?? "-"}</td>
-                          <td className="border px-2 py-2 text-center">{department.is_active ? "Y" : "N"}</td>
-                        </tr>
-                      );
-                    })}
-                    {departments.length === 0 ? (
-                      <tr>
-                        <td className="border px-2 py-8 text-center text-slate-500" colSpan={6}>
-                          {"\uC870\uD68C\uB41C \uC870\uC9C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."}
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+              <div className="ag-theme-alpine h-[560px] w-full rounded-md border">
+                <AgGridReact<OrganizationDepartmentItem>
+                  rowData={departments}
+                  columnDefs={columnDefs}
+                  defaultColDef={defaultColDef}
+                  rowSelection="single"
+                  suppressRowClickSelection={false}
+                  getRowId={(params) => String(params.data.id)}
+                  onGridReady={onGridReady}
+                  onRowClicked={onRowClicked}
+                  overlayNoRowsTemplate="<span>조회된 조직이 없습니다.</span>"
+                />
               </div>
             </div>
 
             <div className="xl:col-span-2">
               <div className="space-y-4 rounded-md border p-4">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {isCreateMode
-                    ? "\uC2E0\uADDC \uC870\uC9C1 \uC785\uB825"
-                    : "\uC870\uC9C1 \uC0C1\uC138"}
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700">{isCreateMode ? "신규 조직 입력" : "조직 상세"}</h3>
 
                 <div className="space-y-2">
-                  <Label>{"\uC870\uC9C1\uCF54\uB4DC"}</Label>
-                  <Input
-                    value={form.code}
-                    onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
-                  />
+                  <Label>조직코드</Label>
+                  <Input value={form.code} onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{"\uC870\uC9C1\uBA85"}</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  />
+                  <Label>조직명</Label>
+                  <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{"\uC0C1\uC704\uC870\uC9C1"}</Label>
+                  <Label>상위조직</Label>
                   <select
                     className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm"
                     value={form.parent_id}
                     onChange={(event) => setForm((prev) => ({ ...prev, parent_id: event.target.value }))}
                   >
-                    <option value="">{"(\uCD5C\uC0C1\uC704)"}</option>
+                    <option value="">(최상위)</option>
                     {parentOptions.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.name} ({department.code})
@@ -393,17 +411,13 @@ export function OrganizationManager() {
                     checked={form.is_active}
                     onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: Boolean(checked) }))}
                   />
-                  {"\uC0AC\uC6A9\uC5EC\uBD80"}
+                  사용여부
                 </label>
 
                 {!isCreateMode && selectedDepartment ? (
                   <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-                    <p>
-                      {"\uC0DD\uC131\uC77C"}: {new Date(selectedDepartment.created_at).toLocaleString()}
-                    </p>
-                    <p>
-                      {"\uC218\uC815\uC77C"}: {new Date(selectedDepartment.updated_at).toLocaleString()}
-                    </p>
+                    <p>생성일: {new Date(selectedDepartment.created_at).toLocaleString()}</p>
+                    <p>수정일: {new Date(selectedDepartment.updated_at).toLocaleString()}</p>
                   </div>
                 ) : null}
               </div>

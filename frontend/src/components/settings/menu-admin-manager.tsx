@@ -1,6 +1,11 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
+
+import { ensureAgGridRegistered } from "@/lib/ag-grid";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,11 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { MenuAdminItem, RoleItem } from "@/types/menu-admin";
 
+ensureAgGridRegistered();
+
 type FlatMenu = {
   id: number;
   code: string;
   depth: number;
   name: string;
+  parent_id: number | null;
+  path: string | null;
+  is_active: boolean;
 };
 
 type MenuFormState = {
@@ -38,7 +48,15 @@ const initialForm: MenuFormState = {
 
 function flattenMenus(nodes: MenuAdminItem[], depth = 0): FlatMenu[] {
   return nodes.flatMap((node) => [
-    { id: node.id, code: node.code, depth, name: node.name },
+    {
+      id: node.id,
+      code: node.code,
+      depth,
+      name: node.name,
+      parent_id: node.parent_id,
+      path: node.path,
+      is_active: node.is_active,
+    },
     ...flattenMenus(node.children, depth + 1),
   ]);
 }
@@ -52,49 +70,13 @@ function findMenu(nodes: MenuAdminItem[], id: number): MenuAdminItem | null {
   return null;
 }
 
-function MenuTree({
-  nodes,
-  selectedId,
-  onSelect,
-}: {
-  nodes: MenuAdminItem[];
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-}) {
-  return (
-    <ul className="space-y-1">
-      {nodes.map((node) => {
-        const selected = node.id === selectedId;
-        return (
-          <li key={node.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(node.id)}
-              className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
-                selected ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
-              }`}
-            >
-              <span className="font-medium">{node.name}</span>
-              <span className="ml-2 text-xs text-gray-500">({node.code})</span>
-            </button>
-            {node.children.length > 0 ? (
-              <div className="ml-4 border-l border-gray-200 pl-2">
-                <MenuTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} />
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 export function MenuAdminManager() {
   const [menus, setMenus] = useState<MenuAdminItem[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
   const [form, setForm] = useState<MenuFormState>(initialForm);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -102,13 +84,68 @@ export function MenuAdminManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
+  const gridApiRef = useRef<GridApi<FlatMenu> | null>(null);
+
   const flatMenus = useMemo(() => flattenMenus(menus), [menus]);
+  const visibleMenus = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return flatMenus;
+    return flatMenus.filter((menu) => menu.name.toLowerCase().includes(q) || menu.code.toLowerCase().includes(q));
+  }, [flatMenus, search]);
+
   const selectedMenu = useMemo(
     () => (selectedMenuId ? findMenu(menus, selectedMenuId) : null),
-    [menus, selectedMenuId]
+    [menus, selectedMenuId],
   );
 
-  async function loadBase() {
+  const columnDefs = useMemo<ColDef<FlatMenu>[]>(
+    () => [
+      {
+        headerName: "메뉴명",
+        field: "name",
+        flex: 1,
+        minWidth: 220,
+        cellRenderer: (params: { data: FlatMenu | undefined }) => {
+          if (!params.data) return null;
+          return (
+            <span style={{ paddingLeft: `${params.data.depth * 14}px` }}>
+              {params.data.depth > 0 ? "- " : ""}
+              {params.data.name}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: "코드",
+        field: "code",
+        width: 150,
+      },
+      {
+        headerName: "경로",
+        field: "path",
+        width: 170,
+        valueFormatter: (params) => params.value || "-",
+      },
+      {
+        headerName: "활성",
+        field: "is_active",
+        width: 90,
+        valueFormatter: (params) => (params.value ? "Y" : "N"),
+      },
+    ],
+    [],
+  );
+
+  const defaultColDef = useMemo<ColDef<FlatMenu>>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+    }),
+    [],
+  );
+
+  const loadBase = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -124,16 +161,16 @@ export function MenuAdminManager() {
       setMenus(menusJson.menus);
       setRoles(rolesJson.roles);
 
-      const firstId = menusJson.menus[0]?.id ?? null;
+      const firstId = flattenMenus(menusJson.menus)[0]?.id ?? null;
       setSelectedMenuId((prev) => prev ?? firstId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "불러오기에 실패했습니다.");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  async function loadMenuRoles(menuId: number) {
+  const loadMenuRoles = useCallback(async (menuId: number) => {
     const res = await fetch(`/api/menus/admin/${menuId}/roles`, { cache: "no-store" });
     if (!res.ok) {
       setSelectedRoleIds([]);
@@ -141,16 +178,16 @@ export function MenuAdminManager() {
     }
     const data = (await res.json()) as { menu_id: number; roles: RoleItem[] };
     setSelectedRoleIds(data.roles.map((r) => r.id));
-  }
+  }, []);
 
   useEffect(() => {
     void loadBase();
-  }, []);
+  }, [loadBase]);
 
   useEffect(() => {
     if (!selectedMenuId) return;
     void loadMenuRoles(selectedMenuId);
-  }, [selectedMenuId]);
+  }, [loadMenuRoles, selectedMenuId]);
 
   useEffect(() => {
     if (!selectedMenu) return;
@@ -164,6 +201,25 @@ export function MenuAdminManager() {
       is_active: selectedMenu.is_active,
     });
   }, [selectedMenu]);
+
+  useEffect(() => {
+    if (!gridApiRef.current) return;
+    gridApiRef.current.forEachNode((node) => {
+      node.setSelected(node.data?.id === selectedMenuId);
+    });
+  }, [selectedMenuId, visibleMenus]);
+
+  const onGridReady = useCallback((event: GridReadyEvent<FlatMenu>) => {
+    gridApiRef.current = event.api;
+  }, []);
+
+  const onRowClicked = useCallback((event: RowClickedEvent<FlatMenu>) => {
+    if (!event.data) return;
+    setError(null);
+    setNotice(null);
+    setNoticeType(null);
+    setSelectedMenuId(event.data.id);
+  }, []);
 
   async function saveMenu() {
     if (!selectedMenuId) return;
@@ -221,6 +277,9 @@ export function MenuAdminManager() {
       setShowCreate(false);
       setForm(initialForm);
       await loadBase();
+      if (data?.menu?.id) {
+        setSelectedMenuId(data.menu.id);
+      }
       setNoticeType("success");
       setNotice("생성이 완료되었습니다.");
     } catch (e) {
@@ -287,23 +346,42 @@ export function MenuAdminManager() {
   return (
     <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
       <Card className="lg:col-span-1">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>메뉴 트리</CardTitle>
-          <Button size="sm" onClick={() => { setShowCreate(true); setForm(initialForm); setError(null); setNotice(null); setNoticeType(null); }}>
-            새 메뉴
-          </Button>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between">
+            <CardTitle>메뉴 목록</CardTitle>
+            <Button
+              size="sm"
+              onClick={() => {
+                setShowCreate(true);
+                setForm(initialForm);
+                setError(null);
+                setNotice(null);
+                setNoticeType(null);
+              }}
+            >
+              새 메뉴
+            </Button>
+          </div>
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="메뉴명/코드 검색"
+          />
         </CardHeader>
         <CardContent>
-          <MenuTree
-            nodes={menus}
-            selectedId={selectedMenuId}
-            onSelect={(id) => {
-              setError(null);
-              setNotice(null);
-              setNoticeType(null);
-              setSelectedMenuId(id);
-            }}
-          />
+          <div className="ag-theme-alpine h-[520px] w-full rounded-md border">
+            <AgGridReact<FlatMenu>
+              rowData={visibleMenus}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              rowSelection="single"
+              quickFilterText={search}
+              getRowId={(params) => String(params.data.id)}
+              onGridReady={onGridReady}
+              onRowClicked={onRowClicked}
+              overlayNoRowsTemplate="<span>메뉴가 없습니다.</span>"
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -374,8 +452,12 @@ export function MenuAdminManager() {
               </label>
 
               <div className="flex gap-2">
-                <Button onClick={saveMenu} disabled={saving}>저장</Button>
-                <Button variant="destructive" onClick={removeMenu} disabled={saving}>삭제</Button>
+                <Button onClick={saveMenu} disabled={saving}>
+                  저장
+                </Button>
+                <Button variant="destructive" onClick={removeMenu} disabled={saving}>
+                  삭제
+                </Button>
               </div>
 
               <div className="space-y-2">
@@ -389,7 +471,7 @@ export function MenuAdminManager() {
                           checked={checked}
                           onCheckedChange={(v) => {
                             setSelectedRoleIds((prev) =>
-                              v ? [...prev, role.id] : prev.filter((id) => id !== role.id)
+                              v ? [...prev, role.id] : prev.filter((id) => id !== role.id),
                             );
                           }}
                         />
@@ -401,7 +483,9 @@ export function MenuAdminManager() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={saveRoles} disabled={saving}>저장</Button>
+                <Button variant="secondary" onClick={saveRoles} disabled={saving}>
+                  저장
+                </Button>
               </div>
             </>
           ) : (
@@ -463,7 +547,9 @@ export function MenuAdminManager() {
                 <Button variant="outline" onClick={() => setShowCreate(false)} disabled={saving}>
                   취소
                 </Button>
-                <Button onClick={createMenu} disabled={saving}>생성</Button>
+                <Button onClick={createMenu} disabled={saving}>
+                  생성
+                </Button>
               </div>
             </CardContent>
           </Card>
