@@ -75,7 +75,7 @@ class HrEmployee(SQLModel, table=True):
 
 
 class HrAttendanceDaily(SQLModel, table=True):
-    __tablename__ = "hr_attendance_daily"
+    __tablename__ = "tim_attendance_daily"
     __table_args__ = (
         UniqueConstraint(
             "employee_id",
@@ -125,7 +125,7 @@ class AppMenuRole(SQLModel, table=True):
 
 
 class HrLeaveRequest(SQLModel, table=True):
-    __tablename__ = "hr_leave_requests"
+    __tablename__ = "tim_leave_requests"
     __table_args__ = (
         CheckConstraint(
             "leave_type IN ('annual', 'sick', 'half_day', 'unpaid', 'other')",
