@@ -1,0 +1,17 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B4D91"/>
+      <stop offset="1" stop-color="#1D72D8"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bg)"/>
+
+  <!-- people mark -->
+  <circle cx="86" cy="92" r="18" fill="#E8F1FF" fill-opacity="0.95"/>
+  <circle cx="124" cy="84" r="14" fill="#E8F1FF" fill-opacity="0.8"/>
+  <path d="M60 142c0-17.7 14.3-32 32-32h5c17.7 0 32 14.3 32 32v4H60v-4Z" fill="#E8F1FF" fill-opacity="0.95"/>
+
+  <!-- HR text -->
+  <text x="78" y="192" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="800" letter-spacing="1" fill="white">HR</text>
+</svg>
