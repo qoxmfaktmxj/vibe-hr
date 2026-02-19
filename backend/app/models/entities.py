@@ -124,6 +124,36 @@ class AppMenuRole(SQLModel, table=True):
     role_id: int = Field(foreign_key="auth_roles.id", primary_key=True)
 
 
+class AppCodeGroup(SQLModel, table=True):
+    __tablename__ = "app_code_groups"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(index=True, unique=True, max_length=30)
+    name: str = Field(max_length=100)
+    description: Optional[str] = None
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AppCode(SQLModel, table=True):
+    __tablename__ = "app_codes"
+    __table_args__ = (UniqueConstraint("group_id", "code", name="uq_app_codes_group_code"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(foreign_key="app_code_groups.id", index=True)
+    code: str = Field(max_length=30)
+    name: str = Field(max_length=100)
+    description: Optional[str] = None
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    extra_value1: Optional[str] = Field(default=None, max_length=200)
+    extra_value2: Optional[str] = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "tim_leave_requests"
     __table_args__ = (

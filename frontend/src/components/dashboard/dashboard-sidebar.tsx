@@ -10,6 +10,7 @@ import {
   FileText,
   FolderTree,
   LayoutDashboard,
+  ListOrdered,
   Menu,
   PanelLeft,
   Settings,
@@ -56,7 +57,9 @@ function renderIcon(iconName: string | null, className: string) {
       return <Shield className={className} aria-hidden="true" />;
     case "Menu":
       return <Menu className={className} aria-hidden="true" />;
-    case "PanelLeft":
+    case "ListOrdered":
+      return <ListOrdered className={className} aria-hidden="true" />;
+    case "PanelLeft": 
       return <PanelLeft className={className} aria-hidden="true" />;
     default:
       return <LayoutDashboard className={className} aria-hidden="true" />;

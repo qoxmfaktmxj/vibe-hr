@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
 from app.api.auth import router as auth_router
+from app.api.common_code import router as common_code_router
 from app.api.dashboard import router as dashboard_router
 from app.api.employee import router as employee_router
 from app.api.menu import router as menu_router
@@ -42,6 +43,7 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(employee_router, prefix="/api/v1")
 app.include_router(menu_router, prefix="/api/v1")
 app.include_router(organization_router, prefix="/api/v1")
+app.include_router(common_code_router, prefix="/api/v1")
 
 
 @app.get("/health")

@@ -9,6 +9,8 @@ from sqlmodel import Session, select
 
 from app.core.security import hash_password
 from app.models import (
+    AppCode,
+    AppCodeGroup,
     AppMenu,
     AppMenuRole,
     AuthRole,
@@ -224,6 +226,14 @@ MENU_TREE: list[dict] = [
                 "roles": ["admin"],
             },
             {
+                "code": "settings.common-codes",
+                "name": "\uACF5\uD1B5\uCF54\uB4DC\uAD00\uB9AC",
+                "path": "/settings/common-codes",
+                "icon": "ListOrdered",
+                "sort_order": 918,
+                "roles": ["admin"],
+            },
+            {
                 "code": "settings.menus",
                 "name": "\uBA54\uB274\uAD00\uB9AC",
                 "path": "/settings/menus",
@@ -234,6 +244,26 @@ MENU_TREE: list[dict] = [
         ],
     },
 ]
+
+
+COMMON_CODE_GROUP_SEEDS = [
+    ("POSITION", "직위", "직위 구분", 1),
+    ("RANK", "직급", "직급 구분", 2),
+    ("JOB_GROUP", "직군", "직군 구분", 3),
+    ("SALARY_TYPE", "연봉타입", "연봉 유형", 4),
+    ("ORG_TYPE", "조직유형", "조직 유형 구분", 5),
+]
+
+COMMON_CODE_ITEM_SEEDS = {
+    "POSITION": [
+        ("01", "사원", 1),
+        ("02", "대리", 2),
+        ("03", "과장", 3),
+        ("04", "차장", 4),
+        ("05", "부장", 5),
+        ("06", "이사", 6),
+    ],
+}
 
 
 def ensure_auth_user_login_id_schema(session: Session) -> None:
@@ -664,6 +694,77 @@ def ensure_menus(session: Session) -> None:
         _upsert(top)
 
 
+def ensure_common_codes(session: Session) -> None:
+    group_map: dict[str, AppCodeGroup] = {}
+
+    for code, name, description, sort_order in COMMON_CODE_GROUP_SEEDS:
+        group = session.exec(select(AppCodeGroup).where(AppCodeGroup.code == code)).first()
+        if group is None:
+            group = AppCodeGroup(
+                code=code,
+                name=name,
+                description=description,
+                is_active=True,
+                sort_order=sort_order,
+            )
+            session.add(group)
+            session.commit()
+            session.refresh(group)
+        else:
+            changed = False
+            if group.name != name:
+                group.name = name
+                changed = True
+            if group.description != description:
+                group.description = description
+                changed = True
+            if group.sort_order != sort_order:
+                group.sort_order = sort_order
+                changed = True
+            if not group.is_active:
+                group.is_active = True
+                changed = True
+            if changed:
+                session.add(group)
+                session.commit()
+                session.refresh(group)
+        group_map[code] = group
+
+    for group_code, items in COMMON_CODE_ITEM_SEEDS.items():
+        group = group_map.get(group_code)
+        if group is None:
+            continue
+
+        for code, name, sort_order in items:
+            item = session.exec(
+                select(AppCode).where(AppCode.group_id == group.id, AppCode.code == code)
+            ).first()
+            if item is None:
+                item = AppCode(
+                    group_id=group.id,
+                    code=code,
+                    name=name,
+                    is_active=True,
+                    sort_order=sort_order,
+                )
+                session.add(item)
+                session.commit()
+            else:
+                changed = False
+                if item.name != name:
+                    item.name = name
+                    changed = True
+                if item.sort_order != sort_order:
+                    item.sort_order = sort_order
+                    changed = True
+                if not item.is_active:
+                    item.is_active = True
+                    changed = True
+                if changed:
+                    session.add(item)
+                    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -708,3 +809,4 @@ def seed_initial_data(session: Session) -> None:
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
+    ensure_common_codes(session)

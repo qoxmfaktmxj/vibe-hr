@@ -17,6 +17,7 @@
 - `payroll.slip` → `FileText`
 - `settings.roles` → `Shield`
 - `settings.permissions` → `Menu`
+- `settings.common-codes` → `ListOrdered`
 - `settings.menus` → `PanelLeft`
 
 ## 원칙
