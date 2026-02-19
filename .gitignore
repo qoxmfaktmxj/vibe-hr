@@ -19,3 +19,6 @@ frontend/out/
 
 # Deploy env
 .env.deploy
+
+# Seed archive
+seed-archive/*.sqlite

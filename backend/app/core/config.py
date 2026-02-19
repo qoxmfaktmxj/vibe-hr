@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     environment: str = "local"
     database_url: str = "sqlite:///./vibe_hr.db"
     cors_origins: str = "http://localhost:3000"
+    seed_archive_enabled: bool = False
+    seed_archive_sqlite_path: str = "./db/dev_seed_accum.sqlite"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

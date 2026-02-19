@@ -3,7 +3,9 @@ from datetime import date
 from sqlalchemy import text
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.core.security import hash_password
+from app.core.seed_archive import archive_seed_to_sqlite
 from app.models import (
     AppMenu,
     AppMenuRole,
@@ -439,3 +441,11 @@ def seed_initial_data(session: Session) -> None:
 
     # 메뉴 및 메뉴-역할 매핑 시드
     ensure_menus(session)
+
+    # 개발 초기 데이터 아카이브(SQLite 누적본)
+    if settings.seed_archive_enabled:
+        try:
+            archive_seed_to_sqlite(session, settings.seed_archive_sqlite_path)
+        except Exception:
+            # 아카이브 실패가 서비스 기동을 막지 않도록 보호
+            pass

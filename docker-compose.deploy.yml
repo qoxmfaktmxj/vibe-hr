@@ -10,6 +10,8 @@ services:
       - "127.0.0.1:8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./seed-archive:/app/seed-archive
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\""]
       interval: 15s
