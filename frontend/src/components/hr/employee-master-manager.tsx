@@ -70,14 +70,14 @@ const I18N = {
   searchPlaceholder: "사번/이름/로그인ID/부서 검색",
   addRow: "입력",
   copy: "복사",
-  templateDownload: "양식다운로드(CSV)",
-  upload: "업로드",
+  templateDownload: "양식다운로드(엑셀)",
+  upload: "엑셀 업로드",
   download: "엑셀 다운로드",
   saveAll: "저장",
   removeAddedRowDone: "선택한 행을 삭제 상태로 변경했습니다.",
   copyDone: "선택한 행을 입력행으로 복제했습니다.",
   templateDone: "양식을 다운로드했습니다.",
-  uploadDone: "업로드 데이터를 반영했습니다.",
+  uploadDone: "엑셀 업로드 데이터를 반영했습니다.",
   downloadDone: "현재 시트 전체를 엑셀로 다운로드했습니다.",
   selectedCount: "선택",
   rowCount: "전체",
@@ -560,19 +560,16 @@ export function EmployeeMasterManager() {
     setNotice(I18N.copyDone);
   }
 
-  function downloadTemplateCsv() {
+  async function downloadTemplateExcel() {
     const headers = ["이름", "부서코드(또는 부서명)", "직책", "입사일", "재직상태", "이메일", "활성(Y/N)", "비밀번호"];
     const sample = ["홍길동", "HQ-HR", "사원", "2026-01-01", "active", "hong@vibe-hr.local", "Y", "admin"];
-    const csv = [headers, sample]
-      .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "employee-upload-template.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+
+    const { utils, writeFileXLSX } = await import("xlsx");
+    const sheet = utils.aoa_to_sheet([headers, sample]);
+    const book = utils.book_new();
+    utils.book_append_sheet(book, sheet, "업로드양식");
+    writeFileXLSX(book, "employee-upload-template.xlsx");
+
     setNoticeType("success");
     setNotice(I18N.templateDone);
   }
@@ -605,17 +602,20 @@ export function EmployeeMasterManager() {
   }
 
   async function handleUploadFile(file: File) {
-    const text = await file.text();
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    if (lines.length <= 1) return;
+    const { read, utils } = await import("xlsx");
+    const buffer = await file.arrayBuffer();
+    const workbook = read(buffer, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(firstSheet, { header: 1, raw: false });
 
-    const body = lines.slice(1);
+    if (!rowsAoa || rowsAoa.length <= 1) return;
+
+    const body = rowsAoa.slice(1);
     const parsedRows: EmployeeGridRow[] = [];
-    for (const line of body) {
-      const cells = (line.includes("	") ? line.split("	") : line.split(",")).map((cell) => cell.replace(/^"|"$/g, "").trim());
+    for (const rowCells of body) {
+      const cells = rowCells.map((cell) => String(cell ?? "").trim());
+      if (!cells.some((cell) => cell.length > 0)) continue;
+
       const departmentId = parseDepartmentId(cells[1] ?? "");
       parsedRows.push({
         id: issueTempId(),
@@ -839,7 +839,7 @@ export function EmployeeMasterManager() {
             <Button size="sm" variant="outline" onClick={copySelectedRows}>
               {I18N.copy}
             </Button>
-            <Button size="sm" variant="outline" onClick={downloadTemplateCsv}>
+            <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
               {I18N.templateDownload}
             </Button>
             <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
@@ -854,7 +854,7 @@ export function EmployeeMasterManager() {
             <input
               ref={uploadInputRef}
               type="file"
-              accept=".csv,.tsv,.txt"
+              accept=".xlsx,.xls"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
