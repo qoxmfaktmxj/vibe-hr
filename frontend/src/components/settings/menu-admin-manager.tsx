@@ -341,8 +341,13 @@ export function MenuAdminManager() {
                 활성 메뉴
               </label>
 
+              <div className="flex gap-2">
+                <Button onClick={saveMenu} disabled={saving}>저장</Button>
+                <Button variant="destructive" onClick={removeMenu} disabled={saving}>삭제</Button>
+              </div>
+
               <div className="space-y-2">
-                <Label>접근 역할</Label>
+                <Label>접근 권한</Label>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {roles.map((role) => {
                     const checked = selectedRoleIds.includes(role.id);
@@ -364,9 +369,7 @@ export function MenuAdminManager() {
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={saveMenu} disabled={saving}>저장</Button>
-                <Button variant="secondary" onClick={saveRoles} disabled={saving}>권한 저장</Button>
-                <Button variant="destructive" onClick={removeMenu} disabled={saving}>삭제</Button>
+                <Button variant="secondary" onClick={saveRoles} disabled={saving}>접근 권한 저장</Button>
               </div>
             </>
           ) : (

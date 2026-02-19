@@ -89,49 +89,52 @@ export function RoleAdminManager() {
   }, []);
 
   useEffect(() => {
-    if (!selectedRoleId) return;
+    if (!selectedRoleId) {
+      setCode("");
+      setName("");
+      setSelectedMenuIds([]);
+      return;
+    }
+
     setName(selectedRole?.name ?? "");
     setCode(selectedRole?.code ?? "");
     void loadRoleMenus(selectedRoleId);
   }, [selectedRoleId, selectedRole]);
 
-  async function createRole() {
-    setSaving(true);
+  function startCreateMode() {
+    setSelectedRoleId(null);
+    setCode("");
+    setName("");
+    setSelectedMenuIds([]);
     setError(null);
-    try {
-      const res = await fetch("/api/menus/admin/roles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, name }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.detail ?? "역할 생성 실패");
-
-      await loadBase();
-      if (data?.role?.id) setSelectedRoleId(data.role.id);
-      setCode("");
-      setName("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "역할 생성 실패");
-    } finally {
-      setSaving(false);
-    }
   }
 
-  async function updateRole() {
-    if (!selectedRoleId) return;
+  async function saveRole() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/menus/admin/roles/${selectedRoleId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.detail ?? "역할 저장 실패");
-      await loadBase();
-      setSelectedRoleId(selectedRoleId);
+      if (selectedRoleId) {
+        const res = await fetch(`/api/menus/admin/roles/${selectedRoleId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.detail ?? "역할 저장 실패");
+        await loadBase();
+        setSelectedRoleId(selectedRoleId);
+      } else {
+        const res = await fetch("/api/menus/admin/roles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, name }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.detail ?? "역할 저장 실패");
+
+        await loadBase();
+        if (data?.role?.id) setSelectedRoleId(data.role.id);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "역할 저장 실패");
     } finally {
@@ -187,8 +190,11 @@ export function RoleAdminManager() {
   return (
     <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-3">
       <Card className="lg:col-span-1">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>역할 목록</CardTitle>
+          <Button size="sm" variant="outline" onClick={startCreateMode}>
+            새 역할
+          </Button>
         </CardHeader>
         <CardContent className="space-y-2">
           {roles.map((role) => (
@@ -216,8 +222,13 @@ export function RoleAdminManager() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>역할 코드 (신규 생성용)</Label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="예: reviewer" />
+              <Label>역할 코드</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="예: reviewer"
+                disabled={Boolean(selectedRoleId)}
+              />
             </div>
             <div className="space-y-2">
               <Label>역할 이름</Label>
@@ -226,11 +237,11 @@ export function RoleAdminManager() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={createRole} disabled={saving || !code || !name}>
-              역할 생성
-            </Button>
-            <Button onClick={updateRole} variant="secondary" disabled={saving || !selectedRoleId || !name}>
-              역할 저장
+            <Button
+              onClick={saveRole}
+              disabled={saving || !name || (!selectedRoleId && !code)}
+            >
+              저장
             </Button>
             <Button onClick={deleteRole} variant="destructive" disabled={saving || !selectedRoleId}>
               역할 삭제
