@@ -72,12 +72,13 @@ const I18N = {
   copy: "복사",
   templateDownload: "양식다운로드",
   upload: "업로드",
-  rollback: "변경 취소",
+  download: "다운로드",
   saveAll: "저장",
   removeAddedRowDone: "입력된 행을 제거했습니다.",
-  copyDone: "선택한 행을 복사했습니다.",
+  copyDone: "선택한 행을 입력행으로 복제했습니다.",
   templateDone: "양식을 다운로드했습니다.",
   uploadDone: "업로드 데이터를 반영했습니다.",
+  downloadDone: "현재 시트 전체를 다운로드했습니다.",
   selectedCount: "선택",
   rowCount: "전체",
   pasteGuide:
@@ -522,20 +523,33 @@ export function EmployeeMasterManager() {
     const selected = gridApiRef.current.getSelectedRows().filter((row) => row._status !== "deleted");
     if (selected.length === 0) return;
 
-    const lines = selected.map((row) =>
-      [
-        row.display_name,
-        row.department_name || departmentNameById.get(row.department_id) || "",
-        row.position_title,
-        row.hire_date,
-        row.employment_status,
-        row.email,
-        row.is_active ? "Y" : "N",
-        row.password || "",
-      ].join("\t"),
+    const selectedIdSet = new Set(selected.map((row) => row.id));
+    const clonesById = new Map<number, EmployeeGridRow>(
+      selected.map((row) => [
+        row.id,
+        {
+          ...row,
+          id: issueTempId(),
+          employee_no: "",
+          login_id: "",
+          _status: "added",
+          _error: undefined,
+        },
+      ]),
     );
 
-    void navigator.clipboard.writeText(lines.join("\n"));
+    setRows((prev) => {
+      const next: EmployeeGridRow[] = [];
+      for (const row of prev) {
+        next.push(row);
+        if (selectedIdSet.has(row.id)) {
+          const clone = clonesById.get(row.id);
+          if (clone) next.push(clone);
+        }
+      }
+      return next;
+    });
+
     setNoticeType("success");
     setNotice(I18N.copyDone);
   }
@@ -555,6 +569,37 @@ export function EmployeeMasterManager() {
     URL.revokeObjectURL(url);
     setNoticeType("success");
     setNotice(I18N.templateDone);
+  }
+
+  function downloadCurrentSheetCsv() {
+    const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
+    const data = rows
+      .filter((row) => row._status !== "deleted")
+      .map((row) => [
+        row.employee_no,
+        row.login_id,
+        row.display_name,
+        row.department_name || departmentNameById.get(row.department_id) || "",
+        row.position_title,
+        row.hire_date,
+        row.employment_status,
+        row.email,
+        row.is_active ? "Y" : "N",
+      ]);
+
+    const csv = [headers, ...data]
+      .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employee-sheet-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setNoticeType("success");
+    setNotice(I18N.downloadDone);
   }
 
   async function handleUploadFile(file: File) {
@@ -797,6 +842,9 @@ export function EmployeeMasterManager() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
               {I18N.upload}
+            </Button>
+            <Button size="sm" variant="outline" onClick={downloadCurrentSheetCsv}>
+              {I18N.download}
             </Button>
             <Button size="sm" onClick={saveAllChanges} disabled={saving}>
               {saving ? `${I18N.saveAll}...` : I18N.saveAll}
