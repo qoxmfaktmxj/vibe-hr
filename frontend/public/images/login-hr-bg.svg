@@ -1,0 +1,46 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#334155"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(460 240) rotate(34) scale(520 320)">
+      <stop stop-color="#60a5fa" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#60a5fa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1520 820) rotate(12) scale(480 300)">
+      <stop stop-color="#a5b4fc" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glowA)"/>
+  <rect width="1920" height="1080" fill="url(#glowB)"/>
+
+  <g opacity="0.18" stroke="#E2E8F0" stroke-width="1">
+    <path d="M120 920L500 520L860 780L1280 420L1760 700"/>
+    <path d="M160 860L540 460L900 720L1320 360L1800 640"/>
+    <path d="M100 980L480 580L840 840L1260 480L1740 760"/>
+  </g>
+
+  <g opacity="0.22" fill="#F8FAFC">
+    <circle cx="420" cy="500" r="6"/>
+    <circle cx="860" cy="780" r="6"/>
+    <circle cx="1280" cy="420" r="6"/>
+    <circle cx="1760" cy="700" r="6"/>
+  </g>
+
+  <g opacity="0.16" fill="#DBEAFE">
+    <rect x="240" y="180" width="420" height="220" rx="20"/>
+    <rect x="300" y="250" width="300" height="14" rx="7"/>
+    <rect x="300" y="282" width="220" height="14" rx="7"/>
+    <rect x="300" y="314" width="260" height="14" rx="7"/>
+
+    <rect x="1260" y="680" width="420" height="220" rx="20"/>
+    <rect x="1320" y="750" width="300" height="14" rx="7"/>
+    <rect x="1320" y="782" width="220" height="14" rx="7"/>
+    <rect x="1320" y="814" width="260" height="14" rx="7"/>
+  </g>
+</svg>

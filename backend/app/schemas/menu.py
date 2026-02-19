@@ -104,3 +104,16 @@ class RoleMenuMappingResponse(BaseModel):
 
 class RoleMenuUpdateRequest(BaseModel):
     menu_ids: List[int] = Field(default_factory=list)
+
+
+class RoleMenuPermissionItem(BaseModel):
+    role_id: int
+    menu_ids: List[int] = Field(default_factory=list)
+
+
+class RoleMenuPermissionMatrixResponse(BaseModel):
+    mappings: List[RoleMenuPermissionItem]
+
+
+class RoleMenuPermissionMatrixUpdateRequest(BaseModel):
+    mappings: List[RoleMenuPermissionItem] = Field(default_factory=list)

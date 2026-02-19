@@ -292,13 +292,28 @@ def delete_role(session: Session, *, role_id: int) -> None:
 def get_role_menus(session: Session, *, role_id: int) -> list[MenuAdminItem]:
     _get_role_or_404(session, role_id)
 
-    menu_ids = set(
+    selected_menu_ids = set(
         session.exec(select(AppMenuRole.menu_id).where(AppMenuRole.role_id == role_id)).all()
     )
-    all_menus = list(session.exec(select(AppMenu)).all())
+    if not selected_menu_ids:
+        return []
 
-    # 선택된 메뉴만 트리 형태로 표시
-    return _build_admin_tree([m for m in all_menus if m.id in menu_ids])
+    all_menus = list(session.exec(select(AppMenu)).all())
+    menu_map = {menu.id: menu for menu in all_menus}
+
+    # Include ancestors so selected child menus appear in context.
+    menu_ids_with_ancestors = set(selected_menu_ids)
+    for menu_id in selected_menu_ids:
+        current = menu_map.get(menu_id)
+        while current is not None and current.parent_id is not None:
+            parent_id = current.parent_id
+            if parent_id in menu_ids_with_ancestors:
+                current = menu_map.get(parent_id)
+                continue
+            menu_ids_with_ancestors.add(parent_id)
+            current = menu_map.get(parent_id)
+
+    return _build_admin_tree([m for m in all_menus if m.id in menu_ids_with_ancestors])
 
 
 def replace_role_menus(session: Session, *, role_id: int, menu_ids: list[int]) -> list[MenuAdminItem]:
@@ -315,3 +330,71 @@ def replace_role_menus(session: Session, *, role_id: int, menu_ids: list[int]) -
     session.commit()
 
     return get_role_menus(session, role_id=role_id)
+
+
+def get_role_menu_permission_matrix(
+    session: Session,
+    *,
+    role_ids: list[int] | None = None,
+) -> dict[int, list[int]]:
+    if role_ids is None:
+        target_role_ids = list(session.exec(select(AuthRole.id).order_by(AuthRole.id)).all())
+    else:
+        valid_role_ids = set(session.exec(select(AuthRole.id)).all())
+        unknown = [role_id for role_id in role_ids if role_id not in valid_role_ids]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role_id: {unknown}",
+            )
+        target_role_ids = sorted(set(role_ids))
+
+    if not target_role_ids:
+        return {}
+
+    rows = session.exec(
+        select(AppMenuRole.role_id, AppMenuRole.menu_id).where(AppMenuRole.role_id.in_(target_role_ids))
+    ).all()
+    matrix = {role_id: [] for role_id in target_role_ids}
+    for role_id, menu_id in rows:
+        matrix[role_id].append(menu_id)
+
+    for role_id in matrix:
+        matrix[role_id] = sorted(set(matrix[role_id]))
+
+    return matrix
+
+
+def replace_role_menu_permission_matrix(
+    session: Session,
+    *,
+    mappings: dict[int, list[int]],
+) -> dict[int, list[int]]:
+    if not mappings:
+        return {}
+
+    role_ids = sorted(set(mappings.keys()))
+    valid_role_ids = set(session.exec(select(AuthRole.id)).all())
+    unknown_roles = [role_id for role_id in role_ids if role_id not in valid_role_ids]
+    if unknown_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role_id: {unknown_roles}",
+        )
+
+    valid_menu_ids = set(session.exec(select(AppMenu.id)).all())
+    for role_id, menu_ids in mappings.items():
+        unknown_menus = [menu_id for menu_id in menu_ids if menu_id not in valid_menu_ids]
+        if unknown_menus:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"role_id={role_id}, invalid menu_id: {unknown_menus}",
+            )
+
+    session.exec(delete(AppMenuRole).where(AppMenuRole.role_id.in_(role_ids)))
+    for role_id in role_ids:
+        for menu_id in sorted(set(mappings.get(role_id, []))):
+            session.add(AppMenuRole(menu_id=menu_id, role_id=role_id))
+    session.commit()
+
+    return get_role_menu_permission_matrix(session, role_ids=role_ids)

@@ -1,25 +1,50 @@
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import InvalidTokenError
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.models import AuthRole, AuthUser, AuthUserRole
 
-TOKEN_PREFIX = "dev-token-"
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def build_access_token(user_id: int) -> str:
-    return f"{TOKEN_PREFIX}{user_id}"
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=settings.auth_token_expires_min)).timestamp()),
+        "iss": settings.auth_token_issuer,
+    }
+    return jwt.encode(
+        payload,
+        settings.auth_token_secret,
+        algorithm=settings.auth_token_algorithm,
+    )
 
 
 def parse_access_token(token: str) -> int | None:
-    if not token.startswith(TOKEN_PREFIX):
+    try:
+        payload = jwt.decode(
+            token,
+            settings.auth_token_secret,
+            algorithms=[settings.auth_token_algorithm],
+            issuer=settings.auth_token_issuer,
+            options={"require": ["sub", "iat", "exp", "iss"]},
+        )
+    except InvalidTokenError:
         return None
 
-    user_id_str = token.removeprefix(TOKEN_PREFIX)
+    user_id_str = payload.get("sub")
+    if not isinstance(user_id_str, str):
+        return None
+
     if not user_id_str.isdigit():
         return None
 

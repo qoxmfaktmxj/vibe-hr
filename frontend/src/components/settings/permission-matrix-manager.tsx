@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import type { MenuAdminItem, RoleItem } from "@/types/menu-admin";
+import type {
+  MenuAdminItem,
+  RoleItem,
+  RoleMenuPermissionMatrixResponse,
+} from "@/types/menu-admin";
 
 type FlatMenu = {
   id: number;
@@ -21,18 +25,6 @@ function flattenMenus(nodes: MenuAdminItem[], depth = 0, parentId: number | null
     { id: node.id, code: node.code, name: node.name, depth, parentId },
     ...flattenMenus(node.children, depth + 1, node.id),
   ]);
-}
-
-function collectIds(nodes: MenuAdminItem[]): number[] {
-  const ids: number[] = [];
-  const walk = (items: MenuAdminItem[]) => {
-    for (const item of items) {
-      ids.push(item.id);
-      if (item.children.length > 0) walk(item.children);
-    }
-  };
-  walk(nodes);
-  return ids;
 }
 
 export function PermissionMatrixManager() {
@@ -73,30 +65,30 @@ export function PermissionMatrixManager() {
 
   async function loadBase() {
     setLoading(true);
-    const [rolesRes, menusRes] = await Promise.all([
+    const [rolesRes, menusRes, permissionsRes] = await Promise.all([
       fetch("/api/menus/admin/roles", { cache: "no-store" }),
       fetch("/api/menus/admin/tree", { cache: "no-store" }),
+      fetch("/api/menus/admin/roles/permissions", { cache: "no-store" }),
     ]);
 
     if (!rolesRes.ok) throw new Error("권한 목록을 불러오지 못했습니다.");
     if (!menusRes.ok) throw new Error("메뉴 목록을 불러오지 못했습니다.");
+    if (!permissionsRes.ok) throw new Error("권한 매트릭스를 불러오지 못했습니다.");
 
     const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
     const menusJson = (await menusRes.json()) as { menus: MenuAdminItem[] };
+    const permissionsJson = (await permissionsRes.json()) as RoleMenuPermissionMatrixResponse;
 
     setRoles(rolesJson.roles);
     setMenus(menusJson.menus);
     setSelectedRoleIds((prev) => (prev.length > 0 ? prev : rolesJson.roles.map((r) => r.id)));
 
+    const mappingByRoleId = new Map(
+      permissionsJson.mappings.map((mapping) => [mapping.role_id, mapping.menu_ids]),
+    );
     const nextMatrix: Record<number, Set<number>> = {};
     for (const role of rolesJson.roles) {
-      const res = await fetch(`/api/menus/admin/roles/${role.id}/menus`, { cache: "no-store" });
-      if (!res.ok) {
-        nextMatrix[role.id] = new Set<number>();
-        continue;
-      }
-      const data = (await res.json()) as { role_id: number; menus: MenuAdminItem[] };
-      nextMatrix[role.id] = new Set(collectIds(data.menus));
+      nextMatrix[role.id] = new Set(mappingByRoleId.get(role.id) ?? []);
     }
     setMatrix(nextMatrix);
     setLoading(false);
@@ -116,7 +108,7 @@ export function PermissionMatrixManager() {
 
   function toggleRole(roleId: number) {
     setSelectedRoleIds((prev) =>
-      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
     );
   }
 
@@ -125,9 +117,7 @@ export function PermissionMatrixManager() {
       const next = { ...prev };
       const set = new Set(next[roleId] ?? []);
 
-      const targets = applyToChildren
-        ? [menuId, ...(descendantsMap[menuId] ?? [])]
-        : [menuId];
+      const targets = applyToChildren ? [menuId, ...(descendantsMap[menuId] ?? [])] : [menuId];
 
       if (checked) {
         for (const id of targets) set.add(id);
@@ -165,16 +155,35 @@ export function PermissionMatrixManager() {
     setSaving(true);
     setNotice(null);
     try {
-      for (const roleId of selectedRoleIds) {
-        const menuIds = Array.from(matrix[roleId] ?? []);
-        const res = await fetch(`/api/menus/admin/roles/${roleId}/menus`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ menu_ids: menuIds }),
-        });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.detail ?? `role_id=${roleId} 저장 실패`);
+      const res = await fetch("/api/menus/admin/roles/permissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mappings: selectedRoleIds.map((roleId) => ({
+            role_id: roleId,
+            menu_ids: Array.from(matrix[roleId] ?? []),
+          })),
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | RoleMenuPermissionMatrixResponse
+        | { detail?: string }
+        | null;
+
+      if (!res.ok) {
+        throw new Error((data as { detail?: string } | null)?.detail ?? "저장 실패");
       }
+
+      if (data && "mappings" in data) {
+        setMatrix((prev) => {
+          const next = { ...prev };
+          for (const mapping of data.mappings) {
+            next[mapping.role_id] = new Set(mapping.menu_ids);
+          }
+          return next;
+        });
+      }
+
       setNoticeType("success");
       setNotice("메뉴 권한 저장이 완료되었습니다.");
     } catch (e) {
@@ -185,7 +194,7 @@ export function PermissionMatrixManager() {
     }
   }
 
-  if (loading) return <div className="p-6">불러오는 중...</div>;
+  if (loading) return <div className="p-6">불러오는 중..</div>;
 
   return (
     <div className="space-y-4 p-6">
@@ -214,7 +223,10 @@ export function PermissionMatrixManager() {
               {roles.map((role) => {
                 const checked = selectedRoleIds.includes(role.id);
                 return (
-                  <label key={role.id} className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm">
+                  <label
+                    key={role.id}
+                    className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm"
+                  >
                     <Checkbox checked={checked} onCheckedChange={() => toggleRole(role.id)} />
                     {role.name} ({role.code})
                   </label>
@@ -224,16 +236,13 @@ export function PermissionMatrixManager() {
           </div>
 
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
-            <p className="mb-2 text-xs font-semibold text-blue-700">일괄 적용 옵션</p>
+            <p className="mb-2 text-xs font-semibold text-blue-700">하위 적용 옵션</p>
             <label className="flex items-center gap-2 text-sm text-blue-900">
-              <Checkbox
-                checked={applyToChildren}
-                onCheckedChange={(v) => setApplyToChildren(Boolean(v))}
-              />
+              <Checkbox checked={applyToChildren} onCheckedChange={(v) => setApplyToChildren(Boolean(v))} />
               하위 메뉴 일괄 적용 (기본 ON)
             </label>
             <p className="mt-1 text-xs text-blue-700">
-              ON: 부모 체크/해제 시 하위 메뉴까지 함께 반영, OFF: 선택 메뉴만 반영
+              ON: 부모 체크/해제 시 하위 메뉴까지 반영, OFF: 선택 메뉴만 반영
             </p>
           </div>
 

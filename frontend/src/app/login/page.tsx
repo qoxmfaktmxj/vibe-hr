@@ -6,8 +6,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage:
-            "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBvLganA2l4Iedc39kMRrlm6ejEZC2nVFVOHxooKWgm4FF3B_xeMTTzkZVu5aETxyQxc-KGUWm6srT8Lwno8Y6VIgcW72PgsjtIr3HSln9qPqSZfBbZO8J5pWlkY3TjKWi0fgPWzereseZjEVRlTOudnk03riajwdAfPtRt7Kak7Sy1zD5DKq_cRFshN6yY0S6tn5EpvLvnvbB73nhKVFkk2sxDXi7SncWA2IDaHjTN9Cdcx_pY5TeLSMdaVoMlNJCH9YCaSxoGuvH3')",
+          backgroundImage: "url('/images/login-hr-bg.svg')",
         }}
       />
       <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]" />

@@ -11,7 +11,10 @@ const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
-const AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 8;
+const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
+const AUTH_TOKEN_EXPIRES_MIN =
+  Number.isFinite(tokenExpiresEnv) && tokenExpiresEnv > 0 ? tokenExpiresEnv : 480;
+const AUTH_COOKIE_MAX_AGE_SECONDS = Math.max(60, AUTH_TOKEN_EXPIRES_MIN * 60);
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);

@@ -14,6 +14,7 @@ from app.core.database import engine, init_db
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    settings.validate_security_settings()
     init_db()
     with Session(engine) as session:
         seed_initial_data(session)

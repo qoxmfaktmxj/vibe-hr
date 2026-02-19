@@ -39,3 +39,12 @@ export type RoleMenuMappingResponse = {
   role_id: number;
   menus: MenuAdminItem[];
 };
+
+export type RoleMenuPermissionItem = {
+  role_id: number;
+  menu_ids: number[];
+};
+
+export type RoleMenuPermissionMatrixResponse = {
+  mappings: RoleMenuPermissionItem[];
+};

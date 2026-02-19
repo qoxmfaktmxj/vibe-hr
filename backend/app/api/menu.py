@@ -16,6 +16,9 @@ from app.schemas.menu import (
     RoleCreateRequest,
     RoleDetailResponse,
     RoleListResponse,
+    RoleMenuPermissionItem,
+    RoleMenuPermissionMatrixResponse,
+    RoleMenuPermissionMatrixUpdateRequest,
     RoleMenuMappingResponse,
     RoleMenuUpdateRequest,
     RoleUpdateRequest,
@@ -27,10 +30,12 @@ from app.services.menu_service import (
     delete_role,
     get_admin_menu_tree,
     get_menu_roles,
+    get_role_menu_permission_matrix,
     get_menu_tree_for_user,
     get_role_menus,
     list_roles,
     replace_menu_roles,
+    replace_role_menu_permission_matrix,
     replace_role_menus,
     update_menu,
     update_role,
@@ -147,6 +152,43 @@ def admin_delete_menu(menu_id: int, session: Session = Depends(get_session)) -> 
 )
 def admin_role_list(session: Session = Depends(get_session)) -> RoleListResponse:
     return RoleListResponse(roles=list_roles(session))
+
+
+@router.get(
+    "/admin/roles/permissions",
+    response_model=RoleMenuPermissionMatrixResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_role_permission_matrix(
+    session: Session = Depends(get_session),
+) -> RoleMenuPermissionMatrixResponse:
+    matrix = get_role_menu_permission_matrix(session)
+    mappings = [
+        RoleMenuPermissionItem(role_id=role_id, menu_ids=menu_ids)
+        for role_id, menu_ids in matrix.items()
+    ]
+    return RoleMenuPermissionMatrixResponse(mappings=mappings)
+
+
+@router.put(
+    "/admin/roles/permissions",
+    response_model=RoleMenuPermissionMatrixResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_update_role_permission_matrix(
+    payload: RoleMenuPermissionMatrixUpdateRequest,
+    session: Session = Depends(get_session),
+) -> RoleMenuPermissionMatrixResponse:
+    requested: dict[int, list[int]] = {}
+    for item in payload.mappings:
+        requested[item.role_id] = item.menu_ids
+
+    matrix = replace_role_menu_permission_matrix(session, mappings=requested)
+    mappings = [
+        RoleMenuPermissionItem(role_id=role_id, menu_ids=menu_ids)
+        for role_id, menu_ids in matrix.items()
+    ]
+    return RoleMenuPermissionMatrixResponse(mappings=mappings)
 
 
 @router.post(
