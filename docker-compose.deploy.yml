@@ -6,11 +6,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.deploy
-    environment:
-      - DATABASE_URL
-      - CORS_ORIGINS
-      - APP_NAME
-      - ENVIRONMENT
     ports:
       - "8000:8000"
     extra_hosts:
@@ -28,9 +23,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.deploy
-    environment:
-      - API_BASE_URL
-      - NEXT_PUBLIC_API_BASE_URL
     depends_on:
       backend:
         condition: service_healthy

@@ -18,8 +18,23 @@ from app.models import (
 
 
 def ensure_auth_user_login_id_schema(session: Session) -> None:
-    columns = session.exec(text("PRAGMA table_info(auth_users)")).all()
-    column_names = {row[1] for row in columns}
+    dialect = session.bind.dialect.name if session.bind is not None else "sqlite"
+
+    if dialect == "sqlite":
+        columns = session.exec(text("PRAGMA table_info(auth_users)")).all()
+        column_names = {row[1] for row in columns}
+    else:
+        columns = session.exec(
+            text(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'auth_users'
+                """
+            )
+        ).all()
+        column_names = {row[0] for row in columns}
 
     if "login_id" not in column_names:
         session.exec(text("ALTER TABLE auth_users ADD COLUMN login_id TEXT"))
