@@ -91,6 +91,43 @@ const I18N = {
   colError: "\uc5d0\ub7ec",
 };
 
+const AG_GRID_LOCALE_KO: Record<string, string> = {
+  page: "페이지",
+  more: "더보기",
+  to: "~",
+  of: "/",
+  next: "다음",
+  last: "마지막",
+  first: "처음",
+  previous: "이전",
+  loadingOoo: "로딩 중...",
+  noRowsToShow: "데이터가 없습니다.",
+  searchOoo: "검색...",
+  blanks: "(빈값)",
+  filterOoo: "필터...",
+  applyFilter: "적용",
+  equals: "같음",
+  notEqual: "같지 않음",
+  lessThan: "보다 작음",
+  greaterThan: "보다 큼",
+  contains: "포함",
+  notContains: "미포함",
+  startsWith: "시작",
+  endsWith: "끝",
+  andCondition: "그리고",
+  orCondition: "또는",
+  clearFilter: "초기화",
+  resetFilter: "리셋",
+  cancelFilter: "취소",
+  textFilter: "텍스트 필터",
+  numberFilter: "숫자 필터",
+  dateFilter: "날짜 필터",
+  selectAll: "전체 선택",
+  selectAllSearchResults: "검색 결과 전체 선택",
+  addCurrentSelectionToFilter: "현재 선택 추가",
+  noMatches: "일치 항목 없음",
+};
+
 const STATUS_LABELS: Record<RowStatus, string> = {
   clean: I18N.statusClean,
   added: I18N.statusAdded,
@@ -182,7 +219,7 @@ export function EmployeeMasterManager() {
         email: "",
         department_id: departmentId,
         department_name: departmentNameById.get(departmentId) ?? "",
-        position_title: "Staff",
+        position_title: "사원",
         hire_date: today,
         employment_status: "active",
         is_active: true,
@@ -444,7 +481,7 @@ export function EmployeeMasterManager() {
           display_name: cells[0] ?? "",
           department_id: departmentId,
           department_name: departmentNameById.get(departmentId) ?? "",
-          position_title: cells[2] || "Staff",
+          position_title: cells[2] || "사원",
           hire_date: (cells[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
           employment_status: normalizeEmploymentStatus(cells[4] || "active"),
           email: cells[5] || "",
@@ -548,7 +585,7 @@ export function EmployeeMasterManager() {
         const payload = {
           display_name: row.display_name.trim(),
           department_id: row.department_id,
-          position_title: row.position_title.trim() || "Staff",
+          position_title: row.position_title.trim() || "사원",
           hire_date: row.hire_date || null,
           employment_status: row.employment_status,
           email: row.email.trim() || null,
@@ -584,7 +621,7 @@ export function EmployeeMasterManager() {
         const payload = {
           display_name: row.display_name.trim(),
           department_id: row.department_id,
-          position_title: row.position_title.trim() || "Staff",
+          position_title: row.position_title.trim() || "사원",
           hire_date: row.hire_date || null,
           employment_status: row.employment_status,
           email: row.email.trim(),
@@ -736,6 +773,7 @@ export function EmployeeMasterManager() {
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
               onCellValueChanged={onCellValueChanged}
+              localeText={AG_GRID_LOCALE_KO}
               overlayNoRowsTemplate={`<span>${I18N.noRows}</span>`}
             />
           </div>
