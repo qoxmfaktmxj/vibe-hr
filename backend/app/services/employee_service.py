@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import secrets
@@ -79,6 +79,21 @@ def list_employees(session: Session) -> list[EmployeeItem]:
     ).all()
 
     return [_build_employee_item(employee, user, department) for employee, user, department in rows]
+
+
+def get_employee_by_user_id(session: Session, user_id: int) -> EmployeeItem:
+    row = session.exec(
+        select(HrEmployee, AuthUser, OrgDepartment)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
+        .where(HrEmployee.user_id == user_id)
+    ).first()
+
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee profile not found.")
+
+    employee, user, department = row
+    return _build_employee_item(employee, user, department)
 
 
 def create_employee(session: Session, payload: EmployeeCreateRequest) -> EmployeeItem:

@@ -1,8 +1,9 @@
-﻿from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlmodel import Session
 
-from app.core.auth import require_roles
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.models import AuthUser
 from app.schemas.employee import (
     DepartmentListResponse,
     EmployeeCreateRequest,
@@ -13,6 +14,7 @@ from app.schemas.employee import (
 from app.services.employee_service import (
     create_employee,
     delete_employee,
+    get_employee_by_user_id,
     list_departments,
     list_employees,
     update_employee,
@@ -51,6 +53,15 @@ def employee_create(
     session: Session = Depends(get_session),
 ) -> EmployeeDetailResponse:
     employee = create_employee(session, payload)
+    return EmployeeDetailResponse(employee=employee)
+
+
+@router.get("/me", response_model=EmployeeDetailResponse)
+def employee_me(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> EmployeeDetailResponse:
+    employee = get_employee_by_user_id(session, current_user.id)
     return EmployeeDetailResponse(employee=employee)
 
 
