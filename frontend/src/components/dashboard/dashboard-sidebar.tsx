@@ -30,6 +30,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   UsersRound,
   UserRound,
   Clock,
+  CalendarCheck2,
   CalendarDays,
   Wallet,
   Calculator,

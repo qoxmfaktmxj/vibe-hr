@@ -203,7 +203,7 @@ export function PermissionMatrixManager() {
             />
             <div className="ml-auto">
               <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
-                메뉴 권한 저장
+                저장
               </Button>
             </div>
           </div>

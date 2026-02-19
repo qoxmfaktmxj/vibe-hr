@@ -401,7 +401,7 @@ export function MenuAdminManager() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={saveRoles} disabled={saving}>접근 권한 저장</Button>
+                <Button variant="secondary" onClick={saveRoles} disabled={saving}>저장</Button>
               </div>
             </>
           ) : (

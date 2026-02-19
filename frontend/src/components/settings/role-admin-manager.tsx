@@ -193,7 +193,7 @@ export function RoleAdminManager() {
               저장
             </Button>
             <Button onClick={deleteRole} variant="destructive" disabled={saving || !selectedRoleId}>
-              권한 삭제
+              삭제
             </Button>
           </div>
         </CardContent>
