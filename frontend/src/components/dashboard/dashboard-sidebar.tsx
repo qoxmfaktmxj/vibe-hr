@@ -75,18 +75,23 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
   );
 }
 
+function hasActiveDescendant(node: MenuNode, currentPath: string): boolean {
+  if (node.path && currentPath.startsWith(node.path)) return true;
+  return node.children.some((child) => hasActiveDescendant(child, currentPath));
+}
+
 /** 자식이 있는 그룹 메뉴 (접을 수 있는 섹션) */
 function MenuGroupItem({
   node,
   currentPath,
+  depth = 0,
 }: {
   node: MenuNode;
   currentPath: string;
+  depth?: number;
 }) {
-  const hasActiveChild = node.children.some(
-    (child) => child.path && currentPath.startsWith(child.path)
-  );
-  const [isOpen, setIsOpen] = useState(hasActiveChild);
+  const active = hasActiveDescendant(node, currentPath);
+  const [isOpen, setIsOpen] = useState(active);
   const Icon = getIcon(node.icon);
 
   return (
@@ -95,10 +100,9 @@ function MenuGroupItem({
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-          hasActiveChild
-            ? "text-primary"
-            : "text-gray-500 hover:bg-white hover:text-gray-800"
+          active ? "text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
         }`}
+        style={{ paddingLeft: `${16 + depth * 12}px` }}
       >
         <Icon className="h-4 w-4" aria-hidden="true" />
         <span className="flex-1 text-left">{node.name}</span>
@@ -109,14 +113,18 @@ function MenuGroupItem({
       </button>
 
       {isOpen && (
-        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-gray-200 pl-3">
-          {node.children.map((child) => (
-            <MenuLeafItem
-              key={child.code}
-              node={child}
-              isActive={child.path ? currentPath.startsWith(child.path) : false}
-            />
-          ))}
+        <div className={`mt-0.5 space-y-0.5 ${depth >= 0 ? "ml-4 border-l border-gray-200 pl-3" : ""}`}>
+          {node.children.map((child) =>
+            child.children.length > 0 ? (
+              <MenuGroupItem key={child.code} node={child} currentPath={currentPath} depth={depth + 1} />
+            ) : (
+              <MenuLeafItem
+                key={child.code}
+                node={child}
+                isActive={child.path ? currentPath.startsWith(child.path) : false}
+              />
+            )
+          )}
         </div>
       )}
     </div>

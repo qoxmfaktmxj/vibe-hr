@@ -276,7 +276,14 @@ export function MenuAdminManager() {
           </Button>
         </CardHeader>
         <CardContent>
-          <MenuTree nodes={menus} selectedId={selectedMenuId} onSelect={setSelectedMenuId} />
+          <MenuTree
+            nodes={menus}
+            selectedId={selectedMenuId}
+            onSelect={(id) => {
+              setError(null);
+              setSelectedMenuId(id);
+            }}
+          />
         </CardContent>
       </Card>
 

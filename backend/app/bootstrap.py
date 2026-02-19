@@ -225,6 +225,31 @@ def _get_or_create_menu(
         session.add(menu)
         session.commit()
         session.refresh(menu)
+        return menu
+
+    # 기존 메뉴도 시드 정의와 동기화 (이름/부모/경로/아이콘/정렬)
+    changed = False
+    if menu.name != name:
+        menu.name = name
+        changed = True
+    if menu.parent_id != parent_id:
+        menu.parent_id = parent_id
+        changed = True
+    if menu.path != path:
+        menu.path = path
+        changed = True
+    if menu.icon != icon:
+        menu.icon = icon
+        changed = True
+    if menu.sort_order != sort_order:
+        menu.sort_order = sort_order
+        changed = True
+
+    if changed:
+        session.add(menu)
+        session.commit()
+        session.refresh(menu)
+
     return menu
 
 
@@ -254,7 +279,7 @@ _MENU_TREE: list[dict] = [
     },
     {
         "code": "hr",
-        "name": "인사관리",
+        "name": "인사",
         "path": None,
         "icon": "UsersRound",
         "sort_order": 200,
@@ -269,26 +294,36 @@ _MENU_TREE: list[dict] = [
                 "roles": ["hr_manager", "admin"],
             },
             {
-                "code": "hr.attendance",
-                "name": "근태관리",
-                "path": "/hr/attendance",
+                "code": "tim",
+                "name": "근태",
+                "path": None,
                 "icon": "Clock",
                 "sort_order": 220,
                 "roles": ["employee", "hr_manager", "admin"],
-            },
-            {
-                "code": "hr.leave",
-                "name": "휴가관리",
-                "path": "/hr/leave",
-                "icon": "CalendarDays",
-                "sort_order": 230,
-                "roles": ["employee", "hr_manager", "admin"],
+                "children": [
+                    {
+                        "code": "hr.attendance",
+                        "name": "근태관리",
+                        "path": "/tim/codes",
+                        "icon": "Clock",
+                        "sort_order": 221,
+                        "roles": ["hr_manager", "admin"],
+                    },
+                    {
+                        "code": "hr.leave",
+                        "name": "휴가관리",
+                        "path": "/tim/holidays",
+                        "icon": "CalendarDays",
+                        "sort_order": 222,
+                        "roles": ["hr_manager", "admin"],
+                    },
+                ],
             },
         ],
     },
     {
         "code": "payroll",
-        "name": "급여관리",
+        "name": "급",
         "path": None,
         "icon": "Wallet",
         "sort_order": 300,
@@ -342,28 +377,23 @@ _MENU_TREE: list[dict] = [
 
 
 def ensure_menus(session: Session) -> None:
-    for top in _MENU_TREE:
-        parent_menu = _get_or_create_menu(
+    def _upsert(node: dict, parent_id: int | None = None) -> None:
+        menu = _get_or_create_menu(
             session,
-            code=top["code"],
-            name=top["name"],
-            path=top.get("path"),
-            icon=top.get("icon"),
-            sort_order=top.get("sort_order", 0),
+            code=node["code"],
+            name=node["name"],
+            parent_id=parent_id,
+            path=node.get("path"),
+            icon=node.get("icon"),
+            sort_order=node.get("sort_order", 0),
         )
-        _link_menu_roles(session, parent_menu, top["roles"])
+        _link_menu_roles(session, menu, node.get("roles", []))
 
-        for child in top.get("children", []):
-            child_menu = _get_or_create_menu(
-                session,
-                code=child["code"],
-                name=child["name"],
-                parent_id=parent_menu.id,
-                path=child.get("path"),
-                icon=child.get("icon"),
-                sort_order=child.get("sort_order", 0),
-            )
-            _link_menu_roles(session, child_menu, child["roles"])
+        for child in node.get("children", []):
+            _upsert(child, parent_id=menu.id)
+
+    for top in _MENU_TREE:
+        _upsert(top)
 
 
 def seed_initial_data(session: Session) -> None:
