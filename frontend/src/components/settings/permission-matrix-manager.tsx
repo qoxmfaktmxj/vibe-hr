@@ -140,6 +140,27 @@ export function PermissionMatrixManager() {
     });
   }
 
+  function getCellState(roleId: number, menuId: number): boolean | "indeterminate" {
+    const set = matrix[roleId] ?? new Set<number>();
+    const selfChecked = set.has(menuId);
+    const descendants = descendantsMap[menuId] ?? [];
+
+    if (descendants.length === 0) {
+      return selfChecked;
+    }
+
+    const checkedChildren = descendants.filter((id) => set.has(id)).length;
+    if (checkedChildren === 0) {
+      return selfChecked;
+    }
+
+    if (selfChecked && checkedChildren === descendants.length) {
+      return true;
+    }
+
+    return "indeterminate";
+  }
+
   async function saveAll() {
     setSaving(true);
     setNotice(null);
@@ -237,12 +258,12 @@ export function PermissionMatrixManager() {
                     {roles
                       .filter((r) => selectedRoleIds.includes(r.id))
                       .map((role) => {
-                        const checked = (matrix[role.id] ?? new Set<number>()).has(menu.id);
+                        const state = getCellState(role.id, menu.id);
                         return (
                           <td key={`${menu.id}-${role.id}`} className="border px-2 py-2 text-center">
                             <Checkbox
-                              checked={checked}
-                              onCheckedChange={(v) => toggleCell(role.id, menu.id, Boolean(v))}
+                              checked={state}
+                              onCheckedChange={(v) => toggleCell(role.id, menu.id, v === true)}
                             />
                           </td>
                         );
