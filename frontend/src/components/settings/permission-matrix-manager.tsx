@@ -201,29 +201,40 @@ export function PermissionMatrixManager() {
               placeholder="메뉴명/코드 검색"
               className="max-w-sm"
             />
+            <div className="ml-auto">
+              <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
+                메뉴 권한 저장
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-md border bg-slate-50 p-3">
+            <p className="mb-2 text-xs font-semibold text-slate-600">권한 표시/편집 대상</p>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => {
                 const checked = selectedRoleIds.includes(role.id);
                 return (
-                  <label key={role.id} className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
+                  <label key={role.id} className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm">
                     <Checkbox checked={checked} onCheckedChange={() => toggleRole(role.id)} />
                     {role.name} ({role.code})
                   </label>
                 );
               })}
             </div>
-            <label className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
+          </div>
+
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+            <p className="mb-2 text-xs font-semibold text-blue-700">일괄 적용 옵션</p>
+            <label className="flex items-center gap-2 text-sm text-blue-900">
               <Checkbox
                 checked={applyToChildren}
                 onCheckedChange={(v) => setApplyToChildren(Boolean(v))}
               />
-              하위 메뉴 일괄 적용
+              하위 메뉴 일괄 적용 (기본 ON)
             </label>
-            <div className="ml-auto">
-              <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
-                메뉴 권한 저장
-              </Button>
-            </div>
+            <p className="mt-1 text-xs text-blue-700">
+              ON: 부모 체크/해제 시 하위 메뉴까지 함께 반영, OFF: 선택 메뉴만 반영
+            </p>
           </div>
 
           {notice ? (
