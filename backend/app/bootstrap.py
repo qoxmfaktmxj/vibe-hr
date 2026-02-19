@@ -23,6 +23,7 @@ from app.models import (
 DEV_EMPLOYEE_TOTAL = 2000
 DEV_EMPLOYEE_LOGIN_PREFIX = "kr-"
 DEV_EMPLOYEE_PASSWORD_HASH = hash_password("admin")
+PRIMARY_DEPARTMENT_CODE = "HQ-HR"
 
 KOREAN_SURNAMES = [
     "\uAE40",
@@ -92,11 +93,12 @@ KOREAN_GIVEN_SECOND = [
 ]
 
 DEPARTMENT_SEEDS = [
-    ("HQ-HR", "\uC778\uC0AC\uD300"),
-    ("HQ-ENG", "\uAC1C\uBC1C\uD300"),
-    ("HQ-SALES", "\uC601\uC5C5\uD300"),
-    ("HQ-FIN", "\uC7AC\uBB34\uD300"),
-    ("HQ-OPS", "\uC6B4\uC601\uD300"),
+    ("HQ-HR", "\uC778\uC0AC\uBCF8\uBD80"),
+    ("HQ-ENG", "\uAC1C\uBC1C\uBCF8\uBD80"),
+    ("HQ-SALES", "\uC601\uC5C5\uBCF8\uBD80"),
+    ("HQ-FIN", "\uC7AC\uBB34\uBCF8\uBD80"),
+    ("HQ-OPS", "\uC6B4\uC601\uBCF8\uBD80"),
+    *[(f"ORG-{index:04d}", f"\uC870\uC9C1{index:02d}") for index in range(1, 46)],
 ]
 
 MENU_TREE: list[dict] = [
@@ -137,7 +139,7 @@ MENU_TREE: list[dict] = [
         "children": [
             {
                 "code": "org.departments",
-                "name": "\uC870\uC9C1\uAD00\uB9AC",
+                "name": "\uC870\uC9C1\uCF54\uB4DC\uAD00\uB9AC",
                 "path": "/org/departments",
                 "icon": "FolderTree",
                 "sort_order": 211,
@@ -315,7 +317,7 @@ def ensure_departments(session: Session) -> list[OrgDepartment]:
 def ensure_department(session: Session) -> OrgDepartment:
     departments = ensure_departments(session)
     for department in departments:
-        if department.code == "HQ-HR":
+        if department.code == PRIMARY_DEPARTMENT_CODE:
             return department
     return departments[0]
 
@@ -416,6 +418,40 @@ def _build_dev_login_id(index: int) -> str:
     return f"{DEV_EMPLOYEE_LOGIN_PREFIX}{token}-{index:04d}"
 
 
+def _build_department_distribution(
+    *,
+    total_employees: int,
+    department_ids: list[int],
+) -> list[int]:
+    if not department_ids:
+        return []
+
+    min_per_department = 3
+    counts = [min_per_department for _ in department_ids]
+    remaining = total_employees - (min_per_department * len(department_ids))
+    if remaining <= 0:
+        counts[0] += max(remaining, 0)
+        return counts
+
+    # Guarantee a few high-density departments for load/perf verification scenarios.
+    high_density_bonus = [140, 130, 120, 110, 100]
+    for index, bonus in enumerate(high_density_bonus):
+        if index >= len(counts):
+            break
+        add = min(remaining, bonus)
+        counts[index] += add
+        remaining -= add
+        if remaining == 0:
+            break
+
+    if remaining > 0:
+        base_add, extra = divmod(remaining, len(counts))
+        for index in range(len(counts)):
+            counts[index] += base_add + (1 if index < extra else 0)
+
+    return counts
+
+
 def ensure_bulk_korean_employees(
     session: Session,
     *,
@@ -441,7 +477,19 @@ def ensure_bulk_korean_employees(
         session.exec(select(AuthUserRole.user_id).where(AuthUserRole.role_id == employee_role.id)).all()
     )
 
-    department_ids = [department.id for department in departments]
+    sorted_departments = sorted(departments, key=lambda department: department.code)
+    department_ids = [department.id for department in sorted_departments]
+    distribution = _build_department_distribution(
+        total_employees=total,
+        department_ids=department_ids,
+    )
+    assignment: list[int] = []
+    for department_id, count in zip(department_ids, distribution):
+        assignment.extend([department_id] * count)
+    if len(assignment) < total:
+        assignment.extend([department_ids[0]] * (total - len(assignment)))
+    elif len(assignment) > total:
+        assignment = assignment[:total]
 
     for index in range(1, total + 1):
         login_id = _build_dev_login_id(index)
@@ -449,6 +497,7 @@ def ensure_bulk_korean_employees(
         display_name = _build_korean_name(index)
 
         user = user_by_login.get(login_id)
+        assigned_department_id = assignment[index - 1]
         if user is None:
             user = AuthUser(
                 login_id=login_id,
@@ -479,13 +528,16 @@ def ensure_bulk_korean_employees(
             employee = HrEmployee(
                 user_id=user.id,
                 employee_no=f"KR-{index:04d}",
-                department_id=department_ids[(index - 1) % len(department_ids)],
+                department_id=assigned_department_id,
                 position_title="Staff",
                 hire_date=date(hire_year, hire_month, hire_day),
                 employment_status="active",
             )
             session.add(employee)
             employee_by_user_id[user.id] = employee
+        elif employee.department_id != assigned_department_id:
+            employee.department_id = assigned_department_id
+            session.add(employee)
 
         if user.id not in employee_role_user_ids:
             session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
