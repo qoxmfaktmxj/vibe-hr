@@ -13,17 +13,27 @@ from app.schemas.menu import (
     MenuRoleUpdateRequest,
     MenuTreeResponse,
     MenuUpdateRequest,
+    RoleCreateRequest,
+    RoleDetailResponse,
     RoleListResponse,
+    RoleMenuMappingResponse,
+    RoleMenuUpdateRequest,
+    RoleUpdateRequest,
 )
 from app.services.menu_service import (
     create_menu,
+    create_role,
     delete_menu,
+    delete_role,
     get_admin_menu_tree,
     get_menu_roles,
     get_menu_tree_for_user,
+    get_role_menus,
     list_roles,
     replace_menu_roles,
+    replace_role_menus,
     update_menu,
+    update_role,
 )
 
 router = APIRouter(prefix="/menus", tags=["menus"])
@@ -137,6 +147,64 @@ def admin_delete_menu(menu_id: int, session: Session = Depends(get_session)) -> 
 )
 def admin_role_list(session: Session = Depends(get_session)) -> RoleListResponse:
     return RoleListResponse(roles=list_roles(session))
+
+
+@router.post(
+    "/admin/roles",
+    response_model=RoleDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_create_role(payload: RoleCreateRequest, session: Session = Depends(get_session)) -> RoleDetailResponse:
+    role = create_role(session, code=payload.code, name=payload.name)
+    return RoleDetailResponse(role={"id": role.id, "code": role.code, "name": role.name})
+
+
+@router.put(
+    "/admin/roles/{role_id}",
+    response_model=RoleDetailResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_update_role(
+    role_id: int,
+    payload: RoleUpdateRequest,
+    session: Session = Depends(get_session),
+) -> RoleDetailResponse:
+    role = update_role(session, role_id=role_id, name=payload.name)
+    return RoleDetailResponse(role={"id": role.id, "code": role.code, "name": role.name})
+
+
+@router.delete(
+    "/admin/roles/{role_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_delete_role(role_id: int, session: Session = Depends(get_session)) -> Response:
+    delete_role(session, role_id=role_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/admin/roles/{role_id}/menus",
+    response_model=RoleMenuMappingResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_role_menus(role_id: int, session: Session = Depends(get_session)) -> RoleMenuMappingResponse:
+    return RoleMenuMappingResponse(role_id=role_id, menus=get_role_menus(session, role_id=role_id))
+
+
+@router.put(
+    "/admin/roles/{role_id}/menus",
+    response_model=RoleMenuMappingResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_update_role_menus(
+    role_id: int,
+    payload: RoleMenuUpdateRequest,
+    session: Session = Depends(get_session),
+) -> RoleMenuMappingResponse:
+    menus = replace_role_menus(session, role_id=role_id, menu_ids=payload.menu_ids)
+    return RoleMenuMappingResponse(role_id=role_id, menus=menus)
 
 
 @router.get(

@@ -82,3 +82,25 @@ class MenuAdminDetailResponse(BaseModel):
 
 class RoleListResponse(BaseModel):
     roles: List[RoleItem]
+
+
+class RoleCreateRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=60)
+
+
+class RoleUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+class RoleDetailResponse(BaseModel):
+    role: RoleItem
+
+
+class RoleMenuMappingResponse(BaseModel):
+    role_id: int
+    menus: List[MenuAdminItem]
+
+
+class RoleMenuUpdateRequest(BaseModel):
+    menu_ids: List[int] = Field(default_factory=list)

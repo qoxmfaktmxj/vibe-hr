@@ -25,13 +25,14 @@ export function LogoutButton() {
   return (
     <Button
       variant="outline"
-      className="gap-2 border-gray-200 text-gray-600"
+      className="border-gray-200 text-gray-600"
       disabled={isSubmitting}
       onClick={handleLogout}
       type="button"
+      aria-label={isSubmitting ? "로그아웃 중" : "로그아웃"}
+      title={isSubmitting ? "로그아웃 중" : "로그아웃"}
     >
       <LogOut className="h-4 w-4" aria-hidden="true" />
-      {isSubmitting ? "로그아웃 중..." : "로그아웃"}
     </Button>
   );
 }

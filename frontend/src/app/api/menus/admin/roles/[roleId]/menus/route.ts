@@ -4,13 +4,17 @@ const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
-export async function GET(request: NextRequest) {
+type RouteContext = { params: Promise<{ roleId: string }> };
+
+export async function GET(request: NextRequest, context: RouteContext) {
   const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!accessToken) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles`, {
+  const { roleId } = await context.params;
+
+  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles/${roleId}/menus`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -20,19 +24,20 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data, { status: upstreamResponse.status });
 }
 
-export async function POST(request: NextRequest) {
+export async function PUT(request: NextRequest, context: RouteContext) {
   const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!accessToken) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
+  const { roleId } = await context.params;
   const payload = await request.json().catch(() => null);
   if (!payload) {
     return NextResponse.json({ detail: "유효하지 않은 요청입니다." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles`, {
-    method: "POST",
+  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles/${roleId}/menus`, {
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",

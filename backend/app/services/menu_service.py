@@ -244,3 +244,74 @@ def check_menu_access(session: Session, user_id: int, menu_code: str) -> bool:
         )
     ).first()
     return link is not None
+
+
+def _get_role_or_404(session: Session, role_id: int) -> AuthRole:
+    role = session.get(AuthRole, role_id)
+    if role is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="역할을 찾을 수 없습니다.")
+    return role
+
+
+def create_role(session: Session, *, code: str, name: str) -> AuthRole:
+    code = code.strip()
+    name = name.strip()
+
+    exists = session.exec(select(AuthRole).where(AuthRole.code == code)).first()
+    if exists is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 존재하는 역할 코드입니다.")
+
+    role = AuthRole(code=code, name=name)
+    session.add(role)
+    session.commit()
+    session.refresh(role)
+    return role
+
+
+def update_role(session: Session, *, role_id: int, name: str) -> AuthRole:
+    role = _get_role_or_404(session, role_id)
+    role.name = name.strip()
+    session.add(role)
+    session.commit()
+    session.refresh(role)
+    return role
+
+
+def delete_role(session: Session, *, role_id: int) -> None:
+    role = _get_role_or_404(session, role_id)
+
+    linked_users = session.exec(select(AuthUserRole.user_id).where(AuthUserRole.role_id == role_id)).first()
+    if linked_users is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="사용자에 연결된 역할은 삭제할 수 없습니다.")
+
+    session.exec(delete(AppMenuRole).where(AppMenuRole.role_id == role_id))
+    session.delete(role)
+    session.commit()
+
+
+def get_role_menus(session: Session, *, role_id: int) -> list[MenuAdminItem]:
+    _get_role_or_404(session, role_id)
+
+    menu_ids = set(
+        session.exec(select(AppMenuRole.menu_id).where(AppMenuRole.role_id == role_id)).all()
+    )
+    all_menus = list(session.exec(select(AppMenu)).all())
+
+    # 선택된 메뉴만 트리 형태로 표시
+    return _build_admin_tree([m for m in all_menus if m.id in menu_ids])
+
+
+def replace_role_menus(session: Session, *, role_id: int, menu_ids: list[int]) -> list[MenuAdminItem]:
+    _get_role_or_404(session, role_id)
+
+    valid_menu_ids = set(session.exec(select(AppMenu.id)).all())
+    unknown = [menu_id for menu_id in menu_ids if menu_id not in valid_menu_ids]
+    if unknown:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"유효하지 않은 menu_id: {unknown}")
+
+    session.exec(delete(AppMenuRole).where(AppMenuRole.role_id == role_id))
+    for menu_id in sorted(set(menu_ids)):
+        session.add(AppMenuRole(menu_id=menu_id, role_id=role_id))
+    session.commit()
+
+    return get_role_menus(session, role_id=role_id)

@@ -26,7 +26,16 @@ export type RoleListResponse = {
   roles: RoleItem[];
 };
 
+export type RoleDetailResponse = {
+  role: RoleItem;
+};
+
 export type MenuRoleMappingResponse = {
   menu_id: number;
   roles: RoleItem[];
+};
+
+export type RoleMenuMappingResponse = {
+  role_id: number;
+  menus: MenuAdminItem[];
 };
