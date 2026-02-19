@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Building2, LockKeyhole, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { useMenu } from "@/components/auth/menu-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,6 +37,7 @@ function AuthCardIntro() {
 function AuthCardForm() {
   const router = useRouter();
   const { login } = useAuth();
+  const { refreshMenus } = useMenu();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -56,6 +58,7 @@ function AuthCardForm() {
 
     try {
       await login({ loginId, password });
+      await refreshMenus();
       router.replace("/dashboard");
     } catch {
       setErrorMessage("로그인에 실패했습니다. 아이디와 비밀번호를 확인해 주세요.");

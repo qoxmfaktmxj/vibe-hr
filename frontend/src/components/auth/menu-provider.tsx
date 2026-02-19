@@ -1,20 +1,20 @@
-"use client";
+﻿"use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { usePathname } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import type { MenuNode } from "@/types/menu";
 
 type MenuContextValue = {
   menus: MenuNode[];
-  /** 특정 경로에 대한 접근 권한이 있는지 확인 */
+  isLoading: boolean;
+  refreshMenus: () => Promise<void>;
   hasAccess: (path: string) => boolean;
-  /** 특정 메뉴 코드에 대한 접근 권한이 있는지 확인 */
   hasMenuCode: (code: string) => boolean;
 };
 
 const MenuContext = createContext<MenuContextValue | null>(null);
 
-/** 트리에서 모든 경로/코드를 플랫하게 수집 */
 function collectPaths(menus: MenuNode[]): Set<string> {
   const paths = new Set<string>();
   function walk(nodes: MenuNode[]) {
@@ -46,16 +46,55 @@ export function MenuProvider({
   children: React.ReactNode;
   initialMenus: MenuNode[];
 }) {
+  const pathname = usePathname();
+  const [menus, setMenus] = useState<MenuNode[]>(initialMenus);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const refreshMenus = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/menus/tree", {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        setMenus([]);
+        return;
+      }
+
+      const data = (await response.json()) as { menus?: MenuNode[] };
+      setMenus(data.menus ?? []);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setMenus(initialMenus);
+  }, [initialMenus]);
+
+  useEffect(() => {
+    if (pathname === "/login" || pathname === "/unauthorized") {
+      return;
+    }
+
+    if (menus.length === 0) {
+      void refreshMenus();
+    }
+  }, [menus.length, pathname, refreshMenus]);
+
   const value = useMemo<MenuContextValue>(() => {
-    const pathSet = collectPaths(initialMenus);
-    const codeSet = collectCodes(initialMenus);
+    const pathSet = collectPaths(menus);
+    const codeSet = collectCodes(menus);
 
     return {
-      menus: initialMenus,
+      menus,
+      isLoading,
+      refreshMenus,
       hasAccess: (path: string) => pathSet.has(path),
       hasMenuCode: (code: string) => codeSet.has(code),
     };
-  }, [initialMenus]);
+  }, [isLoading, menus, refreshMenus]);
 
   return <MenuContext.Provider value={value}>{children}</MenuContext.Provider>;
 }
