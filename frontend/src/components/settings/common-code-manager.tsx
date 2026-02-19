@@ -17,39 +17,39 @@ import type {
 } from "@/types/common-code";
 
 const T = {
-  loading: "\uacf5\ud1b5\ucf54\ub4dc\ub97c \ubd88\ub7ec\uc624\ub294 \uc911...",
-  loadGroupsError: "\ucf54\ub4dc \uadf8\ub8f9\uc744 \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
-  initLoadError: "\ucd08\uae30 \ub85c\ub529\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  saveFailed: "\uc800\uc7a5\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  deleteFailed: "\uc0ad\uc81c\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  groupSaved: "\uadf8\ub8f9\ucf54\ub4dc \uc800\uc7a5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  groupDeleted: "\uadf8\ub8f9\ucf54\ub4dc \uc0ad\uc81c\uac00 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  codeSaved: "\uc138\ubd80\ucf54\ub4dc \uc800\uc7a5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  codeDeleted: "\uc138\ubd80\ucf54\ub4dc \uc0ad\uc81c\uac00 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
+  loading: "공통코드를 불러오는 중...",
+  loadGroupsError: "코드 그룹을 불러오지 못했습니다.",
+  initLoadError: "초기 로딩에 실패했습니다.",
+  saveFailed: "저장에 실패했습니다.",
+  deleteFailed: "삭제에 실패했습니다.",
+  groupSaved: "그룹코드 저장이 완료되었습니다.",
+  groupDeleted: "그룹코드 삭제가 완료되었습니다.",
+  codeSaved: "세부코드 저장이 완료되었습니다.",
+  codeDeleted: "세부코드 삭제가 완료되었습니다.",
   askDeleteGroup:
-    "\uc120\ud0dd\ud55c \uadf8\ub8f9\ucf54\ub4dc\ub97c \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c? \ud558\uc704 \uc138\ubd80\ucf54\ub4dc\ub3c4 \ud568\uaed8 \uc0ad\uc81c\ub429\ub2c8\ub2e4.",
-  askDeleteCode: "\uc120\ud0dd\ud55c \uc138\ubd80\ucf54\ub4dc\ub97c \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?",
-  copySuffix: " \ubcf5\uc0ac",
-  groupCode: "\uadf8\ub8f9\ucf54\ub4dc",
-  groupName: "\uadf8\ub8f9\ucf54\ub4dc\uba85",
-  query: "\uc870\ud68c",
-  groupManage: "\uadf8\ub8f9\ucf54\ub4dc \uad00\ub9ac",
-  codeName: "\ucf54\ub4dc\uba85",
-  codeDesc: "\ucf54\ub4dc\uc124\uba85",
-  use: "\uc0ac\uc6a9",
-  order: "\uc21c\uc11c",
-  sortOrder: "\uc815\ub82c\uc21c\uc11c",
-  download: "\ub2e4\uc6b4\ub85c\ub4dc",
-  copy: "\ubcf5\uc0ac",
-  input: "\uc785\ub825",
-  save: "\uc800\uc7a5",
-  delete: "\uc0ad\uc81c",
-  detailCode: "\uc138\ubd80\ucf54\ub4dc",
-  detailCodeName: "\uc138\ubd80\ucf54\ub4dc\uba85",
-  detailManage: "\uc138\ubd80\ucf54\ub4dc \uad00\ub9ac",
-  engName: "\uc601\ubb38\uba85",
-  note1: "\ube44\uace01",
-  note2: "\ube44\uace02",
+    "선택한 그룹코드를 삭제하시겠습니까? 하위 세부코드도 함께 삭제됩니다.",
+  askDeleteCode: "선택한 세부코드를 삭제하시겠습니까?",
+  copySuffix: " 복사",
+  groupCode: "그룹코드",
+  groupName: "그룹코드명",
+  query: "조회",
+  groupManage: "그룹코드 관리",
+  codeName: "코드명",
+  codeDesc: "코드설명",
+  use: "사용",
+  order: "순서",
+  sortOrder: "정렬순서",
+  download: "다운로드",
+  copy: "복사",
+  input: "입력",
+  save: "저장",
+  delete: "삭제",
+  detailCode: "세부코드",
+  detailCodeName: "세부코드명",
+  detailManage: "세부코드 관리",
+  engName: "영문명",
+  note1: "비고1",
+  note2: "비고2",
 };
 
 const EMPTY_GROUP = {
@@ -80,7 +80,7 @@ function downloadCsv(filename: string, headers: string[], rows: Array<Array<stri
     ...rows.map((row) => row.map((value) => toCsvCell(value)).join(",")),
   ].join("\n");
 
-  const blob = new Blob(["\uFEFF", text], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿", text], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

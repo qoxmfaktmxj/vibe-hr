@@ -40,55 +40,55 @@ type EmployeeGridRow = EmployeeItem & {
 };
 
 const I18N = {
-  loading: "\uc0ac\uc6d0 \ub370\uc774\ud130\ub97c \ubd88\ub7ec\uc624\ub294 \uc911...",
-  loadEmployeeError: "\uc0ac\uc6d0 \ubaa9\ub85d\uc744 \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
-  loadDepartmentError: "\ubd80\uc11c \ubaa9\ub85d\uc744 \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
-  initError: "\ucd08\uae30 \ub85c\ub529\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  saveDone: "\uc77c\uad04 \uc800\uc7a5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
-  saveFailed: "\uc800\uc7a5\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  deleteFailed: "\uc0ad\uc81c\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  nothingToSave: "\uc800\uc7a5\ud560 \ubcc0\uacbd \uc0ac\ud56d\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
-  validationError: "\uc785\ub825 \uac12\uc744 \ud655\uc778\ud558\uc138\uc694. \ud544\uc218 \uc785\ub825\uc774 \ube44\uc5b4 \uc788\uc2b5\ub2c8\ub2e4.",
-  pasteDone: "\ud074\ub9bd\ubcf4\ub4dc \ub370\uc774\ud130\ub97c \uc0c8 \ud589\uc73c\ub85c \ucd94\uac00\ud588\uc2b5\ub2c8\ub2e4.",
-  addRowsDone: "\uc0c8 \ud589\uc744 \ucd94\uac00\ud588\uc2b5\ub2c8\ub2e4.",
-  markDeleteDone: "\uc120\ud0dd\ud55c \ud589\uc744 \uc0ad\uc81c \uc608\uc815\uc73c\ub85c \ud45c\uc2dc\ud588\uc2b5\ub2c8\ub2e4.",
-  cancelDone: "\ubcc0\uacbd \uc0ac\ud56d\uc744 \ucde8\uc18c\ud588\uc2b5\ub2c8\ub2e4.",
+  loading: "사원 데이터를 불러오는 중...",
+  loadEmployeeError: "사원 목록을 불러오지 못했습니다.",
+  loadDepartmentError: "부서 목록을 불러오지 못했습니다.",
+  initError: "초기 로딩에 실패했습니다.",
+  saveDone: "일괄 저장이 완료되었습니다.",
+  saveFailed: "저장에 실패했습니다.",
+  deleteFailed: "삭제에 실패했습니다.",
+  nothingToSave: "저장할 변경 사항이 없습니다.",
+  validationError: "입력 값을 확인하세요. 필수 입력이 비어 있습니다.",
+  pasteDone: "클립보드 데이터를 새 행으로 추가했습니다.",
+  addRowsDone: "새 행을 추가했습니다.",
+  markDeleteDone: "선택한 행을 삭제 예정으로 표시했습니다.",
+  cancelDone: "변경 사항을 취소했습니다.",
   copiedHint:
-    "\ud654\uba74\uc744 \ud074\ub9ad\ud55c \uc0c1\ud0dc\uc5d0\uc11c Ctrl+V\ub85c \uc5d1\uc140 \ud589\uc744 \uadf8\ub9ac\ub4dc\uc5d0 \ucd94\uac00\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.",
-  summaryLabel: "\ubcc0\uacbd \uc694\uc57d",
-  statusClean: "\uc815\uc0c1",
-  statusAdded: "\uc785\ub825",
-  statusUpdated: "\uc218\uc815",
-  statusDeleted: "\uc0ad\uc81c",
-  noRows: "\uc0ac\uc6d0 \ub370\uc774\ud130\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.",
-  requiredName: "\uc774\ub984\uc740 2\uc790 \uc774\uc0c1 \ud544\uc218\uc785\ub2c8\ub2e4.",
-  requiredDepartment: "\ubd80\uc11c\ub97c \uc120\ud0dd\ud574\uc57c \ud569\ub2c8\ub2e4.",
-  requiredPosition: "\uc9c1\ucc45\uc740 \ud544\uc218\uc785\ub2c8\ub2e4.",
-  savePartial: "\uc77c\uad04 \uc800\uc7a5\uc740 \uc644\ub8cc\ub418\uc5c8\uc9c0\ub9cc \uc77c\ubd80 \ud589\uc774 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
-  deleteConfirm: "\uc120\ud0dd\ud55c \ud589\uc744 \uc0ad\uc81c \uc608\uc815\uc73c\ub85c \ubcc0\uacbd\ud560\uae4c\uc694?",
-  title: "\uc0ac\uc6d0 \ub9c8\uc2a4\ud130",
-  searchPlaceholder: "\uc0ac\ubc88/\uc774\ub984/\ub85c\uadf8\uc778ID/\ubd80\uc11c \uac80\uc0c9",
-  addRow: "\ud589 \ucd94\uac00",
-  addTenRows: "10\ud589 \ucd94\uac00",
-  markDelete: "\uc120\ud0dd \uc0ad\uc81c \ud45c\uc2dc",
-  rollback: "\ubcc0\uacbd \ucde8\uc18c",
-  saveAll: "\uc77c\uad04 \uc800\uc7a5",
-  selectedCount: "\uc120\ud0dd",
-  rowCount: "\uc804\uccb4",
+    "화면을 클릭한 상태에서 Ctrl+V로 엑셀 행을 그리드에 추가할 수 있습니다.",
+  summaryLabel: "변경 요약",
+  statusClean: "정상",
+  statusAdded: "입력",
+  statusUpdated: "수정",
+  statusDeleted: "삭제",
+  noRows: "사원 데이터가 없습니다.",
+  requiredName: "이름은 2자 이상 필수입니다.",
+  requiredDepartment: "부서를 선택해야 합니다.",
+  requiredPosition: "직책은 필수입니다.",
+  savePartial: "일괄 저장은 완료되었지만 일부 행이 실패했습니다.",
+  deleteConfirm: "선택한 행을 삭제 예정으로 변경할까요?",
+  title: "사원 마스터",
+  searchPlaceholder: "사번/이름/로그인ID/부서 검색",
+  addRow: "행 추가",
+  addTenRows: "10행 추가",
+  markDelete: "선택 삭제 표시",
+  rollback: "변경 취소",
+  saveAll: "일괄 저장",
+  selectedCount: "선택",
+  rowCount: "전체",
   pasteGuide:
-    "\uc5d1\uc140 \ubcf5\uc0ac \uc5f4 \uc21c\uc11c: \uc774\ub984 | \ubd80\uc11c\ucf54\ub4dc(\ub610\ub294 \ubd80\uc11c\uba85) | \uc9c1\ucc45 | \uc785\uc0ac\uc77c(YYYY-MM-DD) | \uc7ac\uc9c1\uc0c1\ud0dc(active/leave/resigned) | \uc774\uba54\uc77c | \ud65c\uc131(Y/N) | \ube44\ubc00\ubc88\ud638",
-  colStatus: "\uc0c1\ud0dc",
-  colEmployeeNo: "\uc0ac\ubc88",
-  colLoginId: "\ub85c\uadf8\uc778ID",
-  colName: "\uc774\ub984",
-  colDepartment: "\ubd80\uc11c",
-  colPosition: "\uc9c1\ucc45",
-  colHireDate: "\uc785\uc0ac\uc77c",
-  colEmploymentStatus: "\uc7ac\uc9c1\uc0c1\ud0dc",
-  colEmail: "\uc774\uba54\uc77c",
-  colActive: "\ud65c\uc131",
-  colPassword: "\ube44\ubc00\ubc88\ud638(\uc2e0\uaddc/\ubcc0\uacbd)",
-  colError: "\uc5d0\ub7ec",
+    "엑셀 복사 열 순서: 이름 | 부서코드(또는 부서명) | 직책 | 입사일(YYYY-MM-DD) | 재직상태(active/leave/resigned) | 이메일 | 활성(Y/N) | 비밀번호",
+  colStatus: "상태",
+  colEmployeeNo: "사번",
+  colLoginId: "로그인ID",
+  colName: "이름",
+  colDepartment: "부서",
+  colPosition: "직책",
+  colHireDate: "입사일",
+  colEmploymentStatus: "재직상태",
+  colEmail: "이메일",
+  colActive: "활성",
+  colPassword: "비밀번호(신규/변경)",
+  colError: "에러",
 };
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
@@ -145,8 +145,8 @@ function toGridRow(employee: EmployeeItem): EmployeeGridRow {
 
 function normalizeEmploymentStatus(value: string): EmployeeItem["employment_status"] {
   const v = value.trim().toLowerCase();
-  if (v === "leave" || v === "\ud734\uc9c1") return "leave";
-  if (v === "resigned" || v === "\ud1f4\uc0ac") return "resigned";
+  if (v === "leave" || v === "휴직") return "leave";
+  if (v === "resigned" || v === "퇴사") return "resigned";
   return "active";
 }
 
@@ -701,7 +701,7 @@ export function EmployeeMasterManager() {
 
     if (failedMessages.length > 0) {
       setNoticeType("error");
-      setNotice(`${I18N.savePartial} (${failedMessages.length}\uac74)`);
+      setNotice(`${I18N.savePartial} (${failedMessages.length}건)`);
       return;
     }
 
@@ -721,7 +721,7 @@ export function EmployeeMasterManager() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>
-              {I18N.title} ({rows.length.toLocaleString()}\uba85)
+              {I18N.title} ({rows.length.toLocaleString()}명)
             </CardTitle>
             <p className="mt-1 text-xs text-slate-500">{I18N.pasteGuide}</p>
           </div>
@@ -746,7 +746,7 @@ export function EmployeeMasterManager() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
             <div className="space-y-1">
-              <Label className="text-xs">\uac80\uc0c9</Label>
+              <Label className="text-xs">검색</Label>
               <Input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
@@ -755,7 +755,7 @@ export function EmployeeMasterManager() {
             </div>
             <div className="flex items-end text-xs text-slate-500">
               <div>
-                {I18N.summaryLabel}: {I18N.statusAdded} {changeSummary.added}\uac74 / {I18N.statusUpdated} {changeSummary.updated}\uac74 / {I18N.statusDeleted} {changeSummary.deleted}\uac74
+                {I18N.summaryLabel}: {I18N.statusAdded} {changeSummary.added}건 / {I18N.statusUpdated} {changeSummary.updated}건 / {I18N.statusDeleted} {changeSummary.deleted}건
               </div>
             </div>
           </div>

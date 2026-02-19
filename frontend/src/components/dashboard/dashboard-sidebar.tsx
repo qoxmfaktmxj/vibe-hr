@@ -79,11 +79,11 @@ function getInitials(name: string): string {
 function toEmploymentStatusLabel(status: EmployeeItem["employment_status"]): string {
   switch (status) {
     case "leave":
-      return "\uD734\uC9C1";
+      return "휴직";
     case "resigned":
-      return "\uD1F4\uC0AC";
+      return "퇴사";
     default:
-      return "\uC7AC\uC9C1";
+      return "재직";
   }
 }
 
@@ -172,20 +172,20 @@ export function DashboardSidebar() {
 
   const profileRows = useMemo(
     () => [
-      { label: "\uC774\uB984", value: displayName },
-      { label: "\uC774\uBA54\uC77C", value: user?.email ?? "-" },
-      { label: "\uAD8C\uD55C", value: roleLabels || "-" },
-      { label: "\uB85C\uADF8\uC778ID", value: profileEmployee?.login_id ?? "-" },
-      { label: "\uC0AC\uBC88", value: profileEmployee?.employee_no ?? "-" },
-      { label: "\uBD80\uC11C", value: profileEmployee?.department_name ?? "-" },
-      { label: "\uC9C1\uCC45", value: profileEmployee?.position_title ?? "-" },
-      { label: "\uC785\uC0AC\uC77C", value: profileEmployee?.hire_date ?? "-" },
+      { label: "이름", value: displayName },
+      { label: "이메일", value: user?.email ?? "-" },
+      { label: "권한", value: roleLabels || "-" },
+      { label: "로그인ID", value: profileEmployee?.login_id ?? "-" },
+      { label: "사번", value: profileEmployee?.employee_no ?? "-" },
+      { label: "부서", value: profileEmployee?.department_name ?? "-" },
+      { label: "직책", value: profileEmployee?.position_title ?? "-" },
+      { label: "입사일", value: profileEmployee?.hire_date ?? "-" },
       {
-        label: "\uC7AC\uC9C1\uC0C1\uD0DC",
+        label: "재직상태",
         value: profileEmployee ? toEmploymentStatusLabel(profileEmployee.employment_status) : "-",
       },
       {
-        label: "\uB85C\uADF8\uC778 \uD65C\uC131",
+        label: "로그인 활성",
         value: profileEmployee ? (profileEmployee.is_active ? "Y" : "N") : "-",
       },
     ],
@@ -200,7 +200,7 @@ export function DashboardSidebar() {
       const response = await fetch("/api/employees/me", { cache: "no-store" });
       if (!response.ok) {
         const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(json?.detail ?? "\uD504\uB85C\uD544 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+        throw new Error(json?.detail ?? "프로필 정보를 불러오지 못했습니다.");
       }
 
       const json = (await response.json()) as { employee?: EmployeeItem };
@@ -210,7 +210,7 @@ export function DashboardSidebar() {
       setProfileError(
         error instanceof Error
           ? error.message
-          : "\uD504\uB85C\uD544 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+          : "프로필 정보를 불러오지 못했습니다.",
       );
     } finally {
       setProfileLoading(false);
@@ -230,7 +230,7 @@ export function DashboardSidebar() {
         </div>
         <div>
           <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
-          <p className="text-xs text-[var(--vibe-accent-muted)]">\uC778\uC0AC \uAD00\uB9AC \uC2DC\uC2A4\uD15C</p>
+          <p className="text-xs text-[var(--vibe-accent-muted)]">인사 관리 시스템</p>
         </div>
       </div>
 
@@ -260,7 +260,7 @@ export function DashboardSidebar() {
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-gray-900">{displayName}</span>
             <span className="text-xs text-[var(--vibe-accent-muted)]">{roleLabels || "-"}</span>
-            <span className="text-[11px] text-[var(--vibe-accent-muted)]">\uB0B4 \uC815\uBCF4 \uBCF4\uAE30</span>
+            <span className="text-[11px] text-[var(--vibe-accent-muted)]">내 정보 보기</span>
           </div>
         </button>
       </div>
@@ -273,22 +273,22 @@ export function DashboardSidebar() {
         type="button"
         className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
         onClick={() => setMobileOpen(true)}
-        aria-label="\uBA54\uB274 \uC5F4\uAE30"
+        aria-label="메뉴 열기"
       >
         <PanelLeft className="h-4 w-4" aria-hidden="true" />
-        \uBA54\uB274
+        메뉴
       </button>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="\uBA54\uB274 \uB2EB\uAE30" />
+          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-gray-200 bg-[var(--vibe-sidebar-bg)]">
             <div className="flex justify-end p-3">
               <button
                 type="button"
                 className="rounded-md border bg-white p-2"
                 onClick={() => setMobileOpen(false)}
-                aria-label="\uBA54\uB274 \uB2EB\uAE30"
+                aria-label="메뉴 닫기"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -303,7 +303,7 @@ export function DashboardSidebar() {
           <button
             type="button"
             className="absolute inset-0 bg-black/50"
-            aria-label="\uD504\uB85C\uD544 \uB2EB\uAE30"
+            aria-label="프로필 닫기"
             onClick={() => setProfileOpen(false)}
           />
           <div className="relative z-10 w-full max-w-xl rounded-xl border bg-white p-6 shadow-2xl">
@@ -321,13 +321,13 @@ export function DashboardSidebar() {
                 type="button"
                 className="rounded-md border p-2 text-slate-500 hover:bg-slate-50"
                 onClick={() => setProfileOpen(false)}
-                aria-label="\uD504\uB85C\uD544 \uB2EB\uAE30"
+                aria-label="프로필 닫기"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {profileLoading ? <p className="mb-4 text-sm text-slate-500">\uBD88\uB7EC\uC624\uB294 \uC911...</p> : null}
+            {profileLoading ? <p className="mb-4 text-sm text-slate-500">불러오는 중...</p> : null}
             {profileError ? <p className="mb-4 text-sm text-red-500">{profileError}</p> : null}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
