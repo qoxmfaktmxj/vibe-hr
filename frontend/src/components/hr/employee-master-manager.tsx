@@ -72,13 +72,13 @@ const I18N = {
   copy: "복사",
   templateDownload: "양식다운로드(CSV)",
   upload: "업로드",
-  download: "CSV 다운로드",
+  download: "엑셀 다운로드",
   saveAll: "저장",
   removeAddedRowDone: "선택한 행을 삭제 상태로 변경했습니다.",
   copyDone: "선택한 행을 입력행으로 복제했습니다.",
   templateDone: "양식을 다운로드했습니다.",
   uploadDone: "업로드 데이터를 반영했습니다.",
-  downloadDone: "현재 시트 전체를 다운로드했습니다.",
+  downloadDone: "현재 시트 전체를 엑셀로 다운로드했습니다.",
   selectedCount: "선택",
   rowCount: "전체",
   pasteGuide:
@@ -577,7 +577,7 @@ export function EmployeeMasterManager() {
     setNotice(I18N.templateDone);
   }
 
-  function downloadCurrentSheetCsv() {
+  async function downloadCurrentSheetExcel() {
     const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
     const data = rows
       .filter((row) => row._status !== "deleted")
@@ -593,17 +593,13 @@ export function EmployeeMasterManager() {
         row.is_active ? "Y" : "N",
       ]);
 
-    const csv = [headers, ...data]
-      .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const { utils, writeFileXLSX } = await import("xlsx");
+    const aoa = [headers, ...data];
+    const sheet = utils.aoa_to_sheet(aoa);
+    const book = utils.book_new();
+    utils.book_append_sheet(book, sheet, "사원관리");
+    writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `employee-sheet-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
     setNoticeType("success");
     setNotice(I18N.downloadDone);
   }
@@ -849,7 +845,7 @@ export function EmployeeMasterManager() {
             <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
               {I18N.upload}
             </Button>
-            <Button size="sm" variant="outline" onClick={downloadCurrentSheetCsv}>
+            <Button size="sm" variant="outline" onClick={() => void downloadCurrentSheetExcel()}>
               {I18N.download}
             </Button>
             <Button size="sm" onClick={saveAllChanges} disabled={saving}>
