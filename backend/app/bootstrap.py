@@ -315,7 +315,7 @@ _MENU_TREE: list[dict] = [
             },
             {
                 "code": "hr.leave",
-                "name": "휴가관리",
+                "name": "휴일관리",
                 "path": "/tim/holidays",
                 "icon": "CalendarDays",
                 "sort_order": 222,
