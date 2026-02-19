@@ -26,26 +26,35 @@ import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { MenuNode } from "@/types/menu";
 
-/** 아이콘 이름 → lucide-react 컴포넌트 매핑 */
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard,
-  UsersRound,
-  UserRound,
-  Clock,
-  CalendarCheck2,
-  CalendarDays,
-  Wallet,
-  Calculator,
-  FileText,
-  Settings,
-  Shield,
-  Menu: Menu,
-  PanelLeft,
-};
-
-function getIcon(iconName: string | null) {
-  if (!iconName) return LayoutDashboard;
-  return ICON_MAP[iconName] ?? LayoutDashboard;
+function renderIcon(iconName: string | null, className: string) {
+  switch (iconName) {
+    case "UsersRound":
+      return <UsersRound className={className} aria-hidden="true" />;
+    case "UserRound":
+      return <UserRound className={className} aria-hidden="true" />;
+    case "Clock":
+      return <Clock className={className} aria-hidden="true" />;
+    case "CalendarCheck2":
+      return <CalendarCheck2 className={className} aria-hidden="true" />;
+    case "CalendarDays":
+      return <CalendarDays className={className} aria-hidden="true" />;
+    case "Wallet":
+      return <Wallet className={className} aria-hidden="true" />;
+    case "Calculator":
+      return <Calculator className={className} aria-hidden="true" />;
+    case "FileText":
+      return <FileText className={className} aria-hidden="true" />;
+    case "Settings":
+      return <Settings className={className} aria-hidden="true" />;
+    case "Shield":
+      return <Shield className={className} aria-hidden="true" />;
+    case "Menu":
+      return <Menu className={className} aria-hidden="true" />;
+    case "PanelLeft":
+      return <PanelLeft className={className} aria-hidden="true" />;
+    default:
+      return <LayoutDashboard className={className} aria-hidden="true" />;
+  }
 }
 
 function getInitials(name: string): string {
@@ -57,23 +66,18 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-/** 단일 메뉴 아이템 (리프 노드) */
 function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean }) {
-  const Icon = getIcon(node.icon);
-
   if (!node.path) return null;
 
   return (
     <Link
       href={node.path}
       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-        isActive
-          ? "bg-primary/10 text-primary"
-          : "text-gray-500 hover:bg-white hover:text-gray-800"
+        isActive ? "bg-primary/10 text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
       }`}
       aria-current={isActive ? "page" : undefined}
     >
-      <Icon className="h-4 w-4" aria-hidden="true" />
+      {renderIcon(node.icon, "h-4 w-4")}
       {node.name}
     </Link>
   );
@@ -84,7 +88,6 @@ function hasActiveDescendant(node: MenuNode, currentPath: string): boolean {
   return node.children.some((child) => hasActiveDescendant(child, currentPath));
 }
 
-/** 자식이 있는 그룹 메뉴 (접을 수 있는 섹션) */
 function MenuGroupItem({
   node,
   currentPath,
@@ -96,7 +99,6 @@ function MenuGroupItem({
 }) {
   const active = hasActiveDescendant(node, currentPath);
   const [isOpen, setIsOpen] = useState(active);
-  const Icon = getIcon(node.icon);
 
   return (
     <div>
@@ -108,7 +110,7 @@ function MenuGroupItem({
         }`}
         style={{ paddingLeft: `${16 + depth * 12}px` }}
       >
-        <Icon className="h-4 w-4" aria-hidden="true" />
+        {renderIcon(node.icon, "h-4 w-4")}
         <span className="flex-1 text-left">{node.name}</span>
         <ChevronDown
           className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -116,7 +118,7 @@ function MenuGroupItem({
         />
       </button>
 
-      {isOpen && (
+      {isOpen ? (
         <div className={`mt-0.5 space-y-0.5 ${depth >= 0 ? "ml-4 border-l border-gray-200 pl-3" : ""}`}>
           {node.children.map((child) =>
             child.children.length > 0 ? (
@@ -127,10 +129,10 @@ function MenuGroupItem({
                 node={child}
                 isActive={child.path ? currentPath.startsWith(child.path) : false}
               />
-            )
+            ),
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -149,7 +151,7 @@ export function DashboardSidebar() {
     <>
       <div className="flex items-center gap-3 p-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-          <CalendarCheck2 className="h-5 w-5" />
+          <CalendarCheck2 className="h-5 w-5" aria-hidden="true" />
         </div>
         <div>
           <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
@@ -167,16 +169,14 @@ export function DashboardSidebar() {
               node={node}
               isActive={node.path ? pathname.startsWith(node.path) : false}
             />
-          )
+          ),
         )}
       </nav>
 
       <div className="border-t border-gray-100 p-4">
         <div className="flex items-center gap-3 p-2">
           <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-              {initials}
-            </AvatarFallback>
+            <AvatarFallback className="bg-primary/10 font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-gray-900">{displayName}</span>
@@ -193,24 +193,28 @@ export function DashboardSidebar() {
         type="button"
         className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
         onClick={() => setMobileOpen(true)}
-        aria-label="메뉴 열기"
+        aria-label="Open menu"
       >
-        <PanelLeft className="h-4 w-4" />
-        메뉴
+        <PanelLeft className="h-4 w-4" aria-hidden="true" />
+        Menu
       </button>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <button
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu backdrop"
+          />
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-gray-200 bg-[var(--vibe-sidebar-bg)]">
             <div className="flex justify-end p-3">
               <button
                 type="button"
                 className="rounded-md border bg-white p-2"
                 onClick={() => setMobileOpen(false)}
-                aria-label="메뉴 닫기"
+                aria-label="Close menu"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
             {sidebarContent}

@@ -1,0 +1,78 @@
+﻿from fastapi import APIRouter, Depends, Response, status
+from sqlmodel import Session
+
+from app.core.auth import require_roles
+from app.core.database import get_session
+from app.schemas.employee import (
+    DepartmentListResponse,
+    EmployeeCreateRequest,
+    EmployeeDetailResponse,
+    EmployeeListResponse,
+    EmployeeUpdateRequest,
+)
+from app.services.employee_service import (
+    create_employee,
+    delete_employee,
+    list_departments,
+    list_employees,
+    update_employee,
+)
+
+router = APIRouter(prefix="/employees", tags=["employees"])
+
+
+@router.get(
+    "",
+    response_model=EmployeeListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_list(session: Session = Depends(get_session)) -> EmployeeListResponse:
+    employees = list_employees(session)
+    return EmployeeListResponse(employees=employees, total_count=len(employees))
+
+
+@router.get(
+    "/departments",
+    response_model=DepartmentListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_departments(session: Session = Depends(get_session)) -> DepartmentListResponse:
+    return DepartmentListResponse(departments=list_departments(session))
+
+
+@router.post(
+    "",
+    response_model=EmployeeDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_create(
+    payload: EmployeeCreateRequest,
+    session: Session = Depends(get_session),
+) -> EmployeeDetailResponse:
+    employee = create_employee(session, payload)
+    return EmployeeDetailResponse(employee=employee)
+
+
+@router.put(
+    "/{employee_id}",
+    response_model=EmployeeDetailResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_update(
+    employee_id: int,
+    payload: EmployeeUpdateRequest,
+    session: Session = Depends(get_session),
+) -> EmployeeDetailResponse:
+    employee = update_employee(session, employee_id, payload)
+    return EmployeeDetailResponse(employee=employee)
+
+
+@router.delete(
+    "/{employee_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_delete(employee_id: int, session: Session = Depends(get_session)) -> Response:
+    delete_employee(session, employee_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

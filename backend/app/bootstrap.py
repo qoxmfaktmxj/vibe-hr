@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from datetime import date
+import random
+import string
 
 from sqlalchemy import text
 from sqlmodel import Session, select
@@ -17,6 +21,201 @@ from app.models import (
     HrLeaveRequest,
     OrgDepartment,
 )
+
+DEV_EMPLOYEE_TOTAL = 2000
+DEV_EMPLOYEE_LOGIN_PREFIX = "kr-"
+DEV_EMPLOYEE_PASSWORD_HASH = hash_password("admin")
+
+KOREAN_SURNAMES = [
+    "\uAE40",
+    "\uC774",
+    "\uBC15",
+    "\uCD5C",
+    "\uC815",
+    "\uAC15",
+    "\uC870",
+    "\uC724",
+    "\uC7A5",
+    "\uC784",
+    "\uC624",
+    "\uD55C",
+    "\uC11C",
+    "\uC2E0",
+    "\uAD8C",
+    "\uD669",
+    "\uC548",
+    "\uC1A1",
+    "\uB958",
+    "\uC804",
+]
+KOREAN_GIVEN_FIRST = [
+    "\uBBFC",
+    "\uC11C",
+    "\uC9C0",
+    "\uC218",
+    "\uC608",
+    "\uD604",
+    "\uC720",
+    "\uC6B0",
+    "\uC900",
+    "\uD558",
+    "\uC815",
+    "\uC740",
+    "\uC601",
+    "\uB3D9",
+    "\uC131",
+    "\uC7AC",
+    "\uC9C4",
+    "\uD0DC",
+    "\uC9C4",
+    "\uC5F0",
+]
+KOREAN_GIVEN_SECOND = [
+    "\uC900",
+    "\uC544",
+    "\uD76C",
+    "\uC5F0",
+    "\uD604",
+    "\uC6B0",
+    "\uD6C8",
+    "\uC11D",
+    "\uB9BC",
+    "\uC11D",
+    "\uC6D0",
+    "\uB9AC",
+    "\uC740",
+    "\uB0A8",
+    "\uC120",
+    "\uBE48",
+    "\uC601",
+    "\uC548",
+    "\uBBFC",
+    "\uD658",
+]
+
+DEPARTMENT_SEEDS = [
+    ("HQ-HR", "HR"),
+    ("HQ-ENG", "Engineering"),
+    ("HQ-SALES", "Sales"),
+    ("HQ-FIN", "Finance"),
+    ("HQ-OPS", "Operations"),
+]
+
+MENU_TREE: list[dict] = [
+    {
+        "code": "dashboard",
+        "name": "Dashboard",
+        "path": "/dashboard",
+        "icon": "LayoutDashboard",
+        "sort_order": 100,
+        "roles": ["employee", "hr_manager", "payroll_mgr", "admin"],
+        "children": [],
+    },
+    {
+        "code": "hr",
+        "name": "HR",
+        "path": None,
+        "icon": "UsersRound",
+        "sort_order": 200,
+        "roles": ["hr_manager", "admin"],
+        "children": [
+            {
+                "code": "hr.employee",
+                "name": "Employee Master",
+                "path": "/hr/employee",
+                "icon": "UserRound",
+                "sort_order": 210,
+                "roles": ["hr_manager", "admin"],
+            },
+        ],
+    },
+    {
+        "code": "tim",
+        "name": "Attendance",
+        "path": None,
+        "icon": "Clock",
+        "sort_order": 220,
+        "roles": ["employee", "hr_manager", "admin"],
+        "children": [
+            {
+                "code": "hr.attendance",
+                "name": "Attendance Code",
+                "path": "/tim/codes",
+                "icon": "CalendarCheck2",
+                "sort_order": 221,
+                "roles": ["hr_manager", "admin"],
+            },
+            {
+                "code": "hr.leave",
+                "name": "Holiday Calendar",
+                "path": "/tim/holidays",
+                "icon": "CalendarDays",
+                "sort_order": 222,
+                "roles": ["hr_manager", "admin"],
+            },
+        ],
+    },
+    {
+        "code": "payroll",
+        "name": "Payroll",
+        "path": None,
+        "icon": "Wallet",
+        "sort_order": 300,
+        "roles": ["payroll_mgr", "admin"],
+        "children": [
+            {
+                "code": "payroll.calc",
+                "name": "Payroll Calc",
+                "path": "/payroll/calc",
+                "icon": "Calculator",
+                "sort_order": 310,
+                "roles": ["payroll_mgr", "admin"],
+            },
+            {
+                "code": "payroll.slip",
+                "name": "Payroll Slip",
+                "path": "/payroll/slip",
+                "icon": "FileText",
+                "sort_order": 320,
+                "roles": ["employee", "payroll_mgr", "admin"],
+            },
+        ],
+    },
+    {
+        "code": "settings",
+        "name": "Settings",
+        "path": None,
+        "icon": "Settings",
+        "sort_order": 900,
+        "roles": ["admin"],
+        "children": [
+            {
+                "code": "settings.roles",
+                "name": "Role Admin",
+                "path": "/settings/roles",
+                "icon": "Shield",
+                "sort_order": 910,
+                "roles": ["admin"],
+            },
+            {
+                "code": "settings.permissions",
+                "name": "Menu Permissions",
+                "path": "/settings/permissions",
+                "icon": "Menu",
+                "sort_order": 915,
+                "roles": ["admin"],
+            },
+            {
+                "code": "settings.menus",
+                "name": "Menu Admin",
+                "path": "/settings/menus",
+                "icon": "PanelLeft",
+                "sort_order": 920,
+                "roles": ["admin"],
+            },
+        ],
+    },
+]
 
 
 def ensure_auth_user_login_id_schema(session: Session) -> None:
@@ -60,20 +259,16 @@ def ensure_auth_user_login_id_schema(session: Session) -> None:
             """
         )
     )
-    session.exec(
-        text(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ux_auth_users_login_id ON auth_users (login_id)"
-        )
-    )
+    session.exec(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_auth_users_login_id ON auth_users (login_id)"))
     session.commit()
 
 
 def ensure_roles(session: Session) -> None:
     role_map = {
-        "admin": "관리자",
-        "hr_manager": "인사담당자",
-        "payroll_mgr": "급여담당자",
-        "employee": "일반직원",
+        "admin": "Admin",
+        "hr_manager": "HR Manager",
+        "payroll_mgr": "Payroll Manager",
+        "employee": "Employee",
     }
     for code, name in role_map.items():
         existing_role = session.exec(select(AuthRole).where(AuthRole.code == code)).first()
@@ -82,14 +277,37 @@ def ensure_roles(session: Session) -> None:
     session.commit()
 
 
+def ensure_departments(session: Session) -> list[OrgDepartment]:
+    departments: list[OrgDepartment] = []
+    for code, name in DEPARTMENT_SEEDS:
+        department = session.exec(select(OrgDepartment).where(OrgDepartment.code == code)).first()
+        if department is None:
+            department = OrgDepartment(code=code, name=name, is_active=True)
+            session.add(department)
+            session.commit()
+            session.refresh(department)
+        else:
+            changed = False
+            if department.name != name:
+                department.name = name
+                changed = True
+            if not department.is_active:
+                department.is_active = True
+                changed = True
+            if changed:
+                session.add(department)
+                session.commit()
+                session.refresh(department)
+        departments.append(department)
+    return departments
+
+
 def ensure_department(session: Session) -> OrgDepartment:
-    dept = session.exec(select(OrgDepartment).where(OrgDepartment.code == "HQ-HR")).first()
-    if dept is None:
-        dept = OrgDepartment(code="HQ-HR", name="인사팀")
-        session.add(dept)
-        session.commit()
-        session.refresh(dept)
-    return dept
+    departments = ensure_departments(session)
+    for department in departments:
+        if department.code == "HQ-HR":
+            return department
+    return departments[0]
 
 
 def ensure_user(
@@ -116,6 +334,12 @@ def ensure_user(
         return user
 
     changed = False
+    if user.email != email:
+        user.email = email
+        changed = True
+    if user.display_name != display_name:
+        user.display_name = display_name
+        changed = True
     if reset_password:
         user.password_hash = hash_password(password)
         changed = True
@@ -167,6 +391,99 @@ def ensure_employee(
     return employee
 
 
+def _build_korean_name(index: int) -> str:
+    rng = random.Random(20260219 + index * 97)
+    surname = KOREAN_SURNAMES[rng.randrange(len(KOREAN_SURNAMES))]
+    first = KOREAN_GIVEN_FIRST[rng.randrange(len(KOREAN_GIVEN_FIRST))]
+    second = KOREAN_GIVEN_SECOND[rng.randrange(len(KOREAN_GIVEN_SECOND))]
+    return f"{surname}{first}{second}"
+
+
+def _build_dev_login_id(index: int) -> str:
+    rng = random.Random(31000 + index * 173)
+    chars = string.ascii_lowercase + string.digits
+    token = "".join(rng.choice(chars) for _ in range(8))
+    return f"{DEV_EMPLOYEE_LOGIN_PREFIX}{token}-{index:04d}"
+
+
+def ensure_bulk_korean_employees(
+    session: Session,
+    *,
+    departments: list[OrgDepartment],
+    total: int = DEV_EMPLOYEE_TOTAL,
+) -> None:
+    if not departments:
+        return
+
+    employee_role = session.exec(select(AuthRole).where(AuthRole.code == "employee")).first()
+    if employee_role is None:
+        return
+
+    users = session.exec(
+        select(AuthUser).where(AuthUser.login_id.like(f"{DEV_EMPLOYEE_LOGIN_PREFIX}%"))
+    ).all()
+    user_by_login = {user.login_id: user for user in users}
+
+    employees = session.exec(select(HrEmployee)).all()
+    employee_by_user_id = {employee.user_id: employee for employee in employees}
+
+    employee_role_user_ids = set(
+        session.exec(select(AuthUserRole.user_id).where(AuthUserRole.role_id == employee_role.id)).all()
+    )
+
+    department_ids = [department.id for department in departments]
+
+    for index in range(1, total + 1):
+        login_id = _build_dev_login_id(index)
+        email = f"{login_id}@vibe-hr.local"
+        display_name = _build_korean_name(index)
+
+        user = user_by_login.get(login_id)
+        if user is None:
+            user = AuthUser(
+                login_id=login_id,
+                email=email,
+                password_hash=DEV_EMPLOYEE_PASSWORD_HASH,
+                display_name=display_name,
+                is_active=True,
+            )
+            session.add(user)
+            session.flush()
+            user_by_login[login_id] = user
+        else:
+            if user.email != email:
+                user.email = email
+            if user.display_name != display_name:
+                user.display_name = display_name
+            if not user.is_active:
+                user.is_active = True
+            if user.password_hash != DEV_EMPLOYEE_PASSWORD_HASH:
+                user.password_hash = DEV_EMPLOYEE_PASSWORD_HASH
+            session.add(user)
+
+        employee = employee_by_user_id.get(user.id)
+        if employee is None:
+            hire_year = 2016 + (index % 10)
+            hire_month = (index % 12) + 1
+            hire_day = (index % 28) + 1
+            employee = HrEmployee(
+                user_id=user.id,
+                employee_no=f"KR-{index:04d}",
+                department_id=department_ids[(index - 1) % len(department_ids)],
+                position_title="Staff",
+                hire_date=date(hire_year, hire_month, hire_day),
+                employment_status="active",
+            )
+            session.add(employee)
+            employee_by_user_id[user.id] = employee
+
+        if user.id not in employee_role_user_ids:
+            session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
+            employee_role_user_ids.add(user.id)
+
+    session.commit()
+
+
 def ensure_sample_records(session: Session, employee: HrEmployee) -> None:
     today = date.today()
     today_attendance = session.exec(
@@ -197,7 +514,7 @@ def ensure_sample_records(session: Session, employee: HrEmployee) -> None:
                 leave_type="annual",
                 start_date=today,
                 end_date=today,
-                reason="샘플 연차 신청",
+                reason="Sample leave request",
                 request_status="pending",
             )
         )
@@ -229,7 +546,6 @@ def _get_or_create_menu(
         session.refresh(menu)
         return menu
 
-    # 기존 메뉴도 시드 정의와 동기화 (이름/부모/경로/아이콘/정렬)
     changed = False
     if menu.name != name:
         menu.name = name
@@ -257,133 +573,13 @@ def _get_or_create_menu(
 
 def _link_menu_roles(session: Session, menu: AppMenu, role_codes: list[str]) -> None:
     roles = session.exec(select(AuthRole).where(AuthRole.code.in_(role_codes))).all()
-    existing = session.exec(
-        select(AppMenuRole).where(AppMenuRole.menu_id == menu.id)
-    ).all()
+    existing = session.exec(select(AppMenuRole).where(AppMenuRole.menu_id == menu.id)).all()
     existing_role_ids = {link.role_id for link in existing}
 
     for role in roles:
         if role.id not in existing_role_ids:
             session.add(AppMenuRole(menu_id=menu.id, role_id=role.id))
     session.commit()
-
-
-# ── 메뉴 구조 정의 ──
-_MENU_TREE: list[dict] = [
-    {
-        "code": "dashboard",
-        "name": "대시보드",
-        "path": "/dashboard",
-        "icon": "LayoutDashboard",
-        "sort_order": 100,
-        "roles": ["employee", "hr_manager", "payroll_mgr", "admin"],
-        "children": [],
-    },
-    {
-        "code": "hr",
-        "name": "인사",
-        "path": None,
-        "icon": "UsersRound",
-        "sort_order": 200,
-        "roles": ["hr_manager", "admin"],
-        "children": [
-            {
-                "code": "hr.employee",
-                "name": "사원관리",
-                "path": "/hr/employee",
-                "icon": "UserRound",
-                "sort_order": 210,
-                "roles": ["hr_manager", "admin"],
-            },
-        ],
-    },
-    {
-        "code": "tim",
-        "name": "근태",
-        "path": None,
-        "icon": "Clock",
-        "sort_order": 220,
-        "roles": ["employee", "hr_manager", "admin"],
-        "children": [
-            {
-                "code": "hr.attendance",
-                "name": "근태관리",
-                "path": "/tim/codes",
-                "icon": "CalendarCheck2",
-                "sort_order": 221,
-                "roles": ["hr_manager", "admin"],
-            },
-            {
-                "code": "hr.leave",
-                "name": "휴일관리",
-                "path": "/tim/holidays",
-                "icon": "CalendarDays",
-                "sort_order": 222,
-                "roles": ["hr_manager", "admin"],
-            },
-        ],
-    },
-    {
-        "code": "payroll",
-        "name": "급여",
-        "path": None,
-        "icon": "Wallet",
-        "sort_order": 300,
-        "roles": ["payroll_mgr", "admin"],
-        "children": [
-            {
-                "code": "payroll.calc",
-                "name": "급여계산",
-                "path": "/payroll/calc",
-                "icon": "Calculator",
-                "sort_order": 310,
-                "roles": ["payroll_mgr", "admin"],
-            },
-            {
-                "code": "payroll.slip",
-                "name": "급여명세서",
-                "path": "/payroll/slip",
-                "icon": "FileText",
-                "sort_order": 320,
-                "roles": ["employee", "payroll_mgr", "admin"],
-            },
-        ],
-    },
-    {
-        "code": "settings",
-        "name": "설정",
-        "path": None,
-        "icon": "Settings",
-        "sort_order": 900,
-        "roles": ["admin"],
-        "children": [
-            {
-                "code": "settings.roles",
-                "name": "권한관리",
-                "path": "/settings/roles",
-                "icon": "Shield",
-                "sort_order": 910,
-                "roles": ["admin"],
-            },
-            {
-                "code": "settings.permissions",
-                "name": "메뉴권한관리",
-                "path": "/settings/permissions",
-                "icon": "Menu",
-                "sort_order": 915,
-                "roles": ["admin"],
-            },
-            {
-                "code": "settings.menus",
-                "name": "메뉴관리",
-                "path": "/settings/menus",
-                "icon": "PanelLeft",
-                "sort_order": 920,
-                "roles": ["admin"],
-            },
-        ],
-    },
-]
 
 
 def ensure_menus(session: Session) -> None:
@@ -402,28 +598,30 @@ def ensure_menus(session: Session) -> None:
         for child in node.get("children", []):
             _upsert(child, parent_id=menu.id)
 
-    for top in _MENU_TREE:
+    for top in MENU_TREE:
         _upsert(top)
 
 
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
-    department = ensure_department(session)
+    departments = ensure_departments(session)
+    department = next((item for item in departments if item.code == "HQ-HR"), departments[0])
 
     admin_local_user = ensure_user(
         session,
         login_id="admin-local",
         email="admin@vibe-hr.local",
-        password="admin1234",
-        display_name="Vibe HR 관리자",
+        password="admin",
+        display_name="Admin",
+        reset_password=True,
     )
     quick_admin_user = ensure_user(
         session,
         login_id="admin",
         email="admin2@vibe-hr.local",
         password="admin",
-        display_name="기본 관리자",
+        display_name="Admin",
         reset_password=True,
     )
 
@@ -445,15 +643,12 @@ def seed_initial_data(session: Session) -> None:
         position_title="HR Manager",
     )
 
+    ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
-
-    # 메뉴 및 메뉴-역할 매핑 시드
     ensure_menus(session)
 
-    # 개발 초기 데이터 아카이브(SQLite 누적본)
     if settings.seed_archive_enabled:
         try:
             archive_seed_to_sqlite(session, settings.seed_archive_sqlite_path)
         except Exception:
-            # 아카이브 실패가 서비스 기동을 막지 않도록 보호
             pass
