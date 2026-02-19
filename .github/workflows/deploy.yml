@@ -8,14 +8,36 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || vars.DEPLOY_PORT || '22' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
     steps:
+      - name: Validate deploy configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+
+          [[ -z "${DEPLOY_HOST}" ]] && missing+=("DEPLOY_HOST (Secret or Variable)")
+          [[ -z "${DEPLOY_USER}" ]] && missing+=("DEPLOY_USER (Secret or Variable)")
+          [[ -z "${DEPLOY_SSH_KEY}" ]] && missing+=("DEPLOY_SSH_KEY (Secret)")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Missing required deploy settings: ${missing[*]}"
+            echo "::error::Set them in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || '22' }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
+          port: ${{ env.DEPLOY_PORT }}
           script: |
             set -e
             cd /root/.openclaw/workspace/vibe-hr
