@@ -1,12 +1,22 @@
 # Vibe-HR
 
-Vibe-HR MVP project.
+Vibe-HR은 **한국어 사용 환경을 기본으로 하는 인사(HR) 시스템 프로젝트**입니다.
 
 - Frontend: Next.js (App Router) + TypeScript + shadcn/ui
 - Backend: FastAPI + SQLModel
-- Database: PostgreSQL only
+- Database: PostgreSQL
 
-## Run backend
+---
+
+## 프로젝트 성격
+
+- 한국어 UI/문구를 기본으로 설계합니다.
+- 국내 조직/인사 운영 시나리오(권한, 조직, 근태, 휴일, 공통코드)를 중심으로 개발합니다.
+- 운영 환경은 Docker + Nginx Reverse Proxy 기반을 전제로 합니다.
+
+---
+
+## 백엔드 실행
 
 ```bash
 cd backend
@@ -17,11 +27,13 @@ copy .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Default dev login:
+기본 개발 계정:
 - login_id: `admin`
 - password: `admin`
 
-## Run frontend
+---
+
+## 프론트엔드 실행
 
 ```bash
 cd frontend
@@ -30,15 +42,19 @@ npm install
 npm run dev
 ```
 
-Entry points:
-- Login: `http://localhost:3000/login`
-- Dashboard: `http://localhost:3000/dashboard`
-- Employee master: `http://localhost:3000/hr/employee`
+주요 진입 경로:
+- 로그인: `http://localhost:3000/login`
+- 대시보드: `http://localhost:3000/dashboard`
+- 사원관리: `http://localhost:3000/hr/employee`
+- 공통코드관리: `http://localhost:3000/settings/common-codes`
 
-## Dev data seeding (PostgreSQL)
+---
 
-The API startup already runs `seed_initial_data()`.
-To re-run seed explicitly against PostgreSQL:
+## 개발 시드 데이터 (PostgreSQL)
+
+API 시작 시 `seed_initial_data()`가 자동 실행됩니다.
+
+PostgreSQL 기준으로 시드를 수동 재실행하려면:
 
 ```bash
 cd backend
@@ -47,8 +63,8 @@ set PYTHONPATH=%CD%
 python scripts/seed_dev_postgres.py
 ```
 
-Seed behavior:
-- Ensures `admin` and `admin-local` accounts exist
-- Sets display name of `admin` to `Admin`
-- Generates/maintains 2,000 Korean employee users (`kr-*` login IDs)
-- Keeps 1:1 mapping between `auth_users` and `hr_employees`
+시드 동작:
+- `admin`, `admin-local` 계정 보장
+- `admin` 표시명 기본값 보정
+- 한국어 더미 사용자/사원 데이터 생성 및 유지
+- 메뉴/권한/공통코드 초기 데이터 동기화
