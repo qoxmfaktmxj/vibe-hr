@@ -7,9 +7,7 @@ import string
 from sqlalchemy import text
 from sqlmodel import Session, select
 
-from app.core.config import settings
 from app.core.security import hash_password
-from app.core.seed_archive import archive_seed_to_sqlite
 from app.models import (
     AppMenu,
     AppMenuRole,
@@ -219,23 +217,17 @@ MENU_TREE: list[dict] = [
 
 
 def ensure_auth_user_login_id_schema(session: Session) -> None:
-    dialect = session.bind.dialect.name if session.bind is not None else "sqlite"
-
-    if dialect == "sqlite":
-        columns = session.exec(text("PRAGMA table_info(auth_users)")).all()
-        column_names = {row[1] for row in columns}
-    else:
-        columns = session.exec(
-            text(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = current_schema()
-                  AND table_name = 'auth_users'
-                """
-            )
-        ).all()
-        column_names = {row[0] for row in columns}
+    columns = session.exec(
+        text(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'auth_users'
+            """
+        )
+    ).all()
+    column_names = {row[0] for row in columns}
 
     if "login_id" not in column_names:
         session.exec(text("ALTER TABLE auth_users ADD COLUMN login_id TEXT"))
@@ -646,9 +638,3 @@ def seed_initial_data(session: Session) -> None:
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
-
-    if settings.seed_archive_enabled:
-        try:
-            archive_seed_to_sqlite(session, settings.seed_archive_sqlite_path)
-        except Exception:
-            pass

@@ -4,14 +4,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Vibe-HR API"
     environment: str = "local"
-    database_url: str = "sqlite:///./vibe_hr.db"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/vibe_hr"
     cors_origins: str = "http://localhost:3000"
     auth_token_secret: str = "dev-only-change-me"
     auth_token_algorithm: str = "HS256"
     auth_token_expires_min: int = 480
     auth_token_issuer: str = "vibe-hr"
-    seed_archive_enabled: bool = False
-    seed_archive_sqlite_path: str = "./db/dev_seed_accum.sqlite"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

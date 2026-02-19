@@ -6,7 +6,6 @@ Thumbs.db
 backend/.venv/
 backend/__pycache__/
 backend/**/*.pyc
-backend/vibe_hr.db
 
 # Node
 frontend/node_modules/
@@ -19,6 +18,3 @@ frontend/out/
 
 # Deploy env
 .env.deploy
-
-# Seed archive
-seed-archive/*.sqlite
