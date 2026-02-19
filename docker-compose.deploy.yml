@@ -7,7 +7,7 @@ services:
     env_file:
       - ./.env.deploy
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -27,4 +27,4 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
