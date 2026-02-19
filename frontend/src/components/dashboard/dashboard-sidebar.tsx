@@ -9,11 +9,13 @@ import {
   FileText,
   LayoutDashboard,
   Menu,
+  PanelLeft,
   Settings,
   Shield,
   UserRound,
   UsersRound,
   Wallet,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -136,14 +138,14 @@ export function DashboardSidebar() {
   const { user } = useAuth();
   const { menus } = useMenu();
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const displayName = user?.display_name ?? "User";
   const roleLabels = user?.roles?.join(", ") ?? "";
   const initials = getInitials(displayName);
 
-  return (
-    <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
-      {/* 로고 영역 */}
+  const sidebarContent = (
+    <>
       <div className="flex items-center gap-3 p-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
           <CalendarCheck2 className="h-5 w-5" />
@@ -154,7 +156,6 @@ export function DashboardSidebar() {
         </div>
       </div>
 
-      {/* 동적 메뉴 내비게이션 */}
       <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
         {menus.map((node) =>
           node.children.length > 0 ? (
@@ -169,7 +170,6 @@ export function DashboardSidebar() {
         )}
       </nav>
 
-      {/* 사용자 정보 (AuthContext 연동) */}
       <div className="border-t border-gray-100 p-4">
         <div className="flex items-center gap-3 p-2">
           <Avatar className="h-10 w-10">
@@ -183,6 +183,42 @@ export function DashboardSidebar() {
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed left-4 top-4 z-40 rounded-md border bg-white p-2 shadow lg:hidden"
+        onClick={() => setMobileOpen(true)}
+        aria-label="메뉴 열기"
+      >
+        <PanelLeft className="h-5 w-5" />
+      </button>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-gray-200 bg-[var(--vibe-sidebar-bg)]">
+            <div className="flex justify-end p-3">
+              <button
+                type="button"
+                className="rounded-md border bg-white p-2"
+                onClick={() => setMobileOpen(false)}
+                aria-label="메뉴 닫기"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {sidebarContent}
+          </aside>
+        </div>
+      ) : null}
+
+      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
+        {sidebarContent}
+      </aside>
+    </>
   );
 }
