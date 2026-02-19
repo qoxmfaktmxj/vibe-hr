@@ -56,7 +56,7 @@ const I18N = {
   copiedHint:
     "화면을 클릭한 상태에서 Ctrl+V로 엑셀 행을 그리드에 추가할 수 있습니다.",
   summaryLabel: "변경 요약",
-  statusClean: "정상",
+  statusClean: "",
   statusAdded: "입력",
   statusUpdated: "수정",
   statusDeleted: "삭제",
@@ -74,7 +74,7 @@ const I18N = {
   upload: "업로드",
   download: "다운로드",
   saveAll: "저장",
-  removeAddedRowDone: "입력된 행을 제거했습니다.",
+  removeAddedRowDone: "선택한 행을 삭제 상태로 변경했습니다.",
   copyDone: "선택한 행을 입력행으로 복제했습니다.",
   templateDone: "양식을 다운로드했습니다.",
   uploadDone: "업로드 데이터를 반영했습니다.",
@@ -508,11 +508,17 @@ export function EmployeeMasterManager() {
   function handleSelectionChanged() {
     if (!gridApiRef.current) return;
     const selected = gridApiRef.current.getSelectedRows();
-    const addedIds = selected.filter((row) => row._status === "added").map((row) => row.id);
-    if (addedIds.length === 0) return;
+    if (selected.length === 0) return;
 
-    const addedIdSet = new Set(addedIds);
-    setRows((prev) => prev.filter((row) => !addedIdSet.has(row.id)));
+    const selectedIds = new Set(selected.map((row) => row.id));
+    setRows((prev) =>
+      prev.map((row) => {
+        if (!selectedIds.has(row.id)) return row;
+        if (row._status === "deleted") return row;
+        return { ...row, _status: "deleted", _error: undefined };
+      }),
+    );
+
     gridApiRef.current.deselectAll();
     setNoticeType("success");
     setNotice(I18N.removeAddedRowDone);
@@ -795,13 +801,13 @@ export function EmployeeMasterManager() {
         }
 
         if (row._status === "deleted" && row.id < 0) {
-          return row;
+          return null;
         }
 
         return row;
       });
 
-    setRows(mergedRows);
+    setRows(mergedRows.filter((row): row is EmployeeGridRow => row !== null));
     setSaving(false);
 
     if (failedMessages.length > 0) {
