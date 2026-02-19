@@ -44,14 +44,14 @@ const I18N = {
   loadEmployeeError: "사원 목록을 불러오지 못했습니다.",
   loadDepartmentError: "부서 목록을 불러오지 못했습니다.",
   initError: "초기 로딩에 실패했습니다.",
-  saveDone: "일괄 저장이 완료되었습니다.",
+  saveDone: "저장이 완료되었습니다.",
   saveFailed: "저장에 실패했습니다.",
   deleteFailed: "삭제에 실패했습니다.",
   nothingToSave: "저장할 변경 사항이 없습니다.",
   validationError: "입력 값을 확인하세요. 필수 입력이 비어 있습니다.",
   pasteDone: "클립보드 데이터를 새 행으로 추가했습니다.",
   addRowsDone: "새 행을 추가했습니다.",
-  markDeleteDone: "선택한 행을 삭제 예정으로 표시했습니다.",
+  markDeleteDone: "선택한 행을 삭제 처리했습니다.",
   cancelDone: "변경 사항을 취소했습니다.",
   copiedHint:
     "화면을 클릭한 상태에서 Ctrl+V로 엑셀 행을 그리드에 추가할 수 있습니다.",
@@ -68,11 +68,13 @@ const I18N = {
   deleteConfirm: "선택한 행을 삭제 예정으로 변경할까요?",
   title: "사원 마스터",
   searchPlaceholder: "사번/이름/로그인ID/부서 검색",
-  addRow: "행 추가",
+  addRow: "입력",
   addTenRows: "10행 추가",
   markDelete: "선택 삭제 표시",
   rollback: "변경 취소",
-  saveAll: "일괄 저장",
+  saveAll: "저장",
+  downloadExcel: "엑셀 다운로드",
+  removeAddedRowDone: "입력된 행을 제거했습니다.",
   selectedCount: "선택",
   rowCount: "전체",
   pasteGuide:
@@ -438,6 +440,46 @@ export function EmployeeMasterManager() {
     setNotice(I18N.addRowsDone);
   }
 
+  function downloadExcelCsv() {
+    const headers = [
+      "사번",
+      "로그인ID",
+      "이름",
+      "부서",
+      "직책",
+      "입사일",
+      "재직상태",
+      "이메일",
+      "활성",
+    ];
+
+    const exportRows = rows
+      .filter((row) => row._status !== "deleted")
+      .map((row) => [
+        row.employee_no,
+        row.login_id,
+        row.display_name,
+        row.department_name || departmentNameById.get(row.department_id) || "",
+        row.position_title,
+        row.hire_date,
+        row.employment_status,
+        row.email,
+        row.is_active ? "Y" : "N",
+      ]);
+
+    const csvBody = [headers, ...exportRows]
+      .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvBody], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `employee-master-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const parseDepartmentId = useCallback(
     (input: string): number => {
       const value = input.trim().toLowerCase();
@@ -498,6 +540,19 @@ export function EmployeeMasterManager() {
     [departmentNameById, issueTempId, parseDepartmentId],
   );
 
+  function handleSelectionChanged() {
+    if (!gridApiRef.current) return;
+    const selected = gridApiRef.current.getSelectedRows();
+    const addedIds = selected.filter((row) => row._status === "added").map((row) => row.id);
+    if (addedIds.length === 0) return;
+
+    const addedIdSet = new Set(addedIds);
+    setRows((prev) => prev.filter((row) => !addedIdSet.has(row.id)));
+    gridApiRef.current.deselectAll();
+    setNoticeType("success");
+    setNotice(I18N.removeAddedRowDone);
+  }
+
   function markSelectedRowsDeleted() {
     if (!gridApiRef.current) return;
     const selected = gridApiRef.current.getSelectedRows();
@@ -519,17 +574,6 @@ export function EmployeeMasterManager() {
     gridApiRef.current.deselectAll();
     setNoticeType("success");
     setNotice(I18N.markDeleteDone);
-  }
-
-  async function rollbackChanges() {
-    try {
-      await loadBase();
-      setNoticeType("success");
-      setNotice(I18N.cancelDone);
-    } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : I18N.initError);
-    }
   }
 
   function validateRow(row: EmployeeGridRow): string | null {
@@ -729,14 +773,11 @@ export function EmployeeMasterManager() {
             <Button size="sm" variant="outline" onClick={() => addRows(1)}>
               {I18N.addRow}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => addRows(10)}>
-              {I18N.addTenRows}
-            </Button>
             <Button size="sm" variant="outline" onClick={markSelectedRowsDeleted}>
               {I18N.markDelete}
             </Button>
-            <Button size="sm" variant="outline" onClick={rollbackChanges} disabled={saving}>
-              {I18N.rollback}
+            <Button size="sm" variant="outline" onClick={downloadExcelCsv}>
+              {I18N.downloadExcel}
             </Button>
             <Button size="sm" onClick={saveAllChanges} disabled={saving}>
               {saving ? `${I18N.saveAll}...` : I18N.saveAll}
@@ -773,6 +814,7 @@ export function EmployeeMasterManager() {
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
               onCellValueChanged={onCellValueChanged}
+              onSelectionChanged={handleSelectionChanged}
               localeText={AG_GRID_LOCALE_KO}
               overlayNoRowsTemplate={`<span>${I18N.noRows}</span>`}
             />
