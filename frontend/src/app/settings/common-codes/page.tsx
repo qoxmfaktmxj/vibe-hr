@@ -13,7 +13,7 @@ export default async function SettingsCommonCodesPage() {
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">
           <div>
             <h1 className="text-xl font-bold text-gray-800">공통코드 관리</h1>
-            <p className="text-sm text-gray-500">코드 그룹/코드 마스터-디테일 관리</p>
+            <p className="text-sm text-gray-500">코드 그룹과 세부코드를 상하 그리드로 관리합니다.</p>
           </div>
           <LogoutButton />
         </header>
