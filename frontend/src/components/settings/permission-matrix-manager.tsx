@@ -116,7 +116,6 @@ export function PermissionMatrixManager() {
     setMatrix((prev) => {
       const next = { ...prev };
       const set = new Set(next[roleId] ?? []);
-
       const targets = applyToChildren ? [menuId, ...(descendantsMap[menuId] ?? [])] : [menuId];
 
       if (checked) {
@@ -194,7 +193,7 @@ export function PermissionMatrixManager() {
     }
   }
 
-  if (loading) return <div className="p-6">불러오는 중..</div>;
+  if (loading) return <div className="p-6">불러오는 중...</div>;
 
   return (
     <div className="space-y-4 p-6">
@@ -210,6 +209,10 @@ export function PermissionMatrixManager() {
               placeholder="메뉴명/코드 검색"
               className="max-w-sm"
             />
+            <label className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              <Checkbox checked={applyToChildren} onCheckedChange={(v) => setApplyToChildren(Boolean(v))} />
+              하위 메뉴 일괄 적용
+            </label>
             <div className="ml-auto">
               <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
                 저장
@@ -235,17 +238,6 @@ export function PermissionMatrixManager() {
             </div>
           </div>
 
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
-            <p className="mb-2 text-xs font-semibold text-blue-700">하위 적용 옵션</p>
-            <label className="flex items-center gap-2 text-sm text-blue-900">
-              <Checkbox checked={applyToChildren} onCheckedChange={(v) => setApplyToChildren(Boolean(v))} />
-              하위 메뉴 일괄 적용 (기본 ON)
-            </label>
-            <p className="mt-1 text-xs text-blue-700">
-              ON: 부모 체크/해제 시 하위 메뉴까지 반영, OFF: 선택 메뉴만 반영
-            </p>
-          </div>
-
           {notice ? (
             <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>
               {notice}
@@ -253,7 +245,7 @@ export function PermissionMatrixManager() {
           ) : null}
 
           <div className="overflow-x-auto rounded-md border">
-            <table className="min-w-[900px] w-full border-collapse text-sm">
+            <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead className="bg-slate-100">
                 <tr>
                   <th className="border px-2 py-2 text-left">메뉴</th>

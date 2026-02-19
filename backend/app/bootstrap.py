@@ -92,17 +92,17 @@ KOREAN_GIVEN_SECOND = [
 ]
 
 DEPARTMENT_SEEDS = [
-    ("HQ-HR", "HR"),
-    ("HQ-ENG", "Engineering"),
-    ("HQ-SALES", "Sales"),
-    ("HQ-FIN", "Finance"),
-    ("HQ-OPS", "Operations"),
+    ("HQ-HR", "\uC778\uC0AC\uD300"),
+    ("HQ-ENG", "\uAC1C\uBC1C\uD300"),
+    ("HQ-SALES", "\uC601\uC5C5\uD300"),
+    ("HQ-FIN", "\uC7AC\uBB34\uD300"),
+    ("HQ-OPS", "\uC6B4\uC601\uD300"),
 ]
 
 MENU_TREE: list[dict] = [
     {
         "code": "dashboard",
-        "name": "Dashboard",
+        "name": "\uB300\uC2DC\uBCF4\uB4DC",
         "path": "/dashboard",
         "icon": "LayoutDashboard",
         "sort_order": 100,
@@ -111,7 +111,7 @@ MENU_TREE: list[dict] = [
     },
     {
         "code": "hr",
-        "name": "HR",
+        "name": "\uC778\uC0AC",
         "path": None,
         "icon": "UsersRound",
         "sort_order": 200,
@@ -119,7 +119,7 @@ MENU_TREE: list[dict] = [
         "children": [
             {
                 "code": "hr.employee",
-                "name": "Employee Master",
+                "name": "\uC0AC\uC6D0\uAD00\uB9AC",
                 "path": "/hr/employee",
                 "icon": "UserRound",
                 "sort_order": 210,
@@ -129,7 +129,7 @@ MENU_TREE: list[dict] = [
     },
     {
         "code": "tim",
-        "name": "Attendance",
+        "name": "\uADFC\uD0DC",
         "path": None,
         "icon": "Clock",
         "sort_order": 220,
@@ -137,7 +137,7 @@ MENU_TREE: list[dict] = [
         "children": [
             {
                 "code": "hr.attendance",
-                "name": "Attendance Code",
+                "name": "\uADFC\uD0DC\uCF54\uB4DC\uAD00\uB9AC",
                 "path": "/tim/codes",
                 "icon": "CalendarCheck2",
                 "sort_order": 221,
@@ -145,7 +145,7 @@ MENU_TREE: list[dict] = [
             },
             {
                 "code": "hr.leave",
-                "name": "Holiday Calendar",
+                "name": "\uD734\uC77C\uAD00\uB9AC",
                 "path": "/tim/holidays",
                 "icon": "CalendarDays",
                 "sort_order": 222,
@@ -155,7 +155,7 @@ MENU_TREE: list[dict] = [
     },
     {
         "code": "payroll",
-        "name": "Payroll",
+        "name": "\uAE09\uC5EC",
         "path": None,
         "icon": "Wallet",
         "sort_order": 300,
@@ -163,7 +163,7 @@ MENU_TREE: list[dict] = [
         "children": [
             {
                 "code": "payroll.calc",
-                "name": "Payroll Calc",
+                "name": "\uAE09\uC5EC\uACC4\uC0B0",
                 "path": "/payroll/calc",
                 "icon": "Calculator",
                 "sort_order": 310,
@@ -171,7 +171,7 @@ MENU_TREE: list[dict] = [
             },
             {
                 "code": "payroll.slip",
-                "name": "Payroll Slip",
+                "name": "\uAE09\uC5EC\uBA85\uC138\uC11C",
                 "path": "/payroll/slip",
                 "icon": "FileText",
                 "sort_order": 320,
@@ -181,7 +181,7 @@ MENU_TREE: list[dict] = [
     },
     {
         "code": "settings",
-        "name": "Settings",
+        "name": "\uC2DC\uC2A4\uD15C",
         "path": None,
         "icon": "Settings",
         "sort_order": 900,
@@ -189,7 +189,7 @@ MENU_TREE: list[dict] = [
         "children": [
             {
                 "code": "settings.roles",
-                "name": "Role Admin",
+                "name": "\uAD8C\uD55C\uAD00\uB9AC",
                 "path": "/settings/roles",
                 "icon": "Shield",
                 "sort_order": 910,
@@ -197,7 +197,7 @@ MENU_TREE: list[dict] = [
             },
             {
                 "code": "settings.permissions",
-                "name": "Menu Permissions",
+                "name": "\uBA54\uB274\uAD8C\uD55C\uAD00\uB9AC",
                 "path": "/settings/permissions",
                 "icon": "Menu",
                 "sort_order": 915,
@@ -205,7 +205,7 @@ MENU_TREE: list[dict] = [
             },
             {
                 "code": "settings.menus",
-                "name": "Menu Admin",
+                "name": "\uBA54\uB274\uAD00\uB9AC",
                 "path": "/settings/menus",
                 "icon": "PanelLeft",
                 "sort_order": 920,
@@ -257,10 +257,10 @@ def ensure_auth_user_login_id_schema(session: Session) -> None:
 
 def ensure_roles(session: Session) -> None:
     role_map = {
-        "admin": "Admin",
-        "hr_manager": "HR Manager",
-        "payroll_mgr": "Payroll Manager",
-        "employee": "Employee",
+        "admin": "\uAD00\uB9AC\uC790",
+        "hr_manager": "\uC778\uC0AC\uB2F4\uB2F9\uC790",
+        "payroll_mgr": "\uAE09\uC5EC\uB2F4\uB2F9\uC790",
+        "employee": "\uC77C\uBC18\uC9C1\uC6D0",
     }
     for code, name in role_map.items():
         existing_role = session.exec(select(AuthRole).where(AuthRole.code == code)).first()
@@ -506,7 +506,7 @@ def ensure_sample_records(session: Session, employee: HrEmployee) -> None:
                 leave_type="annual",
                 start_date=today,
                 end_date=today,
-                reason="Sample leave request",
+                reason="\uC0D8\uD50C \uC5F0\uCC28 \uC2E0\uCCAD",
                 request_status="pending",
             )
         )
@@ -625,14 +625,14 @@ def seed_initial_data(session: Session) -> None:
         user=admin_local_user,
         employee_no="HR-0001",
         department_id=department.id,
-        position_title="HR Director",
+        position_title="\uC778\uC0AC\uCD1D\uAD04",
     )
     ensure_employee(
         session,
         user=quick_admin_user,
         employee_no="HR-0002",
         department_id=department.id,
-        position_title="HR Manager",
+        position_title="\uC778\uC0AC\uB9E4\uB2C8\uC800",
     )
 
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)

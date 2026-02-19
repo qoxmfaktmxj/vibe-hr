@@ -155,7 +155,7 @@ export function DashboardSidebar() {
         </div>
         <div>
           <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
-          <p className="text-xs text-[var(--vibe-accent-muted)]">Engagement Suite</p>
+          <p className="text-xs text-[var(--vibe-accent-muted)]">인사 관리 시스템</p>
         </div>
       </div>
 
@@ -193,26 +193,22 @@ export function DashboardSidebar() {
         type="button"
         className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
         onClick={() => setMobileOpen(true)}
-        aria-label="Open menu"
+        aria-label="메뉴 열기"
       >
         <PanelLeft className="h-4 w-4" aria-hidden="true" />
-        Menu
+        메뉴
       </button>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu backdrop"
-          />
+          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-gray-200 bg-[var(--vibe-sidebar-bg)]">
             <div className="flex justify-end p-3">
               <button
                 type="button"
                 className="rounded-md border bg-white p-2"
                 onClick={() => setMobileOpen(false)}
-                aria-label="Close menu"
+                aria-label="메뉴 닫기"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
