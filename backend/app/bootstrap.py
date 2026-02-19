@@ -325,7 +325,7 @@ _MENU_TREE: list[dict] = [
     },
     {
         "code": "payroll",
-        "name": "급",
+        "name": "급여",
         "path": None,
         "icon": "Wallet",
         "sort_order": 300,
