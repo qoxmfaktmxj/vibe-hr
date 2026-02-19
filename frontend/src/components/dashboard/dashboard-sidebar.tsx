@@ -191,11 +191,12 @@ export function DashboardSidebar() {
     <>
       <button
         type="button"
-        className="fixed left-4 top-4 z-40 rounded-md border bg-white p-2 shadow lg:hidden"
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="메뉴 열기"
       >
-        <PanelLeft className="h-5 w-5" />
+        <PanelLeft className="h-4 w-4" />
+        메뉴
       </button>
 
       {mobileOpen ? (
