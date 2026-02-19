@@ -41,6 +41,7 @@ export function PermissionMatrixManager() {
   const [search, setSearch] = useState("");
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
   const [matrix, setMatrix] = useState<Record<number, Set<number>>>({});
+  const [applyToChildren, setApplyToChildren] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
@@ -52,6 +53,23 @@ export function PermissionMatrixManager() {
     if (!q) return flatMenus;
     return flatMenus.filter((m) => m.name.toLowerCase().includes(q) || m.code.toLowerCase().includes(q));
   }, [flatMenus, search]);
+
+  const descendantsMap = useMemo(() => {
+    const map: Record<number, number[]> = {};
+
+    const walk = (nodes: MenuAdminItem[]): number[] => {
+      const all: number[] = [];
+      for (const node of nodes) {
+        const childIds = walk(node.children);
+        map[node.id] = childIds;
+        all.push(node.id, ...childIds);
+      }
+      return all;
+    };
+
+    walk(menus);
+    return map;
+  }, [menus]);
 
   async function loadBase() {
     setLoading(true);
@@ -106,8 +124,17 @@ export function PermissionMatrixManager() {
     setMatrix((prev) => {
       const next = { ...prev };
       const set = new Set(next[roleId] ?? []);
-      if (checked) set.add(menuId);
-      else set.delete(menuId);
+
+      const targets = applyToChildren
+        ? [menuId, ...(descendantsMap[menuId] ?? [])]
+        : [menuId];
+
+      if (checked) {
+        for (const id of targets) set.add(id);
+      } else {
+        for (const id of targets) set.delete(id);
+      }
+
       next[roleId] = set;
       return next;
     });
@@ -164,6 +191,13 @@ export function PermissionMatrixManager() {
                 );
               })}
             </div>
+            <label className="flex items-center gap-2 rounded border px-3 py-1.5 text-sm">
+              <Checkbox
+                checked={applyToChildren}
+                onCheckedChange={(v) => setApplyToChildren(Boolean(v))}
+              />
+              하위 메뉴 일괄 적용
+            </label>
             <div className="ml-auto">
               <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
                 메뉴 권한 저장
