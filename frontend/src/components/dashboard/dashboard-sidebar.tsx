@@ -40,6 +40,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
   Shield,
   Menu: Menu,
+  PanelLeft,
 };
 
 function getIcon(iconName: string | null) {

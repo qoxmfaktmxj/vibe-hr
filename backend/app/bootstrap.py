@@ -377,7 +377,7 @@ _MENU_TREE: list[dict] = [
                 "code": "settings.menus",
                 "name": "메뉴관리",
                 "path": "/settings/menus",
-                "icon": "Menu",
+                "icon": "PanelLeft",
                 "sort_order": 920,
                 "roles": ["admin"],
             },
