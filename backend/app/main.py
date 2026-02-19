@@ -8,6 +8,7 @@ from app.api.auth import router as auth_router
 from app.api.dashboard import router as dashboard_router
 from app.api.employee import router as employee_router
 from app.api.menu import router as menu_router
+from app.api.organization import router as organization_router
 from app.bootstrap import seed_initial_data
 from app.core.config import settings
 from app.core.database import engine, init_db
@@ -40,6 +41,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(employee_router, prefix="/api/v1")
 app.include_router(menu_router, prefix="/api/v1")
+app.include_router(organization_router, prefix="/api/v1")
 
 
 @app.get("/health")

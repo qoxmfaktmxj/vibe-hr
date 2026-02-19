@@ -128,6 +128,24 @@ MENU_TREE: list[dict] = [
         ],
     },
     {
+        "code": "org",
+        "name": "\uC870\uC9C1",
+        "path": None,
+        "icon": "Building2",
+        "sort_order": 210,
+        "roles": ["hr_manager", "admin"],
+        "children": [
+            {
+                "code": "org.departments",
+                "name": "\uC870\uC9C1\uAD00\uB9AC",
+                "path": "/org/departments",
+                "icon": "FolderTree",
+                "sort_order": 211,
+                "roles": ["hr_manager", "admin"],
+            },
+        ],
+    },
+    {
         "code": "tim",
         "name": "\uADFC\uD0DC",
         "path": None,

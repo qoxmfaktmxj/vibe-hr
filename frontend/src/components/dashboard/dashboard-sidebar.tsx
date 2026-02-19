@@ -1,12 +1,14 @@
 "use client";
 
 import {
+  Building2,
   Calculator,
   CalendarCheck2,
   CalendarDays,
   ChevronDown,
   Clock,
   FileText,
+  FolderTree,
   LayoutDashboard,
   Menu,
   PanelLeft,
@@ -44,6 +46,10 @@ function renderIcon(iconName: string | null, className: string) {
       return <Calculator className={className} aria-hidden="true" />;
     case "FileText":
       return <FileText className={className} aria-hidden="true" />;
+    case "Building2":
+      return <Building2 className={className} aria-hidden="true" />;
+    case "FolderTree":
+      return <FolderTree className={className} aria-hidden="true" />;
     case "Settings":
       return <Settings className={className} aria-hidden="true" />;
     case "Shield":
