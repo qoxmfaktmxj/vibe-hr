@@ -17,7 +17,6 @@ import {
   Upload,
   Download,
   Save,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,7 +55,7 @@ import type {
 } from "@/types/employee";
 
 /* ------------------------------------------------------------------ */
-/* AG Grid module registration (once)                                  */
+/* 그리드 모듈 등록(최초 1회)                                           */
 /* ------------------------------------------------------------------ */
 let modulesRegistered = false;
 if (!modulesRegistered) {
@@ -65,7 +64,7 @@ if (!modulesRegistered) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Types                                                               */
+/* 타입 정의                                                           */
 /* ------------------------------------------------------------------ */
 type RowStatus = GridRowStatus;
 type ActiveFilter = "" | "Y" | "N";
@@ -82,9 +81,9 @@ type SearchFilters = {
 type EmployeeGridRow = EmployeeItem & {
   password: string;
   _status: RowStatus;
-  /** Snapshot of original field values so we can detect "reverted edits" */
+  /** 원복 판정을 위한 원본 필드 스냅샷 */
   _original?: Record<string, unknown>;
-  /** Status before being marked deleted ??so we can restore */
+  /** 삭제 처리 전 상태(삭제 해제 시 복구용) */
   _prevStatus?: RowStatus;
 };
 
@@ -107,7 +106,7 @@ const EMPTY_SEARCH_FILTERS: SearchFilters = {
 };
 
 /* ------------------------------------------------------------------ */
-/* i18n                                                                */
+/* 다국어 문구                                                         */
 /* ------------------------------------------------------------------ */
 const I18N = {
   loading: "사원 데이터를 불러오는 중...",
@@ -132,7 +131,6 @@ const I18N = {
   query: "조회",
   addRow: "입력",
   copy: "복사",
-  deleteRow: "삭제",
   templateDownload: "양식 다운로드",
   upload: "업로드",
   download: "다운로드",
@@ -198,9 +196,9 @@ const STATUS_LABELS: Record<RowStatus, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                             */
+/* 공통 보조 함수                                                       */
 /* ------------------------------------------------------------------ */
-/** Fields that we track for "revert to original = back to clean" */
+/** 원복 시 정상 상태 판정에 사용하는 추적 필드 */
 const TRACKED_FIELDS: (keyof EmployeeItem)[] = [
   "display_name",
   "department_id",
@@ -296,7 +294,7 @@ const HireDateCellEditor = forwardRef<
 });
 
 /* ------------------------------------------------------------------ */
-/* Component                                                           */
+/* 컴포넌트                                                            */
 /* ------------------------------------------------------------------ */
 export function EmployeeMasterManager() {
   const [rows, setRows] = useState<EmployeeGridRow[]>([]);
@@ -316,7 +314,7 @@ export function EmployeeMasterManager() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
 
-  /* -- derived ---------------------------------------------------- */
+  /* -- 파생값 ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
     const map = new Map<number, string>();
     for (const d of departments) map.set(d.id, d.name);
@@ -357,7 +355,7 @@ export function EmployeeMasterManager() {
     return map;
   }, [employmentOptions]);
 
-  /* -- id helper -------------------------------------------------- */
+  /* -- 임시 식별자 발급 ------------------------------------------------ */
   const issueTempId = useCallback(() => {
     const id = tempIdRef.current;
     tempIdRef.current -= 1;
@@ -417,7 +415,7 @@ export function EmployeeMasterManager() {
     })();
   }, []);
 
-  /* -- Refresh grid row styles after data change ------------------ */
+  /* -- 데이터 변경 후 그리드 행 스타일 갱신 ------------------ */
   const refreshGridRows = useCallback(() => {
     if (!gridApiRef.current) return;
     gridApiRef.current.redrawRows();
@@ -468,7 +466,7 @@ export function EmployeeMasterManager() {
     [refreshGridRows],
   );
 
-  /* -- load ------------------------------------------------------- */
+  /* -- 초기 로딩 ------------------------------------------------------- */
   const loadBase = useCallback(async () => {
     setLoading(true);
     const baseData = await fetchEmployeeBaseData({
@@ -492,7 +490,7 @@ export function EmployeeMasterManager() {
     })();
   }, [loadBase]);
 
-  /* -- column defs ------------------------------------------------ */
+  /* -- 컬럼 정의 ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     return [
       {
@@ -633,7 +631,7 @@ export function EmployeeMasterManager() {
     [],
   );
 
-  /* -- row styling via CSS class ---------------------------------- */
+  /* -- 클래스 기반 행 스타일 ---------------------------------- */
   const getRowClass = useCallback((params: RowClassParams<EmployeeGridRow>) => {
     if (!params.data) return "";
     if (params.data._status === "added") return "vibe-row-added";
@@ -642,7 +640,7 @@ export function EmployeeMasterManager() {
     return "";
   }, []);
 
-  /* -- grid events ------------------------------------------------ */
+  /* -- 그리드 이벤트 ------------------------------------------------ */
   const onGridReady = useCallback((event: GridReadyEvent<EmployeeGridRow>) => {
     gridApiRef.current = event.api;
   }, []);
@@ -696,7 +694,7 @@ export function EmployeeMasterManager() {
         }),
       );
 
-      // Redraw after state update so row class refreshes
+      // 상태 변경 후 행 스타일 반영을 위해 다시 그리기
       setTimeout(refreshGridRows, 0);
     },
     [departmentNameById, refreshGridRows],
@@ -723,53 +721,7 @@ export function EmployeeMasterManager() {
     [refreshGridRows],
   );
 
-  const handleDeleteSelected = useCallback(() => {
-    if (!gridApiRef.current) return;
-    const selected = gridApiRef.current.getSelectedRows();
-    if (selected.length === 0) return;
-
-    const selectedIds = new Set(selected.map((r) => r.id));
-
-    setRows((prev) => {
-      const next: EmployeeGridRow[] = [];
-      for (const row of prev) {
-        if (!selectedIds.has(row.id)) {
-          next.push(row);
-          continue;
-        }
-
-        if (row._status === "added") {
-          // new row: just remove from list
-          continue;
-        }
-
-        if (row._status === "deleted") {
-          const restoredStatus = resolveRestoredStatus(
-            row,
-            (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
-          );
-          next.push({ ...row, _status: restoredStatus, _prevStatus: undefined });
-        } else {
-          // clean or updated => mark as deleted
-          next.push({
-            ...row,
-            _status: "deleted",
-            _prevStatus: row._status,
-          });
-        }
-      }
-      return next;
-    });
-
-    setTimeout(() => {
-      refreshGridRows();
-      if (gridApiRef.current) {
-        gridApiRef.current.deselectAll();
-      }
-    }, 0);
-  }, [refreshGridRows]);
-
-  /* -- actions ---------------------------------------------------- */
+  /* -- 액션 ---------------------------------------------------- */
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
     setRows((prev) => [...added, ...prev]);
@@ -943,7 +895,7 @@ export function EmployeeMasterManager() {
     setTimeout(refreshGridRows, 0);
   }
 
-  /* -- query: reload grid data only (no full-screen loading) ------- */
+  /* -- 조회: 전체 화면 로딩 없이 데이터만 재조회 ------- */
   async function handleQuery() {
     const nextFilters: SearchFilters = {
       ...searchFilters,
@@ -967,7 +919,7 @@ export function EmployeeMasterManager() {
     }
   }
 
-  /* -- validation & save ------------------------------------------ */
+  /* -- 검증 및 저장 ------------------------------------------ */
   function validateRow(row: EmployeeGridRow): string | null {
     if (!row.display_name.trim() || row.display_name.trim().length < 2) return I18N.requiredName;
     if (!row.department_id || !departmentNameById.has(row.department_id)) return I18N.requiredDepartment;
@@ -1074,7 +1026,7 @@ export function EmployeeMasterManager() {
     void handleQuery();
   }
 
-  /* -- render ----------------------------------------------------- */
+  /* -- 렌더링 ----------------------------------------------------- */
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -1087,83 +1039,105 @@ export function EmployeeMasterManager() {
 
   return (
     <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
-      {/* ?? Search bar area ??????????????????????????????????? */}
+      {/* 검색 영역 */}
       <div className="border-b border-gray-200 bg-white px-3 py-3 md:px-6">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
-          <Input
-            value={searchFilters.employeeNo}
-            onChange={(e) => setSearchFilters((prev) => ({ ...prev, employeeNo: e.target.value }))}
-            onKeyDown={handleSearchFieldEnter}
-            placeholder="사번 검색"
-            className="h-9 text-sm"
-          />
-          <Input
-            value={searchFilters.name}
-            onChange={(e) => setSearchFilters((prev) => ({ ...prev, name: e.target.value }))}
-            onKeyDown={handleSearchFieldEnter}
-            placeholder="이름 검색"
-            className="h-9 text-sm"
-          />
-          <Input
-            value={searchFilters.department}
-            onChange={(e) => setSearchFilters((prev) => ({ ...prev, department: e.target.value }))}
-            onKeyDown={handleSearchFieldEnter}
-            placeholder="부서 검색"
-            className="h-9 text-sm"
-          />
-          <select
-            value={searchFilters.position}
-            onChange={(e) => setSearchFilters((prev) => ({ ...prev, position: e.target.value }))}
-            onKeyDown={handleSearchFieldEnter}
-            className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
-          >
-            <option value="">직책 전체</option>
-            {positionNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <CustomDatePicker
-            value={searchFilters.hireDateTo}
-            onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-            placeholder="입사일 이전 검색"
-            className="w-full"
-          />
-          <select
-            value={searchFilters.active}
-            onChange={(e) =>
-              setSearchFilters((prev) => ({
-                ...prev,
-                active: e.target.value as ActiveFilter,
-              }))
-            }
-            onKeyDown={handleSearchFieldEnter}
-            className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
-          >
-            <option value="">전체</option>
-            <option value="Y">Y</option>
-            <option value="N">N</option>
-          </select>
-          <div className="space-y-1">
-            <div className="text-xs text-slate-500">재직상태</div>
-            <MultiSelectFilter
-              options={statusOptions}
-              values={searchFilters.employmentStatuses}
-              onChange={handleEmploymentStatusChange}
-              placeholder="재직상태 전체"
-              searchPlaceholder="재직상태 검색"
-            />
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid flex-1 gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">사번</div>
+              <Input
+                value={searchFilters.employeeNo}
+                onChange={(e) => setSearchFilters((prev) => ({ ...prev, employeeNo: e.target.value }))}
+                onKeyDown={handleSearchFieldEnter}
+                placeholder="사번"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">이름</div>
+              <Input
+                value={searchFilters.name}
+                onChange={(e) => setSearchFilters((prev) => ({ ...prev, name: e.target.value }))}
+                onKeyDown={handleSearchFieldEnter}
+                placeholder="이름"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">부서</div>
+              <Input
+                value={searchFilters.department}
+                onChange={(e) => setSearchFilters((prev) => ({ ...prev, department: e.target.value }))}
+                onKeyDown={handleSearchFieldEnter}
+                placeholder="부서"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">직책</div>
+              <select
+                value={searchFilters.position}
+                onChange={(e) => setSearchFilters((prev) => ({ ...prev, position: e.target.value }))}
+                onKeyDown={handleSearchFieldEnter}
+                className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+              >
+                <option value="">전체</option>
+                {positionNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">입사일</div>
+              <CustomDatePicker
+                value={searchFilters.hireDateTo}
+                onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+                placeholder="입사일 이전"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">활성상태</div>
+              <select
+                value={searchFilters.active}
+                onChange={(e) =>
+                  setSearchFilters((prev) => ({
+                    ...prev,
+                    active: e.target.value as ActiveFilter,
+                  }))
+                }
+                onKeyDown={handleSearchFieldEnter}
+                className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+              >
+                <option value="">전체</option>
+                <option value="Y">Y</option>
+                <option value="N">N</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-slate-500">재직상태</div>
+              <MultiSelectFilter
+                options={statusOptions}
+                values={searchFilters.employmentStatuses}
+                onChange={handleEmploymentStatusChange}
+                placeholder="전체"
+                searchPlaceholder="재직상태 검색"
+              />
+            </div>
           </div>
-          <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-9">
-            <Search className="h-3.5 w-3.5" />
-            조회
-          </Button>
+          <div className="flex justify-end">
+            <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-8 min-w-20 px-3">
+              <Search className="h-3 w-3" />
+              조회
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* ?? Sheet header: title + buttons ???????????????????? */}
+      {/* 시트 헤더: 제목 + 버튼 */}
       <div className="flex flex-col gap-2 border-b border-gray-100 bg-white px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-800">
@@ -1202,10 +1176,6 @@ export function EmployeeMasterManager() {
             <Copy className="h-3.5 w-3.5" />
             {I18N.copy}
           </Button>
-          <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
-            <Trash2 className="h-3.5 w-3.5" />
-            {I18N.deleteRow}
-          </Button>
           <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
             <FileDown className="h-3.5 w-3.5" />
             {I18N.templateDownload}
@@ -1240,7 +1210,7 @@ export function EmployeeMasterManager() {
         </div>
       </div>
 
-      {/* ?? Mobile cards ????????????????????????????????????? */}
+      {/* 모바일 카드 영역 */}
       <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
         <div className="space-y-2">
           {mobileRows.length === 0 ? (
@@ -1328,7 +1298,7 @@ export function EmployeeMasterManager() {
         </div>
       </div>
 
-      {/* ?? AG Grid (Desktop) ??????????????????????????????? */}
+      {/* AG Grid (데스크톱) */}
       <div className="hidden flex-1 px-6 pb-4 pt-2 md:block">
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<EmployeeGridRow>
