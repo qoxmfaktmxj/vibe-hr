@@ -802,6 +802,15 @@ export function EmployeeMasterManager() {
       setDepartments(deptJson.departments);
       setRows(empJson.employees.map((e) => toGridRow(e)));
       tempIdRef.current = -1;
+
+      // Reset transient grid UI state (selection / row class rendering) on query.
+      setTimeout(() => {
+        if (!gridApiRef.current) return;
+        suppressSelectionRef.current = true;
+        gridApiRef.current.deselectAll();
+        gridApiRef.current.redrawRows();
+        suppressSelectionRef.current = false;
+      }, 0);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.initError);
     }
