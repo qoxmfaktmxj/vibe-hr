@@ -72,7 +72,7 @@ type SearchFilters = {
   employeeNo: string;
   name: string;
   department: string;
-  position: string;
+  positions: string[];
   hireDateTo: string;
   employmentStatuses: EmployeeItem["employment_status"][];
   active: ActiveFilter;
@@ -99,7 +99,7 @@ const EMPTY_SEARCH_FILTERS: SearchFilters = {
   employeeNo: "",
   name: "",
   department: "",
-  position: "",
+  positions: [],
   hireDateTo: "",
   employmentStatuses: [],
   active: "",
@@ -899,6 +899,7 @@ export function EmployeeMasterManager() {
   async function handleQuery() {
     const nextFilters: SearchFilters = {
       ...searchFilters,
+      positions: [...searchFilters.positions],
       employmentStatuses: [...searchFilters.employmentStatuses],
     };
     setAppliedFilters(nextFilters);
@@ -983,20 +984,19 @@ export function EmployeeMasterManager() {
     const employeeNo = appliedFilters.employeeNo.trim().toLowerCase();
     const name = appliedFilters.name.trim().toLowerCase();
     const department = appliedFilters.department.trim().toLowerCase();
-    const position = appliedFilters.position.trim().toLowerCase();
     const hireDateTo = appliedFilters.hireDateTo.trim();
     const active = appliedFilters.active;
+    const positionFilter = new Set(appliedFilters.positions);
     const statusFilter = new Set(appliedFilters.employmentStatuses);
 
     return rows.filter((row) => {
       const departmentName = (row.department_name || departmentNameById.get(row.department_id) || "").toLowerCase();
-      const positionTitle = row.position_title.toLowerCase();
       const hireDate = normalizeDateKey(row.hire_date);
 
       if (employeeNo && !row.employee_no.toLowerCase().includes(employeeNo)) return false;
       if (name && !row.display_name.toLowerCase().includes(name)) return false;
       if (department && !departmentName.includes(department)) return false;
-      if (position && positionTitle !== position.toLowerCase()) return false;
+      if (positionFilter.size > 0 && !positionFilter.has(row.position_title)) return false;
       if (hireDateTo && (!hireDate || hireDate > hireDateTo)) return false;
       if (statusFilter.size > 0 && !statusFilter.has(row.employment_status)) return false;
       if (active === "Y" && !row.is_active) return false;
@@ -1018,6 +1018,13 @@ export function EmployeeMasterManager() {
     );
   const handleEmploymentStatusChange = useCallback((values: EmployeeItem["employment_status"][]) => {
     setSearchFilters((prev) => ({ ...prev, employmentStatuses: values }));
+  }, []);
+  const positionFilterOptions = useMemo(
+    () => positionNames.map((name) => ({ value: name, label: name })),
+    [positionNames],
+  );
+  const handlePositionChange = useCallback((values: string[]) => {
+    setSearchFilters((prev) => ({ ...prev, positions: values }));
   }, []);
 
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
@@ -1075,19 +1082,13 @@ export function EmployeeMasterManager() {
             </div>
             <div className="space-y-1">
               <div className="text-xs text-slate-500">직책</div>
-              <select
-                value={searchFilters.position}
-                onChange={(e) => setSearchFilters((prev) => ({ ...prev, position: e.target.value }))}
-                onKeyDown={handleSearchFieldEnter}
-                className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
-              >
-                <option value="">전체</option>
-                {positionNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <MultiSelectFilter
+                options={positionFilterOptions}
+                values={searchFilters.positions}
+                onChange={handlePositionChange}
+                placeholder="전체"
+                searchPlaceholder="직책 검색"
+              />
             </div>
             <div className="space-y-1">
               <div className="text-xs text-slate-500">입사일</div>

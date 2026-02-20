@@ -94,6 +94,14 @@ KOREAN_GIVEN_SECOND = [
     "\uD658",
 ]
 
+KOREAN_POSITION_TITLES = [
+    "\uC0AC\uC6D0",
+    "\uB300\uB9AC",
+    "\uACFC\uC7A5",
+    "\uCC28\uC7A5",
+    "\uBD80\uC7A5",
+]
+
 DEPARTMENT_SEEDS = [
     ("HQ-HR", "\uC778\uC0AC\uBCF8\uBD80"),
     ("HQ-ENG", "\uAC1C\uBC1C\uBCF8\uBD80"),
@@ -448,6 +456,10 @@ def _build_dev_login_id(index: int) -> str:
     return f"{DEV_EMPLOYEE_LOGIN_PREFIX}{token}-{index:04d}"
 
 
+def _build_position_title(index: int) -> str:
+    return KOREAN_POSITION_TITLES[(index - 1) % len(KOREAN_POSITION_TITLES)]
+
+
 def _build_department_distribution(
     *,
     total_employees: int,
@@ -525,6 +537,7 @@ def ensure_bulk_korean_employees(
         login_id = _build_dev_login_id(index)
         email = f"{login_id}@vibe-hr.local"
         display_name = _build_korean_name(index)
+        position_title = _build_position_title(index)
 
         user = user_by_login.get(login_id)
         assigned_department_id = assignment[index - 1]
@@ -559,15 +572,22 @@ def ensure_bulk_korean_employees(
                 user_id=user.id,
                 employee_no=f"KR-{index:04d}",
                 department_id=assigned_department_id,
-                position_title="Staff",
+                position_title=position_title,
                 hire_date=date(hire_year, hire_month, hire_day),
                 employment_status="active",
             )
             session.add(employee)
             employee_by_user_id[user.id] = employee
-        elif employee.department_id != assigned_department_id:
-            employee.department_id = assigned_department_id
-            session.add(employee)
+        else:
+            changed = False
+            if employee.department_id != assigned_department_id:
+                employee.department_id = assigned_department_id
+                changed = True
+            if employee.position_title != position_title:
+                employee.position_title = position_title
+                changed = True
+            if changed:
+                session.add(employee)
 
         if user.id not in employee_role_user_ids:
             session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
