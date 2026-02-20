@@ -1,5 +1,6 @@
 import { LogoutButton } from "@/components/auth/logout-button";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { Button } from "@/components/ui/button";
 import { requireMenuAccess } from "@/lib/guard";
 
 const holidays = [
@@ -33,7 +34,7 @@ export default async function TimHolidaysPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-gray-600">년도</span>
               <input className="h-10 w-24 rounded-md border px-3" defaultValue="2026" />
-              <button className="h-10 rounded-md bg-primary px-4 text-white">조회</button>
+              <Button variant="query" className="h-10 px-4">조회</Button>
             </div>
           </section>
 
@@ -41,10 +42,10 @@ export default async function TimHolidaysPage() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold">휴일관리</h2>
               <div className="flex gap-2">
-                <button className="rounded border px-3 py-1 text-sm">입력</button>
-                <button className="rounded border px-3 py-1 text-sm">복사</button>
-                <button className="rounded border px-3 py-1 text-sm">저장</button>
-                <button className="rounded border px-3 py-1 text-sm">다운로드</button>
+                <Button variant="outline" size="sm">입력</Button>
+                <Button variant="outline" size="sm">복사</Button>
+                <Button variant="save" size="sm">저장</Button>
+                <Button variant="outline" size="sm">다운로드</Button>
               </div>
             </div>
 

@@ -848,7 +848,7 @@ export function EmployeeMasterManager() {
             <Button size="sm" variant="outline" onClick={() => void downloadCurrentSheetExcel()}>
               {I18N.download}
             </Button>
-            <Button size="sm" onClick={saveAllChanges} disabled={saving}>
+            <Button size="sm" variant="save" onClick={saveAllChanges} disabled={saving}>
               {saving ? `${I18N.saveAll}...` : I18N.saveAll}
             </Button>
             <input

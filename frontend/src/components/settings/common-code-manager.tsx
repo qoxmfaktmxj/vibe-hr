@@ -390,7 +390,7 @@ export function CommonCodeManager() {
               <Input placeholder={`${T.groupName} ${T.input}`} value={groupNameQuery} onChange={(e) => setGroupNameQuery(e.target.value)} />
             </div>
             <div className="flex items-end">
-              <Button type="button">{T.query}</Button>
+              <Button variant="query" type="button">{T.query}</Button>
             </div>
           </div>
         </CardContent>
@@ -425,7 +425,7 @@ export function CommonCodeManager() {
             <Button size="sm" variant="outline" onClick={() => { setGroupCreateMode(true); setSelectedGroupId(null); setNotice(null); }}>
               {T.input}
             </Button>
-            <Button size="sm" onClick={saveGroup} disabled={saving}>{T.save}</Button>
+            <Button size="sm" variant="save" onClick={saveGroup} disabled={saving}>{T.save}</Button>
             <Button size="sm" variant="destructive" onClick={deleteGroup} disabled={saving || !selectedGroupId || groupCreateMode}>{T.delete}</Button>
           </div>
         </CardHeader>
@@ -502,7 +502,7 @@ export function CommonCodeManager() {
               <Input placeholder={`${T.detailCodeName} ${T.input}`} value={detailNameQuery} onChange={(e) => setDetailNameQuery(e.target.value)} />
             </div>
             <div className="flex items-end">
-              <Button type="button">{T.query}</Button>
+              <Button variant="query" type="button">{T.query}</Button>
             </div>
           </div>
         </CardContent>
@@ -528,7 +528,7 @@ export function CommonCodeManager() {
             </Button>
             <Button size="sm" variant="outline" onClick={copyCode} disabled={!selectedCode}>{T.copy}</Button>
             <Button size="sm" variant="outline" onClick={() => { setCodeCreateMode(true); setSelectedCodeId(null); }} disabled={!selectedGroupId}>{T.input}</Button>
-            <Button size="sm" onClick={saveCode} disabled={saving || !selectedGroupId}>{T.save}</Button>
+            <Button size="sm" variant="save" onClick={saveCode} disabled={saving || !selectedGroupId}>{T.save}</Button>
             <Button size="sm" variant="destructive" onClick={deleteCode} disabled={saving || !selectedCodeId || codeCreateMode}>{T.delete}</Button>
           </div>
         </CardHeader>

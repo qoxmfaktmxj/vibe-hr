@@ -214,7 +214,7 @@ export function PermissionMatrixManager() {
               하위 메뉴 일괄 적용
             </label>
             <div className="ml-auto">
-              <Button onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
+              <Button variant="save" onClick={saveAll} disabled={saving || selectedRoleIds.length === 0}>
                 저장
               </Button>
             </div>

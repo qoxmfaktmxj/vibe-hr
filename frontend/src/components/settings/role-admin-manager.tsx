@@ -134,7 +134,7 @@ export function RoleAdminManager() {
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>권한 목록</CardTitle>
-          <Button size="sm" variant="outline" onClick={startCreateMode}>
+          <Button size="sm" variant="action" onClick={startCreateMode}>
             새 권한
           </Button>
         </CardHeader>
@@ -189,7 +189,7 @@ export function RoleAdminManager() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={saveRole} disabled={saving || !name || (!selectedRoleId && !code)}>
+            <Button variant="save" onClick={saveRole} disabled={saving || !name || (!selectedRoleId && !code)}>
               저장
             </Button>
             <Button onClick={deleteRole} variant="destructive" disabled={saving || !selectedRoleId}>

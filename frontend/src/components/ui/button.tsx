@@ -10,10 +10,14 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        query: "bg-primary text-primary-foreground hover:bg-primary/90",
+        save: "bg-[var(--vibe-save)] text-white hover:brightness-95",
+        action: "bg-[var(--vibe-action)] text-white hover:brightness-95",
+        warning: "bg-[var(--vibe-warning)] text-slate-900 hover:brightness-95",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
+          "border bg-white text-slate-700 shadow-xs hover:bg-slate-50 hover:text-slate-900 dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:

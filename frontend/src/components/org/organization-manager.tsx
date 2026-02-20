@@ -266,7 +266,7 @@ export function OrganizationManager() {
                 onChange={(event) => setReferenceDate(event.target.value)}
               />
             </div>
-            <Button className="h-9 px-5" onClick={runSearch}>
+            <Button variant="query" className="h-9 px-5" onClick={runSearch}>
               {"조회"}
             </Button>
           </div>
@@ -280,7 +280,7 @@ export function OrganizationManager() {
             <Button variant="outline" onClick={startCreate} disabled={saving}>
               {"입력"}
             </Button>
-            <Button onClick={saveDepartment} disabled={saving}>
+            <Button variant="save" onClick={saveDepartment} disabled={saving}>
               {"저장"}
             </Button>
             <Button variant="destructive" onClick={removeDepartment} disabled={saving || !selectedDepartmentId}>

@@ -289,7 +289,7 @@ export function MenuAdminManager() {
       <Card className="lg:col-span-1">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>메뉴 트리</CardTitle>
-          <Button size="sm" onClick={() => { setShowCreate(true); setForm(initialForm); setError(null); setNotice(null); setNoticeType(null); }}>
+          <Button size="sm" variant="action" onClick={() => { setShowCreate(true); setForm(initialForm); setError(null); setNotice(null); setNoticeType(null); }}>
             새 메뉴
           </Button>
         </CardHeader>
@@ -374,7 +374,7 @@ export function MenuAdminManager() {
               </label>
 
               <div className="flex gap-2">
-                <Button onClick={saveMenu} disabled={saving}>저장</Button>
+                <Button variant="save" onClick={saveMenu} disabled={saving}>저장</Button>
                 <Button variant="destructive" onClick={removeMenu} disabled={saving}>삭제</Button>
               </div>
 
@@ -401,7 +401,7 @@ export function MenuAdminManager() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={saveRoles} disabled={saving}>저장</Button>
+                <Button variant="save" onClick={saveRoles} disabled={saving}>저장</Button>
               </div>
             </>
           ) : (
@@ -463,7 +463,7 @@ export function MenuAdminManager() {
                 <Button variant="outline" onClick={() => setShowCreate(false)} disabled={saving}>
                   취소
                 </Button>
-                <Button onClick={createMenu} disabled={saving}>생성</Button>
+                <Button variant="action" onClick={createMenu} disabled={saving}>생성</Button>
               </div>
             </CardContent>
           </Card>
