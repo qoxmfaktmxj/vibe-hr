@@ -1,6 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  Plus,
+  Copy,
+  FileDown,
+  Upload,
+  Download,
+  Save,
+  Trash2,
+} from "lucide-react";
 
 import {
   AllCommunityModule,
@@ -9,14 +19,13 @@ import {
   type ColDef,
   type GridApi,
   type GridReadyEvent,
-  type RowStyle,
+  type RowClassParams,
+  type SelectionChangedEvent,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type {
   DepartmentItem,
   DepartmentListResponse,
@@ -25,20 +34,33 @@ import type {
   EmployeeListResponse,
 } from "@/types/employee";
 
+/* ------------------------------------------------------------------ */
+/* AG Grid module registration (once)                                  */
+/* ------------------------------------------------------------------ */
 let modulesRegistered = false;
 if (!modulesRegistered) {
   ModuleRegistry.registerModules([AllCommunityModule]);
   modulesRegistered = true;
 }
 
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
 type RowStatus = "clean" | "added" | "updated" | "deleted";
 
 type EmployeeGridRow = EmployeeItem & {
   password: string;
   _status: RowStatus;
   _error?: string;
+  /** Snapshot of original field values so we can detect "reverted edits" */
+  _original?: Record<string, unknown>;
+  /** Status before being marked deleted – so we can restore */
+  _prevStatus?: RowStatus;
 };
 
+/* ------------------------------------------------------------------ */
+/* i18n                                                                */
+/* ------------------------------------------------------------------ */
 const I18N = {
   loading: "사원 데이터를 불러오는 중...",
   loadEmployeeError: "사원 목록을 불러오지 못했습니다.",
@@ -52,7 +74,6 @@ const I18N = {
   pasteDone: "클립보드 데이터를 새 행으로 추가했습니다.",
   addRowsDone: "새 행을 추가했습니다.",
   markDeleteDone: "선택한 행을 삭제 처리했습니다.",
-  cancelDone: "변경 사항을 취소했습니다.",
   copiedHint:
     "화면을 클릭한 상태에서 Ctrl+V로 엑셀 행을 그리드에 추가할 수 있습니다.",
   summaryLabel: "변경 요약",
@@ -65,22 +86,19 @@ const I18N = {
   requiredDepartment: "부서를 선택해야 합니다.",
   requiredPosition: "직책은 필수입니다.",
   savePartial: "일괄 저장은 완료되었지만 일부 행이 실패했습니다.",
-  deleteConfirm: "선택한 행을 삭제 예정으로 변경할까요?",
   title: "사원 마스터",
-  searchPlaceholder: "사번/이름/로그인ID/부서 검색",
+  searchPlaceholder: "사번 / 이름 / 부서 검색",
+  query: "조회",
   addRow: "입력",
   copy: "복사",
-  templateDownload: "양식다운로드(엑셀)",
-  upload: "엑셀 업로드",
-  download: "엑셀 다운로드",
+  templateDownload: "양식 다운로드",
+  upload: "업로드",
+  download: "다운로드",
   saveAll: "저장",
-  removeAddedRowDone: "선택한 행을 삭제 상태로 변경했습니다.",
   copyDone: "선택한 행을 입력행으로 복제했습니다.",
   templateDone: "양식을 다운로드했습니다.",
   uploadDone: "엑셀 업로드 데이터를 반영했습니다.",
   downloadDone: "현재 시트 전체를 엑셀로 다운로드했습니다.",
-  selectedCount: "선택",
-  rowCount: "전체",
   pasteGuide:
     "엑셀 복사 열 순서: 이름 | 부서코드(또는 부서명) | 직책 | 입사일(YYYY-MM-DD) | 재직상태(active/leave/resigned) | 이메일 | 활성(Y/N) | 비밀번호",
   colStatus: "상태",
@@ -141,11 +159,40 @@ const STATUS_LABELS: Record<RowStatus, string> = {
   deleted: I18N.statusDeleted,
 };
 
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+/** Fields that we track for "revert to original = back to clean" */
+const TRACKED_FIELDS: (keyof EmployeeItem)[] = [
+  "display_name",
+  "department_id",
+  "position_title",
+  "hire_date",
+  "employment_status",
+  "email",
+  "is_active",
+];
+
+function snapshotOriginal(row: EmployeeItem): Record<string, unknown> {
+  const snap: Record<string, unknown> = {};
+  for (const f of TRACKED_FIELDS) snap[f] = row[f];
+  return snap;
+}
+
+function isRevertedToOriginal(row: EmployeeGridRow): boolean {
+  if (!row._original) return false;
+  for (const f of TRACKED_FIELDS) {
+    if (row[f] !== row._original[f]) return false;
+  }
+  return true;
+}
+
 function toGridRow(employee: EmployeeItem): EmployeeGridRow {
   return {
     ...employee,
     password: "",
     _status: "clean",
+    _original: snapshotOriginal(employee),
   };
 }
 
@@ -166,10 +213,14 @@ async function parseErrorDetail(response: Response, fallback: string): Promise<s
   return json?.detail ?? fallback;
 }
 
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
 export function EmployeeMasterManager() {
   const [rows, setRows] = useState<EmployeeGridRow[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [keyword, setKeyword] = useState("");
+  const [appliedKeyword, setAppliedKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -180,83 +231,75 @@ export function EmployeeMasterManager() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
 
+  /* -- derived ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
     const map = new Map<number, string>();
-    for (const department of departments) {
-      map.set(department.id, department.name);
-    }
+    for (const d of departments) map.set(d.id, d.name);
     return map;
   }, [departments]);
 
   const departmentLookupList = useMemo(
     () =>
-      departments.map((department) => ({
-        ...department,
-        codeLower: department.code.toLowerCase(),
-        nameLower: department.name.toLowerCase(),
+      departments.map((d) => ({
+        ...d,
+        codeLower: d.code.toLowerCase(),
+        nameLower: d.name.toLowerCase(),
       })),
     [departments],
   );
 
   const changeSummary = useMemo(() => {
-    const summary = { added: 0, updated: 0, deleted: 0 };
-    for (const row of rows) {
-      if (row._status === "added") summary.added += 1;
-      else if (row._status === "updated") summary.updated += 1;
-      else if (row._status === "deleted") summary.deleted += 1;
+    const s = { added: 0, updated: 0, deleted: 0 };
+    for (const r of rows) {
+      if (r._status === "added") s.added += 1;
+      else if (r._status === "updated") s.updated += 1;
+      else if (r._status === "deleted") s.deleted += 1;
     }
-    return summary;
+    return s;
   }, [rows]);
 
+  /* -- id helper -------------------------------------------------- */
   const issueTempId = useCallback(() => {
     const id = tempIdRef.current;
     tempIdRef.current -= 1;
     return id;
   }, []);
 
-  const createEmptyRow = useCallback(
-    (): EmployeeGridRow => {
-      const departmentId = departments[0]?.id ?? 0;
-      const today = new Date().toISOString().slice(0, 10);
-      return {
-        id: issueTempId(),
-        employee_no: "",
-        login_id: "",
-        display_name: "",
-        email: "",
-        department_id: departmentId,
-        department_name: departmentNameById.get(departmentId) ?? "",
-        position_title: "사원",
-        hire_date: today,
-        employment_status: "active",
-        is_active: true,
-        password: "admin",
-        _status: "added",
-      };
-    },
-    [departmentNameById, departments, issueTempId],
-  );
+  const createEmptyRow = useCallback((): EmployeeGridRow => {
+    const departmentId = departments[0]?.id ?? 0;
+    const today = new Date().toISOString().slice(0, 10);
+    return {
+      id: issueTempId(),
+      employee_no: "",
+      login_id: "",
+      display_name: "",
+      email: "",
+      department_id: departmentId,
+      department_name: departmentNameById.get(departmentId) ?? "",
+      position_title: "사원",
+      hire_date: today,
+      employment_status: "active",
+      is_active: true,
+      password: "admin",
+      _status: "added",
+    };
+  }, [departmentNameById, departments, issueTempId]);
 
+  /* -- load ------------------------------------------------------- */
   const loadBase = useCallback(async () => {
     setLoading(true);
-
-    const [employeeRes, departmentRes] = await Promise.all([
+    const [empRes, deptRes] = await Promise.all([
       fetch("/api/employees", { cache: "no-store" }),
       fetch("/api/employees/departments", { cache: "no-store" }),
     ]);
+    if (!empRes.ok) throw new Error(await parseErrorDetail(empRes, I18N.loadEmployeeError));
+    if (!deptRes.ok) throw new Error(await parseErrorDetail(deptRes, I18N.loadDepartmentError));
 
-    if (!employeeRes.ok) {
-      throw new Error(await parseErrorDetail(employeeRes, I18N.loadEmployeeError));
-    }
-    if (!departmentRes.ok) {
-      throw new Error(await parseErrorDetail(departmentRes, I18N.loadDepartmentError));
-    }
+    const empJson = (await empRes.json()) as EmployeeListResponse;
+    const deptJson = (await deptRes.json()) as DepartmentListResponse;
 
-    const employeeJson = (await employeeRes.json()) as EmployeeListResponse;
-    const departmentJson = (await departmentRes.json()) as DepartmentListResponse;
-
-    setDepartments(departmentJson.departments);
-    setRows(employeeJson.employees.map((employee) => toGridRow(employee)));
+    setDepartments(deptJson.departments);
+    setRows(empJson.employees.map((e) => toGridRow(e)));
     setLoading(false);
   }, []);
 
@@ -272,9 +315,9 @@ export function EmployeeMasterManager() {
     })();
   }, [loadBase]);
 
+  /* -- column defs ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     const statusOptions: EmployeeItem["employment_status"][] = ["active", "leave", "resigned"];
-
     return [
       {
         headerName: "",
@@ -289,54 +332,61 @@ export function EmployeeMasterManager() {
       {
         headerName: I18N.colStatus,
         field: "_status",
-        width: 86,
+        width: 80,
         editable: false,
+        cellClass: (params) => {
+          const s = params.value as RowStatus;
+          if (s === "added") return "vibe-status-added";
+          if (s === "updated") return "vibe-status-updated";
+          if (s === "deleted") return "vibe-status-deleted";
+          return "";
+        },
         valueFormatter: (params) => STATUS_LABELS[(params.value as RowStatus) ?? "clean"],
       },
-      { headerName: I18N.colEmployeeNo, field: "employee_no", width: 130, editable: false },
+      {
+        headerName: I18N.colEmployeeNo,
+        field: "employee_no",
+        width: 120,
+        editable: (params) => params.data?._status === "added",
+      },
       {
         headerName: I18N.colLoginId,
         field: "login_id",
-        width: 140,
+        width: 130,
         editable: (params) => params.data?._status === "added",
       },
       {
         headerName: I18N.colName,
         field: "display_name",
-        width: 130,
+        width: 120,
         editable: (params) => params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colDepartment,
         field: "department_id",
-        width: 150,
+        width: 140,
         editable: (params) => params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
-        cellEditorParams: {
-          values: departments.map((department) => department.id),
-        },
-        valueFormatter: (params) => {
-          const value = Number(params.value);
-          return departmentNameById.get(value) ?? "";
-        },
+        cellEditorParams: { values: departments.map((d) => d.id) },
+        valueFormatter: (params) => departmentNameById.get(Number(params.value)) ?? "",
         valueParser: (params) => Number(params.newValue),
       },
       {
         headerName: I18N.colPosition,
         field: "position_title",
-        width: 140,
+        width: 120,
         editable: (params) => params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colHireDate,
         field: "hire_date",
-        width: 128,
+        width: 120,
         editable: (params) => params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colEmploymentStatus,
         field: "employment_status",
-        width: 120,
+        width: 110,
         editable: (params) => params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: statusOptions },
@@ -344,13 +394,13 @@ export function EmployeeMasterManager() {
       {
         headerName: I18N.colEmail,
         field: "email",
-        width: 190,
+        width: 180,
         editable: (params) => params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colActive,
         field: "is_active",
-        width: 90,
+        width: 80,
         editable: (params) => params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: ["Y", "N"] },
@@ -360,37 +410,28 @@ export function EmployeeMasterManager() {
       {
         headerName: I18N.colPassword,
         field: "password",
-        width: 180,
+        width: 160,
         editable: (params) => params.data?._status !== "deleted",
       },
-      { headerName: I18N.colError, field: "_error", width: 240, editable: false },
+      { headerName: I18N.colError, field: "_error", width: 220, editable: false },
     ];
   }, [departmentNameById, departments]);
 
   const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(
-    () => ({
-      sortable: true,
-      filter: true,
-      resizable: true,
-      editable: false,
-    }),
+    () => ({ sortable: true, filter: true, resizable: true, editable: false }),
     [],
   );
 
-  const getRowStyle = useCallback((row: { data: EmployeeGridRow | undefined }): RowStyle | undefined => {
-    if (!row.data) return undefined;
-    if (row.data._status === "added") return { backgroundColor: "#edfdf1" };
-    if (row.data._status === "updated") return { backgroundColor: "#fff8e1" };
-    if (row.data._status === "deleted") {
-      return {
-        backgroundColor: "#ffecec",
-        textDecoration: "line-through",
-        color: "#b91c1c",
-      };
-    }
-    return undefined;
+  /* -- row styling via CSS class ---------------------------------- */
+  const getRowClass = useCallback((params: RowClassParams<EmployeeGridRow>) => {
+    if (!params.data) return "";
+    if (params.data._status === "added") return "vibe-row-added";
+    if (params.data._status === "updated") return "vibe-row-updated";
+    if (params.data._status === "deleted") return "vibe-row-deleted";
+    return "";
   }, []);
 
+  /* -- grid events ------------------------------------------------ */
   const onGridReady = useCallback((event: GridReadyEvent<EmployeeGridRow>) => {
     gridApiRef.current = event.api;
   }, []);
@@ -399,7 +440,7 @@ export function EmployeeMasterManager() {
     (event: CellValueChangedEvent<EmployeeGridRow>) => {
       const rowId = event.data?.id;
       const field = event.colDef.field as keyof EmployeeGridRow | undefined;
-      if (!rowId || !field) return;
+      if (rowId == null || !field) return;
 
       setRows((prev) =>
         prev.map((row) => {
@@ -408,14 +449,16 @@ export function EmployeeMasterManager() {
           const next: EmployeeGridRow = { ...row, _error: undefined };
 
           if (field === "department_id") {
-            const departmentId = Number(event.newValue);
-            next.department_id = Number.isFinite(departmentId) ? departmentId : row.department_id;
+            const dId = Number(event.newValue);
+            next.department_id = Number.isFinite(dId) ? dId : row.department_id;
             next.department_name = departmentNameById.get(next.department_id) ?? "";
           } else if (field === "employment_status") {
             next.employment_status = normalizeEmploymentStatus(String(event.newValue ?? "active"));
           } else if (field === "is_active") {
-            if (typeof event.newValue === "boolean") next.is_active = event.newValue;
-            else next.is_active = parseBoolean(String(event.newValue ?? "N"));
+            next.is_active =
+              typeof event.newValue === "boolean"
+                ? event.newValue
+                : parseBoolean(String(event.newValue ?? "N"));
           } else if (field === "hire_date") {
             next.hire_date = String(event.newValue ?? "").slice(0, 10);
           } else if (field === "password") {
@@ -428,9 +471,18 @@ export function EmployeeMasterManager() {
             next.email = String(event.newValue ?? "");
           } else if (field === "position_title") {
             next.position_title = String(event.newValue ?? "");
+          } else if (field === "employee_no") {
+            next.employee_no = String(event.newValue ?? "").trim();
           }
 
-          if (next._status === "clean") next._status = "updated";
+          /* --- revert detection ---- */
+          if (next._status === "clean") {
+            next._status = "updated";
+          } else if (next._status === "updated" && isRevertedToOriginal(next) && !next.password) {
+            // All tracked fields match original & no password change => back to clean
+            next._status = "clean";
+          }
+
           return next;
         }),
       );
@@ -438,6 +490,67 @@ export function EmployeeMasterManager() {
     [departmentNameById],
   );
 
+  /**
+   * Checkbox toggle:
+   * - clean / updated => mark as deleted (remember previous status)
+   * - deleted => restore to previous status (updated keeps its edits)
+   * - added => remove row entirely
+   */
+  const handleSelectionChanged = useCallback(
+    (event: SelectionChangedEvent<EmployeeGridRow>) => {
+      if (!gridApiRef.current) return;
+      const selected = gridApiRef.current.getSelectedRows();
+      if (selected.length === 0) return;
+
+      const selectedIds = new Set(selected.map((r) => r.id));
+
+      setRows((prev) => {
+        const next: EmployeeGridRow[] = [];
+        for (const row of prev) {
+          if (!selectedIds.has(row.id)) {
+            next.push(row);
+            continue;
+          }
+
+          if (row._status === "added") {
+            // new row: just remove from list
+            continue;
+          }
+
+          if (row._status === "deleted") {
+            // restore to previous status
+            const restored: EmployeeGridRow = {
+              ...row,
+              _status: row._prevStatus ?? "clean",
+              _prevStatus: undefined,
+              _error: undefined,
+            };
+            // If restored and values match original, ensure clean
+            if (restored._status === "updated" && isRevertedToOriginal(restored) && !restored.password) {
+              restored._status = "clean";
+            }
+            next.push(restored);
+          } else {
+            // clean or updated => mark as deleted
+            next.push({
+              ...row,
+              _status: "deleted",
+              _prevStatus: row._status,
+              _error: undefined,
+            });
+          }
+        }
+        return next;
+      });
+
+      // Deselect after processing
+      gridApiRef.current.deselectAll();
+      setNotice(null);
+    },
+    [],
+  );
+
+  /* -- actions ---------------------------------------------------- */
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
     setRows((prev) => [...added, ...prev]);
@@ -447,15 +560,10 @@ export function EmployeeMasterManager() {
 
   const parseDepartmentId = useCallback(
     (input: string): number => {
-      const value = input.trim().toLowerCase();
-      if (!value) return departments[0]?.id ?? 0;
-
-      const matched = departmentLookupList.find(
-        (department) => department.codeLower === value || department.nameLower === value,
-      );
-      if (matched) return matched.id;
-
-      return departments[0]?.id ?? 0;
+      const v = input.trim().toLowerCase();
+      if (!v) return departments[0]?.id ?? 0;
+      const matched = departmentLookupList.find((d) => d.codeLower === v || d.nameLower === v);
+      return matched?.id ?? departments[0]?.id ?? 0;
     },
     [departmentLookupList, departments],
   );
@@ -463,83 +571,61 @@ export function EmployeeMasterManager() {
   const handlePasteCapture = useCallback(
     (event: React.ClipboardEvent<HTMLDivElement>) => {
       if (!containerRef.current?.contains(document.activeElement)) return;
-
       const text = event.clipboardData.getData("text/plain");
       if (!text || !text.includes("\t")) return;
 
       event.preventDefault();
-
       const lines = text
         .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
-
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
       if (lines.length === 0) return;
 
-      const parsedRows: EmployeeGridRow[] = [];
-      for (const line of lines) {
-        const cells = line.split("\t").map((cell) => cell.trim());
-        const departmentId = parseDepartmentId(cells[1] ?? "");
-
-        parsedRows.push({
+      const parsed: EmployeeGridRow[] = lines.map((line) => {
+        const c = line.split("\t").map((s) => s.trim());
+        const deptId = parseDepartmentId(c[1] ?? "");
+        return {
           id: issueTempId(),
           employee_no: "",
           login_id: "",
-          display_name: cells[0] ?? "",
-          department_id: departmentId,
-          department_name: departmentNameById.get(departmentId) ?? "",
-          position_title: cells[2] || "사원",
-          hire_date: (cells[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
-          employment_status: normalizeEmploymentStatus(cells[4] || "active"),
-          email: cells[5] || "",
-          is_active: parseBoolean(cells[6] || "Y"),
-          password: cells[7] || "admin",
-          _status: "added",
-        });
-      }
+          display_name: c[0] ?? "",
+          department_id: deptId,
+          department_name: departmentNameById.get(deptId) ?? "",
+          position_title: c[2] || "사원",
+          hire_date: (c[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
+          employment_status: normalizeEmploymentStatus(c[4] || "active"),
+          email: c[5] || "",
+          is_active: parseBoolean(c[6] || "Y"),
+          password: c[7] || "admin",
+          _status: "added" as const,
+        };
+      });
 
-      setRows((prev) => [...parsedRows, ...prev]);
+      setRows((prev) => [...parsed, ...prev]);
       setNoticeType("success");
       setNotice(I18N.pasteDone);
     },
     [departmentNameById, issueTempId, parseDepartmentId],
   );
 
-  function handleSelectionChanged() {
-    if (!gridApiRef.current) return;
-    const selected = gridApiRef.current.getSelectedRows();
-    if (selected.length === 0) return;
-
-    const selectedIds = new Set(selected.map((row) => row.id));
-    setRows((prev) =>
-      prev.map((row) => {
-        if (!selectedIds.has(row.id)) return row;
-        if (row._status === "deleted") return row;
-        return { ...row, _status: "deleted", _error: undefined };
-      }),
-    );
-
-    gridApiRef.current.deselectAll();
-    setNoticeType("success");
-    setNotice(I18N.removeAddedRowDone);
-  }
-
   function copySelectedRows() {
     if (!gridApiRef.current) return;
-    const selected = gridApiRef.current.getSelectedRows().filter((row) => row._status !== "deleted");
+    const selected = gridApiRef.current.getSelectedRows().filter((r) => r._status !== "deleted");
     if (selected.length === 0) return;
 
-    const selectedIdSet = new Set(selected.map((row) => row.id));
+    const selectedIdSet = new Set(selected.map((r) => r.id));
     const clonesById = new Map<number, EmployeeGridRow>(
-      selected.map((row) => [
-        row.id,
+      selected.map((r) => [
+        r.id,
         {
-          ...row,
+          ...r,
           id: issueTempId(),
           employee_no: "",
           login_id: "",
-          _status: "added",
+          _status: "added" as const,
           _error: undefined,
+          _original: undefined,
+          _prevStatus: undefined,
         },
       ]),
     );
@@ -561,8 +647,18 @@ export function EmployeeMasterManager() {
   }
 
   async function downloadTemplateExcel() {
-    const headers = ["이름", "부서코드(또는 부서명)", "직책", "입사일", "재직상태", "이메일", "활성(Y/N)", "비밀번호"];
-    const sample = ["홍길동", "HQ-HR", "사원", "2026-01-01", "active", "hong@vibe-hr.local", "Y", "admin"];
+    const headers = [
+      "사번",
+      "이름",
+      "부서코드(또는 부서명)",
+      "직책",
+      "입사일",
+      "재직상태",
+      "이메일",
+      "활성(Y/N)",
+      "비밀번호",
+    ];
+    const sample = ["", "홍길동", "HQ-HR", "사원", "2026-01-01", "active", "hong@vibe-hr.local", "Y", "admin"];
 
     const { utils, writeFileXLSX } = await import("xlsx");
     const sheet = utils.aoa_to_sheet([headers, sample]);
@@ -577,22 +673,21 @@ export function EmployeeMasterManager() {
   async function downloadCurrentSheetExcel() {
     const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
     const data = rows
-      .filter((row) => row._status !== "deleted")
-      .map((row) => [
-        row.employee_no,
-        row.login_id,
-        row.display_name,
-        row.department_name || departmentNameById.get(row.department_id) || "",
-        row.position_title,
-        row.hire_date,
-        row.employment_status,
-        row.email,
-        row.is_active ? "Y" : "N",
+      .filter((r) => r._status !== "deleted")
+      .map((r) => [
+        r.employee_no,
+        r.login_id,
+        r.display_name,
+        r.department_name || departmentNameById.get(r.department_id) || "",
+        r.position_title,
+        r.hire_date,
+        r.employment_status,
+        r.email,
+        r.is_active ? "Y" : "N",
       ]);
 
     const { utils, writeFileXLSX } = await import("xlsx");
-    const aoa = [headers, ...data];
-    const sheet = utils.aoa_to_sheet(aoa);
+    const sheet = utils.aoa_to_sheet([headers, ...data]);
     const book = utils.book_new();
     utils.book_append_sheet(book, sheet, "사원관리");
     writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -606,39 +701,47 @@ export function EmployeeMasterManager() {
     const buffer = await file.arrayBuffer();
     const workbook = read(buffer, { type: "array" });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(firstSheet, { header: 1, raw: false });
+    const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(firstSheet, {
+      header: 1,
+      raw: false,
+    });
 
     if (!rowsAoa || rowsAoa.length <= 1) return;
 
-    const body = rowsAoa.slice(1);
-    const parsedRows: EmployeeGridRow[] = [];
-    for (const rowCells of body) {
-      const cells = rowCells.map((cell) => String(cell ?? "").trim());
-      if (!cells.some((cell) => cell.length > 0)) continue;
-
-      const departmentId = parseDepartmentId(cells[1] ?? "");
-      parsedRows.push({
+    const parsed: EmployeeGridRow[] = [];
+    for (const cells of rowsAoa.slice(1)) {
+      const c = cells.map((v) => String(v ?? "").trim());
+      if (!c.some((v) => v.length > 0)) continue;
+      const deptId = parseDepartmentId(c[1] ?? "");
+      parsed.push({
         id: issueTempId(),
         employee_no: "",
         login_id: "",
-        display_name: cells[0] ?? "",
-        department_id: departmentId,
-        department_name: departmentNameById.get(departmentId) ?? "",
-        position_title: cells[2] || "사원",
-        hire_date: (cells[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
-        employment_status: normalizeEmploymentStatus(cells[4] || "active"),
-        email: cells[5] || "",
-        is_active: parseBoolean(cells[6] || "Y"),
-        password: cells[7] || "admin",
+        display_name: c[0] ?? "",
+        department_id: deptId,
+        department_name: departmentNameById.get(deptId) ?? "",
+        position_title: c[2] || "사원",
+        hire_date: (c[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
+        employment_status: normalizeEmploymentStatus(c[4] || "active"),
+        email: c[5] || "",
+        is_active: parseBoolean(c[6] || "Y"),
+        password: c[7] || "admin",
         _status: "added",
       });
     }
 
-    setRows((prev) => [...parsedRows, ...prev]);
+    setRows((prev) => [...parsed, ...prev]);
     setNoticeType("success");
     setNotice(I18N.uploadDone);
   }
 
+  /* -- query ------------------------------------------------------ */
+  function handleQuery() {
+    setAppliedKeyword(keyword);
+    setNotice(null);
+  }
+
+  /* -- validation & save ------------------------------------------ */
   function validateRow(row: EmployeeGridRow): string | null {
     if (!row.display_name.trim() || row.display_name.trim().length < 2) return I18N.requiredName;
     if (!row.department_id || !departmentNameById.has(row.department_id)) return I18N.requiredDepartment;
@@ -647,9 +750,9 @@ export function EmployeeMasterManager() {
   }
 
   async function saveAllChanges() {
-    const toInsert = rows.filter((row) => row._status === "added");
-    const toUpdate = rows.filter((row) => row._status === "updated");
-    const toDelete = rows.filter((row) => row._status === "deleted" && row.id > 0);
+    const toInsert = rows.filter((r) => r._status === "added");
+    const toUpdate = rows.filter((r) => r._status === "updated");
+    const toDelete = rows.filter((r) => r._status === "deleted" && r.id > 0);
 
     if (toInsert.length + toUpdate.length + toDelete.length === 0) {
       setNoticeType("success");
@@ -658,13 +761,12 @@ export function EmployeeMasterManager() {
     }
 
     const validationErrors = new Map<number, string>();
-    for (const row of [...toInsert, ...toUpdate]) {
-      const message = validateRow(row);
-      if (message) validationErrors.set(row.id, message);
+    for (const r of [...toInsert, ...toUpdate]) {
+      const msg = validateRow(r);
+      if (msg) validationErrors.set(r.id, msg);
     }
-
     if (validationErrors.size > 0) {
-      setRows((prev) => prev.map((row) => ({ ...row, _error: validationErrors.get(row.id) })));
+      setRows((prev) => prev.map((r) => ({ ...r, _error: validationErrors.get(r.id) })));
       setNoticeType("error");
       setNotice(I18N.validationError);
       return;
@@ -678,10 +780,9 @@ export function EmployeeMasterManager() {
 
     const deleteResults = await Promise.all(
       toDelete.map(async (row) => {
-        const response = await fetch(`/api/employees/${row.id}`, { method: "DELETE" });
-        if (!response.ok) {
-          const detail = await parseErrorDetail(response, I18N.deleteFailed);
-          return { id: row.id, ok: false as const, message: detail };
+        const res = await fetch(`/api/employees/${row.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          return { id: row.id, ok: false as const, message: await parseErrorDetail(res, I18N.deleteFailed) };
         }
         return { id: row.id, ok: true as const };
       }),
@@ -690,6 +791,7 @@ export function EmployeeMasterManager() {
     const insertResults = await Promise.all(
       toInsert.map(async (row) => {
         const payload = {
+          employee_no: row.employee_no.trim() || undefined,
           display_name: row.display_name.trim(),
           department_id: row.department_id,
           position_title: row.position_title.trim() || "사원",
@@ -699,26 +801,19 @@ export function EmployeeMasterManager() {
           login_id: row.login_id.trim() || null,
           password: row.password.trim() || "admin",
         };
-
-        const response = await fetch("/api/employees", {
+        const res = await fetch("/api/employees", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-
-        const json = (await response.json().catch(() => null)) as
-          | EmployeeDetailResponse
-          | { detail?: string }
-          | null;
-
-        if (!response.ok) {
+        const json = (await res.json().catch(() => null)) as EmployeeDetailResponse | { detail?: string } | null;
+        if (!res.ok) {
           return {
             id: row.id,
             ok: false as const,
             message: (json as { detail?: string } | null)?.detail ?? I18N.saveFailed,
           };
         }
-
         return { id: row.id, ok: true as const, employee: (json as EmployeeDetailResponse).employee };
       }),
     );
@@ -735,75 +830,59 @@ export function EmployeeMasterManager() {
           is_active: row.is_active,
           password: row.password.trim() ? row.password.trim() : undefined,
         };
-
-        const response = await fetch(`/api/employees/${row.id}`, {
+        const res = await fetch(`/api/employees/${row.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-
-        const json = (await response.json().catch(() => null)) as
-          | EmployeeDetailResponse
-          | { detail?: string }
-          | null;
-
-        if (!response.ok) {
+        const json = (await res.json().catch(() => null)) as EmployeeDetailResponse | { detail?: string } | null;
+        if (!res.ok) {
           return {
             id: row.id,
             ok: false as const,
             message: (json as { detail?: string } | null)?.detail ?? I18N.saveFailed,
           };
         }
-
         return { id: row.id, ok: true as const, employee: (json as EmployeeDetailResponse).employee };
       }),
     );
 
-    const deleteSuccess = new Set(deleteResults.filter((result) => result.ok).map((result) => result.id));
+    const deleteSuccess = new Set(deleteResults.filter((r) => r.ok).map((r) => r.id));
     const insertSuccess = new Map(
       insertResults
-        .filter((result): result is { id: number; ok: true; employee: EmployeeItem } => result.ok)
-        .map((result) => [result.id, result.employee]),
+        .filter((r): r is { id: number; ok: true; employee: EmployeeItem } => r.ok)
+        .map((r) => [r.id, r.employee]),
     );
     const updateSuccess = new Map(
       updateResults
-        .filter((result): result is { id: number; ok: true; employee: EmployeeItem } => result.ok)
-        .map((result) => [result.id, result.employee]),
+        .filter((r): r is { id: number; ok: true; employee: EmployeeItem } => r.ok)
+        .map((r) => [r.id, r.employee]),
     );
 
     const errorById = new Map<number, string>();
-    for (const result of [...deleteResults, ...insertResults, ...updateResults]) {
-      if (!result.ok) {
-        errorById.set(result.id, result.message);
-        failedMessages.push(`ID ${result.id}: ${result.message}`);
+    for (const r of [...deleteResults, ...insertResults, ...updateResults]) {
+      if (!r.ok) {
+        errorById.set(r.id, r.message);
+        failedMessages.push(`ID ${r.id}: ${r.message}`);
       }
     }
 
     const mergedRows = nextRows
-      .filter((row) => !deleteSuccess.has(row.id))
-      .map((row) => {
-        const created = insertSuccess.get(row.id);
-        if (created) {
-          return { ...toGridRow(created), _error: undefined };
-        }
+      .filter((r) => !deleteSuccess.has(r.id))
+      .map((r) => {
+        const created = insertSuccess.get(r.id);
+        if (created) return { ...toGridRow(created), _error: undefined };
 
-        const updated = updateSuccess.get(row.id);
-        if (updated) {
-          return { ...toGridRow(updated), _error: undefined };
-        }
+        const updated = updateSuccess.get(r.id);
+        if (updated) return { ...toGridRow(updated), _error: undefined };
 
-        if (errorById.has(row.id)) {
-          return { ...row, _error: errorById.get(row.id) };
-        }
+        if (errorById.has(r.id)) return { ...r, _error: errorById.get(r.id) };
 
-        if (row._status === "deleted" && row.id < 0) {
-          return null;
-        }
-
-        return row;
+        if (r._status === "deleted" && r.id < 0) return null;
+        return r;
       });
 
-    setRows(mergedRows.filter((row): row is EmployeeGridRow => row !== null));
+    setRows(mergedRows.filter((r): r is EmployeeGridRow => r !== null));
     setSaving(false);
 
     if (failedMessages.length > 0) {
@@ -816,93 +895,150 @@ export function EmployeeMasterManager() {
     setNotice(I18N.saveDone);
   }
 
-  if (loading) return <div className="p-6">{I18N.loading}</div>;
+  /* -- render ----------------------------------------------------- */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <p className="text-sm text-slate-500">{I18N.loading}</p>
+      </div>
+    );
+  }
+
+  const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
 
   return (
-    <div className="space-y-4 p-6" ref={containerRef} onPasteCapture={handlePasteCapture}>
-      {notice ? (
-        <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p>
-      ) : null}
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>
-              {I18N.title} ({rows.length.toLocaleString()}명)
-            </CardTitle>
-            <p className="mt-1 text-xs text-slate-500">{I18N.pasteGuide}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => addRows(1)}>
-              {I18N.addRow}
-            </Button>
-            <Button size="sm" variant="outline" onClick={copySelectedRows}>
-              {I18N.copy}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
-              {I18N.templateDownload}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
-              {I18N.upload}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => void downloadCurrentSheetExcel()}>
-              {I18N.download}
-            </Button>
-            <Button size="sm" variant="save" onClick={saveAllChanges} disabled={saving}>
-              {saving ? `${I18N.saveAll}...` : I18N.saveAll}
-            </Button>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void handleUploadFile(file);
-                event.currentTarget.value = "";
+    <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
+      {/* ── Search bar area ─────────────────────────────────── */}
+      <div className="border-b border-gray-200 bg-white px-6 py-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleQuery();
               }}
+              placeholder={I18N.searchPlaceholder}
+              className="h-9 pl-9 text-sm"
             />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
-            <div className="space-y-1">
-              <Label className="text-xs">검색</Label>
-              <Input
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                placeholder={I18N.searchPlaceholder}
-              />
-            </div>
-            <div className="flex items-end text-xs text-slate-500">
-              <div>
-                {I18N.summaryLabel}: {I18N.statusAdded} {changeSummary.added}건 / {I18N.statusUpdated} {changeSummary.updated}건 / {I18N.statusDeleted} {changeSummary.deleted}건
-              </div>
-            </div>
-          </div>
+          <Button size="sm" variant="query" onClick={handleQuery}>
+            <Search className="h-3.5 w-3.5" />
+            {I18N.query}
+          </Button>
+        </div>
+      </div>
 
-          <div className="ag-theme-quartz h-[68vh] w-full rounded-md border">
-            <AgGridReact<EmployeeGridRow>
-              rowData={rows}
-              columnDefs={columnDefs}
-              defaultColDef={defaultColDef}
-              quickFilterText={keyword}
-              rowSelection="multiple"
-              suppressRowClickSelection={true}
-              animateRows={true}
-              getRowStyle={getRowStyle}
-              getRowId={(params) => String(params.data.id)}
-              onGridReady={onGridReady}
-              onCellValueChanged={onCellValueChanged}
-              onSelectionChanged={handleSelectionChanged}
-              localeText={AG_GRID_LOCALE_KO}
-              overlayNoRowsTemplate={`<span>${I18N.noRows}</span>`}
-            />
-          </div>
+      {/* ── Sheet header: title + buttons ──────────────────── */}
+      <div className="flex items-center justify-between bg-white px-6 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-gray-800">
+            {I18N.title}
+          </h2>
+          <span className="text-xs text-slate-400">
+            {rows.length.toLocaleString()}건
+          </span>
+          {hasChanges && (
+            <div className="flex items-center gap-2 ml-2">
+              {changeSummary.added > 0 && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  +{changeSummary.added}
+                </span>
+              )}
+              {changeSummary.updated > 0 && (
+                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  ~{changeSummary.updated}
+                </span>
+              )}
+              {changeSummary.deleted > 0 && (
+                <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                  -{changeSummary.deleted}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
 
-          <p className="text-xs text-slate-500">{I18N.copiedHint}</p>
-        </CardContent>
-      </Card>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => addRows(1)}>
+            <Plus className="h-3.5 w-3.5" />
+            {I18N.addRow}
+          </Button>
+          <Button size="sm" variant="outline" onClick={copySelectedRows}>
+            <Copy className="h-3.5 w-3.5" />
+            {I18N.copy}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
+            <FileDown className="h-3.5 w-3.5" />
+            {I18N.templateDownload}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
+            <Upload className="h-3.5 w-3.5" />
+            {I18N.upload}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void downloadCurrentSheetExcel()}>
+            <Download className="h-3.5 w-3.5" />
+            {I18N.download}
+          </Button>
+
+          {/* Separator */}
+          <div className="mx-1 h-6 w-px bg-gray-200" />
+
+          <Button size="sm" variant="save" onClick={saveAllChanges} disabled={saving}>
+            <Save className="h-3.5 w-3.5" />
+            {saving ? `${I18N.saveAll}...` : I18N.saveAll}
+          </Button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUploadFile(file);
+              e.currentTarget.value = "";
+            }}
+          />
+        </div>
+      </div>
+
+      {/* ── Notice bar ─────────────────────────────────────── */}
+      {notice && (
+        <div
+          className={`px-6 py-2 text-sm ${
+            noticeType === "success"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-red-50 text-red-700"
+          }`}
+        >
+          {notice}
+        </div>
+      )}
+
+      {/* ── AG Grid ────────────────────────────────────────── */}
+      <div className="flex-1 px-6 pb-4 pt-2">
+        <div className="ag-theme-quartz vibe-grid h-full w-full rounded-lg border border-gray-200 overflow-hidden">
+          <AgGridReact<EmployeeGridRow>
+            rowData={rows}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            quickFilterText={appliedKeyword}
+            rowSelection="multiple"
+            suppressRowClickSelection={true}
+            animateRows={false}
+            getRowClass={getRowClass}
+            getRowId={(params) => String(params.data.id)}
+            onGridReady={onGridReady}
+            onCellValueChanged={onCellValueChanged}
+            onSelectionChanged={handleSelectionChanged}
+            localeText={AG_GRID_LOCALE_KO}
+            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+            headerHeight={36}
+            rowHeight={34}
+          />
+        </div>
+      </div>
     </div>
   );
 }
