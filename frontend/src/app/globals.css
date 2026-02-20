@@ -169,10 +169,10 @@
 
 /* -- Row status colors ---------------------------------------- */
 .vibe-grid .vibe-row-added {
-  background-color: #f0fdf4 !important;
+  background-color: #eff4ff !important;
 }
 .vibe-grid .vibe-row-added:hover {
-  background-color: #dcfce7 !important;
+  background-color: #dbeafe !important;
 }
 .vibe-grid .vibe-row-updated {
   background-color: #fffbeb !important;
@@ -191,7 +191,7 @@
 
 /* -- Status cell badges --------------------------------------- */
 .vibe-grid .vibe-status-added {
-  color: #16a34a;
+  color: #3c6dee;
   font-weight: 600;
 }
 .vibe-grid .vibe-status-updated {
