@@ -100,8 +100,8 @@ export default async function DashboardPage() {
               trend="+1"
               trendColor="text-emerald-600"
               icon={CalendarDays}
-              iconBg="bg-[var(--vibe-accent-purple)]/10"
-              iconColor="text-[var(--vibe-accent-purple)]"
+              iconBg="bg-[var(--vibe-accent-rose)]/10"
+              iconColor="text-[var(--vibe-accent-rose)]"
             />
             <KpiCard
               title="Late Today"
@@ -109,8 +109,8 @@ export default async function DashboardPage() {
               trend="-1.2%"
               trendColor="text-rose-500"
               icon={Star}
-              iconBg="bg-[var(--vibe-accent-dark)]/10"
-              iconColor="text-[var(--vibe-accent-dark)]"
+              iconBg="bg-[var(--vibe-accent-red)]/10"
+              iconColor="text-[var(--vibe-accent-red)]"
             />
             <KpiCard
               title="Pending Leaves"
@@ -169,12 +169,12 @@ export default async function DashboardPage() {
                 <div className="text-primary">
                   <SurveyMeter label="Work-Life Balance" score="8.4/10" value={84} colorClass="text-primary" />
                 </div>
-                <div className="text-[var(--vibe-accent-purple)]">
+                <div className="text-[var(--vibe-accent-rose)]">
                   <SurveyMeter
                     label="Growth Opportunities"
                     score="6.8/10"
                     value={68}
-                    colorClass="text-[var(--vibe-accent-purple)]"
+                    colorClass="text-[var(--vibe-accent-rose)]"
                   />
                 </div>
                 <div className="text-[var(--vibe-primary-light)]">
@@ -214,7 +214,7 @@ export default async function DashboardPage() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Badge className="bg-primary/10 text-primary">{item.tagA}</Badge>
                       {item.tagB ? (
-                        <Badge className="bg-[var(--vibe-accent-purple)]/10 text-[var(--vibe-accent-purple)]">
+                        <Badge className="bg-[var(--vibe-accent-rose)]/10 text-[var(--vibe-accent-rose)]">
                           {item.tagB}
                         </Badge>
                       ) : null}
@@ -257,7 +257,7 @@ export default async function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--vibe-accent-dark)] text-xs font-bold text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--vibe-accent-red)] text-xs font-bold text-white">
                     3y
                   </div>
                   <div>

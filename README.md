@@ -19,23 +19,23 @@ Vibe-HR은 **한국어 사용 환경을 기본으로 하는 인사(HR) 시스템
 ## UI 컬러/버튼 가이드
 
 기준 팔레트(Coolors):
-- `https://coolors.co/3c6dee-7a9cec-0ea5e9-14b8a6-f59e0b`
+- `https://coolors.co/3c6dee-7a9cec-0ea5e9-b95f89-cc2936`
 
 색상 토큰(`frontend/src/app/globals.css`):
-- `--vibe-primary`: `#3C6DEE` (주색)
+- `--vibe-primary`: `#3C6DEE` (주색 — 조회 등)
 - `--vibe-primary-light`: `#7A9CEC` (보조색)
-- `--vibe-action`: `#0EA5E9` (특수 이벤트)
-- `--vibe-save`: `#14B8A6` (저장/확정)
-- `--vibe-warning`: `#F59E0B` (주의성 동작)
-- 삭제/위험 동작은 `destructive`(빨강) 유지
+- `--vibe-save`: `#0EA5E9` (저장/확정)
+- `--vibe-action`: `#0EA5E9` (특수 이벤트 — save와 동일 톤)
+- `--vibe-warning`: `#B95F89` (주의성 동작)
+- `--destructive`: `#CC2936` (삭제/위험 동작)
 
 버튼 variant 기준(`frontend/src/components/ui/button.tsx`):
-- `query`: 조회 버튼
-- `save`: 저장 버튼
+- `query`: 조회 버튼 (`--vibe-primary` 파랑)
+- `save`: 저장 버튼 (`--vibe-save` 스카이블루)
 - `action`: 화면 특수 이벤트(예: 새 메뉴, 새 권한, 생성)
-- `warning`: 주의성 버튼(필요 시)
+- `warning`: 주의성 버튼 (`--vibe-warning` 로즈핑크)
 - `outline`: 입력/복사/다운로드/업로드/양식 다운로드 계열(흰 배경)
-- `destructive`: 삭제 계열
+- `destructive`: 삭제 계열 (`--destructive` 레드)
 
 적용 원칙:
 - 조회/저장/삭제는 역할을 고정해 화면별 일관성을 유지합니다.

@@ -64,15 +64,15 @@
   --muted-foreground: #64748b;
   --accent: #eff4ff;
   --accent-foreground: #1f2937;
-  --destructive: #dc2626;
+  --destructive: #cc2936;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #3c6dee;
   --chart-1: #3c6dee;
-  --chart-2: #5e5fa3;
-  --chart-3: #7a9cec;
-  --chart-4: #3e3262;
-  --chart-5: #10b981;
+  --chart-2: #7a9cec;
+  --chart-3: #0ea5e9;
+  --chart-4: #b95f89;
+  --chart-5: #cc2936;
   --sidebar: #f8fafc;
   --sidebar-foreground: #111318;
   --sidebar-primary: #3c6dee;
@@ -86,12 +86,12 @@
   --vibe-primary: #3c6dee;
   --vibe-primary-light: #7a9cec;
   --vibe-action: #0ea5e9;
-  --vibe-save: #14b8a6;
-  --vibe-warning: #f59e0b;
+  --vibe-save: #0ea5e9;
+  --vibe-warning: #b95f89;
   --vibe-sidebar-bg: #f8fafc;
-  --vibe-accent-purple: #5e5fa3;
+  --vibe-accent-rose: #b95f89;
   --vibe-accent-muted: #64748b;
-  --vibe-accent-dark: #3e3262;
+  --vibe-accent-red: #cc2936;
   --vibe-background-light: #f6f6f8;
   --vibe-background-dark: #101522;
   --vibe-text-base: #111318;
@@ -112,7 +112,7 @@
   --muted-foreground: #94a3b8;
   --accent: #1e293b;
   --accent-foreground: #f8fafc;
-  --destructive: #ef4444;
+  --destructive: #e04551;
   --border: #1e293b;
   --input: #1e293b;
   --ring: #7a9cec;
@@ -183,7 +183,7 @@
 .vibe-grid .vibe-row-deleted {
   background-color: #fef2f2 !important;
   text-decoration: line-through;
-  color: #b91c1c;
+  color: #cc2936;
 }
 .vibe-grid .vibe-row-deleted:hover {
   background-color: #fee2e2 !important;
@@ -199,7 +199,7 @@
   font-weight: 600;
 }
 .vibe-grid .vibe-status-deleted {
-  color: #dc2626;
+  color: #cc2936;
   font-weight: 600;
 }
 
