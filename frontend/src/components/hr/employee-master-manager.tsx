@@ -785,12 +785,22 @@ export function EmployeeMasterManager() {
     setTimeout(refreshGridRows, 0);
   }
 
-  /* -- query: reload from server & reset state -------------------- */
+  /* -- query: reload grid data only (no full-screen loading) ------- */
   async function handleQuery() {
     setAppliedKeyword(keyword);
     try {
-      await loadBase();
-      // Reset temp ID counter
+      const [empRes, deptRes] = await Promise.all([
+        fetch("/api/employees", { cache: "no-store" }),
+        fetch("/api/employees/departments", { cache: "no-store" }),
+      ]);
+      if (!empRes.ok) throw new Error(await parseErrorDetail(empRes, I18N.loadEmployeeError));
+      if (!deptRes.ok) throw new Error(await parseErrorDetail(deptRes, I18N.loadDepartmentError));
+
+      const empJson = (await empRes.json()) as EmployeeListResponse;
+      const deptJson = (await deptRes.json()) as DepartmentListResponse;
+
+      setDepartments(deptJson.departments);
+      setRows(empJson.employees.map((e) => toGridRow(e)));
       tempIdRef.current = -1;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.initError);
