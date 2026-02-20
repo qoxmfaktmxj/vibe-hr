@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   forwardRef,
@@ -58,6 +58,16 @@ if (!modulesRegistered) {
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 type RowStatus = "clean" | "added" | "updated" | "deleted";
+type ActiveFilter = "" | "Y" | "N";
+type SearchFilters = {
+  employeeNo: string;
+  name: string;
+  department: string;
+  position: string;
+  hireDateTo: string;
+  employmentStatuses: EmployeeItem["employment_status"][];
+  active: ActiveFilter;
+};
 
 type EmployeeGridRow = EmployeeItem & {
   password: string;
@@ -65,8 +75,18 @@ type EmployeeGridRow = EmployeeItem & {
   _error?: string;
   /** Snapshot of original field values so we can detect "reverted edits" */
   _original?: Record<string, unknown>;
-  /** Status before being marked deleted – so we can restore */
+  /** Status before being marked deleted ??so we can restore */
   _prevStatus?: RowStatus;
+};
+
+const EMPTY_SEARCH_FILTERS: SearchFilters = {
+  employeeNo: "",
+  name: "",
+  department: "",
+  position: "",
+  hireDateTo: "",
+  employmentStatuses: [],
+  active: "",
 };
 
 /* ------------------------------------------------------------------ */
@@ -80,7 +100,7 @@ const I18N = {
   saveDone: "저장이 완료되었습니다.",
   saveFailed: "저장에 실패했습니다.",
   deleteFailed: "삭제에 실패했습니다.",
-  validationError: "입력 값을 확인하세요. 필수 입력이 비어 있습니다.",
+  validationError: "입력 값을 확인해 주세요. 필수 입력이 비어 있습니다.",
   statusClean: "",
   statusAdded: "입력",
   statusUpdated: "수정",
@@ -152,7 +172,6 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
   addCurrentSelectionToFilter: "현재 선택 추가",
   noMatches: "일치 항목 없음",
 };
-
 const STATUS_LABELS: Record<RowStatus, string> = {
   clean: I18N.statusClean,
   added: I18N.statusAdded,
@@ -199,8 +218,8 @@ function toGridRow(employee: EmployeeItem): EmployeeGridRow {
 
 function normalizeEmploymentStatus(value: string): EmployeeItem["employment_status"] {
   const v = value.trim().toLowerCase();
-  if (v === "leave" || v === "휴직") return "leave";
-  if (v === "resigned" || v === "퇴사") return "resigned";
+  if (v === "leave" || v === "?댁쭅") return "leave";
+  if (v === "resigned" || v === "?댁궗") return "resigned";
   return "active";
 }
 
@@ -271,8 +290,8 @@ const HireDateCellEditor = forwardRef<
 export function EmployeeMasterManager() {
   const [rows, setRows] = useState<EmployeeGridRow[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
-  const [keyword, setKeyword] = useState("");
-  const [appliedKeyword, setAppliedKeyword] = useState("");
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [gridMountKey, setGridMountKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -622,7 +641,7 @@ export function EmployeeMasterManager() {
   );
 
   /**
-   * Delete selected rows (via the "삭제" button):
+   * Delete selected rows (via the "??젣" button):
    * - added => remove row entirely
    * - clean / updated => mark as deleted (remember previous status)
    * - deleted => restore to previous status (toggle)
@@ -911,7 +930,12 @@ export function EmployeeMasterManager() {
 
   /* -- query: reload grid data only (no full-screen loading) ------- */
   async function handleQuery() {
-    setAppliedKeyword(keyword);
+    const nextFilters: SearchFilters = {
+      ...searchFilters,
+      employmentStatuses: [...searchFilters.employmentStatuses],
+    };
+    setAppliedFilters(nextFilters);
+
     try {
       const [empRes, deptRes] = await Promise.all([
         fetch("/api/employees", { cache: "no-store" }),
@@ -1077,22 +1101,61 @@ export function EmployeeMasterManager() {
     setTimeout(refreshGridRows, 0);
 
     if (failedMessages.length > 0) {
-      toast.error(`${I18N.savePartial} (${failedMessages.length}건)`);
+      toast.error(`${I18N.savePartial} (${failedMessages.length}嫄?`);
       return;
     }
 
     toast.success(I18N.saveDone);
   }
 
-  const mobileRows = useMemo(() => {
-    const q = appliedKeyword.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => {
-      const dept = r.department_name || departmentNameById.get(r.department_id) || "";
-      const haystack = `${r.employee_no} ${r.display_name} ${r.login_id} ${dept}`.toLowerCase();
-      return haystack.includes(q);
+  const filteredRows = useMemo(() => {
+    const employeeNo = appliedFilters.employeeNo.trim().toLowerCase();
+    const name = appliedFilters.name.trim().toLowerCase();
+    const department = appliedFilters.department.trim().toLowerCase();
+    const position = appliedFilters.position.trim().toLowerCase();
+    const hireDateTo = appliedFilters.hireDateTo.trim();
+    const active = appliedFilters.active;
+    const statusFilter = new Set(appliedFilters.employmentStatuses);
+
+    return rows.filter((row) => {
+      const departmentName = (row.department_name || departmentNameById.get(row.department_id) || "").toLowerCase();
+      const positionTitle = row.position_title.toLowerCase();
+      const hireDate = normalizeDateKey(row.hire_date);
+
+      if (employeeNo && !row.employee_no.toLowerCase().includes(employeeNo)) return false;
+      if (name && !row.display_name.toLowerCase().includes(name)) return false;
+      if (department && !departmentName.includes(department)) return false;
+      if (position && !positionTitle.includes(position)) return false;
+      if (hireDateTo && (!hireDate || hireDate > hireDateTo)) return false;
+      if (statusFilter.size > 0 && !statusFilter.has(row.employment_status)) return false;
+      if (active === "Y" && !row.is_active) return false;
+      if (active === "N" && row.is_active) return false;
+
+      return true;
     });
-  }, [appliedKeyword, departmentNameById, rows]);
+  }, [appliedFilters, departmentNameById, rows]);
+
+  const mobileRows = filteredRows;
+  const statusOptions: Array<{ value: EmployeeItem["employment_status"]; label: string }> = [
+    { value: "active", label: "재직" },
+    { value: "leave", label: "휴직" },
+    { value: "resigned", label: "퇴직" },
+  ];
+
+  function toggleEmploymentStatus(value: EmployeeItem["employment_status"], checked: boolean) {
+    setSearchFilters((prev) => {
+      const next = new Set(prev.employmentStatuses);
+      if (checked) next.add(value);
+      else next.delete(value);
+      return { ...prev, employmentStatuses: Array.from(next) };
+    });
+  }
+
+  function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void handleQuery();
+  }
 
   /* -- render ----------------------------------------------------- */
   if (loading) {
@@ -1107,36 +1170,89 @@ export function EmployeeMasterManager() {
 
   return (
     <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
-      {/* ── Search bar area ─────────────────────────────────── */}
+      {/* ?? Search bar area ??????????????????????????????????? */}
       <div className="border-b border-gray-200 bg-white px-3 py-3 md:px-6">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleQuery();
-              }}
-              placeholder={I18N.searchPlaceholder}
-              className="h-9 pl-9 text-sm"
-            />
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+          <Input
+            value={searchFilters.employeeNo}
+            onChange={(e) => setSearchFilters((prev) => ({ ...prev, employeeNo: e.target.value }))}
+            onKeyDown={handleSearchFieldEnter}
+            placeholder="사번 검색"
+            className="h-9 text-sm"
+          />
+          <Input
+            value={searchFilters.name}
+            onChange={(e) => setSearchFilters((prev) => ({ ...prev, name: e.target.value }))}
+            onKeyDown={handleSearchFieldEnter}
+            placeholder="이름 검색"
+            className="h-9 text-sm"
+          />
+          <Input
+            value={searchFilters.department}
+            onChange={(e) => setSearchFilters((prev) => ({ ...prev, department: e.target.value }))}
+            onKeyDown={handleSearchFieldEnter}
+            placeholder="부서 검색"
+            className="h-9 text-sm"
+          />
+          <Input
+            value={searchFilters.position}
+            onChange={(e) => setSearchFilters((prev) => ({ ...prev, position: e.target.value }))}
+            onKeyDown={handleSearchFieldEnter}
+            placeholder="직책 검색"
+            className="h-9 text-sm"
+          />
+          <CustomDatePicker
+            value={searchFilters.hireDateTo}
+            onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
+            holidays={HOLIDAY_DATE_KEYS}
+            placeholder="입사일 이전 검색"
+            className="w-full"
+          />
+          <select
+            value={searchFilters.active}
+            onChange={(e) =>
+              setSearchFilters((prev) => ({
+                ...prev,
+                active: e.target.value as ActiveFilter,
+              }))
+            }
+            onKeyDown={handleSearchFieldEnter}
+            className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+          >
+            <option value="">활성 전체</option>
+            <option value="Y">활성(Y)</option>
+            <option value="N">비활성(N)</option>
+          </select>
+          <div className="rounded-md border border-gray-200 px-2 py-1.5">
+            <div className="mb-1 text-xs text-slate-500">재직상태</div>
+            <div className="flex items-center gap-3">
+              {statusOptions.map((option) => (
+                <label key={option.value} className="inline-flex items-center gap-1 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={searchFilters.employmentStatuses.includes(option.value)}
+                    onChange={(e) => toggleEmploymentStatus(option.value, e.target.checked)}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </div>
           </div>
-          <Button size="sm" variant="query" onClick={() => void handleQuery()}>
+          <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-9">
             <Search className="h-3.5 w-3.5" />
-            {I18N.query}
+            조회
           </Button>
         </div>
       </div>
 
-      {/* ── Sheet header: title + buttons ──────────────────── */}
+      {/* ?? Sheet header: title + buttons ???????????????????? */}
       <div className="flex flex-col gap-2 border-b border-gray-100 bg-white px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-800">
             {I18N.title}
           </h2>
           <span className="text-xs text-slate-400">
-            {rows.length.toLocaleString()}건
+            {filteredRows.length.toLocaleString()} / {rows.length.toLocaleString()}건
           </span>
           {hasChanges && (
             <div className="flex items-center gap-2 ml-2">
@@ -1206,7 +1322,7 @@ export function EmployeeMasterManager() {
         </div>
       </div>
 
-      {/* ── Mobile cards ───────────────────────────────────── */}
+      {/* ?? Mobile cards ????????????????????????????????????? */}
       <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
         <div className="space-y-2">
           {mobileRows.length === 0 ? (
@@ -1220,7 +1336,9 @@ export function EmployeeMasterManager() {
               return (
                 <div key={row.id} className={`rounded-lg border bg-white p-3 ${isDeleted ? "border-red-300 bg-red-50/40" : "border-slate-200"}`}>
                   <div className="mb-2 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">{row.employee_no || "신규"} · {deptName || "부서 미지정"}</div>
+                    <div className="text-xs text-slate-500">
+                      {row.employee_no || "신규"} · {deptName || "부서 미지정"}
+                    </div>
                     <label className="flex items-center gap-1 text-xs text-red-600">
                       <input
                         type="checkbox"
@@ -1287,15 +1405,14 @@ export function EmployeeMasterManager() {
         </div>
       </div>
 
-      {/* ── AG Grid (Desktop) ─────────────────────────────── */}
+      {/* ?? AG Grid (Desktop) ??????????????????????????????? */}
       <div className="hidden flex-1 px-6 pb-4 pt-2 md:block">
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<EmployeeGridRow>
             key={gridMountKey}
-            rowData={rows}
+            rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            quickFilterText={appliedKeyword}
             rowSelection="multiple"
             suppressRowClickSelection={true}
             animateRows={false}
@@ -1314,3 +1431,6 @@ export function EmployeeMasterManager() {
     </div>
   );
 }
+
+
+
