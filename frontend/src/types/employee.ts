@@ -30,3 +30,37 @@ export type EmployeeDetailResponse = {
 export type DepartmentListResponse = {
   departments: DepartmentItem[];
 };
+
+export type EmployeeBatchPayload = {
+  mode?: "atomic";
+  request_id?: string;
+  insert: Array<{
+    display_name: string;
+    department_id: number;
+    position_title: string;
+    hire_date: string | null;
+    employment_status: EmployeeItem["employment_status"];
+    login_id?: string | null;
+    email?: string | null;
+    password?: string;
+  }>;
+  update: Array<{
+    id: number;
+    display_name?: string;
+    department_id?: number;
+    position_title?: string;
+    hire_date?: string | null;
+    employment_status?: EmployeeItem["employment_status"];
+    email?: string;
+    is_active?: boolean;
+    password?: string;
+  }>;
+  delete: number[];
+};
+
+export type EmployeeBatchResponse = {
+  inserted_count: number;
+  updated_count: number;
+  deleted_count: number;
+  employees: EmployeeItem[];
+};

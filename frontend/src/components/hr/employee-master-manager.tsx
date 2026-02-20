@@ -36,14 +36,21 @@ import { AgGridReact } from "ag-grid-react";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetchEmployeeBaseData } from "@/lib/hr/employee-api";
+import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
+import {
+  hasRowPatchChanges,
+  isRowRevertedToOriginal,
+  resolveRestoredStatus,
+  snapshotFields,
+  type GridRowStatus,
+} from "@/lib/hr/grid-change-tracker";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
+  EmployeeBatchResponse,
   DepartmentItem,
-  DepartmentListResponse,
-  EmployeeDetailResponse,
   EmployeeItem,
-  EmployeeListResponse,
 } from "@/types/employee";
 
 /* ------------------------------------------------------------------ */
@@ -58,7 +65,7 @@ if (!modulesRegistered) {
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
-type RowStatus = "clean" | "added" | "updated" | "deleted";
+type RowStatus = GridRowStatus;
 type ActiveFilter = "" | "Y" | "N";
 type SearchFilters = {
   employeeNo: string;
@@ -202,17 +209,11 @@ const TRACKED_FIELDS: (keyof EmployeeItem)[] = [
 ];
 
 function snapshotOriginal(row: EmployeeItem): Record<string, unknown> {
-  const snap: Record<string, unknown> = {};
-  for (const f of TRACKED_FIELDS) snap[f] = row[f];
-  return snap;
+  return snapshotFields(row, TRACKED_FIELDS);
 }
 
 function isRevertedToOriginal(row: EmployeeGridRow): boolean {
-  if (!row._original) return false;
-  for (const f of TRACKED_FIELDS) {
-    if (row[f] !== row._original[f]) return false;
-  }
-  return true;
+  return isRowRevertedToOriginal(row, TRACKED_FIELDS);
 }
 
 function toGridRow(employee: EmployeeItem): EmployeeGridRow {
@@ -241,30 +242,11 @@ function normalizeDateKey(value: unknown): string {
   return text.slice(0, 10);
 }
 
-function hasRowPatchChanges(row: EmployeeGridRow, patch: Partial<EmployeeGridRow>): boolean {
-  for (const [key, value] of Object.entries(patch)) {
-    const rowKey = key as keyof EmployeeGridRow;
-    if (row[rowKey] !== value) return true;
-  }
-  return false;
-}
-
 function toDisplayEmploymentStatus(
   status: EmployeeItem["employment_status"],
   labelByCode: Map<string, string>,
 ): string {
   return labelByCode.get(status) ?? status;
-}
-
-function resolveRestoredStatus(row: EmployeeGridRow): RowStatus {
-  const restored = row._prevStatus ?? "clean";
-  if (restored === "updated") {
-    const candidate = { ...row, _status: "updated" as const };
-    if (isRevertedToOriginal(candidate) && !candidate.password) {
-      return "clean";
-    }
-  }
-  return restored;
 }
 
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
@@ -443,18 +425,13 @@ export function EmployeeMasterManager() {
   /* -- load ------------------------------------------------------- */
   const loadBase = useCallback(async () => {
     setLoading(true);
-    const [empRes, deptRes] = await Promise.all([
-      fetch("/api/employees", { cache: "no-store" }),
-      fetch("/api/employees/departments", { cache: "no-store" }),
-    ]);
-    if (!empRes.ok) throw new Error(await parseErrorDetail(empRes, I18N.loadEmployeeError));
-    if (!deptRes.ok) throw new Error(await parseErrorDetail(deptRes, I18N.loadDepartmentError));
+    const baseData = await fetchEmployeeBaseData({
+      loadEmployeeError: I18N.loadEmployeeError,
+      loadDepartmentError: I18N.loadDepartmentError,
+    });
 
-    const empJson = (await empRes.json()) as EmployeeListResponse;
-    const deptJson = (await deptRes.json()) as DepartmentListResponse;
-
-    setDepartments(deptJson.departments);
-    setRows(empJson.employees.map((e) => toGridRow(e)));
+    setDepartments(baseData.departments);
+    setRows(baseData.employees.map((employee) => toGridRow(employee)));
     setLoading(false);
   }, []);
 
@@ -686,7 +663,10 @@ export function EmployeeMasterManager() {
 
           if (!checked) {
             if (row._status === "deleted") {
-              const restoredStatus = resolveRestoredStatus(row);
+              const restoredStatus = resolveRestoredStatus(
+                row,
+                (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+              );
               next.push({
                 ...row,
                 _status: restoredStatus,
@@ -742,7 +722,10 @@ export function EmployeeMasterManager() {
         }
 
         if (row._status === "deleted") {
-          const restoredStatus = resolveRestoredStatus(row);
+          const restoredStatus = resolveRestoredStatus(
+            row,
+            (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+          );
           next.push({
             ...row,
             _status: restoredStatus,
@@ -790,7 +773,10 @@ export function EmployeeMasterManager() {
         }
 
         if (row._status === "deleted") {
-          const restoredStatus = resolveRestoredStatus(row);
+          const restoredStatus = resolveRestoredStatus(
+            row,
+            (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+          );
           next.push({ ...row, _status: restoredStatus, _prevStatus: undefined });
         } else {
           // clean or updated => mark as deleted
@@ -1000,18 +986,13 @@ export function EmployeeMasterManager() {
     setAppliedFilters(nextFilters);
 
     try {
-      const [empRes, deptRes] = await Promise.all([
-        fetch("/api/employees", { cache: "no-store" }),
-        fetch("/api/employees/departments", { cache: "no-store" }),
-      ]);
-      if (!empRes.ok) throw new Error(await parseErrorDetail(empRes, I18N.loadEmployeeError));
-      if (!deptRes.ok) throw new Error(await parseErrorDetail(deptRes, I18N.loadDepartmentError));
+      const baseData = await fetchEmployeeBaseData({
+        loadEmployeeError: I18N.loadEmployeeError,
+        loadDepartmentError: I18N.loadDepartmentError,
+      });
 
-      const empJson = (await empRes.json()) as EmployeeListResponse;
-      const deptJson = (await deptRes.json()) as DepartmentListResponse;
-
-      setDepartments(deptJson.departments);
-      setRows(empJson.employees.map((e) => toGridRow(e)));
+      setDepartments(baseData.departments);
+      setRows(baseData.employees.map((employee) => toGridRow(employee)));
       tempIdRef.current = -1;
       gridApiRef.current = null;
       suppressSelectionRef.current = false;
@@ -1030,9 +1011,9 @@ export function EmployeeMasterManager() {
   }
 
   async function saveAllChanges() {
-    const toInsert = rows.filter((r) => r._status === "added");
-    const toUpdate = rows.filter((r) => r._status === "updated");
-    const toDelete = rows.filter((r) => r._status === "deleted" && r.id > 0);
+    const toInsert = rows.filter((row) => row._status === "added");
+    const toUpdate = rows.filter((row) => row._status === "updated");
+    const toDelete = rows.filter((row) => row._status === "deleted" && row.id > 0);
 
     if (toInsert.length + toUpdate.length + toDelete.length === 0) {
       return;
@@ -1053,126 +1034,33 @@ export function EmployeeMasterManager() {
     }
 
     setSaving(true);
-
-    const nextRows = [...rows];
-    const failedMessages: string[] = [];
-
-    const deleteResults = await Promise.all(
-      toDelete.map(async (row) => {
-        const res = await fetch(`/api/employees/${row.id}`, { method: "DELETE" });
-        if (!res.ok) {
-          return { id: row.id, ok: false as const, message: await parseErrorDetail(res, I18N.deleteFailed) };
-        }
-        return { id: row.id, ok: true as const };
-      }),
-    );
-
-    const insertResults = await Promise.all(
-      toInsert.map(async (row) => {
-        const payload = {
-          employee_no: row.employee_no.trim() || undefined,
-          display_name: row.display_name.trim(),
-          department_id: row.department_id,
-          position_title: row.position_title.trim() || "사원",
-          hire_date: row.hire_date || null,
-          employment_status: row.employment_status,
-          email: row.email.trim() || null,
-          login_id: row.login_id.trim() || null,
-          password: row.password.trim() || "admin",
-        };
-        const res = await fetch("/api/employees", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const json = (await res.json().catch(() => null)) as EmployeeDetailResponse | { detail?: string } | null;
-        if (!res.ok) {
-          return {
-            id: row.id,
-            ok: false as const,
-            message: (json as { detail?: string } | null)?.detail ?? I18N.saveFailed,
-          };
-        }
-        return { id: row.id, ok: true as const, employee: (json as EmployeeDetailResponse).employee };
-      }),
-    );
-
-    const updateResults = await Promise.all(
-      toUpdate.map(async (row) => {
-        const payload = {
-          display_name: row.display_name.trim(),
-          department_id: row.department_id,
-          position_title: row.position_title.trim() || "사원",
-          hire_date: row.hire_date || null,
-          employment_status: row.employment_status,
-          email: row.email.trim(),
-          is_active: row.is_active,
-          password: row.password.trim() ? row.password.trim() : undefined,
-        };
-        const res = await fetch(`/api/employees/${row.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const json = (await res.json().catch(() => null)) as EmployeeDetailResponse | { detail?: string } | null;
-        if (!res.ok) {
-          return {
-            id: row.id,
-            ok: false as const,
-            message: (json as { detail?: string } | null)?.detail ?? I18N.saveFailed,
-          };
-        }
-        return { id: row.id, ok: true as const, employee: (json as EmployeeDetailResponse).employee };
-      }),
-    );
-
-    const deleteSuccess = new Set(deleteResults.filter((r) => r.ok).map((r) => r.id));
-    const insertSuccess = new Map(
-      insertResults
-        .filter((r): r is { id: number; ok: true; employee: EmployeeItem } => r.ok)
-        .map((r) => [r.id, r.employee]),
-    );
-    const updateSuccess = new Map(
-      updateResults
-        .filter((r): r is { id: number; ok: true; employee: EmployeeItem } => r.ok)
-        .map((r) => [r.id, r.employee]),
-    );
-
-    const errorById = new Map<number, string>();
-    for (const r of [...deleteResults, ...insertResults, ...updateResults]) {
-      if (!r.ok) {
-        errorById.set(r.id, r.message);
-        failedMessages.push(`ID ${r.id}: ${r.message}`);
-      }
-    }
-
-    const mergedRows = nextRows
-      .filter((r) => !deleteSuccess.has(r.id))
-      .map((r) => {
-        const created = insertSuccess.get(r.id);
-        if (created) return toGridRow(created);
-
-        const updated = updateSuccess.get(r.id);
-        if (updated) return toGridRow(updated);
-
-        if (errorById.has(r.id)) return r;
-
-        if (r._status === "deleted" && r.id < 0) return null;
-        return r;
+    try {
+      const payload = buildEmployeeBatchPayload(rows);
+      const res = await fetch("/api/employees/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+      if (!res.ok) {
+        const detail = await parseErrorDetail(res, I18N.saveFailed);
+        toast.error(detail);
+        return;
+      }
 
-    setRows(mergedRows.filter((r): r is EmployeeGridRow => r !== null));
-    setSaving(false);
+      const json = (await res.json()) as EmployeeBatchResponse;
+      setRows(json.employees.map((employee) => toGridRow(employee)));
+      gridApiRef.current = null;
+      suppressSelectionRef.current = false;
+      setGridMountKey((prev) => prev + 1);
 
-    setTimeout(refreshGridRows, 0);
-
-    if (failedMessages.length > 0) {
-      const failedPreview = failedMessages.slice(0, 3).join(" / ");
-      toast.error(`${I18N.savePartial} (${failedMessages.length}건) ${failedPreview}`);
-      return;
+      toast.success(
+        `${I18N.saveDone} (입력 ${json.inserted_count}건 / 수정 ${json.updated_count}건 / 삭제 ${json.deleted_count}건)`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : I18N.saveFailed);
+    } finally {
+      setSaving(false);
     }
-
-    toast.success(I18N.saveDone);
   }
 
   const filteredRows = useMemo(() => {

@@ -5,6 +5,7 @@ import secrets
 import string
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete as sa_delete
 from sqlmodel import Session, select
 
 from app.core.security import hash_password
@@ -18,6 +19,8 @@ from app.models import (
     OrgDepartment,
 )
 from app.schemas.employee import (
+    EmployeeBatchRequest,
+    EmployeeBatchResponse,
     DepartmentItem,
     EmployeeCreateRequest,
     EmployeeItem,
@@ -27,6 +30,13 @@ from app.schemas.employee import (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+BATCH_DELETE_CHUNK_SIZE = 1000
+
+
+def _chunked(values: list[int], size: int) -> list[list[int]]:
+    return [values[index : index + size] for index in range(0, len(values), size)]
 
 
 def _generate_login_id(session: Session) -> str:
@@ -96,7 +106,7 @@ def get_employee_by_user_id(session: Session, user_id: int) -> EmployeeItem:
     return _build_employee_item(employee, user, department)
 
 
-def create_employee(session: Session, payload: EmployeeCreateRequest) -> EmployeeItem:
+def _create_employee_no_commit(session: Session, payload: EmployeeCreateRequest) -> EmployeeItem:
     department = session.get(OrgDepartment, payload.department_id)
     if department is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid department_id.")
@@ -139,15 +149,18 @@ def create_employee(session: Session, payload: EmployeeCreateRequest) -> Employe
     if employee_role is not None:
         session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
 
-    session.commit()
-    session.refresh(user)
-    session.refresh(employee)
-    session.refresh(department)
+    session.flush()
 
     return _build_employee_item(employee, user, department)
 
 
-def update_employee(session: Session, employee_id: int, payload: EmployeeUpdateRequest) -> EmployeeItem:
+def create_employee(session: Session, payload: EmployeeCreateRequest) -> EmployeeItem:
+    item = _create_employee_no_commit(session, payload)
+    session.commit()
+    return item
+
+
+def _update_employee_no_commit(session: Session, employee_id: int, payload: EmployeeUpdateRequest) -> EmployeeItem:
     employee = session.get(HrEmployee, employee_id)
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found.")
@@ -191,9 +204,7 @@ def update_employee(session: Session, employee_id: int, payload: EmployeeUpdateR
 
     session.add(user)
     session.add(employee)
-    session.commit()
-    session.refresh(user)
-    session.refresh(employee)
+    session.flush()
 
     department = session.get(OrgDepartment, employee.department_id)
     if department is None:
@@ -202,33 +213,94 @@ def update_employee(session: Session, employee_id: int, payload: EmployeeUpdateR
     return _build_employee_item(employee, user, department)
 
 
-def delete_employee(session: Session, employee_id: int) -> None:
-    employee = session.get(HrEmployee, employee_id)
-    if employee is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found.")
+def update_employee(session: Session, employee_id: int, payload: EmployeeUpdateRequest) -> EmployeeItem:
+    item = _update_employee_no_commit(session, employee_id, payload)
+    session.commit()
+    return item
 
-    user = session.get(AuthUser, employee.user_id)
-    user_roles = session.exec(select(AuthUserRole).where(AuthUserRole.user_id == employee.user_id)).all()
-    attendance_rows = session.exec(
-        select(HrAttendanceDaily).where(HrAttendanceDaily.employee_id == employee.id)
-    ).all()
-    leave_rows = session.exec(select(HrLeaveRequest).where(HrLeaveRequest.employee_id == employee.id)).all()
+
+def _delete_employees_no_commit(session: Session, employee_ids: list[int]) -> int:
+    target_ids = sorted({employee_id for employee_id in employee_ids if employee_id > 0})
+    if not target_ids:
+        return 0
+
+    rows = session.exec(select(HrEmployee.id, HrEmployee.user_id).where(HrEmployee.id.in_(target_ids))).all()
+    existing_employee_ids = {row[0] for row in rows}
+    missing_ids = sorted(set(target_ids) - existing_employee_ids)
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Employee not found: {missing_ids[0]}",
+        )
+
+    user_ids = [row[1] for row in rows]
+
     approved_rows = session.exec(
-        select(HrLeaveRequest).where(HrLeaveRequest.approver_employee_id == employee.id)
+        select(HrLeaveRequest).where(HrLeaveRequest.approver_employee_id.in_(target_ids))
     ).all()
-
     for row in approved_rows:
         row.approver_employee_id = None
         row.updated_at = _utc_now()
         session.add(row)
-    for row in leave_rows:
-        session.delete(row)
-    for row in attendance_rows:
-        session.delete(row)
-    for row in user_roles:
-        session.delete(row)
 
-    session.delete(employee)
-    if user is not None:
-        session.delete(user)
+    session.exec(sa_delete(HrLeaveRequest).where(HrLeaveRequest.employee_id.in_(target_ids)))
+    session.exec(sa_delete(HrAttendanceDaily).where(HrAttendanceDaily.employee_id.in_(target_ids)))
+    session.exec(sa_delete(AuthUserRole).where(AuthUserRole.user_id.in_(user_ids)))
+    session.exec(sa_delete(HrEmployee).where(HrEmployee.id.in_(target_ids)))
+    session.exec(sa_delete(AuthUser).where(AuthUser.id.in_(user_ids)))
+    session.flush()
+    return len(target_ids)
+
+
+def delete_employee(session: Session, employee_id: int) -> None:
+    _delete_employees_no_commit(session, [employee_id])
     session.commit()
+
+
+def batch_save_employees(session: Session, payload: EmployeeBatchRequest) -> EmployeeBatchResponse:
+    if payload.mode != "atomic":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported batch mode.")
+
+    delete_ids = sorted({employee_id for employee_id in payload.delete if employee_id > 0})
+    update_items = payload.update
+    insert_items = payload.insert
+
+    for index, row in enumerate(update_items, start=1):
+        if row.id is None or row.id <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"update[{index}] requires valid id.",
+            )
+
+    inserted_count = 0
+    updated_count = 0
+    deleted_count = 0
+
+    try:
+        with session.begin():
+            if delete_ids:
+                for chunk in _chunked(delete_ids, BATCH_DELETE_CHUNK_SIZE):
+                    deleted_count += _delete_employees_no_commit(session, chunk)
+
+            for row in update_items:
+                _update_employee_no_commit(session, row.id, row)
+                updated_count += 1
+
+            for row in insert_items:
+                _create_employee_no_commit(session, row)
+                inserted_count += 1
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Batch save failed: {str(exc)}",
+        ) from exc
+
+    employees = list_employees(session)
+    return EmployeeBatchResponse(
+        inserted_count=inserted_count,
+        updated_count=updated_count,
+        deleted_count=deleted_count,
+        employees=employees,
+    )

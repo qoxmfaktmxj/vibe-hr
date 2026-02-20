@@ -5,6 +5,8 @@ from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
 from app.models import AuthUser
 from app.schemas.employee import (
+    EmployeeBatchRequest,
+    EmployeeBatchResponse,
     DepartmentListResponse,
     EmployeeCreateRequest,
     EmployeeDetailResponse,
@@ -12,6 +14,7 @@ from app.schemas.employee import (
     EmployeeUpdateRequest,
 )
 from app.services.employee_service import (
+    batch_save_employees,
     create_employee,
     delete_employee,
     get_employee_by_user_id,
@@ -54,6 +57,18 @@ def employee_create(
 ) -> EmployeeDetailResponse:
     employee = create_employee(session, payload)
     return EmployeeDetailResponse(employee=employee)
+
+
+@router.post(
+    "/batch",
+    response_model=EmployeeBatchResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def employee_batch_save(
+    payload: EmployeeBatchRequest,
+    session: Session = Depends(get_session),
+) -> EmployeeBatchResponse:
+    return batch_save_employees(session, payload)
 
 
 @router.get("/me", response_model=EmployeeDetailResponse)

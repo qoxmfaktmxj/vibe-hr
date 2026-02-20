@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -50,6 +51,7 @@ class EmployeeCreateRequest(BaseModel):
 
 
 class EmployeeUpdateRequest(BaseModel):
+    id: int | None = None
     display_name: str | None = Field(default=None, min_length=2, max_length=100)
     department_id: int | None = None
     position_title: str | None = Field(default=None, min_length=1, max_length=80)
@@ -58,3 +60,18 @@ class EmployeeUpdateRequest(BaseModel):
     email: EmailStr | None = None
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=4, max_length=128)
+
+
+class EmployeeBatchRequest(BaseModel):
+    mode: Literal["atomic"] = "atomic"
+    insert: list[EmployeeCreateRequest] = Field(default_factory=list)
+    update: list[EmployeeUpdateRequest] = Field(default_factory=list)
+    delete: list[int] = Field(default_factory=list)
+    request_id: str | None = Field(default=None, max_length=100)
+
+
+class EmployeeBatchResponse(BaseModel):
+    inserted_count: int
+    updated_count: int
+    deleted_count: int
+    employees: list[EmployeeItem]
