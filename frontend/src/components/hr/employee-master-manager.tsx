@@ -9,8 +9,8 @@ import {
   Upload,
   Download,
   Save,
-  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   AllCommunityModule,
@@ -69,14 +69,7 @@ const I18N = {
   saveDone: "저장이 완료되었습니다.",
   saveFailed: "저장에 실패했습니다.",
   deleteFailed: "삭제에 실패했습니다.",
-  nothingToSave: "저장할 변경 사항이 없습니다.",
   validationError: "입력 값을 확인하세요. 필수 입력이 비어 있습니다.",
-  pasteDone: "클립보드 데이터를 새 행으로 추가했습니다.",
-  addRowsDone: "새 행을 추가했습니다.",
-  markDeleteDone: "선택한 행을 삭제 처리했습니다.",
-  copiedHint:
-    "화면을 클릭한 상태에서 Ctrl+V로 엑셀 행을 그리드에 추가할 수 있습니다.",
-  summaryLabel: "변경 요약",
   statusClean: "",
   statusAdded: "입력",
   statusUpdated: "수정",
@@ -95,10 +88,6 @@ const I18N = {
   upload: "업로드",
   download: "다운로드",
   saveAll: "저장",
-  copyDone: "선택한 행을 입력행으로 복제했습니다.",
-  templateDone: "양식을 다운로드했습니다.",
-  uploadDone: "엑셀 업로드 데이터를 반영했습니다.",
-  downloadDone: "현재 시트 전체를 엑셀로 다운로드했습니다.",
   pasteGuide:
     "엑셀 복사 열 순서: 이름 | 부서코드(또는 부서명) | 직책 | 입사일(YYYY-MM-DD) | 재직상태(active/leave/resigned) | 이메일 | 활성(Y/N) | 비밀번호",
   colStatus: "상태",
@@ -223,8 +212,6 @@ export function EmployeeMasterManager() {
   const [appliedKeyword, setAppliedKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
   const gridApiRef = useRef<GridApi<EmployeeGridRow> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -308,8 +295,7 @@ export function EmployeeMasterManager() {
       try {
         await loadBase();
       } catch (error) {
-        setNoticeType("error");
-        setNotice(error instanceof Error ? error.message : I18N.initError);
+        toast.error(error instanceof Error ? error.message : I18N.initError);
         setLoading(false);
       }
     })();
@@ -545,7 +531,6 @@ export function EmployeeMasterManager() {
 
       // Deselect after processing
       gridApiRef.current.deselectAll();
-      setNotice(null);
     },
     [],
   );
@@ -554,8 +539,6 @@ export function EmployeeMasterManager() {
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
     setRows((prev) => [...added, ...prev]);
-    setNoticeType("success");
-    setNotice(I18N.addRowsDone);
   }
 
   const parseDepartmentId = useCallback(
@@ -602,8 +585,6 @@ export function EmployeeMasterManager() {
       });
 
       setRows((prev) => [...parsed, ...prev]);
-      setNoticeType("success");
-      setNotice(I18N.pasteDone);
     },
     [departmentNameById, issueTempId, parseDepartmentId],
   );
@@ -642,8 +623,6 @@ export function EmployeeMasterManager() {
       return next;
     });
 
-    setNoticeType("success");
-    setNotice(I18N.copyDone);
   }
 
   async function downloadTemplateExcel() {
@@ -665,9 +644,6 @@ export function EmployeeMasterManager() {
     const book = utils.book_new();
     utils.book_append_sheet(book, sheet, "업로드양식");
     writeFileXLSX(book, "employee-upload-template.xlsx");
-
-    setNoticeType("success");
-    setNotice(I18N.templateDone);
   }
 
   async function downloadCurrentSheetExcel() {
@@ -691,9 +667,6 @@ export function EmployeeMasterManager() {
     const book = utils.book_new();
     utils.book_append_sheet(book, sheet, "사원관리");
     writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
-
-    setNoticeType("success");
-    setNotice(I18N.downloadDone);
   }
 
   async function handleUploadFile(file: File) {
@@ -731,14 +704,11 @@ export function EmployeeMasterManager() {
     }
 
     setRows((prev) => [...parsed, ...prev]);
-    setNoticeType("success");
-    setNotice(I18N.uploadDone);
   }
 
   /* -- query ------------------------------------------------------ */
   function handleQuery() {
     setAppliedKeyword(keyword);
-    setNotice(null);
   }
 
   /* -- validation & save ------------------------------------------ */
@@ -755,8 +725,6 @@ export function EmployeeMasterManager() {
     const toDelete = rows.filter((r) => r._status === "deleted" && r.id > 0);
 
     if (toInsert.length + toUpdate.length + toDelete.length === 0) {
-      setNoticeType("success");
-      setNotice(I18N.nothingToSave);
       return;
     }
 
@@ -767,13 +735,11 @@ export function EmployeeMasterManager() {
     }
     if (validationErrors.size > 0) {
       setRows((prev) => prev.map((r) => ({ ...r, _error: validationErrors.get(r.id) })));
-      setNoticeType("error");
-      setNotice(I18N.validationError);
+      toast.error(I18N.validationError);
       return;
     }
 
     setSaving(true);
-    setNotice(null);
 
     const nextRows = [...rows];
     const failedMessages: string[] = [];
@@ -886,13 +852,11 @@ export function EmployeeMasterManager() {
     setSaving(false);
 
     if (failedMessages.length > 0) {
-      setNoticeType("error");
-      setNotice(`${I18N.savePartial} (${failedMessages.length}건)`);
+      toast.error(`${I18N.savePartial} (${failedMessages.length}건)`);
       return;
     }
 
-    setNoticeType("success");
-    setNotice(I18N.saveDone);
+    toast.success(I18N.saveDone);
   }
 
   /* -- render ----------------------------------------------------- */
@@ -1002,19 +966,6 @@ export function EmployeeMasterManager() {
           />
         </div>
       </div>
-
-      {/* ── Notice bar ─────────────────────────────────────── */}
-      {notice && (
-        <div
-          className={`px-6 py-2 text-sm ${
-            noticeType === "success"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-red-50 text-red-700"
-          }`}
-        >
-          {notice}
-        </div>
-      )}
 
       {/* ── AG Grid ────────────────────────────────────────── */}
       <div className="flex-1 px-6 pb-4 pt-2">
