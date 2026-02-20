@@ -25,6 +25,7 @@ import {
   AllCommunityModule,
   ModuleRegistry,
   type CellValueChangedEvent,
+  type ICellRendererParams,
   type ColDef,
   type GridApi,
   type GridReadyEvent,
@@ -36,6 +37,7 @@ import { AgGridReact } from "ag-grid-react";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { fetchEmployeeBaseData } from "@/lib/hr/employee-api";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
@@ -138,6 +140,7 @@ const I18N = {
   pasteGuide:
     "엑셀 복사 열 순서: 이름 | 부서코드(또는 부서명) | 직책 | 입사일(YYYY-MM-DD) | 재직상태(active/leave/resigned) | 이메일 | 활성(Y/N) | 비밀번호",
   colStatus: "상태",
+  colDeleteMark: "삭제",
   colEmployeeNo: "사번",
   colLoginId: "로그인ID",
   colName: "이름",
@@ -312,8 +315,6 @@ export function EmployeeMasterManager() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
-  /** Guard to suppress re-entrant selectionChanged during programmatic updates */
-  const suppressSelectionRef = useRef(false);
 
   /* -- derived ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
@@ -422,6 +423,51 @@ export function EmployeeMasterManager() {
     gridApiRef.current.redrawRows();
   }, []);
 
+  const toggleDeleteById = useCallback(
+    (rowId: number, checked: boolean) => {
+      setRows((prev) => {
+        const next: EmployeeGridRow[] = [];
+        for (const row of prev) {
+          if (row.id !== rowId) {
+            next.push(row);
+            continue;
+          }
+
+          if (!checked) {
+            if (row._status === "deleted") {
+              const restoredStatus = resolveRestoredStatus(
+                row,
+                (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+              );
+              next.push({
+                ...row,
+                _status: restoredStatus,
+                _prevStatus: undefined,
+              });
+            } else {
+              next.push(row);
+            }
+            continue;
+          }
+
+          if (row._status === "added") {
+            continue;
+          }
+
+          if (row._status !== "deleted") {
+            next.push({ ...row, _status: "deleted", _prevStatus: row._status });
+          } else {
+            next.push(row);
+          }
+        }
+        return next;
+      });
+
+      setTimeout(refreshGridRows, 0);
+    },
+    [refreshGridRows],
+  );
+
   /* -- load ------------------------------------------------------- */
   const loadBase = useCallback(async () => {
     setLoading(true);
@@ -450,14 +496,40 @@ export function EmployeeMasterManager() {
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     return [
       {
-        headerName: "",
+        headerName: "선택",
         checkboxSelection: true,
         headerCheckboxSelection: true,
-        width: 48,
+        width: 56,
         pinned: "left",
         sortable: false,
         filter: false,
         suppressMenu: true,
+      },
+      {
+        headerName: I18N.colDeleteMark,
+        width: 56,
+        pinned: "left",
+        sortable: false,
+        filter: false,
+        suppressMenu: true,
+        resizable: false,
+        editable: false,
+        cellRenderer: (params: ICellRendererParams<EmployeeGridRow>) => {
+          const row = params.data;
+          if (!row) return null;
+          const checked = row._status === "deleted";
+          return (
+            <div className="flex h-full items-center justify-center">
+              <input
+                type="checkbox"
+                checked={checked}
+                className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]"
+                onChange={(event) => toggleDeleteById(row.id, event.target.checked)}
+                onClick={(event) => event.stopPropagation()}
+              />
+            </div>
+          );
+        },
       },
       {
         headerName: I18N.colStatus,
@@ -554,7 +626,7 @@ export function EmployeeMasterManager() {
         editable: (params) => params.data?._status !== "deleted",
       },
     ];
-  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, positionNames]);
+  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, positionNames, toggleDeleteById]);
 
   const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(
     () => ({ sortable: true, filter: true, resizable: true, editable: false }),
@@ -651,107 +723,6 @@ export function EmployeeMasterManager() {
     [refreshGridRows],
   );
 
-  const toggleDeleteById = useCallback(
-    (rowId: number, checked: boolean) => {
-      setRows((prev) => {
-        const next: EmployeeGridRow[] = [];
-        for (const row of prev) {
-          if (row.id !== rowId) {
-            next.push(row);
-            continue;
-          }
-
-          if (!checked) {
-            if (row._status === "deleted") {
-              const restoredStatus = resolveRestoredStatus(
-                row,
-                (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
-              );
-              next.push({
-                ...row,
-                _status: restoredStatus,
-                _prevStatus: undefined,
-              });
-            } else {
-              next.push(row);
-            }
-            continue;
-          }
-
-          if (row._status === "added") {
-            continue;
-          }
-
-          if (row._status !== "deleted") {
-            next.push({ ...row, _status: "deleted", _prevStatus: row._status });
-          } else {
-            next.push(row);
-          }
-        }
-        return next;
-      });
-
-      setTimeout(refreshGridRows, 0);
-    },
-    [refreshGridRows],
-  );
-
-  /**
-   * Delete selected rows (via the "??젣" button):
-   * - added => remove row entirely
-   * - clean / updated => mark as deleted (remember previous status)
-   * - deleted => restore to previous status (toggle)
-   */
-  const handleSelectionChanged = useCallback(() => {
-    if (suppressSelectionRef.current || !gridApiRef.current) return;
-
-    const selected = gridApiRef.current.getSelectedRows();
-    if (selected.length === 0) return;
-
-    const selectedIds = new Set(selected.map((row) => row.id));
-    setRows((prev) => {
-      const next: EmployeeGridRow[] = [];
-      for (const row of prev) {
-        if (!selectedIds.has(row.id)) {
-          next.push(row);
-          continue;
-        }
-
-        if (row._status === "added") {
-          continue;
-        }
-
-        if (row._status === "deleted") {
-          const restoredStatus = resolveRestoredStatus(
-            row,
-            (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
-          );
-          next.push({
-            ...row,
-            _status: restoredStatus,
-            _prevStatus: undefined,
-          });
-        } else {
-          next.push({
-            ...row,
-            _status: "deleted",
-            _prevStatus: row._status,
-          });
-        }
-      }
-      return next;
-    });
-
-    suppressSelectionRef.current = true;
-    setTimeout(() => {
-      refreshGridRows();
-      if (gridApiRef.current) {
-        gridApiRef.current.deselectAll();
-      }
-      suppressSelectionRef.current = false;
-    }, 0);
-  }, [refreshGridRows]);
-
   const handleDeleteSelected = useCallback(() => {
     if (!gridApiRef.current) return;
     const selected = gridApiRef.current.getSelectedRows();
@@ -790,16 +761,11 @@ export function EmployeeMasterManager() {
       return next;
     });
 
-    // Keep checkboxes selected on deleted rows, deselect on restored/removed rows
-    // Redraw to refresh row styling
-    suppressSelectionRef.current = true;
     setTimeout(() => {
       refreshGridRows();
-      // Deselect all after processing
       if (gridApiRef.current) {
         gridApiRef.current.deselectAll();
       }
-      suppressSelectionRef.current = false;
     }, 0);
   }, [refreshGridRows]);
 
@@ -995,7 +961,6 @@ export function EmployeeMasterManager() {
       setRows(baseData.employees.map((employee) => toGridRow(employee)));
       tempIdRef.current = -1;
       gridApiRef.current = null;
-      suppressSelectionRef.current = false;
       setGridMountKey((prev) => prev + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.initError);
@@ -1050,7 +1015,6 @@ export function EmployeeMasterManager() {
       const json = (await res.json()) as EmployeeBatchResponse;
       setRows(json.employees.map((employee) => toGridRow(employee)));
       gridApiRef.current = null;
-      suppressSelectionRef.current = false;
       setGridMountKey((prev) => prev + 1);
 
       toast.success(
@@ -1100,15 +1064,9 @@ export function EmployeeMasterManager() {
       (option): option is { value: EmployeeItem["employment_status"]; label: string } =>
         option.value === "active" || option.value === "leave" || option.value === "resigned",
     );
-
-  function toggleEmploymentStatus(value: EmployeeItem["employment_status"], checked: boolean) {
-    setSearchFilters((prev) => {
-      const next = new Set(prev.employmentStatuses);
-      if (checked) next.add(value);
-      else next.delete(value);
-      return { ...prev, employmentStatuses: Array.from(next) };
-    });
-  }
+  const handleEmploymentStatusChange = useCallback((values: EmployeeItem["employment_status"][]) => {
+    setSearchFilters((prev) => ({ ...prev, employmentStatuses: values }));
+  }, []);
 
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
     if (event.key !== "Enter") return;
@@ -1188,20 +1146,15 @@ export function EmployeeMasterManager() {
             <option value="Y">Y</option>
             <option value="N">N</option>
           </select>
-          <div className="rounded-md border border-gray-200 px-2 py-1.5">
-            <div className="mb-1 text-xs text-slate-500">재직상태</div>
-            <div className="flex items-center gap-3">
-              {statusOptions.map((option) => (
-                <label key={option.value} className="inline-flex items-center gap-1 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={searchFilters.employmentStatuses.includes(option.value)}
-                    onChange={(e) => toggleEmploymentStatus(option.value, e.target.checked)}
-                  />
-                  {option.label}
-                </label>
-              ))}
-            </div>
+          <div className="space-y-1">
+            <div className="text-xs text-slate-500">재직상태</div>
+            <MultiSelectFilter
+              options={statusOptions}
+              values={searchFilters.employmentStatuses}
+              onChange={handleEmploymentStatusChange}
+              placeholder="재직상태 전체"
+              searchPlaceholder="재직상태 검색"
+            />
           </div>
           <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-9">
             <Search className="h-3.5 w-3.5" />
@@ -1390,7 +1343,6 @@ export function EmployeeMasterManager() {
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
-            onSelectionChanged={handleSelectionChanged}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
             headerHeight={36}

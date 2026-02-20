@@ -188,6 +188,12 @@
 .vibe-grid .vibe-row-deleted:hover {
   background-color: #fee2e2 !important;
 }
+.vibe-grid .ag-row-selected.vibe-row-deleted {
+  background-color: #fef2f2 !important;
+}
+.vibe-grid .ag-row-selected.vibe-row-deleted:hover {
+  background-color: #fee2e2 !important;
+}
 
 /* -- Status cell badges --------------------------------------- */
 .vibe-grid .vibe-status-added {
