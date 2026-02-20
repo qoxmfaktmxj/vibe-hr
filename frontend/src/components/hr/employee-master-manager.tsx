@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Search,
   Plus,
@@ -9,6 +17,7 @@ import {
   Upload,
   Download,
   Save,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,13 +28,15 @@ import {
   type ColDef,
   type GridApi,
   type GridReadyEvent,
+  type ICellEditorParams,
   type RowClassParams,
-  type SelectionChangedEvent,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type {
   DepartmentItem,
   DepartmentListResponse,
@@ -84,6 +95,7 @@ const I18N = {
   query: "조회",
   addRow: "입력",
   copy: "복사",
+  deleteRow: "삭제",
   templateDownload: "양식 다운로드",
   upload: "업로드",
   download: "다운로드",
@@ -197,10 +209,53 @@ function parseBoolean(value: string): boolean {
   return v === "y" || v === "yes" || v === "true" || v === "1";
 }
 
+function normalizeDateKey(value: unknown): string {
+  const text = typeof value === "string" ? value : "";
+  return text.slice(0, 10);
+}
+
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
   const json = (await response.json().catch(() => null)) as { detail?: string } | null;
   return json?.detail ?? fallback;
 }
+
+type HireDateEditorProps = ICellEditorParams<EmployeeGridRow, string>;
+
+const HireDateCellEditor = forwardRef<
+  { getValue: () => string; isPopup: () => boolean },
+  HireDateEditorProps
+>(function HireDateCellEditor(props, ref) {
+  const [value, setValue] = useState(() => normalizeDateKey(props.value));
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getValue: () => value,
+      isPopup: () => true,
+    }),
+    [value],
+  );
+
+  const handleChange = useCallback(
+    (nextValue: string) => {
+      setValue(nextValue);
+      props.stopEditing();
+    },
+    [props],
+  );
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+      <CustomDatePicker
+        value={value}
+        onChange={handleChange}
+        holidays={HOLIDAY_DATE_KEYS}
+        inline
+        closeOnSelect={false}
+      />
+    </div>
+  );
+});
 
 /* ------------------------------------------------------------------ */
 /* Component                                                           */
@@ -217,6 +272,8 @@ export function EmployeeMasterManager() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  /** Guard to suppress re-entrant selectionChanged during programmatic updates */
+  const suppressSelectionRef = useRef(false);
 
   /* -- derived ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
@@ -271,6 +328,12 @@ export function EmployeeMasterManager() {
       _status: "added",
     };
   }, [departmentNameById, departments, issueTempId]);
+
+  /* -- Refresh grid row styles after data change ------------------ */
+  const refreshGridRows = useCallback(() => {
+    if (!gridApiRef.current) return;
+    gridApiRef.current.redrawRows();
+  }, []);
 
   /* -- load ------------------------------------------------------- */
   const loadBase = useCallback(async () => {
@@ -368,6 +431,9 @@ export function EmployeeMasterManager() {
         field: "hire_date",
         width: 120,
         editable: (params) => params.data?._status !== "deleted",
+        cellEditor: HireDateCellEditor,
+        cellEditorPopup: true,
+        cellEditorPopupPosition: "under",
       },
       {
         headerName: I18N.colEmploymentStatus,
@@ -472,73 +538,83 @@ export function EmployeeMasterManager() {
           return next;
         }),
       );
+
+      // Redraw after state update so row class refreshes
+      setTimeout(refreshGridRows, 0);
     },
-    [departmentNameById],
+    [departmentNameById, refreshGridRows],
   );
 
   /**
-   * Checkbox toggle:
-   * - clean / updated => mark as deleted (remember previous status)
-   * - deleted => restore to previous status (updated keeps its edits)
+   * Delete selected rows (via the "삭제" button):
    * - added => remove row entirely
+   * - clean / updated => mark as deleted (remember previous status)
+   * - deleted => restore to previous status (toggle)
    */
-  const handleSelectionChanged = useCallback(
-    (event: SelectionChangedEvent<EmployeeGridRow>) => {
-      if (!gridApiRef.current) return;
-      const selected = gridApiRef.current.getSelectedRows();
-      if (selected.length === 0) return;
+  const handleDeleteSelected = useCallback(() => {
+    if (!gridApiRef.current) return;
+    const selected = gridApiRef.current.getSelectedRows();
+    if (selected.length === 0) return;
 
-      const selectedIds = new Set(selected.map((r) => r.id));
+    const selectedIds = new Set(selected.map((r) => r.id));
 
-      setRows((prev) => {
-        const next: EmployeeGridRow[] = [];
-        for (const row of prev) {
-          if (!selectedIds.has(row.id)) {
-            next.push(row);
-            continue;
-          }
-
-          if (row._status === "added") {
-            // new row: just remove from list
-            continue;
-          }
-
-          if (row._status === "deleted") {
-            // restore to previous status
-            const restored: EmployeeGridRow = {
-              ...row,
-              _status: row._prevStatus ?? "clean",
-              _prevStatus: undefined,
-              _error: undefined,
-            };
-            // If restored and values match original, ensure clean
-            if (restored._status === "updated" && isRevertedToOriginal(restored) && !restored.password) {
-              restored._status = "clean";
-            }
-            next.push(restored);
-          } else {
-            // clean or updated => mark as deleted
-            next.push({
-              ...row,
-              _status: "deleted",
-              _prevStatus: row._status,
-              _error: undefined,
-            });
-          }
+    setRows((prev) => {
+      const next: EmployeeGridRow[] = [];
+      for (const row of prev) {
+        if (!selectedIds.has(row.id)) {
+          next.push(row);
+          continue;
         }
-        return next;
-      });
 
-      // Deselect after processing
-      gridApiRef.current.deselectAll();
-    },
-    [],
-  );
+        if (row._status === "added") {
+          // new row: just remove from list
+          continue;
+        }
+
+        if (row._status === "deleted") {
+          // restore to previous status
+          const restored: EmployeeGridRow = {
+            ...row,
+            _status: row._prevStatus ?? "clean",
+            _prevStatus: undefined,
+            _error: undefined,
+          };
+          // If restored and values match original, ensure clean
+          if (restored._status === "updated" && isRevertedToOriginal(restored) && !restored.password) {
+            restored._status = "clean";
+          }
+          next.push(restored);
+        } else {
+          // clean or updated => mark as deleted
+          next.push({
+            ...row,
+            _status: "deleted",
+            _prevStatus: row._status,
+            _error: undefined,
+          });
+        }
+      }
+      return next;
+    });
+
+    // Keep checkboxes selected on deleted rows, deselect on restored/removed rows
+    // Redraw to refresh row styling
+    suppressSelectionRef.current = true;
+    setTimeout(() => {
+      refreshGridRows();
+      // Deselect all after processing
+      if (gridApiRef.current) {
+        gridApiRef.current.deselectAll();
+      }
+      suppressSelectionRef.current = false;
+    }, 0);
+  }, [refreshGridRows]);
 
   /* -- actions ---------------------------------------------------- */
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
     setRows((prev) => [...added, ...prev]);
+    setTimeout(refreshGridRows, 0);
   }
 
   const parseDepartmentId = useCallback(
@@ -585,8 +661,9 @@ export function EmployeeMasterManager() {
       });
 
       setRows((prev) => [...parsed, ...prev]);
+      setTimeout(refreshGridRows, 0);
     },
-    [departmentNameById, issueTempId, parseDepartmentId],
+    [departmentNameById, issueTempId, parseDepartmentId, refreshGridRows],
   );
 
   function copySelectedRows() {
@@ -623,6 +700,7 @@ export function EmployeeMasterManager() {
       return next;
     });
 
+    setTimeout(refreshGridRows, 0);
   }
 
   async function downloadTemplateExcel() {
@@ -704,11 +782,19 @@ export function EmployeeMasterManager() {
     }
 
     setRows((prev) => [...parsed, ...prev]);
+    setTimeout(refreshGridRows, 0);
   }
 
-  /* -- query ------------------------------------------------------ */
-  function handleQuery() {
+  /* -- query: reload from server & reset state -------------------- */
+  async function handleQuery() {
     setAppliedKeyword(keyword);
+    try {
+      await loadBase();
+      // Reset temp ID counter
+      tempIdRef.current = -1;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : I18N.initError);
+    }
   }
 
   /* -- validation & save ------------------------------------------ */
@@ -851,6 +937,8 @@ export function EmployeeMasterManager() {
     setRows(mergedRows.filter((r): r is EmployeeGridRow => r !== null));
     setSaving(false);
 
+    setTimeout(refreshGridRows, 0);
+
     if (failedMessages.length > 0) {
       toast.error(`${I18N.savePartial} (${failedMessages.length}건)`);
       return;
@@ -881,13 +969,13 @@ export function EmployeeMasterManager() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleQuery();
+                if (e.key === "Enter") void handleQuery();
               }}
               placeholder={I18N.searchPlaceholder}
               className="h-9 pl-9 text-sm"
             />
           </div>
-          <Button size="sm" variant="query" onClick={handleQuery}>
+          <Button size="sm" variant="query" onClick={() => void handleQuery()}>
             <Search className="h-3.5 w-3.5" />
             {I18N.query}
           </Button>
@@ -906,7 +994,7 @@ export function EmployeeMasterManager() {
           {hasChanges && (
             <div className="flex items-center gap-2 ml-2">
               {changeSummary.added > 0 && (
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                   +{changeSummary.added}
                 </span>
               )}
@@ -932,6 +1020,10 @@ export function EmployeeMasterManager() {
           <Button size="sm" variant="outline" onClick={copySelectedRows}>
             <Copy className="h-3.5 w-3.5" />
             {I18N.copy}
+          </Button>
+          <Button size="sm" variant="destructive" onClick={handleDeleteSelected}>
+            <Trash2 className="h-3.5 w-3.5" />
+            {I18N.deleteRow}
           </Button>
           <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
             <FileDown className="h-3.5 w-3.5" />
@@ -982,7 +1074,10 @@ export function EmployeeMasterManager() {
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
-            onSelectionChanged={handleSelectionChanged}
+            onSelectionChanged={() => {
+              /* No-op: selection is visual only, delete is via button */
+              if (suppressSelectionRef.current) return;
+            }}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
             headerHeight={36}
