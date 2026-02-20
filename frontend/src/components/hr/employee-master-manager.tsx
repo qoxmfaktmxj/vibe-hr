@@ -1030,6 +1030,16 @@ export function EmployeeMasterManager() {
     toast.success(I18N.saveDone);
   }
 
+  const mobileRows = useMemo(() => {
+    const q = appliedKeyword.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const dept = r.department_name || departmentNameById.get(r.department_id) || "";
+      const haystack = `${r.employee_no} ${r.display_name} ${r.login_id} ${dept}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [appliedKeyword, departmentNameById, rows]);
+
   /* -- render ----------------------------------------------------- */
   if (loading) {
     return (
@@ -1040,16 +1050,6 @@ export function EmployeeMasterManager() {
   }
 
   const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
-
-  const mobileRows = useMemo(() => {
-    const q = appliedKeyword.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => {
-      const dept = r.department_name || departmentNameById.get(r.department_id) || "";
-      const haystack = `${r.employee_no} ${r.display_name} ${r.login_id} ${dept}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [appliedKeyword, departmentNameById, rows]);
 
   return (
     <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
