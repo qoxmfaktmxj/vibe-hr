@@ -16,5 +16,14 @@ frontend/out/
 .vscode/
 .idea/
 
-# Deploy env
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.deploy.example
 .env.deploy
+
+# Backend env
+backend/.env
+backend/.env.*
+!backend/.env.example

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.rate_limit import check_login_rate_limit
 from app.models import AuthUser
 from app.schemas.auth import (
     ImpersonationCandidateListResponse,
@@ -23,7 +24,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest, session: Session = Depends(get_session)) -> LoginResponse:
+def login(
+    payload: LoginRequest,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> LoginResponse:
+    check_login_rate_limit(request)
     user = authenticate_user(session, payload.login_id, payload.password)
     if user is None:
         raise HTTPException(

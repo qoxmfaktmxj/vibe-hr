@@ -814,85 +814,98 @@ export function EmployeeMasterManager() {
   }
 
   async function downloadTemplateExcel() {
-    const headers = [
-      "사번",
-      "이름",
-      "부서코드(또는 부서명)",
-      "직책",
-      "입사일",
-      "재직상태",
-      "이메일",
-      "활성(Y/N)",
-      "비밀번호",
-    ];
-    const sample = ["", "홍길동", "HQ-HR", "사원", "2026-01-01", "active", "hong@vibe-hr.local", "Y", "admin"];
+    try {
+      const headers = [
+        "사번",
+        "이름",
+        "부서코드(또는 부서명)",
+        "직책",
+        "입사일",
+        "재직상태",
+        "이메일",
+        "활성(Y/N)",
+        "비밀번호",
+      ];
+      const sample = ["", "홍길동", "HQ-HR", "사원", "2026-01-01", "active", "hong@vibe-hr.local", "Y", "admin"];
 
-    const { utils, writeFileXLSX } = await import("xlsx");
-    const sheet = utils.aoa_to_sheet([headers, sample]);
-    const book = utils.book_new();
-    utils.book_append_sheet(book, sheet, "업로드양식");
-    writeFileXLSX(book, "employee-upload-template.xlsx");
+      const { utils, writeFileXLSX } = await import("xlsx");
+      const sheet = utils.aoa_to_sheet([headers, sample]);
+      const book = utils.book_new();
+      utils.book_append_sheet(book, sheet, "업로드양식");
+      writeFileXLSX(book, "employee-upload-template.xlsx");
+    } catch (error) {
+      toast.error("양식 다운로드에 실패했습니다.");
+    }
   }
 
   async function downloadCurrentSheetExcel() {
-    const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
-    const data = rows
-      .filter((r) => r._status !== "deleted")
-      .map((r) => [
-        r.employee_no,
-        r.login_id,
-        r.display_name,
-        r.department_name || departmentNameById.get(r.department_id) || "",
-        r.position_title,
-        r.hire_date,
-        toDisplayEmploymentStatus(r.employment_status, employmentLabelByCode),
-        r.email,
-        r.is_active ? "Y" : "N",
-      ]);
+    try {
+      const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
+      const data = rows
+        .filter((r) => r._status !== "deleted")
+        .map((r) => [
+          r.employee_no,
+          r.login_id,
+          r.display_name,
+          r.department_name || departmentNameById.get(r.department_id) || "",
+          r.position_title,
+          r.hire_date,
+          toDisplayEmploymentStatus(r.employment_status, employmentLabelByCode),
+          r.email,
+          r.is_active ? "Y" : "N",
+        ]);
 
-    const { utils, writeFileXLSX } = await import("xlsx");
-    const sheet = utils.aoa_to_sheet([headers, ...data]);
-    const book = utils.book_new();
-    utils.book_append_sheet(book, sheet, "사원관리");
-    writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const { utils, writeFileXLSX } = await import("xlsx");
+      const sheet = utils.aoa_to_sheet([headers, ...data]);
+      const book = utils.book_new();
+      utils.book_append_sheet(book, sheet, "사원관리");
+      writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) {
+      toast.error("다운로드에 실패했습니다.");
+    }
   }
 
   async function handleUploadFile(file: File) {
-    const { read, utils } = await import("xlsx");
-    const buffer = await file.arrayBuffer();
-    const workbook = read(buffer, { type: "array" });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(firstSheet, {
-      header: 1,
-      raw: false,
-    });
-
-    if (!rowsAoa || rowsAoa.length <= 1) return;
-
-    const parsed: EmployeeGridRow[] = [];
-    for (const cells of rowsAoa.slice(1)) {
-      const c = cells.map((v) => String(v ?? "").trim());
-      if (!c.some((v) => v.length > 0)) continue;
-      const deptId = parseDepartmentId(c[1] ?? "");
-      parsed.push({
-        id: issueTempId(),
-        employee_no: "",
-        login_id: "",
-        display_name: c[0] ?? "",
-        department_id: deptId,
-        department_name: departmentNameById.get(deptId) ?? "",
-        position_title: c[2] || "사원",
-        hire_date: (c[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
-        employment_status: normalizeEmploymentStatus(c[4] || "active"),
-        email: c[5] || "",
-        is_active: parseBoolean(c[6] || "Y"),
-        password: c[7] || "admin",
-        _status: "added",
+    try {
+      const { read, utils } = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const workbook = read(buffer, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(firstSheet, {
+        header: 1,
+        raw: false,
       });
-    }
 
-    setRows((prev) => [...parsed, ...prev]);
-    setTimeout(refreshGridRows, 0);
+      if (!rowsAoa || rowsAoa.length <= 1) return;
+
+      // 양식 순서: 사번(0) | 이름(1) | 부서(2) | 직책(3) | 입사일(4) | 재직상태(5) | 이메일(6) | 활성(7) | 비밀번호(8)
+      const parsed: EmployeeGridRow[] = [];
+      for (const cells of rowsAoa.slice(1)) {
+        const c = cells.map((v) => String(v ?? "").trim());
+        if (!c.some((v) => v.length > 0)) continue;
+        const deptId = parseDepartmentId(c[2] ?? "");
+        parsed.push({
+          id: issueTempId(),
+          employee_no: c[0] ?? "",
+          login_id: "",
+          display_name: c[1] ?? "",
+          department_id: deptId,
+          department_name: departmentNameById.get(deptId) ?? "",
+          position_title: c[3] || positionNames[0] || "사원",
+          hire_date: (c[4] || new Date().toISOString().slice(0, 10)).slice(0, 10),
+          employment_status: normalizeEmploymentStatus(c[5] || "active"),
+          email: c[6] || "",
+          is_active: parseBoolean(c[7] || "Y"),
+          password: c[8] || "admin",
+          _status: "added",
+        });
+      }
+
+      setRows((prev) => [...parsed, ...prev]);
+      setTimeout(refreshGridRows, 0);
+    } catch (error) {
+      toast.error("엑셀 파일을 읽지 못했습니다. 파일 형식을 확인해 주세요.");
+    }
   }
 
   /* -- 조회: 전체 화면 로딩 없이 데이터만 재조회 ------- */
