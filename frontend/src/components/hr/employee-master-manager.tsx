@@ -37,6 +37,7 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
+import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
   DepartmentItem,
   DepartmentListResponse,
@@ -72,12 +73,19 @@ type SearchFilters = {
 type EmployeeGridRow = EmployeeItem & {
   password: string;
   _status: RowStatus;
-  _error?: string;
   /** Snapshot of original field values so we can detect "reverted edits" */
   _original?: Record<string, unknown>;
   /** Status before being marked deleted ??so we can restore */
   _prevStatus?: RowStatus;
 };
+
+type CommonCodeOption = { code: string; name: string };
+
+const FALLBACK_EMPLOYMENT_OPTIONS: Array<{ code: EmployeeItem["employment_status"]; name: string }> = [
+  { code: "active", name: "재직" },
+  { code: "leave", name: "휴직" },
+  { code: "resigned", name: "퇴직" },
+];
 
 const EMPTY_SEARCH_FILTERS: SearchFilters = {
   employeeNo: "",
@@ -218,8 +226,8 @@ function toGridRow(employee: EmployeeItem): EmployeeGridRow {
 
 function normalizeEmploymentStatus(value: string): EmployeeItem["employment_status"] {
   const v = value.trim().toLowerCase();
-  if (v === "leave" || v === "?댁쭅") return "leave";
-  if (v === "resigned" || v === "?댁궗") return "resigned";
+  if (v === "leave" || v === "휴직") return "leave";
+  if (v === "resigned" || v === "퇴직") return "resigned";
   return "active";
 }
 
@@ -239,6 +247,24 @@ function hasRowPatchChanges(row: EmployeeGridRow, patch: Partial<EmployeeGridRow
     if (row[rowKey] !== value) return true;
   }
   return false;
+}
+
+function toDisplayEmploymentStatus(
+  status: EmployeeItem["employment_status"],
+  labelByCode: Map<string, string>,
+): string {
+  return labelByCode.get(status) ?? status;
+}
+
+function resolveRestoredStatus(row: EmployeeGridRow): RowStatus {
+  const restored = row._prevStatus ?? "clean";
+  if (restored === "updated") {
+    const candidate = { ...row, _status: "updated" as const };
+    if (isRevertedToOriginal(candidate) && !candidate.password) {
+      return "clean";
+    }
+  }
+  return restored;
 }
 
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
@@ -293,6 +319,10 @@ export function EmployeeMasterManager() {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [gridMountKey, setGridMountKey] = useState(0);
+  const [positionOptions, setPositionOptions] = useState<CommonCodeOption[]>([]);
+  const [employmentOptions, setEmploymentOptions] = useState<CommonCodeOption[]>(
+    FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })),
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -330,6 +360,20 @@ export function EmployeeMasterManager() {
     return s;
   }, [rows]);
 
+  const positionNames = useMemo(() => positionOptions.map((option) => option.name), [positionOptions]);
+  const employmentStatusValues = useMemo(
+    () =>
+      employmentOptions
+        .map((option) => option.code)
+        .filter((code): code is EmployeeItem["employment_status"] => code === "active" || code === "leave" || code === "resigned"),
+    [employmentOptions],
+  );
+  const employmentLabelByCode = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const option of employmentOptions) map.set(option.code, option.name);
+    return map;
+  }, [employmentOptions]);
+
   /* -- id helper -------------------------------------------------- */
   const issueTempId = useCallback(() => {
     const id = tempIdRef.current;
@@ -348,14 +392,47 @@ export function EmployeeMasterManager() {
       email: "",
       department_id: departmentId,
       department_name: departmentNameById.get(departmentId) ?? "",
-      position_title: "사원",
+      position_title: positionNames[0] ?? "사원",
       hire_date: today,
       employment_status: "active",
       is_active: true,
       password: "admin",
       _status: "added",
     };
-  }, [departmentNameById, departments, issueTempId]);
+  }, [departmentNameById, departments, issueTempId, positionNames]);
+
+  useEffect(() => {
+    async function loadActiveCodes(groupCode: string): Promise<CommonCodeOption[]> {
+      const res = await fetch(`/api/codes/groups/by-code/${groupCode}/active`, { cache: "no-store" });
+      if (!res.ok) return [];
+      const data = (await res.json()) as ActiveCodeListResponse;
+      return data.options;
+    }
+
+    void (async () => {
+      const [positions, employment] = await Promise.all([
+        loadActiveCodes("POSITION"),
+        loadActiveCodes("EMPLOYMENT_STATUS"),
+      ]);
+
+      if (positions.length > 0) {
+        setPositionOptions(positions);
+      }
+
+      if (employment.length > 0) {
+        const normalized = employment.filter(
+          (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
+            option.code === "active" || option.code === "leave" || option.code === "resigned",
+        );
+        if (normalized.length > 0) {
+          setEmploymentOptions(normalized);
+          return;
+        }
+      }
+
+      setEmploymentOptions(FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })));
+    })();
+  }, []);
 
   /* -- Refresh grid row styles after data change ------------------ */
   const refreshGridRows = useCallback(() => {
@@ -394,7 +471,6 @@ export function EmployeeMasterManager() {
 
   /* -- column defs ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
-    const statusOptions: EmployeeItem["employment_status"][] = ["active", "leave", "resigned"];
     return [
       {
         headerName: "",
@@ -453,6 +529,8 @@ export function EmployeeMasterManager() {
         field: "position_title",
         width: 120,
         editable: (params) => params.data?._status !== "deleted",
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: positionNames.length > 0 ? positionNames : ["사원"] },
       },
       {
         headerName: I18N.colHireDate,
@@ -469,7 +547,12 @@ export function EmployeeMasterManager() {
         width: 110,
         editable: (params) => params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
-        cellEditorParams: { values: statusOptions },
+        cellEditorParams: { values: employmentStatusValues },
+        valueFormatter: (params) =>
+          toDisplayEmploymentStatus(
+            (params.value as EmployeeItem["employment_status"]) ?? "active",
+            employmentLabelByCode,
+          ),
       },
       {
         headerName: I18N.colEmail,
@@ -493,9 +576,8 @@ export function EmployeeMasterManager() {
         width: 160,
         editable: (params) => params.data?._status !== "deleted",
       },
-      { headerName: I18N.colError, field: "_error", width: 220, editable: false },
     ];
-  }, [departmentNameById, departments]);
+  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, positionNames]);
 
   const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(
     () => ({ sortable: true, filter: true, resizable: true, editable: false }),
@@ -528,7 +610,7 @@ export function EmployeeMasterManager() {
         prev.map((row) => {
           if (row.id !== rowId) return row;
 
-          const next: EmployeeGridRow = { ...row, _error: undefined };
+          const next: EmployeeGridRow = { ...row };
 
           if (field === "department_id") {
             const dId = Number(event.newValue);
@@ -557,12 +639,8 @@ export function EmployeeMasterManager() {
             next.employee_no = String(event.newValue ?? "").trim();
           }
 
-          /* --- revert detection ---- */
-          if (next._status === "clean") {
-            next._status = "updated";
-          } else if (next._status === "updated" && isRevertedToOriginal(next) && !next.password) {
-            // All tracked fields match original & no password change => back to clean
-            next._status = "clean";
+          if (next._status !== "added" && next._status !== "deleted") {
+            next._status = isRevertedToOriginal(next) && !next.password ? "clean" : "updated";
           }
 
           return next;
@@ -582,13 +660,11 @@ export function EmployeeMasterManager() {
           if (row.id !== rowId) return row;
           if (!hasRowPatchChanges(row, patch)) return row;
 
-          const next: EmployeeGridRow = { ...row, ...patch, _error: undefined };
+          const next: EmployeeGridRow = { ...row, ...patch };
           if ("_status" in patch) return next;
 
-          if (next._status === "clean") {
-            next._status = "updated";
-          } else if (next._status === "updated" && isRevertedToOriginal(next) && !next.password) {
-            next._status = "clean";
+          if (next._status !== "added" && next._status !== "deleted") {
+            next._status = isRevertedToOriginal(next) && !next.password ? "clean" : "updated";
           }
           return next;
         }),
@@ -610,11 +686,11 @@ export function EmployeeMasterManager() {
 
           if (!checked) {
             if (row._status === "deleted") {
+              const restoredStatus = resolveRestoredStatus(row);
               next.push({
                 ...row,
-                _status: row._prevStatus ?? "clean",
+                _status: restoredStatus,
                 _prevStatus: undefined,
-                _error: undefined,
               });
             } else {
               next.push(row);
@@ -627,7 +703,7 @@ export function EmployeeMasterManager() {
           }
 
           if (row._status !== "deleted") {
-            next.push({ ...row, _status: "deleted", _prevStatus: row._status, _error: undefined });
+            next.push({ ...row, _status: "deleted", _prevStatus: row._status });
           } else {
             next.push(row);
           }
@@ -666,18 +742,17 @@ export function EmployeeMasterManager() {
         }
 
         if (row._status === "deleted") {
+          const restoredStatus = resolveRestoredStatus(row);
           next.push({
             ...row,
-            _status: row._prevStatus ?? "clean",
+            _status: restoredStatus,
             _prevStatus: undefined,
-            _error: undefined,
           });
         } else {
           next.push({
             ...row,
             _status: "deleted",
             _prevStatus: row._status,
-            _error: undefined,
           });
         }
       }
@@ -715,25 +790,14 @@ export function EmployeeMasterManager() {
         }
 
         if (row._status === "deleted") {
-          // restore to previous status
-          const restored: EmployeeGridRow = {
-            ...row,
-            _status: row._prevStatus ?? "clean",
-            _prevStatus: undefined,
-            _error: undefined,
-          };
-          // If restored and values match original, ensure clean
-          if (restored._status === "updated" && isRevertedToOriginal(restored) && !restored.password) {
-            restored._status = "clean";
-          }
-          next.push(restored);
+          const restoredStatus = resolveRestoredStatus(row);
+          next.push({ ...row, _status: restoredStatus, _prevStatus: undefined });
         } else {
           // clean or updated => mark as deleted
           next.push({
             ...row,
             _status: "deleted",
             _prevStatus: row._status,
-            _error: undefined,
           });
         }
       }
@@ -824,7 +888,6 @@ export function EmployeeMasterManager() {
           employee_no: "",
           login_id: "",
           _status: "added" as const,
-          _error: undefined,
           _original: undefined,
           _prevStatus: undefined,
         },
@@ -878,7 +941,7 @@ export function EmployeeMasterManager() {
         r.department_name || departmentNameById.get(r.department_id) || "",
         r.position_title,
         r.hire_date,
-        r.employment_status,
+        toDisplayEmploymentStatus(r.employment_status, employmentLabelByCode),
         r.email,
         r.is_active ? "Y" : "N",
       ]);
@@ -981,8 +1044,11 @@ export function EmployeeMasterManager() {
       if (msg) validationErrors.set(r.id, msg);
     }
     if (validationErrors.size > 0) {
-      setRows((prev) => prev.map((r) => ({ ...r, _error: validationErrors.get(r.id) })));
-      toast.error(I18N.validationError);
+      const details = Array.from(validationErrors.entries())
+        .slice(0, 5)
+        .map(([id, message]) => `ID ${id}: ${message}`)
+        .join(" / ");
+      toast.error(`${I18N.validationError} ${details}`);
       return;
     }
 
@@ -1084,12 +1150,12 @@ export function EmployeeMasterManager() {
       .filter((r) => !deleteSuccess.has(r.id))
       .map((r) => {
         const created = insertSuccess.get(r.id);
-        if (created) return { ...toGridRow(created), _error: undefined };
+        if (created) return toGridRow(created);
 
         const updated = updateSuccess.get(r.id);
-        if (updated) return { ...toGridRow(updated), _error: undefined };
+        if (updated) return toGridRow(updated);
 
-        if (errorById.has(r.id)) return { ...r, _error: errorById.get(r.id) };
+        if (errorById.has(r.id)) return r;
 
         if (r._status === "deleted" && r.id < 0) return null;
         return r;
@@ -1101,7 +1167,8 @@ export function EmployeeMasterManager() {
     setTimeout(refreshGridRows, 0);
 
     if (failedMessages.length > 0) {
-      toast.error(`${I18N.savePartial} (${failedMessages.length}嫄?`);
+      const failedPreview = failedMessages.slice(0, 3).join(" / ");
+      toast.error(`${I18N.savePartial} (${failedMessages.length}건) ${failedPreview}`);
       return;
     }
 
@@ -1125,7 +1192,7 @@ export function EmployeeMasterManager() {
       if (employeeNo && !row.employee_no.toLowerCase().includes(employeeNo)) return false;
       if (name && !row.display_name.toLowerCase().includes(name)) return false;
       if (department && !departmentName.includes(department)) return false;
-      if (position && !positionTitle.includes(position)) return false;
+      if (position && positionTitle !== position.toLowerCase()) return false;
       if (hireDateTo && (!hireDate || hireDate > hireDateTo)) return false;
       if (statusFilter.size > 0 && !statusFilter.has(row.employment_status)) return false;
       if (active === "Y" && !row.is_active) return false;
@@ -1136,11 +1203,15 @@ export function EmployeeMasterManager() {
   }, [appliedFilters, departmentNameById, rows]);
 
   const mobileRows = filteredRows;
-  const statusOptions: Array<{ value: EmployeeItem["employment_status"]; label: string }> = [
-    { value: "active", label: "재직" },
-    { value: "leave", label: "휴직" },
-    { value: "resigned", label: "퇴직" },
-  ];
+  const statusOptions = employmentOptions
+    .map((option) => ({
+      value: option.code,
+      label: option.name,
+    }))
+    .filter(
+      (option): option is { value: EmployeeItem["employment_status"]; label: string } =>
+        option.value === "active" || option.value === "leave" || option.value === "resigned",
+    );
 
   function toggleEmploymentStatus(value: EmployeeItem["employment_status"], checked: boolean) {
     setSearchFilters((prev) => {
@@ -1194,13 +1265,19 @@ export function EmployeeMasterManager() {
             placeholder="부서 검색"
             className="h-9 text-sm"
           />
-          <Input
+          <select
             value={searchFilters.position}
             onChange={(e) => setSearchFilters((prev) => ({ ...prev, position: e.target.value }))}
             onKeyDown={handleSearchFieldEnter}
-            placeholder="직책 검색"
-            className="h-9 text-sm"
-          />
+            className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+          >
+            <option value="">직책 전체</option>
+            {positionNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
           <CustomDatePicker
             value={searchFilters.hireDateTo}
             onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
@@ -1219,9 +1296,9 @@ export function EmployeeMasterManager() {
             onKeyDown={handleSearchFieldEnter}
             className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
           >
-            <option value="">활성 전체</option>
-            <option value="Y">활성(Y)</option>
-            <option value="N">비활성(N)</option>
+            <option value="">전체</option>
+            <option value="Y">Y</option>
+            <option value="N">N</option>
           </select>
           <div className="rounded-md border border-gray-200 px-2 py-1.5">
             <div className="mb-1 text-xs text-slate-500">재직상태</div>
@@ -1375,13 +1452,18 @@ export function EmployeeMasterManager() {
                         </option>
                       ))}
                     </select>
-                    <Input
+                    <select
                       value={row.position_title}
                       disabled={isDeleted}
                       onChange={(e) => patchRow(row.id, { position_title: e.target.value })}
-                      placeholder="직책"
-                      className="h-9"
-                    />
+                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                    >
+                      {(positionNames.length > 0 ? positionNames : [row.position_title || "사원"]).map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
                     <div className={`col-span-2 ${isDeleted ? "pointer-events-none opacity-60" : ""}`}>
                       <CustomDatePicker
                         className="w-full"
