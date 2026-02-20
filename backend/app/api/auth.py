@@ -1,11 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
 from app.models import AuthUser
-from app.schemas.auth import LoginRequest, LoginResponse, LoginUser
-from app.services.auth_service import authenticate_user, build_login_response, build_login_user
+from app.schemas.auth import (
+    ImpersonationCandidateListResponse,
+    ImpersonationLoginRequest,
+    LoginRequest,
+    LoginResponse,
+    LoginUser,
+)
+from app.services.auth_service import (
+    authenticate_user,
+    build_login_response,
+    build_login_user,
+    impersonate_user,
+    list_impersonation_candidates,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -27,3 +39,38 @@ def me(
     current_user: AuthUser = Depends(get_current_user),
 ) -> LoginUser:
     return build_login_user(session, current_user)
+
+
+@router.get(
+    "/impersonation/users",
+    response_model=ImpersonationCandidateListResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def get_impersonation_users(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+    query: str = Query(default="", max_length=100),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> ImpersonationCandidateListResponse:
+    users = list_impersonation_candidates(
+        session,
+        current_user_id=current_user.id,
+        query=query,
+        limit=limit,
+    )
+    return ImpersonationCandidateListResponse(users=users)
+
+
+@router.post(
+    "/impersonation/login",
+    response_model=LoginResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def impersonation_login(
+    payload: ImpersonationLoginRequest,
+    session: Session = Depends(get_session),
+) -> LoginResponse:
+    try:
+        return impersonate_user(session, target_user_id=payload.user_id)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error

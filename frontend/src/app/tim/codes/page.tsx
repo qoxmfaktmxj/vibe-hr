@@ -1,5 +1,4 @@
-import { LogoutButton } from "@/components/auth/logout-button";
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { requireMenuAccess } from "@/lib/guard";
 
@@ -15,18 +14,8 @@ export default async function TimCodesPage() {
   await requireMenuAccess("/tim/codes");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
-      <DashboardSidebar />
-      <main className="flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">근태코드관리</h1>
-            <p className="text-sm text-gray-500">근태/휴가 코드 및 사용 조건 관리</p>
-          </div>
-          <LogoutButton />
-        </header>
-
-        <div className="space-y-4 p-6">
+    <AppShell title="근태코드관리" description="근태/휴가 코드 및 사용 조건 관리">
+      <div className="space-y-4 p-6">
           <section className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
               <input className="h-10 rounded-md border px-3" placeholder="근태명" />
@@ -80,8 +69,7 @@ export default async function TimCodesPage() {
               </table>
             </div>
           </section>
-        </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

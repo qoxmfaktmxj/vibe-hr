@@ -19,3 +19,17 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: LoginUser
+
+
+class ImpersonationCandidate(BaseModel):
+    id: int
+    login_id: str
+    display_name: str
+
+
+class ImpersonationCandidateListResponse(BaseModel):
+    users: list[ImpersonationCandidate]
+
+
+class ImpersonationLoginRequest(BaseModel):
+    user_id: int = Field(gt=0)

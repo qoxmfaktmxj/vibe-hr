@@ -1,23 +1,18 @@
 import {
-  Bell,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  PlusCircle,
-  Search,
   Star,
   Users,
 } from "lucide-react";
 
-import { LogoutButton } from "@/components/auth/logout-button";
-import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { SurveyMeter } from "@/components/dashboard/survey-meter";
+import { AppShell } from "@/components/layout/app-shell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { getDashboardSummary } from "@/lib/api";
 
 const recognitionFeedPromise = Promise.resolve([
@@ -46,44 +41,8 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
-      <DashboardSidebar />
-      <main className="flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 lg:px-8">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Employee Engagement Overview</h1>
-            <p className="text-sm text-gray-500">Real-time insights for the last 30 days</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative hidden md:block">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                aria-hidden="true"
-              />
-              <Input
-                className="h-10 w-64 border-gray-200 bg-gray-100 pl-10"
-                placeholder="Search insights..."
-                aria-label="Search insights"
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative text-gray-500"
-              aria-label="Open notifications"
-            >
-              <Bell className="h-4 w-4" aria-hidden="true" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
-            </Button>
-            <Button className="gap-2 font-bold">
-              <PlusCircle className="h-4 w-4" aria-hidden="true" />
-              Create Survey
-            </Button>
-            <LogoutButton />
-          </div>
-        </header>
-
-        <div className="space-y-8 p-6 lg:p-8">
+    <AppShell title="대시보드" description="실시간 인사 지표를 확인합니다.">
+      <div className="space-y-8 p-6 lg:p-8">
           <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               title="Total Employees"
@@ -276,8 +235,7 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </section>
-        </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }
