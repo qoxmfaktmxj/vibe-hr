@@ -213,9 +213,3 @@
   border-radius: 2px;
 }
 
-/* -- Checkbox rendering (single icon to avoid double-square) -- */
-.vibe-grid {
-  --ag-icon-image-display-checkbox-unchecked: none;
-  --ag-icon-image-display-checkbox-checked: none;
-  --ag-icon-image-display-checkbox-indeterminate: none;
-}

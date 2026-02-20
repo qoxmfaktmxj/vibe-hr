@@ -214,6 +214,14 @@ function normalizeDateKey(value: unknown): string {
   return text.slice(0, 10);
 }
 
+function hasRowPatchChanges(row: EmployeeGridRow, patch: Partial<EmployeeGridRow>): boolean {
+  for (const [key, value] of Object.entries(patch)) {
+    const rowKey = key as keyof EmployeeGridRow;
+    if (row[rowKey] !== value) return true;
+  }
+  return false;
+}
+
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
   const json = (await response.json().catch(() => null)) as { detail?: string } | null;
   return json?.detail ?? fallback;
@@ -265,6 +273,7 @@ export function EmployeeMasterManager() {
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [keyword, setKeyword] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
+  const [gridMountKey, setGridMountKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -490,6 +499,8 @@ export function EmployeeMasterManager() {
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent<EmployeeGridRow>) => {
+      if (event.newValue === event.oldValue) return;
+
       const rowId = event.data?.id;
       const field = event.colDef.field as keyof EmployeeGridRow | undefined;
       if (rowId == null || !field) return;
@@ -550,6 +561,7 @@ export function EmployeeMasterManager() {
       setRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
+          if (!hasRowPatchChanges(row, patch)) return row;
 
           const next: EmployeeGridRow = { ...row, ...patch, _error: undefined };
           if ("_status" in patch) return next;
@@ -615,6 +627,54 @@ export function EmployeeMasterManager() {
    * - clean / updated => mark as deleted (remember previous status)
    * - deleted => restore to previous status (toggle)
    */
+  const handleSelectionChanged = useCallback(() => {
+    if (suppressSelectionRef.current || !gridApiRef.current) return;
+
+    const selected = gridApiRef.current.getSelectedRows();
+    if (selected.length === 0) return;
+
+    const selectedIds = new Set(selected.map((row) => row.id));
+    setRows((prev) => {
+      const next: EmployeeGridRow[] = [];
+      for (const row of prev) {
+        if (!selectedIds.has(row.id)) {
+          next.push(row);
+          continue;
+        }
+
+        if (row._status === "added") {
+          continue;
+        }
+
+        if (row._status === "deleted") {
+          next.push({
+            ...row,
+            _status: row._prevStatus ?? "clean",
+            _prevStatus: undefined,
+            _error: undefined,
+          });
+        } else {
+          next.push({
+            ...row,
+            _status: "deleted",
+            _prevStatus: row._status,
+            _error: undefined,
+          });
+        }
+      }
+      return next;
+    });
+
+    suppressSelectionRef.current = true;
+    setTimeout(() => {
+      refreshGridRows();
+      if (gridApiRef.current) {
+        gridApiRef.current.deselectAll();
+      }
+      suppressSelectionRef.current = false;
+    }, 0);
+  }, [refreshGridRows]);
+
   const handleDeleteSelected = useCallback(() => {
     if (!gridApiRef.current) return;
     const selected = gridApiRef.current.getSelectedRows();
@@ -866,15 +926,9 @@ export function EmployeeMasterManager() {
       setDepartments(deptJson.departments);
       setRows(empJson.employees.map((e) => toGridRow(e)));
       tempIdRef.current = -1;
-
-      // Reset transient grid UI state (selection / row class rendering) on query.
-      setTimeout(() => {
-        if (!gridApiRef.current) return;
-        suppressSelectionRef.current = true;
-        gridApiRef.current.deselectAll();
-        gridApiRef.current.redrawRows();
-        suppressSelectionRef.current = false;
-      }, 0);
+      gridApiRef.current = null;
+      suppressSelectionRef.current = false;
+      setGridMountKey((prev) => prev + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.initError);
     }
@@ -1210,13 +1264,14 @@ export function EmployeeMasterManager() {
                       placeholder="직책"
                       className="h-9"
                     />
-                    <Input
-                      type="date"
-                      value={row.hire_date}
-                      disabled={isDeleted}
-                      onChange={(e) => patchRow(row.id, { hire_date: e.target.value })}
-                      className="h-9"
-                    />
+                    <div className={`col-span-2 ${isDeleted ? "pointer-events-none opacity-60" : ""}`}>
+                      <CustomDatePicker
+                        className="w-full"
+                        value={row.hire_date}
+                        onChange={(value) => patchRow(row.id, { hire_date: value })}
+                        holidays={HOLIDAY_DATE_KEYS}
+                      />
+                    </div>
                     <Input
                       value={row.email}
                       disabled={isDeleted}
@@ -1236,6 +1291,7 @@ export function EmployeeMasterManager() {
       <div className="hidden flex-1 px-6 pb-4 pt-2 md:block">
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<EmployeeGridRow>
+            key={gridMountKey}
             rowData={rows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
@@ -1247,9 +1303,7 @@ export function EmployeeMasterManager() {
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
-            onSelectionChanged={() => {
-              if (suppressSelectionRef.current) return;
-            }}
+            onSelectionChanged={handleSelectionChanged}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
             headerHeight={36}
