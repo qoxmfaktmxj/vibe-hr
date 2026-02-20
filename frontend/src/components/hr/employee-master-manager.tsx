@@ -545,6 +545,70 @@ export function EmployeeMasterManager() {
     [departmentNameById, refreshGridRows],
   );
 
+  const patchRow = useCallback(
+    (rowId: number, patch: Partial<EmployeeGridRow>) => {
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+
+          const next: EmployeeGridRow = { ...row, ...patch, _error: undefined };
+          if ("_status" in patch) return next;
+
+          if (next._status === "clean") {
+            next._status = "updated";
+          } else if (next._status === "updated" && isRevertedToOriginal(next) && !next.password) {
+            next._status = "clean";
+          }
+          return next;
+        }),
+      );
+      setTimeout(refreshGridRows, 0);
+    },
+    [refreshGridRows],
+  );
+
+  const toggleDeleteById = useCallback(
+    (rowId: number, checked: boolean) => {
+      setRows((prev) => {
+        const next: EmployeeGridRow[] = [];
+        for (const row of prev) {
+          if (row.id !== rowId) {
+            next.push(row);
+            continue;
+          }
+
+          if (!checked) {
+            if (row._status === "deleted") {
+              next.push({
+                ...row,
+                _status: row._prevStatus ?? "clean",
+                _prevStatus: undefined,
+                _error: undefined,
+              });
+            } else {
+              next.push(row);
+            }
+            continue;
+          }
+
+          if (row._status === "added") {
+            continue;
+          }
+
+          if (row._status !== "deleted") {
+            next.push({ ...row, _status: "deleted", _prevStatus: row._status, _error: undefined });
+          } else {
+            next.push(row);
+          }
+        }
+        return next;
+      });
+
+      setTimeout(refreshGridRows, 0);
+    },
+    [refreshGridRows],
+  );
+
   /**
    * Delete selected rows (via the "삭제" button):
    * - added => remove row entirely
@@ -977,10 +1041,20 @@ export function EmployeeMasterManager() {
 
   const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
 
+  const mobileRows = useMemo(() => {
+    const q = appliedKeyword.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const dept = r.department_name || departmentNameById.get(r.department_id) || "";
+      const haystack = `${r.employee_no} ${r.display_name} ${r.login_id} ${dept}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [appliedKeyword, departmentNameById, rows]);
+
   return (
     <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
       {/* ── Search bar area ─────────────────────────────────── */}
-      <div className="border-b border-gray-200 bg-white px-6 py-3">
+      <div className="border-b border-gray-200 bg-white px-3 py-3 md:px-6">
         <div className="flex items-center gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1002,7 +1076,7 @@ export function EmployeeMasterManager() {
       </div>
 
       {/* ── Sheet header: title + buttons ──────────────────── */}
-      <div className="flex items-center justify-between bg-white px-6 py-3 border-b border-gray-100">
+      <div className="flex flex-col gap-2 border-b border-gray-100 bg-white px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-800">
             {I18N.title}
@@ -1031,7 +1105,7 @@ export function EmployeeMasterManager() {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button size="sm" variant="outline" onClick={() => addRows(1)}>
             <Plus className="h-3.5 w-3.5" />
             {I18N.addRow}
@@ -1078,9 +1152,89 @@ export function EmployeeMasterManager() {
         </div>
       </div>
 
-      {/* ── AG Grid ────────────────────────────────────────── */}
-      <div className="flex-1 px-6 pb-4 pt-2">
-        <div className="ag-theme-quartz vibe-grid h-full w-full rounded-lg border border-gray-200 overflow-hidden">
+      {/* ── Mobile cards ───────────────────────────────────── */}
+      <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
+        <div className="space-y-2">
+          {mobileRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
+              {I18N.noRows}
+            </div>
+          ) : (
+            mobileRows.map((row) => {
+              const deptName = row.department_name || departmentNameById.get(row.department_id) || "";
+              const isDeleted = row._status === "deleted";
+              return (
+                <div key={row.id} className={`rounded-lg border bg-white p-3 ${isDeleted ? "border-red-300 bg-red-50/40" : "border-slate-200"}`}>
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-xs text-slate-500">{row.employee_no || "신규"} · {deptName || "부서 미지정"}</div>
+                    <label className="flex items-center gap-1 text-xs text-red-600">
+                      <input
+                        type="checkbox"
+                        checked={isDeleted}
+                        onChange={(e) => toggleDeleteById(row.id, e.target.checked)}
+                      />
+                      삭제
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={row.display_name}
+                      disabled={isDeleted}
+                      onChange={(e) => patchRow(row.id, { display_name: e.target.value })}
+                      placeholder="이름"
+                      className="h-9"
+                    />
+                    <select
+                      value={String(row.department_id)}
+                      disabled={isDeleted}
+                      onChange={(e) => {
+                        const dId = Number(e.target.value);
+                        patchRow(row.id, {
+                          department_id: dId,
+                          department_name: departmentNameById.get(dId) ?? "",
+                        });
+                      }}
+                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                    >
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      value={row.position_title}
+                      disabled={isDeleted}
+                      onChange={(e) => patchRow(row.id, { position_title: e.target.value })}
+                      placeholder="직책"
+                      className="h-9"
+                    />
+                    <Input
+                      type="date"
+                      value={row.hire_date}
+                      disabled={isDeleted}
+                      onChange={(e) => patchRow(row.id, { hire_date: e.target.value })}
+                      className="h-9"
+                    />
+                    <Input
+                      value={row.email}
+                      disabled={isDeleted}
+                      onChange={(e) => patchRow(row.id, { email: e.target.value })}
+                      placeholder="이메일"
+                      className="col-span-2 h-9"
+                    />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ── AG Grid (Desktop) ─────────────────────────────── */}
+      <div className="hidden flex-1 px-6 pb-4 pt-2 md:block">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<EmployeeGridRow>
             rowData={rows}
             columnDefs={columnDefs}
@@ -1094,7 +1248,6 @@ export function EmployeeMasterManager() {
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             onSelectionChanged={() => {
-              /* No-op: selection is visual only, delete is via button */
               if (suppressSelectionRef.current) return;
             }}
             localeText={AG_GRID_LOCALE_KO}
