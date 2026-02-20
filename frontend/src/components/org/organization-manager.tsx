@@ -6,8 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type {
   OrganizationDepartmentDetailResponse,
   OrganizationDepartmentItem,
@@ -259,11 +261,11 @@ export function OrganizationManager() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{"기준일자"}</Label>
-              <Input
-                type="date"
-                className="h-9 w-40"
+              <CustomDatePicker
+                className="w-40"
                 value={referenceDate}
-                onChange={(event) => setReferenceDate(event.target.value)}
+                onChange={setReferenceDate}
+                holidays={HOLIDAY_DATE_KEYS}
               />
             </div>
             <Button variant="query" className="h-9 px-5" onClick={runSearch}>
