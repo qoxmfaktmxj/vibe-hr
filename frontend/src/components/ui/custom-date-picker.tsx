@@ -52,6 +52,8 @@ export function CustomDatePicker({
     () => holidays.map((holiday) => parseDateKey(holiday)).filter(Boolean) as Date[],
     [holidays],
   );
+  const today = useMemo(() => new Date(), []);
+  const [viewMonth, setViewMonth] = useState<Date>(selectedDate ?? today);
 
   useEffect(() => {
     if (!open || inline) return;
@@ -64,16 +66,69 @@ export function CustomDatePicker({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [inline, open]);
 
-  const currentYear = new Date().getFullYear();
+  useEffect(() => {
+    if (selectedDate) setViewMonth(selectedDate);
+  }, [selectedDate]);
+
+  const currentYear = today.getFullYear();
+  const yearOptions = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
 
   const calendar = (
     <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
+          className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          aria-label="이전 달"
+        >
+          &lt;
+        </button>
+
+        <div className="flex items-center gap-1">
+          <select
+            value={viewMonth.getFullYear()}
+            onChange={(event) =>
+              setViewMonth(new Date(Number(event.target.value), viewMonth.getMonth(), 1))
+            }
+            className="h-8 rounded border border-slate-200 bg-white px-2 text-xs"
+          >
+            {yearOptions.map((year) => (
+              <option key={year} value={year}>
+                {year}년
+              </option>
+            ))}
+          </select>
+          <select
+            value={viewMonth.getMonth() + 1}
+            onChange={(event) =>
+              setViewMonth(new Date(viewMonth.getFullYear(), Number(event.target.value) - 1, 1))
+            }
+            className="h-8 rounded border border-slate-200 bg-white px-2 text-xs"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+              <option key={month} value={month}>
+                {month}월
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
+          className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          aria-label="다음 달"
+        >
+          &gt;
+        </button>
+      </div>
+
       <DayPicker
         mode="single"
         locale={ko}
-        captionLayout="dropdown"
-        fromYear={currentYear - 10}
-        toYear={currentYear + 10}
+        month={viewMonth}
+        onMonthChange={setViewMonth}
         selected={selectedDate}
         onSelect={(date) => {
           if (!date) return;
@@ -87,22 +142,15 @@ export function CustomDatePicker({
         modifiersClassNames={{
           weekend: "text-red-500",
           holiday:
-            "relative text-red-600 after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-red-500",
+            "relative text-red-600 before:absolute before:top-1 before:left-1/2 before:h-1 before:w-1 before:-translate-x-1/2 before:rounded-full before:bg-red-500",
         }}
         formatters={{
-          formatCaption: (date) => format(date, "yyyy년 M월", { locale: ko }),
           formatWeekdayName: (date) => format(date, "EEEEE", { locale: ko }),
         }}
         classNames={{
           months: "flex",
           month: "space-y-2",
-          caption: "flex items-center justify-center gap-2 pt-1 relative",
-          caption_label: "text-sm font-medium",
-          caption_dropdowns: "flex items-center gap-1",
-          dropdown: "h-8 rounded border border-slate-200 bg-white px-2 text-xs",
-          nav: "flex items-center gap-1",
-          nav_button:
-            "inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+          caption: "hidden",
           table: "w-full border-collapse",
           head_row: "flex",
           head_cell: "w-9 text-[0.8rem] font-normal text-slate-500",
