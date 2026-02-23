@@ -1,6 +1,8 @@
 "use client";
 
 import { CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { ko } from "date-fns/locale";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DayPicker } from "react-day-picker";
 
@@ -66,7 +68,7 @@ export function CustomDatePicker({
     <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
       <DayPicker
         mode="single"
-        locale={undefined}
+        locale={ko}
         selected={selectedDate}
         onSelect={(date) => {
           if (!date) return;
@@ -75,9 +77,15 @@ export function CustomDatePicker({
         }}
         modifiers={{
           holiday: holidayDates,
+          weekend: { dayOfWeek: [0, 6] },
         }}
         modifiersClassNames={{
-          holiday: "text-red-500",
+          weekend: "text-red-500",
+          holiday: "bg-red-50 text-red-600 ring-1 ring-red-200",
+        }}
+        formatters={{
+          formatCaption: (date) => format(date, "yyyy년 M월", { locale: ko }),
+          formatWeekdayName: (date) => format(date, "EEEEE", { locale: ko }),
         }}
         classNames={{
           months: "flex",
