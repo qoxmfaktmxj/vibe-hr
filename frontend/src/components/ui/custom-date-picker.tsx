@@ -64,11 +64,16 @@ export function CustomDatePicker({
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [inline, open]);
 
+  const currentYear = new Date().getFullYear();
+
   const calendar = (
     <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
       <DayPicker
         mode="single"
         locale={ko}
+        captionLayout="dropdown"
+        fromYear={currentYear - 10}
+        toYear={currentYear + 10}
         selected={selectedDate}
         onSelect={(date) => {
           if (!date) return;
@@ -81,7 +86,8 @@ export function CustomDatePicker({
         }}
         modifiersClassNames={{
           weekend: "text-red-500",
-          holiday: "bg-red-50 text-red-600 ring-1 ring-red-200",
+          holiday:
+            "relative text-red-600 after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-red-500",
         }}
         formatters={{
           formatCaption: (date) => format(date, "yyyy년 M월", { locale: ko }),
@@ -90,11 +96,13 @@ export function CustomDatePicker({
         classNames={{
           months: "flex",
           month: "space-y-2",
-          caption: "flex items-center justify-center pt-1 relative",
+          caption: "flex items-center justify-center gap-2 pt-1 relative",
           caption_label: "text-sm font-medium",
-          nav: "space-x-1 flex items-center",
+          caption_dropdowns: "flex items-center gap-1",
+          dropdown: "h-8 rounded border border-slate-200 bg-white px-2 text-xs",
+          nav: "flex items-center gap-1",
           nav_button:
-            "h-8 w-8 bg-transparent p-0 opacity-70 hover:opacity-100 border border-slate-200 rounded",
+            "inline-flex h-8 w-8 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
           table: "w-full border-collapse",
           head_row: "flex",
           head_cell: "w-9 text-[0.8rem] font-normal text-slate-500",
@@ -102,7 +110,7 @@ export function CustomDatePicker({
           cell: "h-9 w-9 text-center text-sm p-0 relative",
           day: "h-9 w-9 p-0 rounded-md hover:bg-slate-100",
           day_selected: "bg-primary text-white hover:bg-primary/90",
-          day_today: "font-semibold",
+          day_today: "bg-slate-100 font-semibold",
           day_outside: "text-slate-300",
           day_disabled: "text-slate-300",
         }}
