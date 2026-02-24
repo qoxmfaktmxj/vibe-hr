@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.deploy
+      - ./.env.deploy.secret
     ports:
       - "127.0.0.1:8000:8000"
     extra_hosts:
@@ -25,6 +26,7 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.deploy
+      - ./.env.deploy.secret
     depends_on:
       backend:
         condition: service_healthy

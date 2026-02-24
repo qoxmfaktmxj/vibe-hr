@@ -44,6 +44,9 @@ jobs:
             git fetch origin
             git checkout main
             git pull --ff-only origin main
-            cp -n .env.deploy.example .env.deploy || true
+            if [ ! -f .env.deploy.secret ]; then
+              echo "[warn] .env.deploy.secret not found. creating empty file (fill secrets on server)."
+              touch .env.deploy.secret
+            fi
             docker compose -f docker-compose.deploy.yml up -d --build
             docker compose -f docker-compose.deploy.yml ps
