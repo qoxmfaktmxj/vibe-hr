@@ -8,6 +8,8 @@ from app.models.entities import (
     AuthUserRole,
     HrAttendanceDaily,
     HrEmployee,
+    HrEmployeeBasicProfile,
+    HrEmployeeInfoRecord,
     HrLeaveRequest,
     OrgDepartment,
 )
@@ -22,6 +24,8 @@ __all__ = [
     "AuthUserRole",
     "OrgDepartment",
     "HrEmployee",
+    "HrEmployeeBasicProfile",
+    "HrEmployeeInfoRecord",
     "HrAttendanceDaily",
     "HrLeaveRequest",
 ]

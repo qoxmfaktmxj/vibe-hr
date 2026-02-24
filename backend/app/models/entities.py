@@ -154,6 +154,42 @@ class AppCode(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class HrEmployeeBasicProfile(SQLModel, table=True):
+    __tablename__ = "hr_employee_basic_profiles"
+    __table_args__ = (UniqueConstraint("employee_id", name="uq_hr_employee_basic_profiles_employee_id"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    gender: Optional[str] = Field(default=None, max_length=20)
+    resident_no_masked: Optional[str] = Field(default=None, max_length=30)
+    birth_date: Optional[date] = None
+    retire_date: Optional[date] = None
+    blood_type: Optional[str] = Field(default=None, max_length=10)
+    marital_status: Optional[str] = Field(default=None, max_length=20)
+    mbti: Optional[str] = Field(default=None, max_length=10)
+    probation_end_date: Optional[date] = None
+    job_family: Optional[str] = Field(default=None, max_length=80)
+    job_role: Optional[str] = Field(default=None, max_length=80)
+    grade: Optional[str] = Field(default=None, max_length=40)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrEmployeeInfoRecord(SQLModel, table=True):
+    __tablename__ = "hr_employee_info_records"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    category: str = Field(max_length=40, index=True)
+    record_date: Optional[date] = None
+    title: Optional[str] = Field(default=None, max_length=120)
+    type: Optional[str] = Field(default=None, max_length=80)
+    organization: Optional[str] = Field(default=None, max_length=120)
+    value: Optional[str] = Field(default=None, max_length=200)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "tim_leave_requests"
     __table_args__ = (

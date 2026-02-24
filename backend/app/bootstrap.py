@@ -18,6 +18,8 @@ from app.models import (
     AuthUserRole,
     HrAttendanceDaily,
     HrEmployee,
+    HrEmployeeBasicProfile,
+    HrEmployeeInfoRecord,
     HrLeaveRequest,
     OrgDepartment,
 )
@@ -793,6 +795,62 @@ def ensure_common_codes(session: Session) -> None:
                     session.commit()
 
 
+def ensure_hr_basic_seed_data(session: Session) -> None:
+    employees = session.exec(select(HrEmployee).order_by(HrEmployee.id).limit(30)).all()
+    if not employees:
+        return
+
+    for index, employee in enumerate(employees, start=1):
+        profile = session.exec(
+            select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee.id)
+        ).first()
+        if profile is None:
+            profile = HrEmployeeBasicProfile(
+                employee_id=employee.id,
+                gender="남" if index % 2 else "여",
+                resident_no_masked=f"90{(index % 12) + 1:02d}15-1******",
+                blood_type=["A", "B", "O", "AB"][index % 4],
+                marital_status="기혼" if index % 3 == 0 else "미혼",
+                mbti=["ISTJ", "ENFP", "INTJ", "ESFJ"][index % 4],
+                job_family=["경영지원", "개발", "영업", "운영"][index % 4],
+                job_role=employee.position_title,
+                grade=["사원", "대리", "과장", "차장", "부장"][index % 5],
+            )
+            session.add(profile)
+
+        record_exists = session.exec(
+            select(HrEmployeeInfoRecord.id).where(HrEmployeeInfoRecord.employee_id == employee.id).limit(1)
+        ).first()
+        if record_exists is not None:
+            continue
+
+        seed_rows = [
+            ("appointment", "정기 발령", "전보", "인사본부", "개발1팀", "정기 인사이동"),
+            ("reward_penalty", "우수사원", "상", "대표이사", "표창", "분기 우수사원 선정"),
+            ("contact", "연락처", "개인전화", None, "010-1234-56{:02d}".format(index), "개인 연락처"),
+            ("education", "학력", "학사", "한국대학교", "컴퓨터공학", "졸업"),
+            ("career", "경력", "이전회사", "샘플테크", "백엔드 개발", "3년"),
+            ("certificate", "자격증", "정보처리기사", "한국산업인력공단", "취득", ""),
+            ("military", "병역", "육군", "대한민국 육군", "병장", "만기전역"),
+            ("evaluation", "연말평가", "A", None, "우수", "성과 우수"),
+        ]
+        for category, title, type_value, org, value, note in seed_rows:
+            session.add(
+                HrEmployeeInfoRecord(
+                    employee_id=employee.id,
+                    category=category,
+                    title=title,
+                    type=type_value,
+                    organization=org,
+                    value=value,
+                    note=note,
+                    record_date=date(2025, (index % 12) + 1, min(20, (index % 27) + 1)),
+                )
+            )
+
+    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -838,3 +896,4 @@ def seed_initial_data(session: Session) -> None:
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
     ensure_common_codes(session)
+    ensure_hr_basic_seed_data(session)
