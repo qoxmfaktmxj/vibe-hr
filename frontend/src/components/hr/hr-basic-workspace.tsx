@@ -27,27 +27,54 @@ export function HrBasicWorkspace() {
     [employees, selectedEmployeeId],
   );
 
-  useEffect(() => {
-    async function loadDetail() {
-      if (!selectedEmployeeId) {
-        setDetail(null);
-        return;
-      }
-      const response = await fetch(`/api/hr/basic/${selectedEmployeeId}`, { cache: "no-store" });
-      if (!response.ok) {
-        setDetail(null);
-        return;
-      }
-      const json = (await response.json()) as HrBasicDetailResponse;
-      setDetail(json);
+  async function reload(targetId: number | null = selectedEmployeeId) {
+    if (!targetId) {
+      setDetail(null);
+      return;
     }
-    void loadDetail();
+    const response = await fetch(`/api/hr/basic/${targetId}`, { cache: "no-store" });
+    if (!response.ok) {
+      setDetail(null);
+      return;
+    }
+    const json = (await response.json()) as HrBasicDetailResponse;
+    setDetail(json);
+  }
+
+  useEffect(() => {
+    void reload(selectedEmployeeId);
   }, [selectedEmployeeId]);
 
   return (
     <>
       <HrEmployeeHeader selectedEmployeeId={selectedEmployeeId} onSelectEmployee={setSelectedEmployeeId} />
-      <HrBasicTabs detail={detail ?? (selectedEmployee ? { profile: { employee_id: selectedEmployee.id, employee_no: selectedEmployee.employee_no, full_name: selectedEmployee.display_name, hire_date: selectedEmployee.hire_date, department_name: selectedEmployee.department_name, position_title: selectedEmployee.position_title }, appointments: [], rewards_penalties: [], contacts: [], educations: [], careers: [], certificates: [], military: [], evaluations: [] } : null)} />
+      <HrBasicTabs
+        employeeId={selectedEmployeeId}
+        onReload={async () => reload(selectedEmployeeId)}
+        detail={
+          detail ??
+          (selectedEmployee
+            ? {
+                profile: {
+                  employee_id: selectedEmployee.id,
+                  employee_no: selectedEmployee.employee_no,
+                  full_name: selectedEmployee.display_name,
+                  hire_date: selectedEmployee.hire_date,
+                  department_name: selectedEmployee.department_name,
+                  position_title: selectedEmployee.position_title,
+                },
+                appointments: [],
+                rewards_penalties: [],
+                contacts: [],
+                educations: [],
+                careers: [],
+                certificates: [],
+                military: [],
+                evaluations: [],
+              }
+            : null)
+        }
+      />
     </>
   );
 }
