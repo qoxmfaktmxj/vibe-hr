@@ -147,6 +147,24 @@ MENU_TREE: list[dict] = [
                 "sort_order": 210,
                 "roles": ["hr_manager", "admin"],
             },
+            {
+                "code": "hr.admin",
+                "name": "\uC778\uC0AC\uAD00\uB9AC\uC790",
+                "path": None,
+                "icon": "UsersRound",
+                "sort_order": 230,
+                "roles": ["hr_manager", "admin"],
+                "children": [
+                    {"code": "hr.admin.appointments", "name": "\uBC1C\uB839\uAD00\uB9AC", "path": "/hr/admin/appointments", "icon": "UserRound", "sort_order": 231, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.rewards", "name": "\uC0C1\uBC8C\uAD00\uB9AC", "path": "/hr/admin/rewards", "icon": "UserRound", "sort_order": 232, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.contacts", "name": "\uC8FC\uC18C\uC5F0\uB77D\uCC98\uAD00\uB9AC", "path": "/hr/admin/contacts", "icon": "UserRound", "sort_order": 233, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.educations", "name": "\uD559\uB825\uAD00\uB9AC", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 234, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.careers", "name": "\uACBD\uB825\uAD00\uB9AC", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 235, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.certificates", "name": "\uC790\uACA9\uC99D\uAD00\uB9AC", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 236, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.military", "name": "\uBCD1\uC5ED\uAD00\uB9AC", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 237, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.evaluations", "name": "\uD3C9\uAC00\uAD00\uB9AC", "path": "/hr/admin/evaluations", "icon": "UserRound", "sort_order": 238, "roles": ["hr_manager", "admin"]}
+                ],
+            },
         ],
     },
     {
