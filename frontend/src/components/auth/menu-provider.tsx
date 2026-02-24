@@ -59,6 +59,9 @@ export function MenuProvider({
       });
       if (!response.ok) {
         setMenus([]);
+        if (response.status === 401 && typeof window !== "undefined") {
+          window.location.replace("/login");
+        }
         return;
       }
 
