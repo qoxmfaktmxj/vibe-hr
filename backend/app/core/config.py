@@ -7,6 +7,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/vibe_hr"
     cors_origins: str = "http://localhost:3000"
     auth_token_secret: str = "dev-only-change-me"
+
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
+
+    kakao_client_id: str = ""
+    kakao_client_secret: str = ""
+    kakao_redirect_uri: str = ""
     auth_token_algorithm: str = "HS256"
     auth_token_expires_min: int = 480
     auth_token_issuer: str = "vibe-hr"

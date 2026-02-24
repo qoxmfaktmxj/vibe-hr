@@ -11,6 +11,7 @@ from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
     LoginUser,
+    SocialExchangeRequest,
 )
 from app.services.auth_service import (
     authenticate_user,
@@ -18,6 +19,7 @@ from app.services.auth_service import (
     build_login_user,
     impersonate_user,
     list_impersonation_candidates,
+    social_exchange_login,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -80,3 +82,14 @@ def impersonation_login(
         return impersonate_user(session, target_user_id=payload.user_id)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router.post("/social/exchange", response_model=LoginResponse)
+def social_exchange(
+    payload: SocialExchangeRequest,
+    session: Session = Depends(get_session),
+) -> LoginResponse:
+    try:
+        return social_exchange_login(session, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error

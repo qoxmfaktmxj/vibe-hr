@@ -143,9 +143,14 @@ function AuthCardForm() {
         </span>
       </div>
 
-      <Button variant="outline" className="h-11 w-full border-slate-200 font-semibold text-slate-700">
-        통합 로그인 (SSO)
-      </Button>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Button asChild variant="outline" className="h-11 w-full border-slate-200 font-semibold text-slate-700">
+          <Link href="/api/auth/social/login/google">Google 로그인</Link>
+        </Button>
+        <Button asChild variant="outline" className="h-11 w-full border-slate-200 font-semibold text-slate-700">
+          <Link href="/api/auth/social/login/kakao">Kakao 로그인</Link>
+        </Button>
+      </div>
     </CardContent>
   );
 }

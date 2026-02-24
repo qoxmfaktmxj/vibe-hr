@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from sqlmodel import Session, select
 
 from app.core.auth import build_access_token
-from app.core.security import verify_password
+from app.core.security import hash_password, verify_password
 from app.models import AuthRole, AuthUser, AuthUserRole
-from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser
+from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
 
 
 def authenticate_user(session: Session, login_id: str, password: str) -> AuthUser | None:
@@ -88,3 +88,42 @@ def impersonate_user(session: Session, *, target_user_id: int) -> LoginResponse:
     if target_user is None:
         raise ValueError("전환 대상 사용자를 찾을 수 없습니다.")
     return build_login_response(session, target_user)
+
+
+def social_exchange_login(session: Session, payload: SocialExchangeRequest) -> LoginResponse:
+    normalized_email = payload.email.strip().lower()
+    if not normalized_email:
+        raise ValueError("이메일 정보가 필요합니다.")
+
+    user = session.exec(select(AuthUser).where(AuthUser.email == normalized_email)).first()
+
+    if user is None:
+        base_login_id = f"{payload.provider}-{payload.provider_user_id}".lower()[:50]
+        login_id = base_login_id
+        seq = 1
+        while session.exec(select(AuthUser.id).where(AuthUser.login_id == login_id)).first() is not None:
+            suffix = f"-{seq}"
+            login_id = f"{base_login_id[: max(1, 50 - len(suffix))]}{suffix}"
+            seq += 1
+
+        user = AuthUser(
+            login_id=login_id,
+            email=normalized_email,
+            display_name=payload.display_name.strip() or "User",
+            password_hash=hash_password(f"social-{payload.provider}-{payload.provider_user_id}"),
+            is_active=True,
+        )
+        session.add(user)
+        session.flush()
+
+        employee_role = session.exec(select(AuthRole).where(AuthRole.code == "employee")).first()
+        if employee_role is not None:
+            session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
+
+        session.commit()
+        session.refresh(user)
+
+    if not user.is_active:
+        raise ValueError("비활성화된 계정입니다.")
+
+    return build_login_response(session, user)
