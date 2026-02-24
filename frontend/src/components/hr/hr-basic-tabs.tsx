@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ function rowsByTab(detail: HrBasicDetailResponse | null, tab: Exclude<TabKey, "b
 export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [newTitle, setNewTitle] = useState("");
+  const [draftRows, setDraftRows] = useState<Record<number, HrInfoRow>>({});
 
   const tabs: Array<[TabKey, string]> = [
     ["basic", "기본"],
@@ -78,12 +79,23 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
 
   const tabRows = activeTab === "basic" ? [] : rowsByTab(detail, activeTab);
 
+  useEffect(() => {
+    const next: Record<number, HrInfoRow> = {};
+    for (const row of tabRows) next[row.id] = row;
+    setDraftRows(next);
+  }, [activeTab, detail]);
+
   async function addRecord() {
     if (!employeeId || activeTab === "basic") return;
     const response = await fetch(`/api/hr/basic/${employeeId}/records`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: toCategory(activeTab), title: newTitle || "신규", type: "", note: "" }),
+      body: JSON.stringify({
+        category: toCategory(activeTab),
+        title: newTitle || "신규",
+        type: "",
+        note: "",
+      }),
     });
     if (!response.ok) return toast.error("추가 실패");
     setNewTitle("");
@@ -91,22 +103,25 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
     await onReload();
   }
 
-  async function updateField(row: HrInfoRow, field: "type" | "title" | "organization" | "value" | "note", value: string) {
+  async function saveRow(rowId: number) {
     if (!employeeId) return;
-    const payload = {
-      record_date: row.record_date,
-      type: field === "type" ? value : row.type,
-      title: field === "title" ? value : row.title,
-      organization: field === "organization" ? value : row.organization,
-      value: field === "value" ? value : row.value,
-      note: field === "note" ? value : row.note,
-    };
+    const row = draftRows[rowId];
+    if (!row) return;
+
     const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        record_date: row.record_date || null,
+        type: row.type || null,
+        title: row.title || null,
+        organization: row.organization || null,
+        value: row.value || null,
+        note: row.note || null,
+      }),
     });
     if (!response.ok) return toast.error("저장 실패");
+    toast.success("저장 완료");
     await onReload();
   }
 
@@ -118,11 +133,28 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
     await onReload();
   }
 
+  function updateDraft(rowId: number, field: keyof HrInfoRow, value: string) {
+    setDraftRows((prev) => ({
+      ...prev,
+      [rowId]: {
+        ...prev[rowId],
+        [field]: value,
+      },
+    }));
+  }
+
   return (
     <div className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-sm lg:mx-8 lg:p-6">
       <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map(([value, label]) => (
-          <button key={value} type="button" onClick={() => setActiveTab(value)} className={`rounded-md border px-3 py-1.5 text-sm ${activeTab === value ? "border-primary/40 bg-primary/10 text-primary" : "border-slate-200 bg-white text-slate-600"}`}>
+          <button
+            key={value}
+            type="button"
+            onClick={() => setActiveTab(value)}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              activeTab === value ? "border-primary/40 bg-primary/10 text-primary" : "border-slate-200 bg-white text-slate-600"
+            }`}
+          >
             {label}
           </button>
         ))}
@@ -130,13 +162,15 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
 
       {activeTab === "basic" ? (
         <Card>
-          <CardHeader><CardTitle>인사기본</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>인사기본</CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
               {basicRows.map(([label, value]) => (
                 <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2">
-                  <p className="text-xs text-slate-500">{label}</p>
-                  <p className="text-sm font-semibold text-slate-800">{value}</p>
+                  <p className="text-xs font-medium text-slate-600">{label}</p>
+                  <p className="text-sm font-semibold text-slate-900">{value}</p>
                 </div>
               ))}
             </div>
@@ -145,34 +179,72 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>탭 데이터 관리</CardTitle>
+            <CardTitle className="text-slate-800">탭 데이터 관리</CardTitle>
             <div className="mt-2 flex gap-2">
               <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="신규 항목 제목" className="max-w-xs" />
               <Button onClick={addRecord}>추가</Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-2 py-2 text-left">일자</th><th className="px-2 py-2 text-left">구분</th><th className="px-2 py-2 text-left">제목</th><th className="px-2 py-2 text-left">기관/부서</th><th className="px-2 py-2 text-left">값</th><th className="px-2 py-2 text-left">비고</th><th className="px-2 py-2 text-left">동작</th>
+                  <tr className="text-slate-700">
+                    <th className="px-2 py-2 text-left font-semibold">일자</th>
+                    <th className="px-2 py-2 text-left font-semibold">구분</th>
+                    <th className="px-2 py-2 text-left font-semibold">제목</th>
+                    <th className="px-2 py-2 text-left font-semibold">기관/부서</th>
+                    <th className="px-2 py-2 text-left font-semibold">값</th>
+                    <th className="px-2 py-2 text-left font-semibold">비고</th>
+                    <th className="px-2 py-2 text-left font-semibold">동작</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tabRows.length === 0 ? (
-                    <tr><td className="px-2 py-6 text-center text-slate-400" colSpan={7}>데이터 없음</td></tr>
-                  ) : tabRows.map((row) => (
-                    <tr key={row.id} className="border-t">
-                      <td className="px-2 py-1">{row.record_date ?? "-"}</td>
-                      <td className="px-2 py-1"><Input defaultValue={row.type ?? ""} onBlur={(e) => void updateField(row, "type", e.target.value)} /></td>
-                      <td className="px-2 py-1"><Input defaultValue={row.title ?? ""} onBlur={(e) => void updateField(row, "title", e.target.value)} /></td>
-                      <td className="px-2 py-1"><Input defaultValue={row.organization ?? ""} onBlur={(e) => void updateField(row, "organization", e.target.value)} /></td>
-                      <td className="px-2 py-1"><Input defaultValue={row.value ?? ""} onBlur={(e) => void updateField(row, "value", e.target.value)} /></td>
-                      <td className="px-2 py-1"><Input defaultValue={row.note ?? ""} onBlur={(e) => void updateField(row, "note", e.target.value)} /></td>
-                      <td className="px-2 py-1"><Button variant="outline" onClick={() => void removeRecord(row)}>삭제</Button></td>
+                    <tr>
+                      <td className="px-2 py-6 text-center text-slate-400" colSpan={7}>
+                        데이터 없음
+                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    tabRows.map((row) => {
+                      const draft = draftRows[row.id] ?? row;
+                      return (
+                        <tr key={row.id} className="border-t">
+                          <td className="px-2 py-1">
+                            <Input
+                              type="date"
+                              value={draft.record_date ?? ""}
+                              onChange={(e) => updateDraft(row.id, "record_date", e.target.value)}
+                            />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input value={draft.type ?? ""} onChange={(e) => updateDraft(row.id, "type", e.target.value)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input value={draft.title ?? ""} onChange={(e) => updateDraft(row.id, "title", e.target.value)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input value={draft.organization ?? ""} onChange={(e) => updateDraft(row.id, "organization", e.target.value)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input value={draft.value ?? ""} onChange={(e) => updateDraft(row.id, "value", e.target.value)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <Input value={draft.note ?? ""} onChange={(e) => updateDraft(row.id, "note", e.target.value)} />
+                          </td>
+                          <td className="px-2 py-1">
+                            <div className="flex gap-1">
+                              <Button size="sm" onClick={() => void saveRow(row.id)}>저장</Button>
+                              <Button size="sm" variant="outline" onClick={() => void removeRecord(row)}>
+                                삭제
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
