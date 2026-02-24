@@ -13,6 +13,8 @@ const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
+const APP_ORIGIN =
+  process.env.APP_ORIGIN ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "";
 const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
 const AUTH_TOKEN_EXPIRES_MIN =
   Number.isFinite(tokenExpiresEnv) && tokenExpiresEnv > 0 ? tokenExpiresEnv : 480;
@@ -38,10 +40,23 @@ function getConfig(provider: Provider) {
   };
 }
 
+function resolveAppOrigin(request: NextRequest): string {
+  if (APP_ORIGIN) return APP_ORIGIN;
+  const xfHost = request.headers.get("x-forwarded-host");
+  if (xfHost) {
+    const xfProto = request.headers.get("x-forwarded-proto") ?? "https";
+    return `${xfProto}://${xfHost}`;
+  }
+  const host = request.headers.get("host") ?? request.nextUrl.host;
+  const proto = request.nextUrl.protocol.replace(":", "") || "https";
+  return `${proto}://${host}`;
+}
+
 export async function GET(request: NextRequest, context: { params: Promise<{ provider: string }> }) {
+  const appOrigin = resolveAppOrigin(request);
   const { provider: raw } = await context.params;
   if (raw !== "google" && raw !== "kakao") {
-    return NextResponse.redirect(new URL("/login?error=unsupported_provider", request.url));
+    return NextResponse.redirect(new URL("/login?error=unsupported_provider", appOrigin));
   }
 
   const provider = raw as Provider;
@@ -51,12 +66,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
   const state = url.searchParams.get("state") ?? "";
   const err = url.searchParams.get("error");
 
-  if (err) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(err)}`, request.url));
-  if (!code) return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
+  if (err) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(err)}`, appOrigin));
+  if (!code) return NextResponse.redirect(new URL("/login?error=missing_code", appOrigin));
 
   const stateCookie = request.cookies.get(`vibe_hr_oauth_state_${provider}`)?.value;
   if (!stateCookie || !state || stateCookie !== state) {
-    return NextResponse.redirect(new URL("/login?error=invalid_state", request.url));
+    return NextResponse.redirect(new URL("/login?error=invalid_state", appOrigin));
   }
 
   try {
@@ -77,7 +92,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
     const tokenJson = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null;
     const accessToken = tokenJson?.access_token;
     if (!tokenRes.ok || !accessToken) {
-      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", request.url));
+      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", appOrigin));
     }
 
     const profileRes = await fetch(cfg.profileUrl, {
@@ -87,7 +102,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
     });
     const profile = (await profileRes.json().catch(() => null)) as any;
     if (!profileRes.ok || !profile) {
-      return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", request.url));
+      return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", appOrigin));
     }
 
     const normalized =
@@ -104,11 +119,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
           };
 
     if (!normalized.provider_user_id) {
-      return NextResponse.redirect(new URL("/login?error=missing_profile_fields", request.url));
+      return NextResponse.redirect(new URL("/login?error=missing_profile_fields", appOrigin));
     }
 
     if (!normalized.email) {
-      return NextResponse.redirect(new URL("/login?error=email_required", request.url));
+      return NextResponse.redirect(new URL("/login?error=email_required", appOrigin));
     }
 
     const backendRes = await fetch(`${API_BASE_URL}/api/v1/auth/social/exchange`, {
@@ -125,10 +140,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 
     const backendJson = (await backendRes.json().catch(() => null)) as BackendLoginResponse | null;
     if (!backendRes.ok || !backendJson?.access_token) {
-      return NextResponse.redirect(new URL("/login?error=social_exchange_failed", request.url));
+      return NextResponse.redirect(new URL("/login?error=social_exchange_failed", appOrigin));
     }
 
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(new URL("/dashboard", appOrigin));
     response.cookies.set({
       name: AUTH_COOKIE_NAME,
       value: backendJson.access_token,
@@ -146,6 +161,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
     });
     return response;
   } catch {
-    return NextResponse.redirect(new URL("/login?error=unexpected", request.url));
+    return NextResponse.redirect(new URL("/login?error=unexpected", appOrigin));
   }
 }
