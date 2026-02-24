@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlmodel import Session, select
 
 from app.core.auth import build_access_token
 from app.core.security import hash_password, verify_password
-from app.models import AuthRole, AuthUser, AuthUserRole
+from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
 from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
 
 
@@ -116,14 +116,47 @@ def social_exchange_login(session: Session, payload: SocialExchangeRequest) -> L
         session.add(user)
         session.flush()
 
-        employee_role = session.exec(select(AuthRole).where(AuthRole.code == "employee")).first()
-        if employee_role is not None:
-            session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
-
-        session.commit()
-        session.refresh(user)
-
     if not user.is_active:
         raise ValueError("비활성화된 계정입니다.")
+
+    employee_role = session.exec(select(AuthRole).where(AuthRole.code == "employee")).first()
+    if employee_role is not None:
+        has_employee_role = session.exec(
+            select(AuthUserRole).where(
+                AuthUserRole.user_id == user.id,
+                AuthUserRole.role_id == employee_role.id,
+            )
+        ).first()
+        if has_employee_role is None:
+            session.add(AuthUserRole(user_id=user.id, role_id=employee_role.id))
+
+    employee = session.exec(select(HrEmployee).where(HrEmployee.user_id == user.id)).first()
+    if employee is None:
+        department = session.exec(select(OrgDepartment).where(OrgDepartment.is_active == True).order_by(OrgDepartment.id)).first()  # noqa: E712
+        if department is None:
+            raise ValueError("활성 부서를 찾을 수 없습니다.")
+
+        existing_no = {row[0] for row in session.exec(select(HrEmployee.employee_no)).all()}
+        employee_no = None
+        for seq in range(1, 999999):
+            candidate = f"EMP-{seq:06d}"
+            if candidate not in existing_no:
+                employee_no = candidate
+                break
+        if employee_no is None:
+            raise ValueError("사번을 생성할 수 없습니다.")
+
+        employee = HrEmployee(
+            user_id=user.id,
+            employee_no=employee_no,
+            department_id=department.id,
+            position_title="사원",
+            hire_date=date.today(),
+            employment_status="active",
+        )
+        session.add(employee)
+
+    session.commit()
+    session.refresh(user)
 
     return build_login_response(session, user)
