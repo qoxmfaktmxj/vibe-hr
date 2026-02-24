@@ -130,6 +130,14 @@ MENU_TREE: list[dict] = [
         "roles": ["hr_manager", "admin"],
         "children": [
             {
+                "code": "hr.basic",
+                "name": "\uC778\uC0AC\uAE30\uBCF8",
+                "path": "/hr/basic",
+                "icon": "UserRound",
+                "sort_order": 205,
+                "roles": ["hr_manager", "admin"],
+            },
+            {
                 "code": "hr.employee",
                 "name": "\uC0AC\uC6D0\uAD00\uB9AC",
                 "path": "/hr/employee",
