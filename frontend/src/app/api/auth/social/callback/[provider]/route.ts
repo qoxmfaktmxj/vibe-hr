@@ -103,8 +103,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
             display_name: String(profile?.kakao_account?.profile?.nickname ?? "Kakao User"),
           };
 
-    if (!normalized.provider_user_id || !normalized.email) {
+    if (!normalized.provider_user_id) {
       return NextResponse.redirect(new URL("/login?error=missing_profile_fields", request.url));
+    }
+
+    if (!normalized.email) {
+      return NextResponse.redirect(new URL("/login?error=email_required", request.url));
     }
 
     const backendRes = await fetch(`${API_BASE_URL}/api/v1/auth/social/exchange`, {

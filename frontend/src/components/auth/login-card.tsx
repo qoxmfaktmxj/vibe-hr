@@ -34,12 +34,12 @@ function AuthCardIntro() {
   );
 }
 
-function AuthCardForm() {
+function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | null }) {
   const router = useRouter();
   const { login } = useAuth();
   const { refreshMenus } = useMenu();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialErrorMessage ?? null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -168,11 +168,11 @@ function AuthCardSupport() {
   );
 }
 
-export function LoginCard() {
+export function LoginCard({ initialErrorMessage = null }: { initialErrorMessage?: string | null }) {
   return (
     <AuthCard>
       <AuthCardIntro />
-      <AuthCardForm />
+      <AuthCardForm initialErrorMessage={initialErrorMessage} />
       <AuthCardSupport />
     </AuthCard>
   );
