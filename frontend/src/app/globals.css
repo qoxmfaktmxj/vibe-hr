@@ -238,6 +238,40 @@
 }
 
 /* ============================================================ */
+/* Dark mode global polish (legacy utility class fallback)       */
+/* ============================================================ */
+.dark .bg-white {
+  background-color: var(--card) !important;
+}
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+.dark .border-gray-200,
+.dark .border-gray-100,
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: var(--border) !important;
+}
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: var(--muted);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+/* ============================================================ */
 /* Vibe-HR AG Grid 커스텀 토큰 (테마 연동)                        */
 /* ============================================================ */
 :root {
@@ -300,6 +334,31 @@
   --grid-updated-text: #fbbf24;
   --grid-deleted-bg: #450a0a;
   --grid-deleted-hover: #7f1d1d;
+}
+
+/* ============================================================ */
+/* AG Grid dark fallback                                          */
+/* ============================================================ */
+.dark .ag-theme-quartz {
+  --ag-background-color: #0f172a;
+  --ag-foreground-color: #e2e8f0;
+  --ag-header-background-color: #1e293b;
+  --ag-header-foreground-color: #cbd5e1;
+  --ag-border-color: #334155;
+  --ag-row-border-color: #1e293b;
+  --ag-odd-row-background-color: #0f172a;
+  --ag-control-panel-background-color: #111827;
+  --ag-selected-row-background-color: #1e3a5f;
+  --ag-range-selection-background-color: rgba(59, 130, 246, 0.2);
+}
+.dark .ag-theme-quartz .ag-root-wrapper,
+.dark .ag-theme-quartz .ag-root,
+.dark .ag-theme-quartz .ag-body-viewport,
+.dark .ag-theme-quartz .ag-center-cols-viewport,
+.dark .ag-theme-quartz .ag-body-horizontal-scroll,
+.dark .ag-theme-quartz .ag-body-vertical-scroll {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
 }
 
 /* ============================================================ */
