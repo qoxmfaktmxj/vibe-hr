@@ -179,6 +179,7 @@ export function DashboardSidebar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuControlVersion, setMenuControlVersion] = useState(0);
   const [menuControlMode, setMenuControlMode] = useState<"expand" | "collapse" | null>(null);
+  const [menuExpanded, setMenuExpanded] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileEmployee, setProfileEmployee] = useState<EmployeeItem | null>(null);
@@ -252,34 +253,25 @@ export function DashboardSidebar() {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-1 px-3">
+        <div className="mt-3 flex items-center justify-end px-3">
           <Button
             type="button"
             size="icon"
             variant="outline"
-            className="h-7 w-7"
+            className="h-6 w-6"
             onClick={() => {
-              setMenuControlMode("expand");
+              if (menuExpanded) {
+                setMenuControlMode("collapse");
+              } else {
+                setMenuControlMode("expand");
+              }
               setMenuControlVersion((prev) => prev + 1);
+              setMenuExpanded((prev) => !prev);
             }}
-            title="메뉴 전체 펼치기"
-            aria-label="메뉴 전체 펼치기"
+            title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
+            aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
           >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-7 w-7"
-            onClick={() => {
-              setMenuControlMode("collapse");
-              setMenuControlVersion((prev) => prev + 1);
-            }}
-            title="메뉴 전체 접기"
-            aria-label="메뉴 전체 접기"
-          >
-            <Minus className="h-3.5 w-3.5" />
+            {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
           </Button>
         </div>
 
