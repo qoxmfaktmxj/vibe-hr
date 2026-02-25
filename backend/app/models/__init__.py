@@ -33,6 +33,11 @@ from app.models.entities import (
     HriRequestHistory,
     HriRequestAttachment,
     HriRequestCounter,
+    TimSchedulePattern,
+    TimSchedulePatternDay,
+    TimDepartmentScheduleAssignment,
+    TimEmployeeScheduleException,
+    TimEmployeeDailySchedule,
 )
 
 __all__ = [
@@ -70,5 +75,10 @@ __all__ = [
     "HriRequestHistory",
     "HriRequestAttachment",
     "HriRequestCounter",
+    "TimSchedulePattern",
+    "TimSchedulePatternDay",
+    "TimDepartmentScheduleAssignment",
+    "TimEmployeeScheduleException",
+    "TimEmployeeDailySchedule",
 ]
 

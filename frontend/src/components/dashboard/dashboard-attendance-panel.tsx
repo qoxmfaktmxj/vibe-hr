@@ -31,7 +31,11 @@ function fmtDateTime(value: string | null) {
   return new Date(value).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
 }
 
-export function DashboardAttendancePanel() {
+type DashboardAttendancePanelProps = {
+  compact?: boolean;
+};
+
+export function DashboardAttendancePanel({ compact = false }: DashboardAttendancePanelProps) {
   const [clock, setClock] = useState(getKoreaDateTime());
   const { data, isLoading } = useSWR<TimTodayScheduleResponse>("/api/tim/attendance-daily/today-schedule", fetcher, {
     revalidateOnFocus: false,
@@ -88,7 +92,7 @@ export function DashboardAttendancePanel() {
         : "근무일";
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className={`rounded-xl border bg-card p-4 ${compact ? "h-full" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs text-muted-foreground">대한민국 표준시 (KST)</p>

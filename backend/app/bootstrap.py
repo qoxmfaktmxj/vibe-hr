@@ -37,6 +37,9 @@ from app.models import (
     HriApprovalLineStep,
     HriFormTypeApprovalMap,
     HriApprovalActorRule,
+    TimSchedulePattern,
+    TimSchedulePatternDay,
+    TimDepartmentScheduleAssignment,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -1100,6 +1103,67 @@ def ensure_work_schedule_codes(session: Session) -> None:
     session.commit()
 
 
+def ensure_schedule_foundations(session: Session) -> None:
+    pattern = session.exec(select(TimSchedulePattern).where(TimSchedulePattern.code == "PTN_DEPT_STD")).first()
+    if pattern is None:
+        pattern = TimSchedulePattern(code="PTN_DEPT_STD", name="부서기본(월~금 09-18)", is_active=True)
+        session.add(pattern)
+        session.commit()
+        session.refresh(pattern)
+
+    day_map = {
+        0: (True, "09:00", "18:00", 60, 480, False),
+        1: (True, "09:00", "18:00", 60, 480, False),
+        2: (True, "09:00", "18:00", 60, 480, False),
+        3: (True, "09:00", "18:00", 60, 480, False),
+        4: (True, "09:00", "18:00", 60, 480, False),
+        5: (False, None, None, 0, 0, False),
+        6: (False, None, None, 0, 0, False),
+    }
+    for weekday, (is_workday, start, end, break_min, expected, overnight) in day_map.items():
+        existing = session.exec(
+            select(TimSchedulePatternDay).where(
+                TimSchedulePatternDay.pattern_id == pattern.id,
+                TimSchedulePatternDay.weekday == weekday,
+            )
+        ).first()
+        if existing is None:
+            session.add(
+                TimSchedulePatternDay(
+                    pattern_id=pattern.id,
+                    weekday=weekday,
+                    is_workday=is_workday,
+                    start_time=start,
+                    end_time=end,
+                    break_minutes=break_min,
+                    expected_minutes=expected,
+                    is_overnight=overnight,
+                )
+            )
+
+    departments = session.exec(select(OrgDepartment)).all()
+    for dept in departments:
+        existing = session.exec(
+            select(TimDepartmentScheduleAssignment).where(
+                TimDepartmentScheduleAssignment.department_id == dept.id,
+                TimDepartmentScheduleAssignment.is_active == True,
+            )
+        ).first()
+        if existing is None:
+            session.add(
+                TimDepartmentScheduleAssignment(
+                    department_id=dept.id,
+                    pattern_id=pattern.id,
+                    effective_from=date(2026, 1, 1),
+                    effective_to=None,
+                    priority=100,
+                    is_active=True,
+                )
+            )
+
+    session.commit()
+
+
 def ensure_holidays(session: Session) -> None:
     for holiday_date, name, holiday_type in HOLIDAY_SEEDS:
         existing = session.exec(select(TimHoliday).where(TimHoliday.holiday_date == holiday_date)).first()
@@ -1601,6 +1665,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_hr_basic_seed_data(session)
     ensure_attendance_codes(session)
     ensure_work_schedule_codes(session)
+    ensure_schedule_foundations(session)
     ensure_holidays(session)
     ensure_annual_leave_seed(session)
     ensure_pay_payroll_codes(session)

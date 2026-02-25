@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
-from app.models import AuthUser, HrEmployee, TimHoliday, TimWorkScheduleCode
+from app.models import AuthUser, HrEmployee, TimEmployeeDailySchedule, TimHoliday, TimSchedulePattern, TimWorkScheduleCode
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionListResponse,
     TimAttendanceCorrectRequest,
@@ -75,6 +75,15 @@ def attendance_today_schedule(
     today = date.today()
 
     holiday = session.exec(select(TimHoliday).where(TimHoliday.holiday_date == today)).first()
+    daily = session.exec(
+        select(TimEmployeeDailySchedule).where(
+            TimEmployeeDailySchedule.employee_id == target_employee_id,
+            TimEmployeeDailySchedule.work_date == today,
+        )
+    ).first()
+
+    pattern = session.get(TimSchedulePattern, daily.pattern_id) if daily and daily.pattern_id else None
+
     default_schedule = session.exec(
         select(TimWorkScheduleCode)
         .where(TimWorkScheduleCode.is_active == True)
@@ -98,19 +107,23 @@ def attendance_today_schedule(
     day_type = "weekend" if is_weekend else "workday"
     if holiday is not None:
         day_type = "holiday"
+    if daily is not None:
+        day_type = "holiday" if daily.is_holiday else ("workday" if daily.is_workday else "weekend")
 
     attendance = get_today_attendance(session, target_employee_id)
+    work_start = daily.planned_start_at.strftime("%H:%M") if daily and daily.planned_start_at else default_schedule.work_start
+    work_end = daily.planned_end_at.strftime("%H:%M") if daily and daily.planned_end_at else default_schedule.work_end
     schedule = TimTodayScheduleItem(
         work_date=today,
         day_type=day_type,
-        schedule_code=default_schedule.code,
-        schedule_name=default_schedule.name,
-        work_start=default_schedule.work_start,
-        work_end=default_schedule.work_end,
-        break_minutes=default_schedule.break_minutes,
-        work_hours=default_schedule.work_hours,
-        is_holiday=holiday is not None,
-        holiday_name=holiday.name if holiday is not None else None,
+        schedule_code=pattern.code if pattern else default_schedule.code,
+        schedule_name=pattern.name if pattern else default_schedule.name,
+        work_start=work_start,
+        work_end=work_end,
+        break_minutes=daily.break_minutes if daily else default_schedule.break_minutes,
+        work_hours=((daily.expected_minutes if daily else int(default_schedule.work_hours * 60)) / 60),
+        is_holiday=daily.is_holiday if daily is not None else holiday is not None,
+        holiday_name=daily.holiday_name if daily is not None else (holiday.name if holiday is not None else None),
     )
     return TimTodayScheduleResponse(schedule=schedule, attendance=attendance)
 

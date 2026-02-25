@@ -692,3 +692,93 @@ class HriRequestCounter(SQLModel, table=True):
     counter_key: str = Field(primary_key=True, max_length=80)
     last_seq: int = Field(default=0)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimSchedulePattern(SQLModel, table=True):
+    __tablename__ = "tim_schedule_patterns"
+    __table_args__ = (UniqueConstraint("code", name="uq_tim_schedule_patterns_code"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=40, index=True)
+    name: str = Field(max_length=120)
+    description: Optional[str] = Field(default=None, max_length=255)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimSchedulePatternDay(SQLModel, table=True):
+    __tablename__ = "tim_schedule_pattern_days"
+    __table_args__ = (
+        UniqueConstraint("pattern_id", "weekday", name="uq_tim_schedule_pattern_days_pattern_weekday"),
+        CheckConstraint("weekday BETWEEN 0 AND 6", name="ck_tim_schedule_pattern_days_weekday"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pattern_id: int = Field(foreign_key="tim_schedule_patterns.id", index=True)
+    weekday: int = Field(default=0)
+    is_workday: bool = Field(default=True)
+    start_time: Optional[str] = Field(default=None, max_length=5)
+    end_time: Optional[str] = Field(default=None, max_length=5)
+    break_minutes: int = Field(default=60)
+    expected_minutes: int = Field(default=480)
+    is_overnight: bool = Field(default=False)
+
+
+class TimDepartmentScheduleAssignment(SQLModel, table=True):
+    __tablename__ = "tim_department_schedule_assignments"
+    __table_args__ = (
+        Index("ix_tim_department_schedule_assignments_dept_date", "department_id", "effective_from", "effective_to"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    department_id: int = Field(foreign_key="org_departments.id", index=True)
+    pattern_id: int = Field(foreign_key="tim_schedule_patterns.id")
+    effective_from: date = Field(index=True)
+    effective_to: Optional[date] = Field(default=None, index=True)
+    priority: int = Field(default=100)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimEmployeeScheduleException(SQLModel, table=True):
+    __tablename__ = "tim_employee_schedule_exceptions"
+    __table_args__ = (
+        Index("ix_tim_employee_schedule_exceptions_emp_date", "employee_id", "effective_from", "effective_to"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    pattern_id: int = Field(foreign_key="tim_schedule_patterns.id")
+    effective_from: date = Field(index=True)
+    effective_to: Optional[date] = Field(default=None, index=True)
+    reason: Optional[str] = Field(default=None, max_length=255)
+    priority: int = Field(default=1000)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimEmployeeDailySchedule(SQLModel, table=True):
+    __tablename__ = "tim_employee_daily_schedules"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "work_date", name="uq_tim_employee_daily_schedules_employee_work_date"),
+        Index("ix_tim_employee_daily_schedules_work_date", "work_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    work_date: date = Field(index=True)
+    schedule_source: str = Field(max_length=30, default="department_default")
+    pattern_id: Optional[int] = Field(default=None, foreign_key="tim_schedule_patterns.id")
+    is_holiday: bool = Field(default=False)
+    holiday_name: Optional[str] = Field(default=None, max_length=120)
+    is_workday: bool = Field(default=True)
+    planned_start_at: Optional[datetime] = None
+    planned_end_at: Optional[datetime] = None
+    break_minutes: int = Field(default=60)
+    expected_minutes: int = Field(default=480)
+    is_overnight: bool = Field(default=False)
+    generated_at: datetime = Field(default_factory=utc_now)
+    version_tag: Optional[str] = Field(default=None, max_length=50)
