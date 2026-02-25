@@ -62,7 +62,12 @@ export function AppShell({ title, description, children }: AppShellProps) {
     try {
       const parsed = JSON.parse(raw) as OpenTab[];
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((tab) => typeof tab.path === "string" && typeof tab.label === "string");
+      return parsed.filter(
+        (tab) =>
+          typeof tab.path === "string" &&
+          typeof tab.label === "string" &&
+          tab.path !== "/dashboard",
+      );
     } catch {
       return [];
     }
@@ -83,7 +88,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
       label: resolveLabel(tab.path),
     }));
 
-    if (!pathname || pathname === "/login" || pathname === "/unauthorized") {
+    if (!pathname || pathname === "/login" || pathname === "/unauthorized" || pathname === "/dashboard") {
       return normalized.slice(-MAX_OPEN_TABS);
     }
 
