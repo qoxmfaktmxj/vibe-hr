@@ -224,31 +224,33 @@ export function DashboardSidebar() {
 
   const sidebarContent = (
     <>
-      <div className="flex items-center gap-3 p-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-          <CalendarCheck2 className="h-5 w-5" aria-hidden="true" />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-3 p-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
+            <CalendarCheck2 className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
+            <p className="text-xs text-[var(--vibe-accent-muted)]">인사 관리 시스템</p>
+          </div>
         </div>
-        <div>
-          <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
-          <p className="text-xs text-[var(--vibe-accent-muted)]">인사 관리 시스템</p>
-        </div>
+
+        <nav className="mt-4 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
+          {menus.map((node) =>
+            node.children.length > 0 ? (
+              <MenuGroupItem key={node.code} node={node} currentPath={pathname} />
+            ) : (
+              <MenuLeafItem
+                key={node.code}
+                node={node}
+                isActive={node.path ? pathname.startsWith(node.path) : false}
+              />
+            ),
+          )}
+        </nav>
       </div>
 
-      <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
-        {menus.map((node) =>
-          node.children.length > 0 ? (
-            <MenuGroupItem key={node.code} node={node} currentPath={pathname} />
-          ) : (
-            <MenuLeafItem
-              key={node.code}
-              node={node}
-              isActive={node.path ? pathname.startsWith(node.path) : false}
-            />
-          ),
-        )}
-      </nav>
-
-      <div className="border-t border-gray-100 p-4">
+      <div className="shrink-0 border-t border-gray-200 bg-[var(--vibe-sidebar-bg)] p-4">
         <button
           type="button"
           className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-white"
