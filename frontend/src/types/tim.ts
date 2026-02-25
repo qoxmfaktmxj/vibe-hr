@@ -146,3 +146,49 @@ export type TimHolidayCopyYearResponse = {
   copied_count: number;
   year_to: number;
 };
+
+// ── 일상근태 (Phase 2) ──
+export type TimAttendanceDailyItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department_id: number;
+  department_name: string;
+  work_date: string;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  worked_minutes: number | null;
+  attendance_status: "present" | "late" | "absent" | "leave" | "remote";
+};
+
+export type TimAttendanceDailyListResponse = {
+  items: TimAttendanceDailyItem[];
+  total_count: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+};
+
+export type TimAttendanceTodayResponse = {
+  item: TimAttendanceDailyItem | null;
+};
+
+export type TimAttendanceCorrectionItem = {
+  id: number;
+  attendance_id: number;
+  corrected_by_employee_id: number;
+  old_status: string;
+  new_status: string;
+  old_check_in_at: string | null;
+  new_check_in_at: string | null;
+  old_check_out_at: string | null;
+  new_check_out_at: string | null;
+  reason: string;
+  corrected_at: string;
+};
+
+export type TimAttendanceCorrectionListResponse = {
+  corrections: TimAttendanceCorrectionItem[];
+  total_count: number;
+};

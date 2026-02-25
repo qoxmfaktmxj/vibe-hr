@@ -13,6 +13,7 @@ from app.models.entities import (
     HrLeaveRequest,
     OrgDepartment,
     TimAttendanceCode,
+    TimAttendanceCorrection,
     TimHoliday,
     TimWorkScheduleCode,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "HrAttendanceDaily",
     "HrLeaveRequest",
     "TimAttendanceCode",
+    "TimAttendanceCorrection",
     "TimWorkScheduleCode",
     "TimHoliday",
 ]

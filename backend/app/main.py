@@ -14,6 +14,7 @@ from app.api.hr_basic import router as hr_basic_router
 from app.api.tim_attendance_code import router as tim_attendance_code_router
 from app.api.tim_work_schedule import router as tim_work_schedule_router
 from app.api.tim_holiday import router as tim_holiday_router
+from app.api.tim_attendance_daily import router as tim_attendance_daily_router
 from app.bootstrap import seed_initial_data
 from app.core.config import settings
 from app.core.database import engine, init_db
@@ -52,6 +53,7 @@ app.include_router(hr_basic_router, prefix="/api/v1")
 app.include_router(tim_attendance_code_router, prefix="/api/v1")
 app.include_router(tim_work_schedule_router, prefix="/api/v1")
 app.include_router(tim_holiday_router, prefix="/api/v1")
+app.include_router(tim_attendance_daily_router, prefix="/api/v1")
 
 
 @app.get("/health")

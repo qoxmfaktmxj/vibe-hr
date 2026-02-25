@@ -221,6 +221,25 @@ class HrLeaveRequest(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class TimAttendanceCorrection(SQLModel, table=True):
+    __tablename__ = "tim_attendance_corrections"
+    __table_args__ = (
+        Index("ix_tim_attendance_corrections_attendance", "attendance_id", "corrected_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    attendance_id: int = Field(foreign_key="tim_attendance_daily.id", index=True)
+    corrected_by_employee_id: int = Field(foreign_key="hr_employees.id")
+    old_status: str = Field(max_length=20)
+    new_status: str = Field(max_length=20)
+    old_check_in_at: Optional[datetime] = None
+    new_check_in_at: Optional[datetime] = None
+    old_check_out_at: Optional[datetime] = None
+    new_check_out_at: Optional[datetime] = None
+    reason: str = Field(max_length=500)
+    corrected_at: datetime = Field(default_factory=utc_now)
+
+
 class TimAttendanceCode(SQLModel, table=True):
     """근태코드 마스터 (연차, 반차, 병가, 출장, 재택 등)"""
 
