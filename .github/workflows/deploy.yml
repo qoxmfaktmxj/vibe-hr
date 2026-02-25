@@ -57,5 +57,10 @@ jobs:
               echo "[warn] .env.deploy.secret not found. creating empty file (fill secrets on server)."
               touch .env.deploy.secret
             fi
-            docker compose -f docker-compose.deploy.yml up -d --build
+
+            # 이전 중단/실패 배포에서 남은 stale container reference 정리
+            docker compose -f docker-compose.deploy.yml down --remove-orphans || true
+            docker rm -f vibehr-backend vibehr-frontend 2>/dev/null || true
+
+            docker compose -f docker-compose.deploy.yml up -d --build --force-recreate
             docker compose -f docker-compose.deploy.yml ps
