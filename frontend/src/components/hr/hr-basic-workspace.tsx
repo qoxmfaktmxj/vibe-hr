@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 
 import { HrBasicTabs } from "@/components/hr/hr-basic-tabs";
@@ -16,32 +16,29 @@ export function HrBasicWorkspace() {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
-  const employees = employeeData?.employees ?? [];
+  const employees = useMemo(() => employeeData?.employees ?? [], [employeeData?.employees]);
+  const resolvedEmployeeId = selectedEmployeeId ?? employees[0]?.id ?? null;
 
-  useEffect(() => {
-    if (!selectedEmployeeId && employees.length > 0) setSelectedEmployeeId(employees[0].id);
-  }, [employees, selectedEmployeeId]);
-
-  const detailKey = selectedEmployeeId ? `/api/hr/basic/${selectedEmployeeId}` : null;
+  const detailKey = resolvedEmployeeId ? `/api/hr/basic/${resolvedEmployeeId}` : null;
   const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 20_000,
   });
 
   const selectedEmployee = useMemo(
-    () => employees.find((item) => item.id === selectedEmployeeId) ?? null,
-    [employees, selectedEmployeeId],
+    () => employees.find((item) => item.id === resolvedEmployeeId) ?? null,
+    [employees, resolvedEmployeeId],
   );
 
   return (
     <>
       <HrEmployeeHeader
         employees={employees}
-        selectedEmployeeId={selectedEmployeeId}
+        selectedEmployeeId={resolvedEmployeeId}
         onSelectEmployee={setSelectedEmployeeId}
       />
       <HrBasicTabs
-        employeeId={selectedEmployeeId}
+        employeeId={resolvedEmployeeId}
         onReload={async () => {
           if (!detailKey) return;
           await mutate(detailKey);

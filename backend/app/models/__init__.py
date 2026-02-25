@@ -10,9 +10,11 @@ from app.models.entities import (
     HrEmployee,
     HrEmployeeBasicProfile,
     HrEmployeeInfoRecord,
+    HrAnnualLeave,
     HrLeaveRequest,
     OrgDepartment,
     TimAttendanceCode,
+    TimAttendanceCorrection,
     TimHoliday,
     TimWorkScheduleCode,
 )
@@ -30,8 +32,10 @@ __all__ = [
     "HrEmployeeBasicProfile",
     "HrEmployeeInfoRecord",
     "HrAttendanceDaily",
+    "HrAnnualLeave",
     "HrLeaveRequest",
     "TimAttendanceCode",
+    "TimAttendanceCorrection",
     "TimWorkScheduleCode",
     "TimHoliday",
 ]

@@ -146,3 +146,125 @@ export type TimHolidayCopyYearResponse = {
   copied_count: number;
   year_to: number;
 };
+
+// ── 일상근태 (Phase 2) ──
+export type TimAttendanceDailyItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department_id: number;
+  department_name: string;
+  work_date: string;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  worked_minutes: number | null;
+  attendance_status: "present" | "late" | "absent" | "leave" | "remote";
+};
+
+export type TimAttendanceDailyListResponse = {
+  items: TimAttendanceDailyItem[];
+  total_count: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+};
+
+export type TimAttendanceTodayResponse = {
+  item: TimAttendanceDailyItem | null;
+};
+
+export type TimAttendanceCorrectionItem = {
+  id: number;
+  attendance_id: number;
+  corrected_by_employee_id: number;
+  old_status: string;
+  new_status: string;
+  old_check_in_at: string | null;
+  new_check_in_at: string | null;
+  old_check_out_at: string | null;
+  new_check_out_at: string | null;
+  reason: string;
+  corrected_at: string;
+};
+
+export type TimAttendanceCorrectionListResponse = {
+  corrections: TimAttendanceCorrectionItem[];
+  total_count: number;
+};
+
+// ── 휴가관리 (Phase 3) ──
+export type TimAnnualLeaveItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  year: number;
+  granted_days: number;
+  used_days: number;
+  carried_over_days: number;
+  remaining_days: number;
+  grant_type: string;
+  note: string | null;
+};
+
+export type TimAnnualLeaveResponse = {
+  item: TimAnnualLeaveItem;
+};
+
+export type TimLeaveRequestItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department_name: string;
+  leave_type: "annual" | "sick" | "half_day" | "unpaid" | "other";
+  start_date: string;
+  end_date: string;
+  leave_days: number;
+  reason: string | null;
+  request_status: "pending" | "approved" | "rejected" | "cancelled";
+  approver_employee_id: number | null;
+  approved_at: string | null;
+  created_at: string;
+};
+
+export type TimLeaveRequestListResponse = {
+  items: TimLeaveRequestItem[];
+  total_count: number;
+};
+
+// ── 근태 리포트 (Phase 4) ──
+export type TimStatusCount = {
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  remote: number;
+};
+
+export type TimDepartmentSummaryItem = {
+  department_id: number;
+  department_name: string;
+  attendance_count: number;
+  present_rate: number;
+  late_rate: number;
+  absent_rate: number;
+};
+
+export type TimLeaveTypeSummaryItem = {
+  leave_type: string;
+  request_count: number;
+  approved_count: number;
+  pending_count: number;
+};
+
+export type TimReportSummaryResponse = {
+  start_date: string;
+  end_date: string;
+  total_attendance_records: number;
+  total_leave_requests: number;
+  status_counts: TimStatusCount;
+  department_summaries: TimDepartmentSummaryItem[];
+  leave_type_summaries: TimLeaveTypeSummaryItem[];
+};
