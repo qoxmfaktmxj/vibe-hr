@@ -116,7 +116,7 @@ DEPARTMENT_SEEDS = [
 MENU_TREE: list[dict] = [
     {
         "code": "dashboard",
-        "name": "\uB300\uC2DC\uBCF4\uB4DC",
+        "name": "대시보드",
         "path": "/dashboard",
         "icon": "LayoutDashboard",
         "sort_order": 100,
@@ -125,157 +125,163 @@ MENU_TREE: list[dict] = [
     },
     {
         "code": "hr",
-        "name": "\uC778\uC0AC",
+        "name": "인사",
         "path": None,
         "icon": "UsersRound",
         "sort_order": 200,
         "roles": ["hr_manager", "admin"],
         "children": [
             {
-                "code": "hr.basic",
-                "name": "\uC778\uC0AC\uAE30\uBCF8",
-                "path": "/hr/basic",
-                "icon": "UserRound",
-                "sort_order": 205,
-                "roles": ["hr_manager", "admin"],
-            },
-            {
-                "code": "hr.employee",
-                "name": "\uC0AC\uC6D0\uAD00\uB9AC",
-                "path": "/hr/employee",
-                "icon": "UserRound",
-                "sort_order": 210,
-                "roles": ["hr_manager", "admin"],
-            },
-            {
-                "code": "hr.admin",
-                "name": "\uC778\uC0AC\uAD00\uB9AC\uC790",
+                "code": "hr.info",
+                "name": "인사정보",
                 "path": None,
-                "icon": "UsersRound",
-                "sort_order": 230,
+                "icon": "UserRound",
+                "sort_order": 201,
                 "roles": ["hr_manager", "admin"],
                 "children": [
-                    {"code": "hr.admin.appointments", "name": "\uBC1C\uB839\uAD00\uB9AC", "path": "/hr/admin/appointments", "icon": "UserRound", "sort_order": 231, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.rewards", "name": "\uC0C1\uBC8C\uAD00\uB9AC", "path": "/hr/admin/rewards", "icon": "UserRound", "sort_order": 232, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.contacts", "name": "\uC8FC\uC18C\uC5F0\uB77D\uCC98\uAD00\uB9AC", "path": "/hr/admin/contacts", "icon": "UserRound", "sort_order": 233, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.educations", "name": "\uD559\uB825\uAD00\uB9AC", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 234, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.careers", "name": "\uACBD\uB825\uAD00\uB9AC", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 235, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.certificates", "name": "\uC790\uACA9\uC99D\uAD00\uB9AC", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 236, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.military", "name": "\uBCD1\uC5ED\uAD00\uB9AC", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 237, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.evaluations", "name": "\uD3C9\uAC00\uAD00\uB9AC", "path": "/hr/admin/evaluations", "icon": "UserRound", "sort_order": 238, "roles": ["hr_manager", "admin"]}
+                    {
+                        "code": "hr.basic",
+                        "name": "인사기본",
+                        "path": "/hr/basic",
+                        "icon": "UserRound",
+                        "sort_order": 202,
+                        "roles": ["hr_manager", "admin"],
+                    },
+                    {
+                        "code": "hr.employee",
+                        "name": "사원관리",
+                        "path": "/hr/employee",
+                        "icon": "UserRound",
+                        "sort_order": 203,
+                        "roles": ["hr_manager", "admin"],
+                    },
+                    {
+                        "code": "hr.admin",
+                        "name": "인사관리",
+                        "path": None,
+                        "icon": "UsersRound",
+                        "sort_order": 204,
+                        "roles": ["hr_manager", "admin"],
+                        "children": [
+                            {"code": "hr.admin.appointments", "name": "발령관리", "path": "/hr/admin/appointments", "icon": "UserRound", "sort_order": 205, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.rewards", "name": "상벌관리", "path": "/hr/admin/rewards", "icon": "UserRound", "sort_order": 206, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.contacts", "name": "주소연락처관리", "path": "/hr/admin/contacts", "icon": "UserRound", "sort_order": 207, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.educations", "name": "학력관리", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 208, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.careers", "name": "경력관리", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 209, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.certificates", "name": "자격증관리", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 210, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.military", "name": "병역관리", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 211, "roles": ["hr_manager", "admin"]},
+                            {"code": "hr.admin.evaluations", "name": "평가관리", "path": "/hr/admin/evaluations", "icon": "UserRound", "sort_order": 212, "roles": ["hr_manager", "admin"]}
+                        ],
+                    },
                 ],
             },
         ],
     },
     {
         "code": "org",
-        "name": "\uC870\uC9C1",
+        "name": "조직",
         "path": None,
         "icon": "Building2",
-        "sort_order": 210,
+        "sort_order": 300,
         "roles": ["hr_manager", "admin"],
         "children": [
             {
-                "code": "org.departments",
-                "name": "\uC870\uC9C1\uCF54\uB4DC\uAD00\uB9AC",
-                "path": "/org/departments",
+                "code": "org.manage",
+                "name": "조직관리",
+                "path": None,
                 "icon": "FolderTree",
-                "sort_order": 211,
+                "sort_order": 301,
                 "roles": ["hr_manager", "admin"],
+                "children": [
+                    {"code": "org.corporations", "name": "법인관리", "path": "/org/corporations", "icon": "Building2", "sort_order": 302, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.departments", "name": "조직코드관리", "path": "/org/departments", "icon": "FolderTree", "sort_order": 303, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.chart", "name": "조직도관리", "path": "/org/chart", "icon": "FolderTree", "sort_order": 304, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.types", "name": "조직구분", "path": "/org/types", "icon": "FolderTree", "sort_order": 305, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.type-items", "name": "조직구분항목", "path": "/org/type-items", "icon": "FolderTree", "sort_order": 306, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.type-upload", "name": "조직구분업로드", "path": "/org/type-upload", "icon": "FolderTree", "sort_order": 307, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.type-personal-status", "name": "조직구분개인별현황", "path": "/org/type-personal-status", "icon": "FolderTree", "sort_order": 308, "roles": ["hr_manager", "admin"]}
+                ],
             },
         ],
     },
     {
         "code": "tim",
-        "name": "\uADFC\uD0DC",
+        "name": "근태",
         "path": None,
         "icon": "Clock",
-        "sort_order": 220,
+        "sort_order": 400,
         "roles": ["employee", "hr_manager", "admin"],
         "children": [
             {
-                "code": "hr.attendance",
-                "name": "\uADFC\uD0DC\uCF54\uB4DC\uAD00\uB9AC",
-                "path": "/tim/codes",
+                "code": "tim.base",
+                "name": "근태기준관리",
+                "path": None,
                 "icon": "CalendarCheck2",
-                "sort_order": 221,
+                "sort_order": 401,
                 "roles": ["hr_manager", "admin"],
-            },
-            {
-                "code": "hr.leave",
-                "name": "\uD734\uC77C\uAD00\uB9AC",
-                "path": "/tim/holidays",
-                "icon": "CalendarDays",
-                "sort_order": 222,
-                "roles": ["hr_manager", "admin"],
+                "children": [
+                    {"code": "hr.leave", "name": "공휴일관리", "path": "/tim/holidays", "icon": "CalendarDays", "sort_order": 402, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.attendance", "name": "근태코드관리", "path": "/tim/codes", "icon": "CalendarCheck2", "sort_order": 403, "roles": ["hr_manager", "admin"]},
+                    {"code": "tim.work-codes", "name": "근무코드관리", "path": "/tim/work-codes", "icon": "Clock", "sort_order": 404, "roles": ["hr_manager", "admin"]}
+                ],
             },
         ],
     },
     {
         "code": "payroll",
-        "name": "\uAE09\uC5EC",
+        "name": "급여",
         "path": None,
         "icon": "Wallet",
-        "sort_order": 300,
+        "sort_order": 500,
         "roles": ["payroll_mgr", "admin"],
         "children": [
             {
-                "code": "payroll.calc",
-                "name": "\uAE09\uC5EC\uACC4\uC0B0",
-                "path": "/payroll/calc",
+                "code": "payroll.base",
+                "name": "급여기준관리",
+                "path": None,
                 "icon": "Calculator",
-                "sort_order": 310,
+                "sort_order": 501,
                 "roles": ["payroll_mgr", "admin"],
-            },
-            {
-                "code": "payroll.slip",
-                "name": "\uAE09\uC5EC\uBA85\uC138\uC11C",
-                "path": "/payroll/slip",
-                "icon": "FileText",
-                "sort_order": 320,
-                "roles": ["employee", "payroll_mgr", "admin"],
+                "children": [
+                    {"code": "payroll.allowance-deduction-items", "name": "수당공제항목관리", "path": "/payroll/allowance-deduction-items", "icon": "Calculator", "sort_order": 502, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.item-groups", "name": "항목그룹관리", "path": "/payroll/item-groups", "icon": "Calculator", "sort_order": 503, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.codes", "name": "급여코드관리", "path": "/payroll/codes", "icon": "Calculator", "sort_order": 504, "roles": ["payroll_mgr", "admin"]}
+                ],
             },
         ],
     },
     {
         "code": "settings",
-        "name": "\uC2DC\uC2A4\uD15C",
+        "name": "시스템",
         "path": None,
         "icon": "Settings",
         "sort_order": 900,
         "roles": ["admin"],
         "children": [
             {
-                "code": "settings.roles",
-                "name": "\uAD8C\uD55C\uAD00\uB9AC",
-                "path": "/settings/roles",
+                "code": "settings.base",
+                "name": "시스템기준관리",
+                "path": None,
+                "icon": "Settings",
+                "sort_order": 901,
+                "roles": ["admin"],
+                "children": [
+                    {"code": "settings.menus", "name": "메뉴관리", "path": "/settings/menus", "icon": "PanelLeft", "sort_order": 902, "roles": ["admin"]},
+                    {"code": "settings.common-codes", "name": "공통코드관리", "path": "/settings/common-codes", "icon": "ListOrdered", "sort_order": 903, "roles": ["admin"]}
+                ],
+            },
+            {
+                "code": "settings.auth",
+                "name": "권한",
+                "path": None,
                 "icon": "Shield",
                 "sort_order": 910,
                 "roles": ["admin"],
-            },
-            {
-                "code": "settings.permissions",
-                "name": "\uBA54\uB274\uAD8C\uD55C\uAD00\uB9AC",
-                "path": "/settings/permissions",
-                "icon": "Menu",
-                "sort_order": 915,
-                "roles": ["admin"],
-            },
-            {
-                "code": "settings.common-codes",
-                "name": "\uACF5\uD1B5\uCF54\uB4DC\uAD00\uB9AC",
-                "path": "/settings/common-codes",
-                "icon": "ListOrdered",
-                "sort_order": 918,
-                "roles": ["admin"],
-            },
-            {
-                "code": "settings.menus",
-                "name": "\uBA54\uB274\uAD00\uB9AC",
-                "path": "/settings/menus",
-                "icon": "PanelLeft",
-                "sort_order": 920,
-                "roles": ["admin"],
+                "children": [
+                    {"code": "settings.roles", "name": "권한관리", "path": "/settings/roles", "icon": "Shield", "sort_order": 911, "roles": ["admin"]},
+                    {"code": "settings.permissions", "name": "메뉴권한관리", "path": "/settings/permissions", "icon": "Menu", "sort_order": 912, "roles": ["admin"]},
+                    {"code": "settings.users", "name": "사용자관리", "path": "/settings/users", "icon": "UserRound", "sort_order": 913, "roles": ["admin"]}
+                ],
             },
         ],
     },
@@ -702,6 +708,9 @@ def _get_or_create_menu(
     if menu.sort_order != sort_order:
         menu.sort_order = sort_order
         changed = True
+    if not menu.is_active:
+        menu.is_active = True
+        changed = True
 
     if changed:
         session.add(menu)
@@ -723,7 +732,10 @@ def _link_menu_roles(session: Session, menu: AppMenu, role_codes: list[str]) -> 
 
 
 def ensure_menus(session: Session) -> None:
+    seeded_codes: set[str] = set()
+
     def _upsert(node: dict, parent_id: int | None = None) -> None:
+        seeded_codes.add(node["code"])
         menu = _get_or_create_menu(
             session,
             code=node["code"],
@@ -740,6 +752,17 @@ def ensure_menus(session: Session) -> None:
 
     for top in MENU_TREE:
         _upsert(top)
+
+    # Seed source-of-truth 기준으로 미사용 메뉴 비활성화
+    all_menus = session.exec(select(AppMenu)).all()
+    changed = False
+    for menu in all_menus:
+        if menu.code not in seeded_codes and menu.is_active:
+            menu.is_active = False
+            session.add(menu)
+            changed = True
+    if changed:
+        session.commit()
 
 
 def ensure_common_codes(session: Session) -> None:
