@@ -32,7 +32,7 @@ def _current_employee(session: Session, current_user: AuthUser) -> HrEmployee:
     return employee
 
 
-@router.get("/annual-leave/{employee_id}", response_model=TimAnnualLeaveResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
+@router.get("/annual-leave/employee/{employee_id}", response_model=TimAnnualLeaveResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
 def annual_leave_by_employee(employee_id: int, year: int = Query(default_factory=lambda: date.today().year), session: Session = Depends(get_session)) -> TimAnnualLeaveResponse:
     return TimAnnualLeaveResponse(item=get_or_create_annual_leave(session, employee_id, year))
 

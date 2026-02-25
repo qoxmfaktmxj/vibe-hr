@@ -1172,6 +1172,21 @@ PAY_TAX_RATE_SEEDS = [
     (2025, "고용보험", 0.9, 1.15, None, None),
 ]
 
+PAY_ALLOWANCE_DEDUCTION_SEEDS = [
+    # code, name, type, tax_type, calculation_type, sort_order
+    ("BSC", "기본급", "allowance", "taxable", "fixed", 10),
+    ("MLA", "식대", "allowance", "non-taxable", "fixed", 20),
+    ("PEN", "국민연금", "deduction", "insurance", "formula", 110),
+    ("HIN", "건강보험", "deduction", "insurance", "formula", 120),
+    ("ITX", "소득세", "deduction", "tax", "formula", 130),
+]
+
+PAY_ITEM_GROUP_SEEDS = [
+    # code, name, description
+    ("GR-OFFICE", "사무직 그룹", "사무직 급여 항목 기본 그룹"),
+    ("GR-PROD", "생산직 그룹", "생산직 급여 항목 기본 그룹"),
+]
+
 HRI_FORM_TYPE_SEEDS = [
     # form_code, form_name_ko, module_code, requires_receive, default_priority
     ("CERT_EMPLOYMENT", "재직증명서 신청", "HR", True, 10),
@@ -1270,6 +1285,67 @@ def ensure_pay_payroll_codes(session: Session) -> None:
                 changed = True
             if existing.tax_deductible != tax_ded:
                 existing.tax_deductible = tax_ded
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_pay_allowance_deductions(session: Session) -> None:
+    for code, name, item_type, tax_type, calc_type, sort_order in PAY_ALLOWANCE_DEDUCTION_SEEDS:
+        existing = session.exec(select(PayAllowanceDeduction).where(PayAllowanceDeduction.code == code)).first()
+        if existing is None:
+            session.add(
+                PayAllowanceDeduction(
+                    code=code,
+                    name=name,
+                    type=item_type,
+                    tax_type=tax_type,
+                    calculation_type=calc_type,
+                    is_active=True,
+                    sort_order=sort_order,
+                )
+            )
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.type != item_type:
+                existing.type = item_type
+                changed = True
+            if existing.tax_type != tax_type:
+                existing.tax_type = tax_type
+                changed = True
+            if existing.calculation_type != calc_type:
+                existing.calculation_type = calc_type
+                changed = True
+            if existing.sort_order != sort_order:
+                existing.sort_order = sort_order
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_pay_item_groups(session: Session) -> None:
+    for code, name, description in PAY_ITEM_GROUP_SEEDS:
+        existing = session.exec(select(PayItemGroup).where(PayItemGroup.code == code)).first()
+        if existing is None:
+            session.add(PayItemGroup(code=code, name=name, description=description, is_active=True))
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.description != description:
+                existing.description = description
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
                 changed = True
             if changed:
                 session.add(existing)
@@ -1529,6 +1605,8 @@ def seed_initial_data(session: Session) -> None:
     ensure_annual_leave_seed(session)
     ensure_pay_payroll_codes(session)
     ensure_pay_tax_rates(session)
+    ensure_pay_allowance_deductions(session)
+    ensure_pay_item_groups(session)
     ensure_hri_form_types(session)
     ensure_hri_form_type_policies(session)
     ensure_hri_approval_actor_rules(session)
