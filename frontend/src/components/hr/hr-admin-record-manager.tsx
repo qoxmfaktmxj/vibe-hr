@@ -35,6 +35,7 @@ type SearchFilters = {
   employeeNo: string;
   name: string;
   department: string;
+  employmentStatus: "" | "active" | "leave" | "resigned";
 };
 
 type AdminGridRow = HrInfoRow & {
@@ -48,6 +49,7 @@ const EMPTY_FILTERS: SearchFilters = {
   employeeNo: "",
   name: "",
   department: "",
+  employmentStatus: "",
 };
 
 function pickRows(detail: HrBasicDetailResponse | null, category: Props["category"]): HrInfoRow[] {
@@ -80,6 +82,7 @@ function matches(employee: EmployeeItem, filters: SearchFilters): boolean {
   if (employeeNo && !employee.employee_no.toLowerCase().includes(employeeNo)) return false;
   if (name && !employee.display_name.toLowerCase().includes(name)) return false;
   if (department && !(employee.department_name ?? "").toLowerCase().includes(department)) return false;
+  if (filters.employmentStatus && employee.employment_status !== filters.employmentStatus) return false;
   return true;
 }
 
@@ -89,8 +92,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
   const [rows, setRows] = useState<AdminGridRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [newTitle, setNewTitle] = useState("");
-  const [addEmployeeId, setAddEmployeeId] = useState<number | null>(null);
+  const totalRows = rows.length;
 
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
@@ -164,28 +166,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }, [filteredEmployees, category]);
 
   useEffect(() => {
-    if (employees.length === 0) return;
-    if (addEmployeeId == null) {
-      setAddEmployeeId(employees[0].id);
-    }
-  }, [employees, addEmployeeId]);
-
-  useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  async function addRow() {
-    if (!addEmployeeId) return;
-    const response = await fetch(`/api/hr/basic/${addEmployeeId}/records`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category, title: newTitle || "신규", type: "", note: "" }),
-    });
-    if (!response.ok) return toast.error("추가 실패");
-    setNewTitle("");
-    toast.success("추가 완료");
-    await refresh();
-  }
 
   async function updateRow(row: AdminGridRow) {
     const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, {
@@ -231,7 +213,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
       <div className="rounded-lg border bg-white p-3">
         <h2 className="mb-3 text-lg font-semibold">{title}</h2>
 
-        <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+        <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
           <Input
             value={searchFilters.employeeNo}
             onChange={(event) =>
@@ -260,13 +242,20 @@ export function HrAdminRecordManager({ category, title }: Props) {
               </option>
             ))}
           </select>
+          <select
+            value={searchFilters.employmentStatus}
+            onChange={(event) =>
+              setSearchFilters((prev) => ({ ...prev, employmentStatus: event.target.value as SearchFilters["employmentStatus"] }))
+            }
+            className="h-9 rounded-md border px-2 text-sm"
+          >
+            <option value="">전체 재직상태</option>
+            <option value="active">재직</option>
+            <option value="leave">휴직</option>
+            <option value="resigned">퇴직</option>
+          </select>
           <div className="flex gap-2">
-            <Button
-              onClick={() => setAppliedFilters(searchFilters)}
-              disabled={loading}
-            >
-              조회
-            </Button>
+            <Button onClick={() => setAppliedFilters(searchFilters)} disabled={loading}>조회</Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -280,30 +269,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-          <select
-            value={addEmployeeId ?? ""}
-            onChange={(event) => setAddEmployeeId(Number(event.target.value))}
-            className="h-9 rounded-md border px-2 text-sm"
-          >
-            {filteredEmployees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.employee_no} | {employee.display_name} | {employee.department_name}
-              </option>
-            ))}
-          </select>
-          <Input
-            value={newTitle}
-            onChange={(event) => setNewTitle(event.target.value)}
-            placeholder="신규 제목"
-            className="max-w-xs"
-          />
-          <Button onClick={addRow} disabled={!addEmployeeId}>
-            행 추가
-          </Button>
-          <span className="text-xs text-slate-500">
-            조회 대상: {filteredEmployees.length}명 / 레코드: {rows.length}건
-          </span>
+        <div className="flex items-center border-t pt-3 text-xs text-slate-500">
+          조회 대상: {filteredEmployees.length}명 / 레코드: {totalRows}건
         </div>
       </div>
 

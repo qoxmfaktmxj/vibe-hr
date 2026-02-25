@@ -1,7 +1,9 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +17,12 @@ import type {
   OrganizationDepartmentItem,
   OrganizationDepartmentListResponse,
 } from "@/types/organization";
+
+let registered = false;
+if (!registered) {
+  ModuleRegistry.registerModules([AllCommunityModule]);
+  registered = true;
+}
 
 type DepartmentFormState = {
   code: string;
@@ -44,33 +52,45 @@ export function OrganizationManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
+  const gridApiRef = useRef<GridApi<OrganizationDepartmentItem> | null>(null);
+
   const selectedDepartment = useMemo(
     () => allDepartments.find((department) => department.id === selectedDepartmentId) ?? null,
     [allDepartments, selectedDepartmentId],
   );
 
-  const parentOptions = useMemo(() => {
-    return allDepartments.filter((department) => department.id !== selectedDepartmentId);
-  }, [allDepartments, selectedDepartmentId]);
+  const parentOptions = useMemo(
+    () => allDepartments.filter((department) => department.id !== selectedDepartmentId),
+    [allDepartments, selectedDepartmentId],
+  );
 
-  const fetchDepartments = useCallback(async (filtered: boolean) => {
-    const params = new URLSearchParams();
-    if (filtered && searchCode.trim()) params.set("code", searchCode.trim());
-    if (filtered && searchName.trim()) params.set("name", searchName.trim());
-    if (referenceDate.trim()) params.set("reference_date", referenceDate.trim());
+  const columns: ColDef<OrganizationDepartmentItem>[] = [
+    { field: "code", headerName: "조직코드", flex: 1, minWidth: 160 },
+    { field: "name", headerName: "조직명", flex: 1.3, minWidth: 200 },
+    { field: "parent_name", headerName: "상위조직", flex: 1.2, minWidth: 180 },
+    { field: "is_active", headerName: "사용", width: 100, valueFormatter: (p) => (p.value ? "Y" : "N") },
+    { field: "updated_at", headerName: "수정일", minWidth: 180, valueFormatter: (p) => new Date(p.value).toLocaleString() },
+  ];
 
-    const endpoint = params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
-    const res = await fetch(endpoint, { cache: "no-store" });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(
-        data?.detail ?? "조직 목록을 불러오지 못했습니다.",
-      );
-    }
+  const fetchDepartments = useCallback(
+    async (filtered: boolean) => {
+      const params = new URLSearchParams();
+      if (filtered && searchCode.trim()) params.set("code", searchCode.trim());
+      if (filtered && searchName.trim()) params.set("name", searchName.trim());
+      if (referenceDate.trim()) params.set("reference_date", referenceDate.trim());
 
-    const data = (await res.json()) as OrganizationDepartmentListResponse;
-    return data.departments;
-  }, [referenceDate, searchCode, searchName]);
+      const endpoint = params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
+      const res = await fetch(endpoint, { cache: "no-store" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(data?.detail ?? "조직 목록을 불러오지 못했습니다.");
+      }
+
+      const data = (await res.json()) as OrganizationDepartmentListResponse;
+      return data.departments;
+    },
+    [referenceDate, searchCode, searchName],
+  );
 
   const loadBase = useCallback(async () => {
     setLoading(true);
@@ -81,7 +101,6 @@ export function OrganizationManager() {
       ]);
       setDepartments(filteredDepartments);
       setAllDepartments(fullDepartments);
-
       setSelectedDepartmentId((prev) => {
         if (prev && fullDepartments.some((department) => department.id === prev)) return prev;
         return filteredDepartments[0]?.id ?? null;
@@ -97,11 +116,7 @@ export function OrganizationManager() {
         await loadBase();
       } catch (error) {
         setNoticeType("error");
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : "초기 로딩에 실패했습니다.",
-        );
+        setNotice(error instanceof Error ? error.message : "초기 로딩에 실패했습니다.");
         setLoading(false);
       }
     })();
@@ -112,7 +127,6 @@ export function OrganizationManager() {
       setForm(EMPTY_FORM);
       return;
     }
-
     if (!selectedDepartment) return;
 
     setForm({
@@ -124,21 +138,7 @@ export function OrganizationManager() {
   }, [isCreateMode, selectedDepartment]);
 
   function runSearch() {
-    void (async () => {
-      setLoading(true);
-      try {
-        const filteredDepartments = await fetchDepartments(true);
-        setDepartments(filteredDepartments);
-        setSelectedDepartmentId(filteredDepartments[0]?.id ?? null);
-      } catch (error) {
-        setNoticeType("error");
-        setNotice(
-          error instanceof Error ? error.message : "조회에 실패했습니다.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadBase();
   }
 
   function startCreate() {
@@ -146,6 +146,18 @@ export function OrganizationManager() {
     setSelectedDepartmentId(null);
     setNotice(null);
     setNoticeType(null);
+  }
+
+  function copyDepartment() {
+    if (!selectedDepartment) return;
+    setIsCreateMode(true);
+    setSelectedDepartmentId(null);
+    setForm({
+      code: `${selectedDepartment.code}_COPY`,
+      name: `${selectedDepartment.name} 복사`,
+      parent_id: selectedDepartment.parent_id ? String(selectedDepartment.parent_id) : "",
+      is_active: selectedDepartment.is_active,
+    });
   }
 
   async function saveDepartment() {
@@ -194,9 +206,7 @@ export function OrganizationManager() {
       setNotice("저장이 완료되었습니다.");
     } catch (error) {
       setNoticeType("error");
-      setNotice(
-        error instanceof Error ? error.message : "저장에 실패했습니다.",
-      );
+      setNotice(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -222,17 +232,13 @@ export function OrganizationManager() {
       setNotice("삭제가 완료되었습니다.");
     } catch (error) {
       setNoticeType("error");
-      setNotice(
-        error instanceof Error ? error.message : "삭제에 실패했습니다.",
-      );
+      setNotice(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
-    return <div className="p-6">{"불러오는 중..."}</div>;
-  }
+  if (loading) return <div className="p-6">불러오는 중...</div>;
 
   return (
     <div className="space-y-4 p-6">
@@ -240,148 +246,83 @@ export function OrganizationManager() {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-end gap-3">
             <div className="mr-1 flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Search className="h-4 w-4 text-primary" />
-              Search
+              <Search className="h-4 w-4 text-primary" /> Search
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"조직코드"}</Label>
-              <Input
-                className="h-9 w-36"
-                value={searchCode}
-                onChange={(event) => setSearchCode(event.target.value)}
-              />
+              <Label className="text-xs">조직코드</Label>
+              <Input className="h-9 w-36" value={searchCode} onChange={(event) => setSearchCode(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"조직명"}</Label>
-              <Input
-                className="h-9 w-44"
-                value={searchName}
-                onChange={(event) => setSearchName(event.target.value)}
-              />
+              <Label className="text-xs">조직명</Label>
+              <Input className="h-9 w-44" value={searchName} onChange={(event) => setSearchName(event.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{"기준일자"}</Label>
-              <CustomDatePicker
-                className="w-40"
-                value={referenceDate}
-                onChange={setReferenceDate}
-                holidays={HOLIDAY_DATE_KEYS}
-              />
+              <Label className="text-xs">기준일자</Label>
+              <CustomDatePicker className="w-40" value={referenceDate} onChange={setReferenceDate} holidays={HOLIDAY_DATE_KEYS} />
             </div>
-            <Button variant="query" className="h-9 px-5" onClick={runSearch}>
-              {"조회"}
-            </Button>
+            <Button variant="query" className="h-9 px-5" onClick={runSearch}>조회</Button>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>{"조직코드관리"}</CardTitle>
+          <CardTitle>조직코드관리</CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={startCreate} disabled={saving}>
-              {"입력"}
-            </Button>
-            <Button variant="save" onClick={saveDepartment} disabled={saving}>
-              {"저장"}
-            </Button>
-            <Button variant="destructive" onClick={removeDepartment} disabled={saving || !selectedDepartmentId}>
-              {"삭제"}
-            </Button>
+            <Button variant="outline" onClick={() => gridApiRef.current?.exportDataAsCsv({ fileName: "org-codes.csv" })}>엑셀 다운로드</Button>
+            <Button variant="outline" onClick={copyDepartment} disabled={!selectedDepartmentId || isCreateMode}>복사</Button>
+            <Button variant="outline" onClick={startCreate} disabled={saving}>입력</Button>
+            <Button variant="save" onClick={saveDepartment} disabled={saving}>저장</Button>
+            <Button variant="destructive" onClick={removeDepartment} disabled={saving || !selectedDepartmentId}>삭제</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {notice ? (
-            <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>
-              {notice}
-            </p>
-          ) : null}
+          {notice ? <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p> : null}
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
             <div className="xl:col-span-3">
-              <div className="max-h-[560px] overflow-auto rounded-md border">
-                <table className="w-full min-w-[760px] border-collapse text-sm">
-                  <thead className="sticky top-0 bg-slate-100">
-                    <tr>
-                      <th className="border px-2 py-2 text-center">No</th>
-                      <th className="border px-2 py-2 text-center">{"상태"}</th>
-                      <th className="border px-2 py-2 text-left">{"조직코드"}</th>
-                      <th className="border px-2 py-2 text-left">{"조직명"}</th>
-                      <th className="border px-2 py-2 text-left">{"상위조직"}</th>
-                      <th className="border px-2 py-2 text-center">{"사용여부"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {departments.map((department, index) => {
-                      const selected = !isCreateMode && department.id === selectedDepartmentId;
-                      return (
-                        <tr
-                          key={department.id}
-                          className={`cursor-pointer ${selected ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
-                          onClick={() => {
-                            setIsCreateMode(false);
-                            setSelectedDepartmentId(department.id);
-                            setNotice(null);
-                            setNoticeType(null);
-                          }}
-                        >
-                          <td className="border px-2 py-2 text-center">{index + 1}</td>
-                          <td className="border px-2 py-2 text-center">
-                            {department.is_active
-                              ? "사용"
-                              : "미사용"}
-                          </td>
-                          <td className="border px-2 py-2">{department.code}</td>
-                          <td className="border px-2 py-2">{department.name}</td>
-                          <td className="border px-2 py-2">{department.parent_name ?? "-"}</td>
-                          <td className="border px-2 py-2 text-center">{department.is_active ? "Y" : "N"}</td>
-                        </tr>
-                      );
-                    })}
-                    {departments.length === 0 ? (
-                      <tr>
-                        <td className="border px-2 py-8 text-center text-slate-500" colSpan={6}>
-                          {"조회된 조직이 없습니다."}
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+              <div className="ag-theme-quartz" style={{ height: 560 }}>
+                <AgGridReact<OrganizationDepartmentItem>
+                  rowData={departments}
+                  columnDefs={columns}
+                  getRowId={(params) => String(params.data.id)}
+                  rowSelection={{ mode: "singleRow", checkboxes: false }}
+                  onGridReady={(event) => {
+                    gridApiRef.current = event.api;
+                  }}
+                  onRowClicked={(event) => {
+                    if (!event.data) return;
+                    setIsCreateMode(false);
+                    setSelectedDepartmentId(event.data.id);
+                    setNotice(null);
+                    setNoticeType(null);
+                  }}
+                />
               </div>
             </div>
 
             <div className="xl:col-span-2">
               <div className="space-y-4 rounded-md border p-4">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  {isCreateMode
-                    ? "신규 조직 입력"
-                    : "조직 상세"}
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-700">{isCreateMode ? "신규 조직 입력" : "조직 상세"}</h3>
 
                 <div className="space-y-2">
-                  <Label>{"조직코드"}</Label>
-                  <Input
-                    value={form.code}
-                    onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))}
-                  />
+                  <Label>조직코드</Label>
+                  <Input value={form.code} onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{"조직명"}</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                  />
+                  <Label>조직명</Label>
+                  <Input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{"상위조직"}</Label>
+                  <Label>상위조직</Label>
                   <select
                     className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm"
                     value={form.parent_id}
                     onChange={(event) => setForm((prev) => ({ ...prev, parent_id: event.target.value }))}
                   >
-                    <option value="">{"(최상위)"}</option>
+                    <option value="">(최상위)</option>
                     {parentOptions.map((department) => (
                       <option key={department.id} value={department.id}>
                         {department.name} ({department.code})
@@ -391,23 +332,9 @@ export function OrganizationManager() {
                 </div>
 
                 <label className="flex items-center gap-2 text-sm">
-                  <Checkbox
-                    checked={form.is_active}
-                    onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: Boolean(checked) }))}
-                  />
-                  {"사용여부"}
+                  <Checkbox checked={form.is_active} onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: Boolean(checked) }))} />
+                  사용여부
                 </label>
-
-                {!isCreateMode && selectedDepartment ? (
-                  <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-                    <p>
-                      {"생성일"}: {new Date(selectedDepartment.created_at).toLocaleString()}
-                    </p>
-                    <p>
-                      {"수정일"}: {new Date(selectedDepartment.updated_at).toLocaleString()}
-                    </p>
-                  </div>
-                ) : null}
               </div>
             </div>
           </div>
