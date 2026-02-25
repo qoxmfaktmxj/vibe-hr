@@ -74,6 +74,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
   });
 
   const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
+  const [skipAutoAddPath, setSkipAutoAddPath] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
 
@@ -88,14 +89,20 @@ export function AppShell({ title, description, children }: AppShellProps) {
       label: resolveLabel(tab.path),
     }));
 
-    if (!pathname || pathname === "/login" || pathname === "/unauthorized" || pathname === "/dashboard") {
+    if (
+      !pathname ||
+      pathname === "/login" ||
+      pathname === "/unauthorized" ||
+      pathname === "/dashboard" ||
+      pathname === skipAutoAddPath
+    ) {
       return normalized.slice(-MAX_OPEN_TABS);
     }
 
     const exists = normalized.some((tab) => tab.path === pathname);
     const next = exists ? normalized : [...normalized, { path: pathname, label: resolveLabel(pathname) }];
     return next.slice(-MAX_OPEN_TABS);
-  }, [pathname, resolveLabel, storedTabs]);
+  }, [pathname, resolveLabel, skipAutoAddPath, storedTabs]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -113,9 +120,13 @@ export function AppShell({ title, description, children }: AppShellProps) {
   }
 
   function closeAllTabs() {
+    setSkipAutoAddPath(pathname);
     setStoredTabs([]);
     router.push("/dashboard");
     setContextMenu(null);
+    window.setTimeout(() => {
+      setSkipAutoAddPath(null);
+    }, 0);
   }
 
   function closeLeftTabs(targetPath: string) {
