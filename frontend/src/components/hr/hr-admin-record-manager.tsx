@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ModuleRegistry, AllCommunityModule, type ColDef } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { toast } from "sonner";
+import useSWR, { mutate } from "swr";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { fetcher } from "@/lib/fetcher";
 import type { EmployeeItem } from "@/types/employee";
 import type { HrBasicDetailResponse, HrInfoRow } from "@/types/hr-employee-profile";
 
@@ -17,47 +19,45 @@ if (!registered) {
 }
 
 type Props = {
-  category:
-    | "appointment"
-    | "reward_penalty"
-    | "contact"
-    | "education"
-    | "career"
-    | "certificate"
-    | "military"
-    | "evaluation";
+  category: "appointment" | "reward_penalty" | "contact" | "education" | "career" | "certificate" | "military" | "evaluation";
   title: string;
 };
 
 function pickRows(detail: HrBasicDetailResponse | null, category: Props["category"]): HrInfoRow[] {
   if (!detail) return [];
   switch (category) {
-    case "appointment":
-      return detail.appointments;
-    case "reward_penalty":
-      return detail.rewards_penalties;
-    case "contact":
-      return detail.contacts;
-    case "education":
-      return detail.educations;
-    case "career":
-      return detail.careers;
-    case "certificate":
-      return detail.certificates;
-    case "military":
-      return detail.military;
-    default:
-      return detail.evaluations;
+    case "appointment": return detail.appointments;
+    case "reward_penalty": return detail.rewards_penalties;
+    case "contact": return detail.contacts;
+    case "education": return detail.educations;
+    case "career": return detail.careers;
+    case "certificate": return detail.certificates;
+    case "military": return detail.military;
+    default: return detail.evaluations;
   }
 }
 
 export function HrAdminRecordManager({ category, title }: Props) {
-  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [employeeId, setEmployeeId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<HrBasicDetailResponse | null>(null);
   const [newTitle, setNewTitle] = useState("");
 
-  const rows = useMemo(() => pickRows(detail, category), [detail, category]);
+  const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const employees = employeeData?.employees ?? [];
+
+  useEffect(() => {
+    if (!employeeId && employees.length > 0) setEmployeeId(employees[0].id);
+  }, [employeeId, employees]);
+
+  const detailKey = employeeId ? `/api/hr/basic/${employeeId}` : null;
+  const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 15_000,
+  });
+
+  const rows = useMemo(() => pickRows(detail ?? null, category), [detail, category]);
 
   const columns: ColDef<HrInfoRow>[] = [
     { field: "record_date", headerName: "일자", editable: true, flex: 1, minWidth: 120 },
@@ -68,29 +68,10 @@ export function HrAdminRecordManager({ category, title }: Props) {
     { field: "note", headerName: "비고", editable: true, flex: 1, minWidth: 160 },
   ];
 
-  async function loadEmployees() {
-    const response = await fetch("/api/employees", { cache: "no-store" });
-    if (!response.ok) return;
-    const json = (await response.json()) as { employees?: EmployeeItem[] };
-    const list = json.employees ?? [];
-    setEmployees(list);
-    if (!employeeId && list.length > 0) setEmployeeId(list[0].id);
+  async function refresh() {
+    if (!detailKey) return;
+    await mutate(detailKey);
   }
-
-  async function loadDetail(targetId: number | null = employeeId) {
-    if (!targetId) return setDetail(null);
-    const response = await fetch(`/api/hr/basic/${targetId}`, { cache: "no-store" });
-    if (!response.ok) return setDetail(null);
-    setDetail((await response.json()) as HrBasicDetailResponse);
-  }
-
-  useEffect(() => {
-    void loadEmployees();
-  }, []);
-
-  useEffect(() => {
-    void loadDetail(employeeId);
-  }, [employeeId]);
 
   async function addRow() {
     if (!employeeId) return;
@@ -102,7 +83,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     if (!response.ok) return toast.error("추가 실패");
     setNewTitle("");
     toast.success("추가 완료");
-    await loadDetail(employeeId);
+    await refresh();
   }
 
   async function updateRow(row: HrInfoRow) {
@@ -121,7 +102,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     });
     if (!response.ok) return toast.error("저장 실패");
     toast.success("저장 완료");
-    await loadDetail(employeeId);
+    await refresh();
   }
 
   async function deleteRow(row: HrInfoRow) {
@@ -129,7 +110,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, { method: "DELETE" });
     if (!response.ok) return toast.error("삭제 실패");
     toast.success("삭제 완료");
-    await loadDetail(employeeId);
+    await refresh();
   }
 
   return (
@@ -137,15 +118,9 @@ export function HrAdminRecordManager({ category, title }: Props) {
       <div className="rounded-lg border bg-white p-3">
         <h2 className="mb-2 text-lg font-semibold">{title}</h2>
         <div className="flex flex-wrap gap-2">
-          <select
-            value={employeeId ?? ""}
-            onChange={(e) => setEmployeeId(Number(e.target.value))}
-            className="h-9 rounded-md border px-2 text-sm"
-          >
+          <select value={employeeId ?? ""} onChange={(e) => setEmployeeId(Number(e.target.value))} className="h-9 rounded-md border px-2 text-sm">
             {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.employee_no} | {employee.display_name}
-              </option>
+              <option key={employee.id} value={employee.id}>{employee.employee_no} | {employee.display_name}</option>
             ))}
           </select>
           <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="신규 제목" className="max-w-xs" />

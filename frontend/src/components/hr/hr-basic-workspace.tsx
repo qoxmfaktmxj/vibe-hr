@@ -1,56 +1,51 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import useSWR, { mutate } from "swr";
 
 import { HrBasicTabs } from "@/components/hr/hr-basic-tabs";
 import { HrEmployeeHeader } from "@/components/hr/hr-employee-header";
+import { fetcher } from "@/lib/fetcher";
 import type { EmployeeItem } from "@/types/employee";
 import type { HrBasicDetailResponse } from "@/types/hr-employee-profile";
 
 export function HrBasicWorkspace() {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
-  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
-  const [detail, setDetail] = useState<HrBasicDetailResponse | null>(null);
+
+  const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const employees = employeeData?.employees ?? [];
 
   useEffect(() => {
-    async function load() {
-      const response = await fetch("/api/employees", { cache: "no-store" });
-      if (!response.ok) return;
-      const json = (await response.json()) as { employees?: EmployeeItem[] };
-      setEmployees(json.employees ?? []);
-    }
-    void load();
-  }, []);
+    if (!selectedEmployeeId && employees.length > 0) setSelectedEmployeeId(employees[0].id);
+  }, [employees, selectedEmployeeId]);
+
+  const detailKey = selectedEmployeeId ? `/api/hr/basic/${selectedEmployeeId}` : null;
+  const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 20_000,
+  });
 
   const selectedEmployee = useMemo(
     () => employees.find((item) => item.id === selectedEmployeeId) ?? null,
     [employees, selectedEmployeeId],
   );
 
-  async function reload(targetId: number | null = selectedEmployeeId) {
-    if (!targetId) {
-      setDetail(null);
-      return;
-    }
-    const response = await fetch(`/api/hr/basic/${targetId}`, { cache: "no-store" });
-    if (!response.ok) {
-      setDetail(null);
-      return;
-    }
-    const json = (await response.json()) as HrBasicDetailResponse;
-    setDetail(json);
-  }
-
-  useEffect(() => {
-    void reload(selectedEmployeeId);
-  }, [selectedEmployeeId]);
-
   return (
     <>
-      <HrEmployeeHeader selectedEmployeeId={selectedEmployeeId} onSelectEmployee={setSelectedEmployeeId} />
+      <HrEmployeeHeader
+        employees={employees}
+        selectedEmployeeId={selectedEmployeeId}
+        onSelectEmployee={setSelectedEmployeeId}
+      />
       <HrBasicTabs
         employeeId={selectedEmployeeId}
-        onReload={async () => reload(selectedEmployeeId)}
+        onReload={async () => {
+          if (!detailKey) return;
+          await mutate(detailKey);
+        }}
         detail={
           detail ??
           (selectedEmployee
