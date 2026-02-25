@@ -26,6 +26,17 @@ from app.models import (
     TimAttendanceCode,
     TimHoliday,
     TimWorkScheduleCode,
+    PayPayrollCode,
+    PayTaxRate,
+    PayAllowanceDeduction,
+    PayItemGroup,
+    PayItemGroupDetail,
+    HriFormType,
+    HriFormTypePolicy,
+    HriApprovalLineTemplate,
+    HriApprovalLineStep,
+    HriFormTypeApprovalMap,
+    HriApprovalActorRule,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -267,6 +278,41 @@ MENU_TREE: list[dict] = [
         ],
     },
     {
+        "code": "hri",
+        "name": "신청서",
+        "path": None,
+        "icon": "FileText",
+        "sort_order": 450,
+        "roles": ["employee", "hr_manager", "admin"],
+        "children": [
+            {
+                "code": "hri.requests",
+                "name": "내 문서",
+                "path": None,
+                "icon": "ListOrdered",
+                "sort_order": 451,
+                "roles": ["employee", "hr_manager", "admin"],
+                "children": [
+                    {"code": "hri.requests.mine", "name": "내 신청서", "path": "/hri/requests/mine", "icon": "FileText", "sort_order": 452, "roles": ["employee", "hr_manager", "admin"]},
+                    {"code": "hri.tasks.approvals", "name": "결재함", "path": "/hri/tasks/approvals", "icon": "ListOrdered", "sort_order": 453, "roles": ["employee", "hr_manager", "admin"]},
+                    {"code": "hri.tasks.receives", "name": "수신함", "path": "/hri/tasks/receives", "icon": "ListOrdered", "sort_order": 454, "roles": ["employee", "hr_manager", "admin"]},
+                ],
+            },
+            {
+                "code": "hri.admin",
+                "name": "신청서관리",
+                "path": None,
+                "icon": "Settings",
+                "sort_order": 460,
+                "roles": ["hr_manager", "admin"],
+                "children": [
+                    {"code": "hri.admin.form-types", "name": "신청서코드관리", "path": "/hri/admin/form-types", "icon": "ListOrdered", "sort_order": 461, "roles": ["hr_manager", "admin"]},
+                    {"code": "hri.admin.approval-lines", "name": "결재선관리", "path": "/hri/admin/approval-lines", "icon": "ListOrdered", "sort_order": 462, "roles": ["hr_manager", "admin"]},
+                ],
+            },
+        ],
+    },
+    {
         "code": "payroll",
         "name": "급여",
         "path": None,
@@ -284,7 +330,8 @@ MENU_TREE: list[dict] = [
                 "children": [
                     {"code": "payroll.allowance-deduction-items", "name": "수당공제항목관리", "path": "/payroll/allowance-deduction-items", "icon": "Calculator", "sort_order": 502, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.item-groups", "name": "항목그룹관리", "path": "/payroll/item-groups", "icon": "Calculator", "sort_order": 503, "roles": ["payroll_mgr", "admin"]},
-                    {"code": "payroll.codes", "name": "급여코드관리", "path": "/payroll/codes", "icon": "Calculator", "sort_order": 504, "roles": ["payroll_mgr", "admin"]}
+                    {"code": "payroll.codes", "name": "급여코드관리", "path": "/payroll/codes", "icon": "Calculator", "sort_order": 504, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]}
                 ],
             },
         ],
@@ -1110,10 +1157,326 @@ def ensure_annual_leave_seed(session: Session) -> None:
                 grant_type="auto",
             )
         )
+PAY_PAYROLL_CODE_SEEDS = [
+    # code, name, pay_type, payment_day, tax_deductible, social_ins_deductible
+    ("P100", "정규급여", "급여", "25", True, True),
+    ("P200", "정기상여", "상여", "25", True, True),
+    ("P300", "연차수당", "수당", "당월말일", True, True),
+]
+
+PAY_TAX_RATE_SEEDS = [
+    # year, rate_type, employee_rate, employer_rate, min_limit, max_limit
+    (2025, "국민연금", 4.5, 4.5, 390000, 6170000),
+    (2025, "건강보험", 3.545, 3.545, 279266, 110332300),
+    (2025, "장기요양", 0.4591, 0.4591, None, None),
+    (2025, "고용보험", 0.9, 1.15, None, None),
+]
+
+HRI_FORM_TYPE_SEEDS = [
+    # form_code, form_name_ko, module_code, requires_receive, default_priority
+    ("CERT_EMPLOYMENT", "재직증명서 신청", "HR", True, 10),
+    ("TIM_CORRECTION", "근태 정정 신청", "TIM", False, 20),
+    ("EXPENSE_COMMON", "공통 경비 신청", "CPN", True, 30),
+]
+
+HRI_FORM_TYPE_POLICY_SEEDS = {
+    "CERT_EMPLOYMENT": [
+        ("attachment_required", "false"),
+        ("max_attachment_count", "3"),
+    ],
+    "TIM_CORRECTION": [
+        ("attachment_required", "true"),
+        ("max_attachment_count", "5"),
+    ],
+    "EXPENSE_COMMON": [
+        ("attachment_required", "true"),
+        ("max_attachment_count", "10"),
+    ],
+}
+
+HRI_APPROVAL_ACTOR_RULE_SEEDS = [
+    # role_code, resolve_method, fallback_rule
+    ("TEAM_LEADER", "ORG_CHAIN", "ESCALATE"),
+    ("DEPT_HEAD", "ORG_CHAIN", "ESCALATE"),
+    ("CEO", "JOB_POSITION", "HR_ADMIN"),
+    ("HR_ADMIN", "FIXED_USER", "HR_ADMIN"),
+]
+
+HRI_APPROVAL_TEMPLATE_SEEDS = [
+    {
+        "template_code": "HRI_TMPL_CERT",
+        "template_name": "증명서 기본 결재선",
+        "scope_type": "GLOBAL",
+        "scope_id": None,
+        "is_default": False,
+        "is_active": True,
+        "priority": 120,
+        "steps": [
+            {"step_order": 1, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "TEAM_LEADER", "required_action": "APPROVE"},
+            {"step_order": 2, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "DEPT_HEAD", "required_action": "APPROVE"},
+            {"step_order": 3, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "CEO", "required_action": "APPROVE"},
+            {"step_order": 4, "step_type": "RECEIVE", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "HR_ADMIN", "required_action": "RECEIVE"},
+        ],
+    },
+    {
+        "template_code": "HRI_TMPL_TIM_SIMPLE",
+        "template_name": "근태 기본 결재선",
+        "scope_type": "GLOBAL",
+        "scope_id": None,
+        "is_default": False,
+        "is_active": True,
+        "priority": 110,
+        "steps": [
+            {"step_order": 1, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "TEAM_LEADER", "required_action": "APPROVE"},
+            {"step_order": 2, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "DEPT_HEAD", "required_action": "APPROVE"},
+        ],
+    },
+    {
+        "template_code": "HRI_TMPL_DEFAULT",
+        "template_name": "공통 기본 결재선",
+        "scope_type": "GLOBAL",
+        "scope_id": None,
+        "is_default": True,
+        "is_active": True,
+        "priority": 100,
+        "steps": [
+            {"step_order": 1, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "TEAM_LEADER", "required_action": "APPROVE"},
+            {"step_order": 2, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "DEPT_HEAD", "required_action": "APPROVE"},
+            {"step_order": 3, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "CEO", "required_action": "APPROVE"},
+        ],
+    },
+]
+
+HRI_FORM_TYPE_TEMPLATE_MAP_SEEDS = [
+    # form_code, template_code
+    ("CERT_EMPLOYMENT", "HRI_TMPL_CERT"),
+    ("TIM_CORRECTION", "HRI_TMPL_TIM_SIMPLE"),
+    ("EXPENSE_COMMON", "HRI_TMPL_DEFAULT"),
+]
+
+
+def ensure_pay_payroll_codes(session: Session) -> None:
+    for code, name, pay_type, payment_day, tax_ded, social_ded in PAY_PAYROLL_CODE_SEEDS:
+        existing = session.exec(select(PayPayrollCode).where(PayPayrollCode.code == code)).first()
+        if existing is None:
+            session.add(PayPayrollCode(
+                code=code, name=name, pay_type=pay_type, payment_day=payment_day,
+                tax_deductible=tax_ded, social_ins_deductible=social_ded, is_active=True
+            ))
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.tax_deductible != tax_ded:
+                existing.tax_deductible = tax_ded
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_hri_form_types(session: Session) -> None:
+    for form_code, form_name_ko, module_code, requires_receive, default_priority in HRI_FORM_TYPE_SEEDS:
+        existing = session.exec(select(HriFormType).where(HriFormType.form_code == form_code)).first()
+        if existing is None:
+            session.add(
+                HriFormType(
+                    form_code=form_code,
+                    form_name_ko=form_name_ko,
+                    module_code=module_code,
+                    requires_receive=requires_receive,
+                    is_active=True,
+                    allow_draft=True,
+                    allow_withdraw=True,
+                    default_priority=default_priority,
+                )
+            )
+        else:
+            changed = False
+            if existing.form_name_ko != form_name_ko:
+                existing.form_name_ko = form_name_ko
+                changed = True
+            if existing.module_code != module_code:
+                existing.module_code = module_code
+                changed = True
+            if existing.requires_receive != requires_receive:
+                existing.requires_receive = requires_receive
+                changed = True
+            if existing.default_priority != default_priority:
+                existing.default_priority = default_priority
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_hri_form_type_policies(session: Session) -> None:
+    base_effective = date(2026, 1, 1)
+    for form_code, policy_rows in HRI_FORM_TYPE_POLICY_SEEDS.items():
+        form_type = session.exec(select(HriFormType).where(HriFormType.form_code == form_code)).first()
+        if form_type is None:
+            continue
+        for policy_key, policy_value in policy_rows:
+            existing = session.exec(
+                select(HriFormTypePolicy).where(
+                    HriFormTypePolicy.form_type_id == form_type.id,
+                    HriFormTypePolicy.policy_key == policy_key,
+                    HriFormTypePolicy.effective_from == base_effective,
+                )
+            ).first()
+            if existing is None:
+                session.add(
+                    HriFormTypePolicy(
+                        form_type_id=form_type.id,
+                        policy_key=policy_key,
+                        policy_value=policy_value,
+                        effective_from=base_effective,
+                        effective_to=None,
+                    )
+                )
+            else:
+                if existing.policy_value != policy_value:
+                    existing.policy_value = policy_value
+                    session.add(existing)
+    session.commit()
+
+
+def ensure_hri_approval_actor_rules(session: Session) -> None:
+    for role_code, resolve_method, fallback_rule in HRI_APPROVAL_ACTOR_RULE_SEEDS:
+        existing = session.exec(select(HriApprovalActorRule).where(HriApprovalActorRule.role_code == role_code)).first()
+        if existing is None:
+            session.add(
+                HriApprovalActorRule(
+                    role_code=role_code,
+                    resolve_method=resolve_method,
+                    fallback_rule=fallback_rule,
+                    is_active=True,
+                )
+            )
+        else:
+            changed = False
+            if existing.resolve_method != resolve_method:
+                existing.resolve_method = resolve_method
+                changed = True
+            if existing.fallback_rule != fallback_rule:
+                existing.fallback_rule = fallback_rule
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_hri_approval_templates(session: Session) -> None:
+    for seed in HRI_APPROVAL_TEMPLATE_SEEDS:
+        template = session.exec(
+            select(HriApprovalLineTemplate).where(HriApprovalLineTemplate.template_code == seed["template_code"])
+        ).first()
+        if template is None:
+            template = HriApprovalLineTemplate(
+                template_code=seed["template_code"],
+                template_name=seed["template_name"],
+                scope_type=seed["scope_type"],
+                scope_id=seed["scope_id"],
+                is_default=seed["is_default"],
+                is_active=seed["is_active"],
+                priority=seed["priority"],
+            )
+            session.add(template)
+            session.flush()
+        else:
+            template.template_name = seed["template_name"]
+            template.scope_type = seed["scope_type"]
+            template.scope_id = seed["scope_id"]
+            template.is_default = seed["is_default"]
+            template.is_active = seed["is_active"]
+            template.priority = seed["priority"]
+            session.add(template)
+            session.flush()
+
+        old_steps = session.exec(
+            select(HriApprovalLineStep).where(HriApprovalLineStep.template_id == template.id)
+        ).all()
+        for old_step in old_steps:
+            session.delete(old_step)
+        session.flush()
+
+        for step in seed["steps"]:
+            session.add(
+                HriApprovalLineStep(
+                    template_id=template.id,
+                    step_order=step["step_order"],
+                    step_type=step["step_type"],
+                    actor_resolve_type=step["actor_resolve_type"],
+                    actor_role_code=step["actor_role_code"],
+                    actor_user_id=None,
+                    allow_delegate=True,
+                    required_action=step["required_action"],
+                )
+            )
 
     session.commit()
 
 
+def ensure_hri_form_type_template_maps(session: Session) -> None:
+    effective_from = date(2026, 1, 1)
+    for form_code, template_code in HRI_FORM_TYPE_TEMPLATE_MAP_SEEDS:
+        form_type = session.exec(select(HriFormType).where(HriFormType.form_code == form_code)).first()
+        template = session.exec(
+            select(HriApprovalLineTemplate).where(HriApprovalLineTemplate.template_code == template_code)
+        ).first()
+        if form_type is None or template is None:
+            continue
+
+        existing = session.exec(
+            select(HriFormTypeApprovalMap).where(
+                HriFormTypeApprovalMap.form_type_id == form_type.id,
+                HriFormTypeApprovalMap.template_id == template.id,
+                HriFormTypeApprovalMap.effective_from == effective_from,
+            )
+        ).first()
+        if existing is None:
+            session.add(
+                HriFormTypeApprovalMap(
+                    form_type_id=form_type.id,
+                    template_id=template.id,
+                    is_active=True,
+                    effective_from=effective_from,
+                    effective_to=None,
+                )
+            )
+        else:
+            if not existing.is_active:
+                existing.is_active = True
+                session.add(existing)
+
+    session.commit()
+
+
+def ensure_pay_tax_rates(session: Session) -> None:
+    for year, rate_type, emp_rate, empl_rate, min_l, max_l in PAY_TAX_RATE_SEEDS:
+        existing = session.exec(select(PayTaxRate).where(
+            PayTaxRate.year == year, PayTaxRate.rate_type == rate_type
+        )).first()
+        if existing is None:
+            session.add(PayTaxRate(
+                year=year, rate_type=rate_type, employee_rate=emp_rate, employer_rate=empl_rate,
+                min_limit=min_l, max_limit=max_l
+            ))
+        else:
+            changed = False
+            if existing.employee_rate != emp_rate:
+                existing.employee_rate = emp_rate
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -1164,3 +1527,10 @@ def seed_initial_data(session: Session) -> None:
     ensure_work_schedule_codes(session)
     ensure_holidays(session)
     ensure_annual_leave_seed(session)
+    ensure_pay_payroll_codes(session)
+    ensure_pay_tax_rates(session)
+    ensure_hri_form_types(session)
+    ensure_hri_form_type_policies(session)
+    ensure_hri_approval_actor_rules(session)
+    ensure_hri_approval_templates(session)
+    ensure_hri_form_type_template_maps(session)

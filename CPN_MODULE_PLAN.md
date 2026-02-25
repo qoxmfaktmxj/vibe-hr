@@ -9,7 +9,7 @@
 ## 1. 개요
 
 ### 1.1 목적
-TIM(근태) 모듈에 이어, 엔터프라이즈급(AutoEver 등 참고) 급여 시스템에 부합하는 **보상/급여(CPN)** 모듈을 개발한다.
+TIM(근태) 모듈에 이어, 엔터프라이즈급 급여 시스템에 부합하는 **보상/급여(CPN)** 모듈을 개발한다.
 결근/지각/초과근무 등 근태 데이터를 연동하여 최종 명세서 발급 및 은행 이체(펌뱅킹) 파일 생성까지 전체 라이프사이클을 커버한다.
 
 ### 1.2 개발 원칙
@@ -26,30 +26,17 @@ TIM(근태) 모듈에 이어, 엔터프라이즈급(AutoEver 등 참고) 급여 
 ### [Phase 1] 급여 기초 정보 설정 (Master Data)
 가장 기본이 되는 공통코드 및 세금/요율 마스터를 구축합니다.
 
-- [ ] **1.1 DB 모델 생성 (`backend/app/models/entities.py`)**
+> **⚠️ 주의 (DB 연동 테스트 대기)**
+> 현재 DB 연결 문제로 인해 `bootstrap.py` 시드 스크립트 테스트가 생략되었습니다.
+> 다음 담당 AI는 **가장 먼저 실제 배포/개발 DB 환경에 연결하여 `seed_dev_postgres.py`를 실행하고 생성 여부를 꼼꼼히 테스트**해야 합니다.
+
+- [x] **1.1 DB 모델 생성 (`backend/app/models/entities.py`)**
   - [ ] `PayPayrollCode`: 급여코드 (정규급여, 정기상여, 연차수당 등)
   - [ ] `PayTaxRate`: 연도별 세율 및 사회보험요율 관리 (국민연금, 건강보험, 간이세액표 상하한선)
-  - [ ] `PayAllowanceDeduction`: 수당/공제 항목 마스터 (기본급, 식대, 소득세 등 과세/비과세 및 계산식 타입 정의)
-  - [ ] `PayItemGroup`: 급여항목 그룹 (사무직, 생산직 등)
-  - [ ] `PayItemGroupDetail`: 그룹별 수당/공제 매핑 테이블
-- [ ] **1.2 스키마 및 서비스 계층 구현 (`schemas`, `services`)**
-  - [ ] `pay_setup_schema.py` 및 `pay_setup_service.py` 생성
-- [ ] **1.3 API 라우터 구현 (`api`)**
-  - [ ] `/api/v1/pay/codes` (CRUD & Batch)
-  - [ ] `/api/v1/pay/tax-rates` (CRUD & Batch)
-  - [ ] `/api/v1/pay/allowance-deductions` (CRUD & Batch)
-  - [ ] `/api/v1/pay/item-groups` (Master-Detail 처리)
-- [ ] **1.4 프론트엔드 화면 구현 (`frontend/src/app/payroll/...`)**
-  - [ ] BFF Route 프록시 작성 (`app/api/pay/...`)
-  - [ ] `급여코드관리` (신규 파일)
-  - [ ] `세율및과세표준관리` (신규 파일)
-  - [ ] `수당/공제항목관리` (`payroll/allowance-deduction-items/page.tsx`)
-  - [ ] `급여항목그룹관리` (`payroll/item-groups/page.tsx`)
-
-### [Phase 2] 개인별 급여 기준 설정 (Employee Compensation)
-사원별 기본 연봉 및 고정 수당 데이터를 매핑합니다.
-
-- [ ] **2.1 DB 모델 생성**
+  - [x] `PayAllowanceDeduction`: 수당/공제 항목 마스터 (기본급, 식대, 소득세 등 과세/비과세 및 계산식 타입 정의)
+  - [x] `PayItemGroup`: 급여항목 그룹 (사무직, 생산직 등)
+  - [x] `PayItemGroupDetail`: 그룹별 수당/공제 매핑 테이블
+- [x] **1.2 스키마 및 서비스 계층 구현 (`schemas`, `services`)**
   - [ ] `PayEmployeeFixedItem`: 개인별 고정 지급/공제 금액 (예: A사원의 기본급 300만, 직책수당 50만)
   - [ ] `PayEmployeeException`: 개인별 수당/공제 예외자 관리 (특정인만 식대 비지급 등)
 - [ ] **2.2 API 및 로직 구현**

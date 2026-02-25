@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -321,4 +323,372 @@ class TimHoliday(SQLModel, table=True):
     holiday_type: str = Field(default="legal", max_length=20)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollCode(SQLModel, table=True):
+    """급여코드 마스터 (정규급여, 정기상여 등)"""
+
+    __tablename__ = "pay_payroll_codes"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_pay_payroll_codes_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    pay_type: str = Field(max_length=20)
+    payment_day: str = Field(max_length=20)
+    tax_deductible: bool = Field(default=True)
+    social_ins_deductible: bool = Field(default=True)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayTaxRate(SQLModel, table=True):
+    """세율 및 4대보험 마스터 (매년 갱신)"""
+
+    __tablename__ = "pay_tax_rates"
+    __table_args__ = (
+        UniqueConstraint("year", "rate_type", name="uq_pay_tax_rates_year_type"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int = Field(index=True)
+    rate_type: str = Field(max_length=50)
+    employee_rate: Optional[float] = None
+    employer_rate: Optional[float] = None
+    min_limit: Optional[int] = None
+    max_limit: Optional[int] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayAllowanceDeduction(SQLModel, table=True):
+    """수당/공제 항목 마스터"""
+
+    __tablename__ = "pay_allowance_deductions"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_pay_allowance_deductions_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    type: str = Field(max_length=20)
+    tax_type: str = Field(max_length=20)
+    calculation_type: str = Field(default="fixed", max_length=20)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayItemGroup(SQLModel, table=True):
+    """급여항목 그룹 관리 (직군별 등)"""
+
+    __tablename__ = "pay_item_groups"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_pay_item_groups_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    description: Optional[str] = Field(default=None, max_length=200)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayItemGroupDetail(SQLModel, table=True):
+    """급여항목 그룹별 매핑"""
+
+    __tablename__ = "pay_item_group_details"
+    __table_args__ = (
+        UniqueConstraint("group_id", "item_id", name="uq_pay_item_group_details_link"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(foreign_key="pay_item_groups.id", index=True)
+    item_id: int = Field(foreign_key="pay_allowance_deductions.id")
+    type: str = Field(max_length=20)
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class HriFormType(SQLModel, table=True):
+    """Common request form type master."""
+
+    __tablename__ = "hri_form_types"
+    __table_args__ = (
+        UniqueConstraint("form_code", name="uq_hri_form_types_form_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    form_code: str = Field(max_length=30, index=True)
+    form_name_ko: str = Field(max_length=100)
+    form_name_en: Optional[str] = Field(default=None, max_length=100)
+    module_code: str = Field(max_length=30, default="COMMON")
+    is_active: bool = Field(default=True)
+    allow_draft: bool = Field(default=True)
+    allow_withdraw: bool = Field(default=True)
+    requires_receive: bool = Field(default=False)
+    default_priority: int = Field(default=50)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriFormTypePolicy(SQLModel, table=True):
+    """Policy key/value by form type."""
+
+    __tablename__ = "hri_form_type_policies"
+    __table_args__ = (
+        UniqueConstraint(
+            "form_type_id",
+            "policy_key",
+            "effective_from",
+            name="uq_hri_form_type_policies_key_period",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    form_type_id: int = Field(foreign_key="hri_form_types.id", index=True)
+    policy_key: str = Field(max_length=50)
+    policy_value: str = Field(max_length=500)
+    effective_from: date = Field(default_factory=date.today)
+    effective_to: Optional[date] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriApprovalLineTemplate(SQLModel, table=True):
+    """Approval line template header."""
+
+    __tablename__ = "hri_approval_line_templates"
+    __table_args__ = (
+        UniqueConstraint("template_code", name="uq_hri_approval_line_templates_code"),
+        CheckConstraint(
+            "scope_type IN ('GLOBAL', 'COMPANY', 'DEPT', 'TEAM', 'USER')",
+            name="ck_hri_approval_line_templates_scope_type",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    template_code: str = Field(max_length=30, index=True)
+    template_name: str = Field(max_length=100)
+    scope_type: str = Field(max_length=20, default="GLOBAL")
+    scope_id: Optional[str] = Field(default=None, max_length=40, index=True)
+    is_default: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+    priority: int = Field(default=100)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriApprovalLineStep(SQLModel, table=True):
+    """Approval line template step definition."""
+
+    __tablename__ = "hri_approval_line_steps"
+    __table_args__ = (
+        UniqueConstraint("template_id", "step_order", name="uq_hri_approval_line_steps_order"),
+        CheckConstraint(
+            "step_type IN ('APPROVAL', 'RECEIVE', 'REFERENCE')",
+            name="ck_hri_approval_line_steps_step_type",
+        ),
+        CheckConstraint(
+            "actor_resolve_type IN ('ROLE_BASED', 'USER_FIXED')",
+            name="ck_hri_approval_line_steps_actor_resolve_type",
+        ),
+        CheckConstraint(
+            "required_action IN ('APPROVE', 'RECEIVE')",
+            name="ck_hri_approval_line_steps_required_action",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    template_id: int = Field(foreign_key="hri_approval_line_templates.id", index=True)
+    step_order: int = Field(default=1)
+    step_type: str = Field(max_length=20, default="APPROVAL")
+    actor_resolve_type: str = Field(max_length=30, default="ROLE_BASED")
+    actor_role_code: Optional[str] = Field(default=None, max_length=30)
+    actor_user_id: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    allow_delegate: bool = Field(default=True)
+    required_action: str = Field(max_length=20, default="APPROVE")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriFormTypeApprovalMap(SQLModel, table=True):
+    """Map form type to approval template."""
+
+    __tablename__ = "hri_form_type_approval_maps"
+    __table_args__ = (
+        UniqueConstraint(
+            "form_type_id",
+            "template_id",
+            "effective_from",
+            name="uq_hri_form_type_approval_maps_link",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    form_type_id: int = Field(foreign_key="hri_form_types.id", index=True)
+    template_id: int = Field(foreign_key="hri_approval_line_templates.id", index=True)
+    is_active: bool = Field(default=True)
+    effective_from: date = Field(default_factory=date.today)
+    effective_to: Optional[date] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriApprovalActorRule(SQLModel, table=True):
+    """Role-based actor resolution rules."""
+
+    __tablename__ = "hri_approval_actor_rules"
+    __table_args__ = (
+        UniqueConstraint("role_code", name="uq_hri_approval_actor_rules_role_code"),
+        CheckConstraint(
+            "resolve_method IN ('ORG_CHAIN', 'JOB_POSITION', 'FIXED_USER')",
+            name="ck_hri_approval_actor_rules_resolve_method",
+        ),
+        CheckConstraint(
+            "fallback_rule IN ('ESCALATE', 'SKIP', 'HR_ADMIN')",
+            name="ck_hri_approval_actor_rules_fallback_rule",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    role_code: str = Field(max_length=30, index=True)
+    resolve_method: str = Field(max_length=30, default="ORG_CHAIN")
+    fallback_rule: str = Field(max_length=30, default="ESCALATE")
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriRequestMaster(SQLModel, table=True):
+    """Request header transaction."""
+
+    __tablename__ = "hri_request_masters"
+    __table_args__ = (
+        UniqueConstraint("request_no", name="uq_hri_request_masters_request_no"),
+        CheckConstraint(
+            "status_code IN ("
+            "'DRAFT',"
+            "'APPROVAL_IN_PROGRESS',"
+            "'APPROVAL_REJECTED',"
+            "'RECEIVE_IN_PROGRESS',"
+            "'RECEIVE_REJECTED',"
+            "'COMPLETED',"
+            "'WITHDRAWN'"
+            ")",
+            name="ck_hri_request_masters_status_code",
+        ),
+        Index("ix_hri_request_masters_requester_created_at", "requester_id", "created_at"),
+        Index("ix_hri_request_masters_status_created_at", "status_code", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_no: str = Field(max_length=40, index=True)
+    form_type_id: int = Field(foreign_key="hri_form_types.id", index=True)
+    requester_id: int = Field(foreign_key="auth_users.id", index=True)
+    requester_org_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    title: str = Field(max_length=200)
+    content_json: str = Field(default="{}")
+    status_code: str = Field(max_length=30, default="DRAFT")
+    current_step_order: Optional[int] = None
+    submitted_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriRequestStepSnapshot(SQLModel, table=True):
+    """Frozen approval/receive line per request."""
+
+    __tablename__ = "hri_request_step_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "request_id",
+            "step_order",
+            name="uq_hri_request_step_snapshots_request_step",
+        ),
+        CheckConstraint(
+            "step_type IN ('APPROVAL', 'RECEIVE', 'REFERENCE')",
+            name="ck_hri_request_step_snapshots_step_type",
+        ),
+        CheckConstraint(
+            "action_status IN ('WAITING', 'APPROVED', 'REJECTED', 'RECEIVED')",
+            name="ck_hri_request_step_snapshots_action_status",
+        ),
+        Index(
+            "ix_hri_request_step_snapshots_actor_status",
+            "actor_user_id",
+            "action_status",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    step_order: int = Field(default=1)
+    step_type: str = Field(max_length=20, default="APPROVAL")
+    actor_user_id: int = Field(foreign_key="auth_users.id", index=True)
+    actor_name: str = Field(max_length=100)
+    actor_org_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    actor_role_code: Optional[str] = Field(default=None, max_length=30)
+    action_status: str = Field(max_length=20, default="WAITING")
+    acted_at: Optional[datetime] = None
+    comment: Optional[str] = Field(default=None, max_length=1000)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriRequestHistory(SQLModel, table=True):
+    """Request lifecycle audit trail."""
+
+    __tablename__ = "hri_request_histories"
+    __table_args__ = (
+        Index("ix_hri_request_histories_request_created_at", "request_id", "created_at"),
+        Index("ix_hri_request_histories_actor_created_at", "actor_user_id", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    event_type: str = Field(max_length=30, index=True)
+    from_status: Optional[str] = Field(default=None, max_length=30)
+    to_status: Optional[str] = Field(default=None, max_length=30)
+    actor_user_id: int = Field(foreign_key="auth_users.id")
+    actor_ip: Optional[str] = Field(default=None, max_length=45)
+    event_payload_json: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class HriRequestAttachment(SQLModel, table=True):
+    """Request attachment metadata."""
+
+    __tablename__ = "hri_request_attachments"
+    __table_args__ = (
+        Index("ix_hri_request_attachments_request_uploaded_at", "request_id", "uploaded_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    file_key: str = Field(max_length=300)
+    file_name: str = Field(max_length=255)
+    file_size: int = Field(default=0)
+    mime_type: Optional[str] = Field(default=None, max_length=120)
+    uploaded_by: int = Field(foreign_key="auth_users.id")
+    uploaded_at: datetime = Field(default_factory=utc_now)
+
+
+class HriRequestCounter(SQLModel, table=True):
+    """Monthly sequence allocator for request number."""
+
+    __tablename__ = "hri_request_counters"
+
+    counter_key: str = Field(primary_key=True, max_length=80)
+    last_seq: int = Field(default=0)
     updated_at: datetime = Field(default_factory=utc_now)
