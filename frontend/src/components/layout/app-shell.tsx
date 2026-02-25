@@ -104,6 +104,18 @@ export function AppShell({ title, description, children }: AppShellProps) {
     router.push("/dashboard");
   }
 
+  function closeLeftTabs() {
+    const activeIndex = openTabs.findIndex((tab) => tab.path === pathname);
+    if (activeIndex <= 0) return;
+    setStoredTabs(openTabs.slice(activeIndex));
+  }
+
+  function closeRightTabs() {
+    const activeIndex = openTabs.findIndex((tab) => tab.path === pathname);
+    if (activeIndex < 0 || activeIndex >= openTabs.length - 1) return;
+    setStoredTabs(openTabs.slice(0, activeIndex + 1));
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
       <DashboardSidebar />
@@ -132,14 +144,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
             </div>
           </div>
 
-          <div
-            className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6"
-            onContextMenu={(event) => {
-              event.preventDefault();
-              if (window.confirm("모든 탭을 닫고 홈으로 이동할까요?")) closeAllTabs();
-            }}
-            title="우클릭: 모든 탭 닫기"
-          >
+          <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6">
             <button
               type="button"
               className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
@@ -186,6 +191,35 @@ export function AppShell({ title, description, children }: AppShellProps) {
                 </button>
               );
             })}
+
+            {openTabs.length > 0 ? (
+              <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                  onClick={closeLeftTabs}
+                  title="현재 탭 기준 왼쪽 탭 모두 닫기"
+                >
+                  좌측 닫기
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                  onClick={closeRightTabs}
+                  title="현재 탭 기준 오른쪽 탭 모두 닫기"
+                >
+                  우측 닫기
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                  onClick={closeAllTabs}
+                  title="모든 탭 닫고 홈으로 이동"
+                >
+                  전체 닫기
+                </button>
+              </div>
+            ) : null}
           </div>
         </header>
 
