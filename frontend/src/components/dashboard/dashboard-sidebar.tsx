@@ -7,6 +7,8 @@ import {
   CalendarDays,
   ChevronDown,
   Clock,
+  Minus,
+  Plus,
   FileText,
   FolderTree,
   LayoutDashboard,
@@ -23,10 +25,10 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import type { EmployeeItem } from "@/types/employee";
 import type { MenuNode } from "@/types/menu";
 
@@ -113,13 +115,19 @@ function MenuGroupItem({
   node,
   currentPath,
   depth = 0,
+  menuControlVersion,
+  menuControlMode,
 }: {
   node: MenuNode;
   currentPath: string;
   depth?: number;
+  menuControlVersion: number;
+  menuControlMode: "expand" | "collapse" | null;
 }) {
   const active = hasActiveDescendant(node, currentPath);
-  const [isOpen, setIsOpen] = useState(active);
+  const [isOpen, setIsOpen] = useState(
+    menuControlMode === "expand" ? true : menuControlMode === "collapse" ? false : active,
+  );
 
   return (
     <div>
@@ -140,7 +148,14 @@ function MenuGroupItem({
         <div className={`mt-0.5 space-y-0.5 ${depth >= 0 ? "ml-4 border-l border-gray-200 pl-3" : ""}`}>
           {node.children.map((child) =>
             child.children.length > 0 ? (
-              <MenuGroupItem key={child.code} node={child} currentPath={currentPath} depth={depth + 1} />
+              <MenuGroupItem
+                key={`${child.code}-${menuControlVersion}`}
+                node={child}
+                currentPath={currentPath}
+                depth={depth + 1}
+                menuControlVersion={menuControlVersion}
+                menuControlMode={menuControlMode}
+              />
             ) : (
               <MenuLeafItem
                 key={child.code}
@@ -162,6 +177,8 @@ export function DashboardSidebar() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [menuControlVersion, setMenuControlVersion] = useState(0);
+  const [menuControlMode, setMenuControlMode] = useState<"expand" | "collapse" | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileEmployee, setProfileEmployee] = useState<EmployeeItem | null>(null);
@@ -235,10 +252,47 @@ export function DashboardSidebar() {
           </div>
         </div>
 
-        <nav className="mt-4 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
+        <div className="mt-3 flex items-center gap-2 px-3">
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            className="h-7 gap-1 px-2"
+            onClick={() => {
+              setMenuControlMode("expand");
+              setMenuControlVersion((prev) => prev + 1);
+            }}
+            title="메뉴 전체 펼치기"
+          >
+            <Plus className="h-3 w-3" />
+            펼치기
+          </Button>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            className="h-7 gap-1 px-2"
+            onClick={() => {
+              setMenuControlMode("collapse");
+              setMenuControlVersion((prev) => prev + 1);
+            }}
+            title="메뉴 전체 접기"
+          >
+            <Minus className="h-3 w-3" />
+            접기
+          </Button>
+        </div>
+
+        <nav className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
           {menus.map((node) =>
             node.children.length > 0 ? (
-              <MenuGroupItem key={node.code} node={node} currentPath={pathname} />
+              <MenuGroupItem
+                key={`${node.code}-${menuControlVersion}`}
+                node={node}
+                currentPath={pathname}
+                menuControlVersion={menuControlVersion}
+                menuControlMode={menuControlMode}
+              />
             ) : (
               <MenuLeafItem
                 key={node.code}
