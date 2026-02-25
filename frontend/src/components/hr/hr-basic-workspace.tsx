@@ -14,6 +14,7 @@ export function HrBasicWorkspace() {
 
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
+    revalidateIfStale: false,
     dedupingInterval: 60_000,
   });
   const employees = useMemo(() => employeeData?.employees ?? [], [employeeData?.employees]);
@@ -22,6 +23,7 @@ export function HrBasicWorkspace() {
   const detailKey = resolvedEmployeeId ? `/api/hr/basic/${resolvedEmployeeId}` : null;
   const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
     revalidateOnFocus: false,
+    revalidateIfStale: false,
     dedupingInterval: 20_000,
   });
 

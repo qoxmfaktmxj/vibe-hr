@@ -15,14 +15,29 @@ type EmployeeApiErrorMessages = {
   loadDepartmentError: string;
 };
 
+type FetchEmployeeBaseDataOptions = {
+  force?: boolean;
+};
+
+let employeeBaseDataCache: EmployeeBaseData | null = null;
+
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
   const json = (await response.json().catch(() => null)) as { detail?: string } | null;
   return json?.detail ?? fallback;
 }
 
+export function setEmployeeBaseDataCache(data: EmployeeBaseData): void {
+  employeeBaseDataCache = data;
+}
+
 export async function fetchEmployeeBaseData(
   messages: EmployeeApiErrorMessages,
+  options: FetchEmployeeBaseDataOptions = {},
 ): Promise<EmployeeBaseData> {
+  if (!options.force && employeeBaseDataCache) {
+    return employeeBaseDataCache;
+  }
+
   const [employeeResponse, departmentResponse] = await Promise.all([
     fetch("/api/employees", { cache: "no-store" }),
     fetch("/api/employees/departments", { cache: "no-store" }),
@@ -38,8 +53,11 @@ export async function fetchEmployeeBaseData(
   const employeeJson = (await employeeResponse.json()) as EmployeeListResponse;
   const departmentJson = (await departmentResponse.json()) as DepartmentListResponse;
 
-  return {
+  const baseData = {
     employees: employeeJson.employees,
     departments: departmentJson.departments,
   };
+
+  setEmployeeBaseDataCache(baseData);
+  return baseData;
 }

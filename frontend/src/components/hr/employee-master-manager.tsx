@@ -37,7 +37,7 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
-import { fetchEmployeeBaseData } from "@/lib/hr/employee-api";
+import { fetchEmployeeBaseData, setEmployeeBaseDataCache } from "@/lib/hr/employee-api";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
   hasRowPatchChanges,
@@ -88,6 +88,8 @@ type EmployeeGridRow = EmployeeItem & {
 };
 
 type CommonCodeOption = { code: string; name: string };
+let cachedPositionOptions: CommonCodeOption[] | null = null;
+let cachedEmploymentOptions: CommonCodeOption[] | null = null;
 
 const FALLBACK_EMPLOYMENT_OPTIONS: Array<{ code: EmployeeItem["employment_status"]; name: string }> = [
   { code: "active", name: "재직" },
@@ -383,6 +385,16 @@ export function EmployeeMasterManager() {
   }, [departmentNameById, departments, issueTempId, positionNames]);
 
   useEffect(() => {
+    if (cachedPositionOptions) {
+      setPositionOptions(cachedPositionOptions);
+    }
+    if (cachedEmploymentOptions) {
+      setEmploymentOptions(cachedEmploymentOptions);
+    }
+    if (cachedPositionOptions && cachedEmploymentOptions) {
+      return;
+    }
+
     async function loadActiveCodes(groupCode: string): Promise<CommonCodeOption[]> {
       const res = await fetch(`/api/codes/groups/by-code/${groupCode}/active`, { cache: "no-store" });
       if (!res.ok) return [];
@@ -397,21 +409,26 @@ export function EmployeeMasterManager() {
       ]);
 
       if (positions.length > 0) {
+        cachedPositionOptions = positions;
         setPositionOptions(positions);
       }
 
+      let nextEmploymentOptions = FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({
+        code: option.code,
+        name: option.name,
+      }));
       if (employment.length > 0) {
         const normalized = employment.filter(
           (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
             option.code === "active" || option.code === "leave" || option.code === "resigned",
         );
         if (normalized.length > 0) {
-          setEmploymentOptions(normalized);
-          return;
+          nextEmploymentOptions = normalized;
         }
       }
 
-      setEmploymentOptions(FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })));
+      cachedEmploymentOptions = nextEmploymentOptions;
+      setEmploymentOptions(nextEmploymentOptions);
     })();
   }, []);
 
@@ -921,7 +938,7 @@ export function EmployeeMasterManager() {
       const baseData = await fetchEmployeeBaseData({
         loadEmployeeError: I18N.loadEmployeeError,
         loadDepartmentError: I18N.loadDepartmentError,
-      });
+      }, { force: true });
 
       setDepartments(baseData.departments);
       setRows(baseData.employees.map((employee) => toGridRow(employee)));
@@ -980,6 +997,10 @@ export function EmployeeMasterManager() {
 
       const json = (await res.json()) as EmployeeBatchResponse;
       setRows(json.employees.map((employee) => toGridRow(employee)));
+      setEmployeeBaseDataCache({
+        employees: json.employees,
+        departments,
+      });
       gridApiRef.current = null;
       setGridMountKey((prev) => prev + 1);
 
