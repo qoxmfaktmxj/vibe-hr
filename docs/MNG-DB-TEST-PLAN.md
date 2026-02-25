@@ -139,3 +139,33 @@ Python/DB 실행 불가 환경에서는 아래만 먼저 수행:
 ### 참고
 - backend 실행 검증은 현재 작업 환경에 Python 런타임이 없어 미수행.
 - DB 연결 기반 테스트는 본 문서 4장 시나리오로 운영 환경에서 추가 수행 필요.
+
+## 10. 추가 실행 로그 (마무리, 2026-02-26)
+
+### 10.1 서버/배포 오류 원인 및 조치
+- 증상: backend 컨테이너가 healthcheck 실패로 재시작 반복
+- 원인: `tim_employee_daily_schedules`의 `work_date` 인덱스 중복 정의로 startup 시 DDL 충돌
+  - 에러: `DuplicateTable: relation "ix_tim_employee_daily_schedules_work_date" already exists`
+- 조치: `backend/app/models/entities.py`에서 중복 인덱스 정의 제거
+- 반영 커밋: `775d2e7`
+
+### 10.2 실환경 검증 (2회)
+- 실행 방식: admin 로그인 후 `/api/v1/mng/*` 전 엔드포인트 계열 호출
+- Round 1: 메뉴 확인 + 임시 데이터 주입 + CRUD/조회 검증 통과
+- Round 2: 동일 흐름 재검증 통과
+- 결과: `ALL_OK`
+
+### 10.3 임시 데이터 정리
+- 정리 대상: Round 1에서 생성한 임시 고객사/개발/외주/인프라 데이터
+- 정리 결과:
+  - `deleted_temp_company_ids: [1]`
+  - `deleted_temp_contract_ids: [1]`
+  - `remaining_companies: 0`
+
+### 10.4 최종 상태
+- backend: `Up (healthy)`
+- frontend: `Up`
+- 정적 검증:
+  - `python -m compileall app`: 통과
+  - `npm run lint`: 통과
+  - `npm run build`: 통과
