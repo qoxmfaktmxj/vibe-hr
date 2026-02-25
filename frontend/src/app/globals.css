@@ -240,9 +240,14 @@
 /* ============================================================ */
 /* Dark mode global polish (legacy utility class fallback)       */
 /* ============================================================ */
-.dark .bg-white {
+.dark .bg-white,
+.dark .bg-slate-50,
+.dark .bg-slate-100,
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
   background-color: var(--card) !important;
 }
+.dark .text-black,
 .dark .text-gray-900,
 .dark .text-gray-800,
 .dark .text-gray-700,
@@ -269,6 +274,19 @@
   background-color: var(--muted);
   color: var(--foreground);
   border-color: var(--border);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8;
+}
+.dark .hover\:bg-white:hover,
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: var(--accent) !important;
+}
+.dark .odd\:bg-white:nth-child(odd),
+.dark .even\:bg-slate-50:nth-child(even) {
+  background-color: color-mix(in oklab, var(--card) 90%, black 10%) !important;
 }
 
 /* ============================================================ */
