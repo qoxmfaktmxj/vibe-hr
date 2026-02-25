@@ -10,6 +10,7 @@ class TimAnnualLeaveItem(BaseModel):
     employee_id: int
     employee_no: str
     employee_name: str
+    department_name: str | None = None
     year: int
     granted_days: float
     used_days: float
@@ -21,6 +22,11 @@ class TimAnnualLeaveItem(BaseModel):
 
 class TimAnnualLeaveResponse(BaseModel):
     item: TimAnnualLeaveItem
+
+
+class TimAnnualLeaveListResponse(BaseModel):
+    items: list[TimAnnualLeaveItem]
+    total_count: int
 
 
 class TimAnnualLeaveAdjustRequest(BaseModel):

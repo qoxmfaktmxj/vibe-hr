@@ -222,6 +222,7 @@ export type TimAnnualLeaveItem = {
   employee_id: number;
   employee_no: string;
   employee_name: string;
+  department_name: string | null;
   year: number;
   granted_days: number;
   used_days: number;
@@ -233,6 +234,11 @@ export type TimAnnualLeaveItem = {
 
 export type TimAnnualLeaveResponse = {
   item: TimAnnualLeaveItem;
+};
+
+export type TimAnnualLeaveListResponse = {
+  items: TimAnnualLeaveItem[];
+  total_count: number;
 };
 
 export type TimLeaveRequestItem = {

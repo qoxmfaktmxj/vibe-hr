@@ -44,21 +44,23 @@ def _default_granted_days(hire_date: date, target_year: int) -> float:
 
 def get_or_create_annual_leave(session: Session, employee_id: int, year: int) -> TimAnnualLeaveItem:
     row = session.exec(
-        select(HrAnnualLeave, HrEmployee, AuthUser)
+        select(HrAnnualLeave, HrEmployee, AuthUser, OrgDepartment)
         .join(HrEmployee, HrAnnualLeave.employee_id == HrEmployee.id)
         .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
         .where(HrAnnualLeave.employee_id == employee_id, HrAnnualLeave.year == year)
     ).first()
 
     if row is None:
         employee_row = session.exec(
-            select(HrEmployee, AuthUser)
+            select(HrEmployee, AuthUser, OrgDepartment)
             .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+            .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
             .where(HrEmployee.id == employee_id)
         ).first()
         if employee_row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found.")
-        employee, user = employee_row
+        employee, user, department = employee_row
         granted = _default_granted_days(employee.hire_date, year)
 
         prev = session.exec(select(HrAnnualLeave).where(HrAnnualLeave.employee_id == employee.id, HrAnnualLeave.year == year - 1)).first()
@@ -83,6 +85,7 @@ def get_or_create_annual_leave(session: Session, employee_id: int, year: int) ->
             employee_id=employee.id,
             employee_no=employee.employee_no,
             employee_name=user.display_name,
+            department_name=department.name,
             year=created.year,
             granted_days=created.granted_days,
             used_days=created.used_days,
@@ -92,12 +95,13 @@ def get_or_create_annual_leave(session: Session, employee_id: int, year: int) ->
             note=created.note,
         )
 
-    annual, employee, user = row
+    annual, employee, user, department = row
     return TimAnnualLeaveItem(
         id=annual.id,
         employee_id=employee.id,
         employee_no=employee.employee_no,
         employee_name=user.display_name,
+        department_name=department.name,
         year=annual.year,
         granted_days=annual.granted_days,
         used_days=annual.used_days,
@@ -252,6 +256,48 @@ def decide_leave_request(session: Session, *, request_id: int, approver_employee
 
     leave, employee, user, department = detail
     return _to_leave_item(leave, employee, user, department)
+
+
+def list_annual_leaves(
+    session: Session,
+    *,
+    year: int,
+    department_id: int | None = None,
+    keyword: str | None = None,
+) -> list[TimAnnualLeaveItem]:
+    query = (
+        select(HrAnnualLeave, HrEmployee, AuthUser, OrgDepartment)
+        .join(HrEmployee, HrAnnualLeave.employee_id == HrEmployee.id)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
+        .where(HrAnnualLeave.year == year)
+    )
+
+    if department_id is not None:
+        query = query.where(HrEmployee.department_id == department_id)
+
+    if keyword:
+        like = f"%{keyword}%"
+        query = query.where((HrEmployee.employee_no.like(like)) | (AuthUser.display_name.like(like)))
+
+    rows = session.exec(query.order_by(OrgDepartment.name.asc(), HrEmployee.employee_no.asc())).all()
+    return [
+        TimAnnualLeaveItem(
+            id=annual.id,
+            employee_id=employee.id,
+            employee_no=employee.employee_no,
+            employee_name=user.display_name,
+            department_name=department.name,
+            year=annual.year,
+            granted_days=annual.granted_days,
+            used_days=annual.used_days,
+            carried_over_days=annual.carried_over_days,
+            remaining_days=annual.remaining_days,
+            grant_type=annual.grant_type,
+            note=annual.note,
+        )
+        for annual, employee, user, department in rows
+    ]
 
 
 def cancel_leave_request(session: Session, *, request_id: int, actor_employee_id: int, reason: str | None = None) -> TimLeaveRequestItem:

@@ -8,6 +8,7 @@ from app.core.database import get_session
 from app.models import AuthUser, HrEmployee
 from app.schemas.tim_leave import (
     TimAnnualLeaveAdjustRequest,
+    TimAnnualLeaveListResponse,
     TimAnnualLeaveResponse,
     TimLeaveDecisionRequest,
     TimLeaveRequestCreateRequest,
@@ -19,6 +20,7 @@ from app.services.tim_leave_service import (
     create_leave_request,
     decide_leave_request,
     get_or_create_annual_leave,
+    list_annual_leaves,
     list_leave_requests,
 )
 
@@ -53,6 +55,17 @@ def annual_leave_adjust(payload: TimAnnualLeaveAdjustRequest, session: Session =
         reason=payload.reason,
     )
     return TimAnnualLeaveResponse(item=item)
+
+
+@router.get("/annual-leave/list", response_model=TimAnnualLeaveListResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
+def annual_leave_list(
+    year: int = Query(default_factory=lambda: date.today().year),
+    department_id: int | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> TimAnnualLeaveListResponse:
+    items = list_annual_leaves(session, year=year, department_id=department_id, keyword=keyword)
+    return TimAnnualLeaveListResponse(items=items, total_count=len(items))
 
 
 @router.get("/leave-requests", response_model=TimLeaveRequestListResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
