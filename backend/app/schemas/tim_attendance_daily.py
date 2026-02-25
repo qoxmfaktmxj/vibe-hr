@@ -35,6 +35,24 @@ class TimCheckInOutRequest(BaseModel):
     employee_id: int | None = None
 
 
+class TimTodayScheduleItem(BaseModel):
+    work_date: date
+    day_type: str
+    schedule_code: str
+    schedule_name: str
+    work_start: str
+    work_end: str
+    break_minutes: int
+    work_hours: float
+    is_holiday: bool = False
+    holiday_name: str | None = None
+
+
+class TimTodayScheduleResponse(BaseModel):
+    schedule: TimTodayScheduleItem
+    attendance: TimAttendanceDailyItem | None = None
+
+
 class TimAttendanceCorrectRequest(BaseModel):
     new_status: str
     reason: str = Field(min_length=1, max_length=500)

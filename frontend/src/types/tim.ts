@@ -174,6 +174,24 @@ export type TimAttendanceTodayResponse = {
   item: TimAttendanceDailyItem | null;
 };
 
+export type TimTodayScheduleItem = {
+  work_date: string;
+  day_type: "workday" | "weekend" | "holiday";
+  schedule_code: string;
+  schedule_name: string;
+  work_start: string;
+  work_end: string;
+  break_minutes: number;
+  work_hours: number;
+  is_holiday: boolean;
+  holiday_name: string | null;
+};
+
+export type TimTodayScheduleResponse = {
+  schedule: TimTodayScheduleItem;
+  attendance: TimAttendanceDailyItem | null;
+};
+
 export type TimAttendanceCorrectionItem = {
   id: number;
   attendance_id: number;

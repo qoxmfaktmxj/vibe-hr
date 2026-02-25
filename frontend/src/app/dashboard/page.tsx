@@ -6,6 +6,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { DashboardAttendancePanel } from "@/components/dashboard/dashboard-attendance-panel";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { SurveyMeter } from "@/components/dashboard/survey-meter";
 import { AppShell } from "@/components/layout/app-shell";
@@ -43,6 +44,8 @@ export default async function DashboardPage() {
   return (
     <AppShell title="대시보드" description="실시간 인사 지표를 확인합니다.">
       <div className="space-y-8 p-6 lg:p-8">
+          <DashboardAttendancePanel />
+
           <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               title="Total Employees"

@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
-from app.models import AuthUser, HrEmployee
+from app.models import AuthUser, HrEmployee, TimHoliday, TimWorkScheduleCode
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionListResponse,
     TimAttendanceCorrectRequest,
@@ -13,6 +13,8 @@ from app.schemas.tim_attendance_daily import (
     TimAttendanceDailyListResponse,
     TimAttendanceTodayResponse,
     TimCheckInOutRequest,
+    TimTodayScheduleItem,
+    TimTodayScheduleResponse,
 )
 from app.services.tim_attendance_daily_service import (
     check_in,
@@ -61,6 +63,56 @@ def attendance_today(
 ) -> TimAttendanceTodayResponse:
     target_employee_id = resolve_target_employee_id(session, current_user, employee_id)
     return TimAttendanceTodayResponse(item=get_today_attendance(session, target_employee_id))
+
+
+@router.get("/today-schedule", response_model=TimTodayScheduleResponse)
+def attendance_today_schedule(
+    employee_id: int | None = Query(default=None),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TimTodayScheduleResponse:
+    target_employee_id = resolve_target_employee_id(session, current_user, employee_id)
+    today = date.today()
+
+    holiday = session.exec(select(TimHoliday).where(TimHoliday.holiday_date == today)).first()
+    default_schedule = session.exec(
+        select(TimWorkScheduleCode)
+        .where(TimWorkScheduleCode.is_active == True)
+        .order_by(TimWorkScheduleCode.sort_order.asc(), TimWorkScheduleCode.id.asc())
+    ).first()
+
+    if default_schedule is None:
+        default_schedule = TimWorkScheduleCode(
+            id=0,
+            code="WS00",
+            name="기본근무",
+            work_start="09:00",
+            work_end="18:00",
+            break_minutes=60,
+            work_hours=8.0,
+            is_active=True,
+            sort_order=0,
+        )
+
+    is_weekend = today.weekday() >= 5
+    day_type = "weekend" if is_weekend else "workday"
+    if holiday is not None:
+        day_type = "holiday"
+
+    attendance = get_today_attendance(session, target_employee_id)
+    schedule = TimTodayScheduleItem(
+        work_date=today,
+        day_type=day_type,
+        schedule_code=default_schedule.code,
+        schedule_name=default_schedule.name,
+        work_start=default_schedule.work_start,
+        work_end=default_schedule.work_end,
+        break_minutes=default_schedule.break_minutes,
+        work_hours=default_schedule.work_hours,
+        is_holiday=holiday is not None,
+        holiday_name=holiday.name if holiday is not None else None,
+    )
+    return TimTodayScheduleResponse(schedule=schedule, attendance=attendance)
 
 
 @router.get("/detail/{attendance_id}", response_model=TimAttendanceDailyItem, dependencies=[Depends(require_roles("hr_manager", "admin"))])

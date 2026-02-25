@@ -170,7 +170,7 @@ export function AppShell({ title: _title, description: _description, children }:
         <header className="border-b border-border bg-card text-card-foreground">
           <div className="grid grid-cols-3 items-center px-4 py-2 lg:px-6">
             <div className="flex items-center gap-2">
-              {isAdmin ? <ImpersonationPopover /> : <span className="h-8 w-8" aria-hidden="true" />}
+              <span className="h-8 w-8" aria-hidden="true" />
             </div>
 
             <div className="flex justify-center">
@@ -187,6 +187,7 @@ export function AppShell({ title: _title, description: _description, children }:
 
             <div className="flex items-center justify-end gap-2">
               <ThemeSettingsPopover />
+              {isAdmin ? <ImpersonationPopover /> : null}
               <LogoutButton />
             </div>
           </div>
