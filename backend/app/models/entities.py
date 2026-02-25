@@ -780,7 +780,6 @@ class TimEmployeeDailySchedule(SQLModel, table=True):
     __tablename__ = "tim_employee_daily_schedules"
     __table_args__ = (
         UniqueConstraint("employee_id", "work_date", name="uq_tim_employee_daily_schedules_employee_work_date"),
-        Index("ix_tim_employee_daily_schedules_work_date", "work_date"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
