@@ -252,34 +252,34 @@ export function DashboardSidebar() {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center gap-2 px-3">
+        <div className="mt-3 flex items-center gap-1 px-3">
           <Button
             type="button"
-            size="xs"
+            size="icon"
             variant="outline"
-            className="h-7 gap-1 px-2"
+            className="h-7 w-7"
             onClick={() => {
               setMenuControlMode("expand");
               setMenuControlVersion((prev) => prev + 1);
             }}
             title="메뉴 전체 펼치기"
+            aria-label="메뉴 전체 펼치기"
           >
-            <Plus className="h-3 w-3" />
-            펼치기
+            <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button
             type="button"
-            size="xs"
+            size="icon"
             variant="outline"
-            className="h-7 gap-1 px-2"
+            className="h-7 w-7"
             onClick={() => {
               setMenuControlMode("collapse");
               setMenuControlVersion((prev) => prev + 1);
             }}
             title="메뉴 전체 접기"
+            aria-label="메뉴 전체 접기"
           >
-            <Minus className="h-3 w-3" />
-            접기
+            <Minus className="h-3.5 w-3.5" />
           </Button>
         </div>
 
