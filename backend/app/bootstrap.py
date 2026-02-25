@@ -228,6 +228,41 @@ MENU_TREE: list[dict] = [
                     {"code": "tim.work-codes", "name": "근무코드관리", "path": "/tim/work-codes", "icon": "Clock", "sort_order": 404, "roles": ["hr_manager", "admin"]}
                 ],
             },
+            {
+                "code": "tim.daily",
+                "name": "일상근태",
+                "path": None,
+                "icon": "Clock",
+                "sort_order": 410,
+                "roles": ["employee", "hr_manager", "admin"],
+                "children": [
+                    {"code": "tim.check-in", "name": "출퇴근기록", "path": "/tim/check-in", "icon": "CalendarCheck2", "sort_order": 411, "roles": ["employee", "hr_manager", "admin"]},
+                    {"code": "tim.status", "name": "근태현황", "path": "/tim/status", "icon": "ListOrdered", "sort_order": 412, "roles": ["hr_manager", "admin"]},
+                    {"code": "tim.correction", "name": "근태수정", "path": "/tim/correction", "icon": "CalendarDays", "sort_order": 413, "roles": ["hr_manager", "admin"]}
+                ],
+            },
+            {
+                "code": "tim.leave",
+                "name": "휴가관리",
+                "path": None,
+                "icon": "CalendarDays",
+                "sort_order": 420,
+                "roles": ["employee", "hr_manager", "admin"],
+                "children": [
+                    {"code": "tim.annual-leave", "name": "연차관리", "path": "/tim/annual-leave", "icon": "CalendarDays", "sort_order": 421, "roles": ["employee", "hr_manager", "admin"]},
+                    {"code": "tim.leave-request", "name": "휴가신청", "path": "/tim/leave-request", "icon": "CalendarCheck2", "sort_order": 422, "roles": ["employee", "hr_manager", "admin"]},
+                    {"code": "tim.leave-approval", "name": "휴가승인", "path": "/tim/leave-approval", "icon": "ListOrdered", "sort_order": 423, "roles": ["hr_manager", "admin"]}
+                ],
+            },
+            {
+                "code": "tim.reports",
+                "name": "근태리포트",
+                "path": "/tim/reports",
+                "icon": "FileText",
+                "sort_order": 430,
+                "roles": ["hr_manager", "admin"],
+                "children": [],
+            },
         ],
     },
     {
