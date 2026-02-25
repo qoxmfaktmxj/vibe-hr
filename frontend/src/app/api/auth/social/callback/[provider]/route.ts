@@ -9,6 +9,22 @@ type BackendLoginResponse = {
   user: AuthUser;
 };
 
+type GoogleProfile = {
+  id?: string | number;
+  email?: string;
+  name?: string;
+};
+
+type KakaoProfile = {
+  id?: string | number;
+  kakao_account?: {
+    email?: string;
+    profile?: {
+      nickname?: string;
+    };
+  };
+};
+
 const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -100,7 +116,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     });
-    const profile = (await profileRes.json().catch(() => null)) as any;
+    const profile = (await profileRes.json().catch(() => null)) as GoogleProfile | KakaoProfile | null;
     if (!profileRes.ok || !profile) {
       return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", appOrigin));
     }

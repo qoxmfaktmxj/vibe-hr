@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ModuleRegistry, AllCommunityModule, type ColDef } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { toast } from "sonner";
@@ -45,13 +45,10 @@ export function HrAdminRecordManager({ category, title }: Props) {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
-  const employees = employeeData?.employees ?? [];
+  const employees = useMemo(() => employeeData?.employees ?? [], [employeeData?.employees]);
+  const resolvedEmployeeId = employeeId ?? employees[0]?.id ?? null;
 
-  useEffect(() => {
-    if (!employeeId && employees.length > 0) setEmployeeId(employees[0].id);
-  }, [employeeId, employees]);
-
-  const detailKey = employeeId ? `/api/hr/basic/${employeeId}` : null;
+  const detailKey = resolvedEmployeeId ? `/api/hr/basic/${resolvedEmployeeId}` : null;
   const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 15_000,
@@ -74,8 +71,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }
 
   async function addRow() {
-    if (!employeeId) return;
-    const response = await fetch(`/api/hr/basic/${employeeId}/records`, {
+    if (!resolvedEmployeeId) return;
+    const response = await fetch(`/api/hr/basic/${resolvedEmployeeId}/records`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category, title: newTitle || "신규", type: "", note: "" }),
@@ -87,8 +84,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }
 
   async function updateRow(row: HrInfoRow) {
-    if (!employeeId) return;
-    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, {
+    if (!resolvedEmployeeId) return;
+    const response = await fetch(`/api/hr/basic/${resolvedEmployeeId}/records/${row.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -106,8 +103,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }
 
   async function deleteRow(row: HrInfoRow) {
-    if (!employeeId) return;
-    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, { method: "DELETE" });
+    if (!resolvedEmployeeId) return;
+    const response = await fetch(`/api/hr/basic/${resolvedEmployeeId}/records/${row.id}`, { method: "DELETE" });
     if (!response.ok) return toast.error("삭제 실패");
     toast.success("삭제 완료");
     await refresh();
@@ -118,7 +115,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
       <div className="rounded-lg border bg-white p-3">
         <h2 className="mb-2 text-lg font-semibold">{title}</h2>
         <div className="flex flex-wrap gap-2">
-          <select value={employeeId ?? ""} onChange={(e) => setEmployeeId(Number(e.target.value))} className="h-9 rounded-md border px-2 text-sm">
+          <select value={resolvedEmployeeId ?? ""} onChange={(e) => setEmployeeId(Number(e.target.value))} className="h-9 rounded-md border px-2 text-sm">
             {employees.map((employee) => (
               <option key={employee.id} value={employee.id}>{employee.employee_no} | {employee.display_name}</option>
             ))}
