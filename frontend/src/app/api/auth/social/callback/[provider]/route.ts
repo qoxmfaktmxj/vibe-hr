@@ -123,16 +123,22 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
 
     const normalized =
       provider === "google"
-        ? {
-            provider_user_id: String(profile.id ?? ""),
-            email: String(profile.email ?? "").trim().toLowerCase(),
-            display_name: String(profile.name ?? profile.email ?? "Google User"),
-          }
-        : {
-            provider_user_id: String(profile.id ?? ""),
-            email: String(profile?.kakao_account?.email ?? "").trim().toLowerCase(),
-            display_name: String(profile?.kakao_account?.profile?.nickname ?? "Kakao User"),
-          };
+        ? (() => {
+            const googleProfile = profile as GoogleProfile;
+            return {
+              provider_user_id: String(googleProfile.id ?? ""),
+              email: String(googleProfile.email ?? "").trim().toLowerCase(),
+              display_name: String(googleProfile.name ?? googleProfile.email ?? "Google User"),
+            };
+          })()
+        : (() => {
+            const kakaoProfile = profile as KakaoProfile;
+            return {
+              provider_user_id: String(kakaoProfile.id ?? ""),
+              email: String(kakaoProfile.kakao_account?.email ?? "").trim().toLowerCase(),
+              display_name: String(kakaoProfile.kakao_account?.profile?.nickname ?? "Kakao User"),
+            };
+          })();
 
     if (!normalized.provider_user_id) {
       return NextResponse.redirect(new URL("/login?error=missing_profile_fields", appOrigin));
