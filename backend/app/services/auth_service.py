@@ -136,11 +136,11 @@ def social_exchange_login(session: Session, payload: SocialExchangeRequest) -> L
         if department is None:
             raise ValueError("활성 부서를 찾을 수 없습니다.")
 
-        existing_no = {row[0] for row in session.exec(select(HrEmployee.employee_no)).all()}
         employee_no = None
         for seq in range(1, 999999):
             candidate = f"EMP-{seq:06d}"
-            if candidate not in existing_no:
+            exists = session.exec(select(HrEmployee.id).where(HrEmployee.employee_no == candidate)).first()
+            if exists is None:
                 employee_no = candidate
                 break
         if employee_no is None:

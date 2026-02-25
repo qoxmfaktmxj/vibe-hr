@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Building2, LockKeyhole, User } from "lucide-react";
+import { Building2, LockKeyhole, MessageCircle, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
@@ -143,13 +143,30 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Button asChild variant="outline" className="h-11 w-full border-slate-200 font-semibold text-slate-700">
-          <Link href="/api/auth/social/login/google">Google 로그인</Link>
-        </Button>
-        <Button asChild variant="outline" className="h-11 w-full border-slate-200 font-semibold text-slate-700">
-          <Link href="/api/auth/social/login/kakao">Kakao 로그인</Link>
-        </Button>
+      <div className="flex items-center justify-center gap-5">
+        <Link
+          href="/api/auth/social/login/kakao"
+          className="group flex flex-col items-center gap-2"
+          aria-label="카카오 로그인"
+          title="카카오 로그인"
+        >
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FEE500] text-[#3A1D1D] shadow-sm ring-1 ring-black/5 transition group-hover:scale-105">
+            <MessageCircle className="h-6 w-6" />
+          </span>
+          <span className="text-xs font-medium text-slate-600">Kakao</span>
+        </Link>
+
+        <Link
+          href="/api/auth/social/login/google"
+          className="group flex flex-col items-center gap-2"
+          aria-label="구글 로그인"
+          title="구글 로그인"
+        >
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#4285F4] shadow-sm ring-1 ring-slate-300 transition group-hover:scale-105">
+            <span className="text-2xl font-bold">G</span>
+          </span>
+          <span className="text-xs font-medium text-slate-600">Google</span>
+        </Link>
       </div>
     </CardContent>
   );
