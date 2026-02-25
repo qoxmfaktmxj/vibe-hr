@@ -40,6 +40,15 @@ from app.models import (
     TimSchedulePattern,
     TimSchedulePatternDay,
     TimDepartmentScheduleAssignment,
+    MngCompany,
+    MngManagerCompany,
+    MngDevRequest,
+    MngDevProject,
+    MngDevInquiry,
+    MngOutsourceContract,
+    MngOutsourceAttendance,
+    MngInfraMaster,
+    MngInfraConfig,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -340,6 +349,65 @@ MENU_TREE: list[dict] = [
         ],
     },
     {
+        "code": "mng",
+        "name": "관리",
+        "path": None,
+        "icon": "Briefcase",
+        "sort_order": 800,
+        "roles": ["admin", "hr_manager"],
+        "children": [
+            {
+                "code": "mng.client",
+                "name": "고객관리",
+                "path": None,
+                "icon": "Building",
+                "sort_order": 810,
+                "roles": ["admin", "hr_manager"],
+                "children": [
+                    {"code": "mng.companies", "name": "고객사관리", "path": "/mng/companies", "icon": "Building", "sort_order": 811, "roles": ["admin", "hr_manager"]},
+                    {"code": "mng.manager-status", "name": "담당자현황", "path": "/mng/manager-status", "icon": "Users", "sort_order": 812, "roles": ["admin", "hr_manager"]},
+                ],
+            },
+            {
+                "code": "mng.dev",
+                "name": "개발관리",
+                "path": None,
+                "icon": "Code",
+                "sort_order": 820,
+                "roles": ["admin", "hr_manager"],
+                "children": [
+                    {"code": "mng.dev-requests", "name": "추가개발관리", "path": "/mng/dev-requests", "icon": "ListPlus", "sort_order": 821, "roles": ["admin", "hr_manager"]},
+                    {"code": "mng.dev-projects", "name": "프로젝트관리", "path": "/mng/dev-projects", "icon": "FolderKanban", "sort_order": 822, "roles": ["admin", "hr_manager"]},
+                    {"code": "mng.dev-inquiries", "name": "문의관리", "path": "/mng/dev-inquiries", "icon": "MessageSquare", "sort_order": 823, "roles": ["admin", "hr_manager"]},
+                    {"code": "mng.dev-staff", "name": "인력현황", "path": "/mng/dev-staff", "icon": "UserCheck", "sort_order": 824, "roles": ["admin", "hr_manager"]},
+                ],
+            },
+            {
+                "code": "mng.outsource",
+                "name": "외주관리",
+                "path": None,
+                "icon": "UserPlus",
+                "sort_order": 830,
+                "roles": ["admin", "hr_manager"],
+                "children": [
+                    {"code": "mng.outsource-contracts", "name": "외주계약관리", "path": "/mng/outsource-contracts", "icon": "FileText", "sort_order": 831, "roles": ["admin", "hr_manager"]},
+                    {"code": "mng.outsource-attendance", "name": "외주근태현황", "path": "/mng/outsource-attendance", "icon": "CalendarCheck", "sort_order": 832, "roles": ["admin", "hr_manager"]},
+                ],
+            },
+            {
+                "code": "mng.infra",
+                "name": "인프라관리",
+                "path": None,
+                "icon": "Server",
+                "sort_order": 840,
+                "roles": ["admin"],
+                "children": [
+                    {"code": "mng.infra-config", "name": "인프라구성관리", "path": "/mng/infra", "icon": "Server", "sort_order": 841, "roles": ["admin"]},
+                ],
+            },
+        ],
+    },
+    {
         "code": "settings",
         "name": "시스템",
         "path": None,
@@ -383,6 +451,15 @@ COMMON_CODE_GROUP_SEEDS = [
     ("JOB_GROUP", "직군", "직군 구분", 3),
     ("SALARY_TYPE", "연봉타입", "연봉 유형", 4),
     ("ORG_TYPE", "조직유형", "조직 유형 구분", 5),
+    # ── MNG 관리 모듈 공통코드 ──
+    ("MNG_DEV_STATUS", "개발진행상태", "추가개발 진행상태 구분", 100),
+    ("MNG_PART", "파트구분", "개발 파트 구분", 101),
+    ("MNG_APPROVAL_STATUS", "승인상태", "승인/반려 상태 구분", 102),
+    ("MNG_ATTEND_TYPE", "외주근태종류", "외주인력 근태 종류", 103),
+    ("MNG_ATTEND_STATUS", "외주근태상태", "외주인력 근태 상태", 104),
+    ("MNG_INQUIRY_STATUS", "문의진행상태", "추가개발 문의 진행상태", 105),
+    ("MNG_INSPECTION", "검수상태", "검수 완료 여부", 106),
+    ("MNG_SERVICE_TYPE", "서비스구분", "인프라 서비스 구분", 107),
 ]
 
 COMMON_CODE_ITEM_SEEDS = {
@@ -393,6 +470,59 @@ COMMON_CODE_ITEM_SEEDS = {
         ("04", "차장", 4),
         ("05", "부장", 5),
         ("06", "이사", 6),
+    ],
+    # ── MNG 관리 모듈 코드 항목 ──
+    "MNG_DEV_STATUS": [
+        ("접수", "접수", 1),
+        ("검토", "검토", 2),
+        ("진행", "진행중", 3),
+        ("완료", "완료", 4),
+        ("보류", "보류", 5),
+        ("취소", "취소", 6),
+    ],
+    "MNG_PART": [
+        ("SI", "SI파트", 1),
+        ("SM", "SM파트", 2),
+        ("SOL", "솔루션파트", 3),
+        ("INFRA", "인프라파트", 4),
+    ],
+    "MNG_APPROVAL_STATUS": [
+        ("신청", "신청", 1),
+        ("승인", "승인", 2),
+        ("반려", "반려", 3),
+    ],
+    "MNG_ATTEND_TYPE": [
+        ("연차", "연차", 1),
+        ("반차", "반차(오전)", 2),
+        ("반차PM", "반차(오후)", 3),
+        ("병가", "병가", 4),
+        ("경조", "경조휴가", 5),
+        ("기타", "기타", 6),
+    ],
+    "MNG_ATTEND_STATUS": [
+        ("신청", "신청", 1),
+        ("승인", "승인", 2),
+        ("반려", "반려", 3),
+    ],
+    "MNG_INQUIRY_STATUS": [
+        ("접수", "접수", 1),
+        ("검토", "검토중", 2),
+        ("견적", "견적진행", 3),
+        ("확정", "확정", 4),
+        ("보류", "보류", 5),
+        ("취소", "취소", 6),
+    ],
+    "MNG_INSPECTION": [
+        ("미검수", "미검수", 1),
+        ("검수완료", "검수완료", 2),
+    ],
+    "MNG_SERVICE_TYPE": [
+        ("ERP", "ERP", 1),
+        ("MES", "MES", 2),
+        ("WMS", "WMS", 3),
+        ("GROUPWARE", "그룹웨어", 4),
+        ("PORTAL", "포털", 5),
+        ("ETC", "기타", 6),
     ],
 }
 

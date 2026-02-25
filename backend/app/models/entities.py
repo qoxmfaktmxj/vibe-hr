@@ -692,8 +692,6 @@ class HriRequestCounter(SQLModel, table=True):
     counter_key: str = Field(primary_key=True, max_length=80)
     last_seq: int = Field(default=0)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
 class HriReqTimAttendance(SQLModel, table=True):
     """근태신청 상세 (마스터 1:1)."""
 
@@ -727,8 +725,6 @@ class TimSchedulePattern(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
 class TimSchedulePatternDay(SQLModel, table=True):
     __tablename__ = "tim_schedule_pattern_days"
     __table_args__ = (
@@ -780,8 +776,6 @@ class TimEmployeeScheduleException(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
-
-
 class TimEmployeeDailySchedule(SQLModel, table=True):
     __tablename__ = "tim_employee_daily_schedules"
     __table_args__ = (
@@ -804,3 +798,220 @@ class TimEmployeeDailySchedule(SQLModel, table=True):
     is_overnight: bool = Field(default=False)
     generated_at: datetime = Field(default_factory=utc_now)
     version_tag: Optional[str] = Field(default=None, max_length=50)
+
+
+# ──────────────────────────────────────────────────────────────────────
+# MNG (관리) 모듈 — SSMS-master 마이그레이션
+# ──────────────────────────────────────────────────────────────────────
+
+
+class MngCompany(SQLModel, table=True):
+    """고객사 마스터"""
+
+    __tablename__ = "mng_companies"
+    __table_args__ = (
+        UniqueConstraint("company_code", name="uq_mng_companies_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    company_code: str = Field(max_length=20, index=True)
+    company_name: str = Field(max_length=100)
+    company_group_code: Optional[str] = Field(default=None, max_length=20)
+    company_type: Optional[str] = Field(default=None, max_length=40)
+    management_type: Optional[str] = Field(default=None, max_length=40)
+    representative_company: Optional[str] = Field(default=None, max_length=20)
+    start_date: Optional[date] = None
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngManagerCompany(SQLModel, table=True):
+    """담당자-고객사 매핑"""
+
+    __tablename__ = "mng_manager_companies"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id",
+            "company_id",
+            "start_date",
+            name="uq_mng_manager_companies_emp_comp_sdate",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    company_id: int = Field(foreign_key="mng_companies.id", index=True)
+    start_date: date
+    end_date: Optional[date] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngDevRequest(SQLModel, table=True):
+    """추가개발 요청관리"""
+
+    __tablename__ = "mng_dev_requests"
+    __table_args__ = (
+        Index("ix_mng_dev_requests_company_ym", "company_id", "request_ym"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    company_id: int = Field(foreign_key="mng_companies.id", index=True)
+    request_ym: date
+    request_seq: int
+    status_code: Optional[str] = Field(default=None, max_length=20)
+    part_code: Optional[str] = Field(default=None, max_length=20)
+    requester_name: Optional[str] = Field(default=None, max_length=100)
+    request_content: Optional[str] = None
+    manager_employee_id: Optional[int] = Field(default=None, foreign_key="hr_employees.id")
+    developer_employee_id: Optional[int] = Field(default=None, foreign_key="hr_employees.id")
+    is_paid: bool = Field(default=False)
+    paid_content: Optional[str] = Field(default=None, max_length=500)
+    has_tax_bill: bool = Field(default=False)
+    start_ym: Optional[date] = None
+    end_ym: Optional[date] = None
+    dev_start_date: Optional[date] = None
+    dev_end_date: Optional[date] = None
+    paid_man_months: Optional[float] = None
+    actual_man_months: Optional[float] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngDevProject(SQLModel, table=True):
+    """추가개발 프로젝트관리"""
+
+    __tablename__ = "mng_dev_projects"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    project_name: str = Field(max_length=200)
+    company_id: int = Field(foreign_key="mng_companies.id", index=True)
+    part_code: Optional[str] = Field(default=None, max_length=20)
+    assigned_staff: Optional[str] = Field(default=None, max_length=200)
+    contract_start_date: Optional[date] = None
+    contract_end_date: Optional[date] = None
+    dev_start_date: Optional[date] = None
+    dev_end_date: Optional[date] = None
+    inspection_status: Optional[str] = Field(default=None, max_length=20)
+    has_tax_bill: bool = Field(default=False)
+    actual_man_months: Optional[float] = None
+    contract_amount: Optional[int] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngDevInquiry(SQLModel, table=True):
+    """추가개발 문의관리"""
+
+    __tablename__ = "mng_dev_inquiries"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    company_id: int = Field(foreign_key="mng_companies.id", index=True)
+    inquiry_content: Optional[str] = None
+    hoped_start_date: Optional[date] = None
+    estimated_man_months: Optional[float] = None
+    sales_rep_name: Optional[str] = Field(default=None, max_length=100)
+    client_contact_name: Optional[str] = Field(default=None, max_length=100)
+    progress_code: Optional[str] = Field(default=None, max_length=20)
+    is_confirmed: bool = Field(default=False)
+    project_name: Optional[str] = Field(default=None, max_length=200)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngOutsourceContract(SQLModel, table=True):
+    """외주인력 계약관리"""
+
+    __tablename__ = "mng_outsource_contracts"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id",
+            "start_date",
+            name="uq_mng_outsource_contracts_emp_sdate",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    start_date: date
+    end_date: date
+    total_leave_count: float = Field(default=0)
+    extra_leave_count: float = Field(default=0)
+    note: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngOutsourceAttendance(SQLModel, table=True):
+    """외주인력 근태관리"""
+
+    __tablename__ = "mng_outsource_attendances"
+    __table_args__ = (
+        Index("ix_mng_outsource_attendances_contract", "contract_id"),
+        Index("ix_mng_outsource_attendances_emp", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    contract_id: int = Field(foreign_key="mng_outsource_contracts.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    attendance_code: str = Field(max_length=20)
+    apply_date: Optional[date] = None
+    status_code: Optional[str] = Field(default=None, max_length=20)
+    start_date: date
+    end_date: date
+    apply_count: Optional[float] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngInfraMaster(SQLModel, table=True):
+    """인프라 구성 마스터"""
+
+    __tablename__ = "mng_infra_masters"
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id",
+            "service_type",
+            "env_type",
+            name="uq_mng_infra_masters_comp_svc_env",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    company_id: int = Field(foreign_key="mng_companies.id", index=True)
+    service_type: str = Field(max_length=40)
+    env_type: str = Field(max_length=10)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class MngInfraConfig(SQLModel, table=True):
+    """인프라 구성 상세 (키-값 방식)"""
+
+    __tablename__ = "mng_infra_configs"
+    __table_args__ = (
+        UniqueConstraint(
+            "master_id",
+            "section",
+            "config_key",
+            name="uq_mng_infra_configs_master_section_key",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    master_id: int = Field(foreign_key="mng_infra_masters.id", index=True)
+    section: str = Field(max_length=100)
+    config_key: str = Field(max_length=100)
+    config_value: Optional[str] = None
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)

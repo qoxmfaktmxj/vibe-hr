@@ -39,6 +39,15 @@ from app.models.entities import (
     TimDepartmentScheduleAssignment,
     TimEmployeeScheduleException,
     TimEmployeeDailySchedule,
+    MngCompany,
+    MngManagerCompany,
+    MngDevRequest,
+    MngDevProject,
+    MngDevInquiry,
+    MngOutsourceContract,
+    MngOutsourceAttendance,
+    MngInfraMaster,
+    MngInfraConfig,
 )
 
 __all__ = [
@@ -82,5 +91,14 @@ __all__ = [
     "TimDepartmentScheduleAssignment",
     "TimEmployeeScheduleException",
     "TimEmployeeDailySchedule",
+    "MngCompany",
+    "MngManagerCompany",
+    "MngDevRequest",
+    "MngDevProject",
+    "MngDevInquiry",
+    "MngOutsourceContract",
+    "MngOutsourceAttendance",
+    "MngInfraMaster",
+    "MngInfraConfig",
 ]
 
