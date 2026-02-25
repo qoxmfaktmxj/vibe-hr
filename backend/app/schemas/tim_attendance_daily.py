@@ -48,9 +48,16 @@ class TimTodayScheduleItem(BaseModel):
     holiday_name: str | None = None
 
 
+class TimTodayDerivedItem(BaseModel):
+    is_late: bool
+    overtime_minutes: int
+    is_weekend_work: bool
+
+
 class TimTodayScheduleResponse(BaseModel):
     schedule: TimTodayScheduleItem
     attendance: TimAttendanceDailyItem | None = None
+    derived: TimTodayDerivedItem
 
 
 class TimAttendanceCorrectRequest(BaseModel):

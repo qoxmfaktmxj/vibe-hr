@@ -39,3 +39,54 @@ class TimScheduleTodayItem(BaseModel):
 
 class TimScheduleTodayResponse(BaseModel):
     item: TimScheduleTodayItem
+
+
+class TimSchedulePatternItem(BaseModel):
+    id: int
+    code: str
+    name: str
+
+
+class TimSchedulePatternListResponse(BaseModel):
+    items: list[TimSchedulePatternItem]
+    total_count: int
+
+
+class TimEmployeeScheduleExceptionItem(BaseModel):
+    id: int
+    employee_id: int
+    pattern_id: int
+    effective_from: date
+    effective_to: date | None
+    reason: str | None
+    priority: int
+    is_active: bool
+
+
+class TimEmployeeScheduleExceptionListResponse(BaseModel):
+    items: list[TimEmployeeScheduleExceptionItem]
+    total_count: int
+
+
+class TimEmployeeScheduleExceptionUpsertRequest(BaseModel):
+    id: int | None = None
+    employee_id: int
+    pattern_id: int
+    effective_from: date
+    effective_to: date | None = None
+    reason: str | None = None
+    priority: int = 1000
+    is_active: bool = True
+
+
+class TimEmployeeScheduleExceptionBatchRequest(BaseModel):
+    items: list[TimEmployeeScheduleExceptionUpsertRequest]
+    delete_ids: list[int] = []
+
+
+class TimEmployeeScheduleExceptionBatchResponse(BaseModel):
+    items: list[TimEmployeeScheduleExceptionItem]
+    total_count: int
+    inserted_count: int
+    updated_count: int
+    deleted_count: int

@@ -113,6 +113,12 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
         <div className="rounded-md border bg-muted/20 p-2">상태: {data?.attendance?.attendance_status ?? "-"}</div>
       </div>
 
+      <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-3">
+        <div className="rounded-md border bg-muted/10 p-2">지각 판정: {data?.derived.is_late ? "Y" : "N"}</div>
+        <div className="rounded-md border bg-muted/10 p-2">야근(분): {data?.derived.overtime_minutes ?? 0}</div>
+        <div className="rounded-md border bg-muted/10 p-2">주말/휴일 근무: {data?.derived.is_weekend_work ? "Y" : "N"}</div>
+      </div>
+
       <div className="mt-3 flex gap-2">
         <Button size="sm" onClick={doCheckIn} disabled={isLoading}>출근</Button>
         <Button size="sm" variant="outline" onClick={doCheckOut} disabled={isLoading}>퇴근</Button>

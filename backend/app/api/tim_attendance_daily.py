@@ -13,6 +13,7 @@ from app.schemas.tim_attendance_daily import (
     TimAttendanceDailyListResponse,
     TimAttendanceTodayResponse,
     TimCheckInOutRequest,
+    TimTodayDerivedItem,
     TimTodayScheduleItem,
     TimTodayScheduleResponse,
 )
@@ -125,7 +126,29 @@ def attendance_today_schedule(
         is_holiday=daily.is_holiday if daily is not None else holiday is not None,
         holiday_name=daily.holiday_name if daily is not None else (holiday.name if holiday is not None else None),
     )
-    return TimTodayScheduleResponse(schedule=schedule, attendance=attendance)
+
+    overtime_minutes = 0
+    is_late = False
+    is_weekend_work = False
+
+    planned_start = daily.planned_start_at if daily else None
+    planned_end = daily.planned_end_at if daily else None
+    if attendance and attendance.check_in_at and planned_start:
+        is_late = attendance.check_in_at > planned_start
+    if attendance and attendance.check_out_at and planned_end:
+        overtime_minutes = max(int((attendance.check_out_at - planned_end).total_seconds() // 60), 0)
+    if attendance and attendance.check_in_at and (day_type in {"weekend", "holiday"}):
+        is_weekend_work = True
+
+    return TimTodayScheduleResponse(
+        schedule=schedule,
+        attendance=attendance,
+        derived=TimTodayDerivedItem(
+            is_late=is_late,
+            overtime_minutes=overtime_minutes,
+            is_weekend_work=is_weekend_work,
+        ),
+    )
 
 
 @router.get("/detail/{attendance_id}", response_model=TimAttendanceDailyItem, dependencies=[Depends(require_roles("hr_manager", "admin"))])

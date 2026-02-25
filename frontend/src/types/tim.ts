@@ -190,6 +190,11 @@ export type TimTodayScheduleItem = {
 export type TimTodayScheduleResponse = {
   schedule: TimTodayScheduleItem;
   attendance: TimAttendanceDailyItem | null;
+  derived: {
+    is_late: boolean;
+    overtime_minutes: number;
+    is_weekend_work: boolean;
+  };
 };
 
 export type TimAttendanceCorrectionItem = {
@@ -285,4 +290,48 @@ export type TimReportSummaryResponse = {
   status_counts: TimStatusCount;
   department_summaries: TimDepartmentSummaryItem[];
   leave_type_summaries: TimLeaveTypeSummaryItem[];
+};
+
+// ── 스케줄 엔진 ──
+export type TimSchedulePatternItem = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+export type TimSchedulePatternListResponse = {
+  items: TimSchedulePatternItem[];
+  total_count: number;
+};
+
+export type TimScheduleGenerateRequest = {
+  target: "all" | "department" | "employee";
+  department_id?: number;
+  employee_ids?: number[];
+  date_from: string;
+  date_to: string;
+  mode: "create_if_missing" | "overwrite";
+};
+
+export type TimScheduleGenerateResponse = {
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  version_tag: string;
+};
+
+export type TimEmployeeScheduleExceptionItem = {
+  id: number;
+  employee_id: number;
+  pattern_id: number;
+  effective_from: string;
+  effective_to: string | null;
+  reason: string | null;
+  priority: number;
+  is_active: boolean;
+};
+
+export type TimEmployeeScheduleExceptionListResponse = {
+  items: TimEmployeeScheduleExceptionItem[];
+  total_count: number;
 };

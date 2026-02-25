@@ -6,7 +6,7 @@ from math import ceil
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
-from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection
+from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection, TimEmployeeDailySchedule
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionItem,
     TimAttendanceDailyItem,
@@ -128,14 +128,30 @@ def check_in(session: Session, employee_id: int) -> TimAttendanceDailyItem:
     now = datetime.now(timezone.utc)
     today = now.date()
 
+    daily_schedule = session.exec(
+        select(TimEmployeeDailySchedule).where(
+            TimEmployeeDailySchedule.employee_id == employee_id,
+            TimEmployeeDailySchedule.work_date == today,
+        )
+    ).first()
+
+    is_late = False
+    if daily_schedule and daily_schedule.planned_start_at:
+        is_late = now > daily_schedule.planned_start_at
+
     row = session.exec(select(HrAttendanceDaily).where(HrAttendanceDaily.employee_id == employee_id, HrAttendanceDaily.work_date == today)).first()
     if row is None:
-        row = HrAttendanceDaily(employee_id=employee_id, work_date=today, check_in_at=now, attendance_status="present")
+        row = HrAttendanceDaily(
+            employee_id=employee_id,
+            work_date=today,
+            check_in_at=now,
+            attendance_status="late" if is_late else "present",
+        )
     elif row.check_in_at is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="오늘 이미 출근 처리되었습니다.")
     else:
         row.check_in_at = now
-        row.attendance_status = "present"
+        row.attendance_status = "late" if is_late else "present"
 
     session.add(row)
     session.commit()

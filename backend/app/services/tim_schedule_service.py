@@ -13,7 +13,15 @@ from app.models import (
     TimSchedulePattern,
     TimSchedulePatternDay,
 )
-from app.schemas.tim_schedule import TimScheduleGenerateRequest, TimScheduleGenerateResponse, TimScheduleTodayItem
+from app.schemas.tim_schedule import (
+    TimEmployeeScheduleExceptionBatchRequest,
+    TimEmployeeScheduleExceptionBatchResponse,
+    TimEmployeeScheduleExceptionItem,
+    TimScheduleGenerateRequest,
+    TimScheduleGenerateResponse,
+    TimSchedulePatternItem,
+    TimScheduleTodayItem,
+)
 
 
 def _in_range(target: date, start: date, end: date | None) -> bool:
@@ -175,4 +183,83 @@ def get_my_today_schedule(session: Session, employee_id: int) -> TimScheduleToda
         is_holiday=row.is_holiday if row else False,
         holiday_name=row.holiday_name if row else None,
         generated_at=row.generated_at if row else None,
+    )
+
+
+def list_schedule_patterns(session: Session) -> list[TimSchedulePatternItem]:
+    rows = session.exec(
+        select(TimSchedulePattern)
+        .where(TimSchedulePattern.is_active == True)
+        .order_by(TimSchedulePattern.id.asc())
+    ).all()
+    return [TimSchedulePatternItem(id=row.id, code=row.code, name=row.name) for row in rows]
+
+
+def list_employee_schedule_exceptions(session: Session, employee_id: int | None = None) -> list[TimEmployeeScheduleExceptionItem]:
+    query = select(TimEmployeeScheduleException).order_by(TimEmployeeScheduleException.effective_from.desc(), TimEmployeeScheduleException.id.desc())
+    if employee_id is not None:
+        query = query.where(TimEmployeeScheduleException.employee_id == employee_id)
+    rows = session.exec(query).all()
+    return [
+        TimEmployeeScheduleExceptionItem(
+            id=row.id,
+            employee_id=row.employee_id,
+            pattern_id=row.pattern_id,
+            effective_from=row.effective_from,
+            effective_to=row.effective_to,
+            reason=row.reason,
+            priority=row.priority,
+            is_active=row.is_active,
+        )
+        for row in rows
+    ]
+
+
+def batch_save_employee_schedule_exceptions(
+    session: Session,
+    payload: TimEmployeeScheduleExceptionBatchRequest,
+) -> TimEmployeeScheduleExceptionBatchResponse:
+    inserted = 0
+    updated = 0
+    deleted = 0
+
+    if payload.delete_ids:
+        targets = session.exec(select(TimEmployeeScheduleException).where(TimEmployeeScheduleException.id.in_(payload.delete_ids))).all()
+        for row in targets:
+            session.delete(row)
+        deleted = len(targets)
+
+    for item in payload.items:
+        row = session.get(TimEmployeeScheduleException, item.id) if item.id else None
+        if row is None:
+            row = TimEmployeeScheduleException(
+                employee_id=item.employee_id,
+                pattern_id=item.pattern_id,
+                effective_from=item.effective_from,
+                effective_to=item.effective_to,
+                reason=item.reason,
+                priority=item.priority,
+                is_active=item.is_active,
+            )
+            session.add(row)
+            inserted += 1
+        else:
+            row.employee_id = item.employee_id
+            row.pattern_id = item.pattern_id
+            row.effective_from = item.effective_from
+            row.effective_to = item.effective_to
+            row.reason = item.reason
+            row.priority = item.priority
+            row.is_active = item.is_active
+            session.add(row)
+            updated += 1
+
+    session.commit()
+    items = list_employee_schedule_exceptions(session)
+    return TimEmployeeScheduleExceptionBatchResponse(
+        items=items,
+        total_count=len(items),
+        inserted_count=inserted,
+        updated_count=updated,
+        deleted_count=deleted,
     )
