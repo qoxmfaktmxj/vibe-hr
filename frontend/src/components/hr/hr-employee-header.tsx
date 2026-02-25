@@ -59,13 +59,13 @@ export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmploy
             </p>
           </div>
 
-          <div className="w-[220px] max-w-[45vw]">
+          <div className="relative w-[220px] max-w-[45vw]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="사번/이름 검색" className="h-9 pl-8" />
             </div>
             {query ? (
-              <div className="mt-1 max-h-32 overflow-auto rounded-md border bg-white">
+              <div className="absolute left-0 right-0 z-20 mt-1 max-h-32 overflow-auto rounded-md border bg-white shadow-lg">
                 {filtered.map((item) => (
                   <button
                     key={item.id}
