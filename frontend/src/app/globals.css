@@ -240,6 +240,25 @@
 /* ============================================================ */
 /* Dark mode global polish (legacy utility class fallback)       */
 /* ============================================================ */
+.dark {
+  scrollbar-color: #334155 #0b1220;
+}
+.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #0b1220;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+  border: 2px solid #0b1220;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
 .dark .bg-white,
 .dark .bg-slate-50,
 .dark .bg-slate-100,
