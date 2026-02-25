@@ -833,7 +833,7 @@ export function EmployeeMasterManager() {
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, "업로드양식");
       writeFileXLSX(book, "employee-upload-template.xlsx");
-    } catch (error) {
+    } catch {
       toast.error("양식 다운로드에 실패했습니다.");
     }
   }
@@ -860,7 +860,7 @@ export function EmployeeMasterManager() {
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, "사원관리");
       writeFileXLSX(book, `employee-sheet-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (error) {
+    } catch {
       toast.error("다운로드에 실패했습니다.");
     }
   }
@@ -903,7 +903,7 @@ export function EmployeeMasterManager() {
 
       setRows((prev) => [...parsed, ...prev]);
       setTimeout(refreshGridRows, 0);
-    } catch (error) {
+    } catch {
       toast.error("엑셀 파일을 읽지 못했습니다. 파일 형식을 확인해 주세요.");
     }
   }

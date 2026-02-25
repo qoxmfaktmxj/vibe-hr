@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -78,12 +78,6 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   );
 
   const tabRows = activeTab === "basic" ? [] : rowsByTab(detail, activeTab);
-
-  useEffect(() => {
-    const next: Record<number, HrInfoRow> = {};
-    for (const row of tabRows) next[row.id] = row;
-    setDraftRows(next);
-  }, [activeTab, detail]);
 
   async function addRecord() {
     if (!employeeId || activeTab === "basic") return;
