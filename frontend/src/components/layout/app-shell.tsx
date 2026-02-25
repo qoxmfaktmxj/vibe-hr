@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { useMenu } from "@/components/auth/menu-provider";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { ChatAssistantFab } from "@/components/layout/chat-assistant-fab";
 import { ImpersonationPopover } from "@/components/layout/impersonation-popover";
 import { ThemeSettingsPopover } from "@/components/layout/theme-settings-popover";
 import type { MenuNode } from "@/types/menu";
@@ -25,6 +26,7 @@ type OpenTab = {
 };
 
 const TAB_STORAGE_KEY = "vibe_hr_open_tabs";
+const MAX_OPEN_TABS = 10;
 
 function findMenuLabel(menus: MenuNode[], path: string): string | null {
   for (const node of menus) {
@@ -74,12 +76,12 @@ export function AppShell({ title, description, children }: AppShellProps) {
     }));
 
     if (!pathname || pathname === "/login" || pathname === "/unauthorized") {
-      return normalized;
+      return normalized.slice(-MAX_OPEN_TABS);
     }
 
     const exists = normalized.some((tab) => tab.path === pathname);
-    if (exists) return normalized;
-    return [...normalized, { path: pathname, label: resolveLabel(pathname) }];
+    const next = exists ? normalized : [...normalized, { path: pathname, label: resolveLabel(pathname) }];
+    return next.slice(-MAX_OPEN_TABS);
   }, [pathname, resolveLabel, storedTabs]);
 
   useEffect(() => {
@@ -88,14 +90,18 @@ export function AppShell({ title, description, children }: AppShellProps) {
   }, [openTabs]);
 
   function closeTab(path: string) {
-    setStoredTabs((prev) => {
-      const next = prev.filter((tab) => tab.path !== path);
-      if (pathname === path) {
-        const fallbackPath = next[next.length - 1]?.path ?? "/dashboard";
-        router.push(fallbackPath);
-      }
-      return next;
-    });
+    const next = openTabs.filter((tab) => tab.path !== path);
+    setStoredTabs(next);
+
+    if (pathname === path) {
+      const fallbackPath = next[next.length - 1]?.path ?? "/dashboard";
+      router.push(fallbackPath);
+    }
+  }
+
+  function closeAllTabs() {
+    setStoredTabs([]);
+    router.push("/dashboard");
   }
 
   return (
@@ -126,7 +132,14 @@ export function AppShell({ title, description, children }: AppShellProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6">
+          <div
+            className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              if (window.confirm("모든 탭을 닫고 홈으로 이동할까요?")) closeAllTabs();
+            }}
+            title="우클릭: 모든 탭 닫기"
+          >
             <button
               type="button"
               className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
@@ -183,6 +196,8 @@ export function AppShell({ title, description, children }: AppShellProps) {
 
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
+
+      <ChatAssistantFab />
     </div>
   );
 }

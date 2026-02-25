@@ -1,10 +1,11 @@
 "use client";
 
-import { Check, Moon, Palette, Settings2, Sun } from "lucide-react";
+import { Bot, Check, Moon, Palette, Settings2, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { CHATBOT_FAB_EVENT, CHATBOT_FAB_VISIBLE_KEY } from "@/components/layout/chat-assistant-fab";
 import { cn } from "@/lib/utils";
 
 type PaletteMode = "default" | "vivid";
@@ -14,6 +15,7 @@ type ThemePreference = {
   darkMode: boolean;
   paletteMode: PaletteMode;
   primaryTone: PrimaryTone;
+  chatbotButtonVisible: boolean;
 };
 
 const STORAGE_KEY = "vibe_hr_theme_preferences";
@@ -45,14 +47,15 @@ function normalizePaletteMode(mode: string | undefined | null): PaletteMode {
 
 function getCurrentPreference(): ThemePreference {
   if (typeof window === "undefined") {
-    return { darkMode: false, paletteMode: "default", primaryTone: "blue" };
+    return { darkMode: false, paletteMode: "default", primaryTone: "blue", chatbotButtonVisible: true };
   }
 
   const root = document.documentElement;
   const darkMode = root.classList.contains("dark");
   const paletteMode = normalizePaletteMode(root.dataset.palette);
   const primaryTone = (root.dataset.primaryTone as PrimaryTone | undefined) ?? "blue";
-  return { darkMode, paletteMode, primaryTone };
+  const chatbotButtonVisible = window.localStorage.getItem(CHATBOT_FAB_VISIBLE_KEY) !== "false";
+  return { darkMode, paletteMode, primaryTone, chatbotButtonVisible };
 }
 
 function loadStoredPreference(): ThemePreference | null {
@@ -66,6 +69,10 @@ function loadStoredPreference(): ThemePreference | null {
       darkMode: Boolean(json.darkMode),
       paletteMode: normalizePaletteMode(json.paletteMode as string | undefined),
       primaryTone: (json.primaryTone as PrimaryTone) || "blue",
+      chatbotButtonVisible:
+        typeof json.chatbotButtonVisible === "boolean"
+          ? json.chatbotButtonVisible
+          : window.localStorage.getItem(CHATBOT_FAB_VISIBLE_KEY) !== "false",
     };
   } catch {
     return null;
@@ -101,6 +108,8 @@ export function ThemeSettingsPopover() {
     applyThemePreference(draft);
     setApplied(draft);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    window.localStorage.setItem(CHATBOT_FAB_VISIBLE_KEY, String(draft.chatbotButtonVisible));
+    window.dispatchEvent(new Event(CHATBOT_FAB_EVENT));
     setOpen(false);
   }
 
@@ -178,6 +187,25 @@ export function ThemeSettingsPopover() {
               </span>
               <span className={cn("text-xs font-semibold", draft.darkMode ? "text-primary" : "text-slate-500")}>
                 {draft.darkMode ? "ON" : "OFF"}
+              </span>
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-slate-600">화면 도구</div>
+            <button
+              type="button"
+              onClick={() => setDraft((prev) => ({ ...prev, chatbotButtonVisible: !prev.chatbotButtonVisible }))}
+              className="flex w-full items-center justify-between rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-2">
+                <Bot className="h-3.5 w-3.5" />
+                챗봇 버튼 표시
+              </span>
+              <span
+                className={cn("text-xs font-semibold", draft.chatbotButtonVisible ? "text-primary" : "text-slate-500")}
+              >
+                {draft.chatbotButtonVisible ? "ON" : "OFF"}
               </span>
             </button>
           </div>
