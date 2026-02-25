@@ -25,6 +25,12 @@ type OpenTab = {
   label: string;
 };
 
+type TabContextMenuState = {
+  x: number;
+  y: number;
+  targetPath: string;
+} | null;
+
 const TAB_STORAGE_KEY = "vibe_hr_open_tabs";
 const MAX_OPEN_TABS = 10;
 
@@ -61,6 +67,8 @@ export function AppShell({ title, description, children }: AppShellProps) {
       return [];
     }
   });
+
+  const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
 
@@ -102,19 +110,39 @@ export function AppShell({ title, description, children }: AppShellProps) {
   function closeAllTabs() {
     setStoredTabs([]);
     router.push("/dashboard");
+    setContextMenu(null);
   }
 
-  function closeLeftTabs() {
-    const activeIndex = openTabs.findIndex((tab) => tab.path === pathname);
-    if (activeIndex <= 0) return;
-    setStoredTabs(openTabs.slice(activeIndex));
+  function closeLeftTabs(targetPath: string) {
+    const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
+    if (targetIndex <= 0) return;
+    setStoredTabs(openTabs.slice(targetIndex));
+    setContextMenu(null);
   }
 
-  function closeRightTabs() {
-    const activeIndex = openTabs.findIndex((tab) => tab.path === pathname);
-    if (activeIndex < 0 || activeIndex >= openTabs.length - 1) return;
-    setStoredTabs(openTabs.slice(0, activeIndex + 1));
+  function closeRightTabs(targetPath: string) {
+    const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
+    if (targetIndex < 0 || targetIndex >= openTabs.length - 1) return;
+    setStoredTabs(openTabs.slice(0, targetIndex + 1));
+    setContextMenu(null);
   }
+
+  useEffect(() => {
+    function handleClose() {
+      setContextMenu(null);
+    }
+
+    function handleEsc(event: KeyboardEvent) {
+      if (event.key === "Escape") setContextMenu(null);
+    }
+
+    window.addEventListener("click", handleClose);
+    window.addEventListener("keydown", handleEsc);
+    return () => {
+      window.removeEventListener("click", handleClose);
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
@@ -167,6 +195,10 @@ export function AppShell({ title, description, children }: AppShellProps) {
                       : "border-border bg-card text-muted-foreground hover:bg-accent"
                   }`}
                   onClick={() => router.push(tab.path)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setContextMenu({ x: event.clientX, y: event.clientY, targetPath: tab.path });
+                  }}
                 >
                   <span className="max-w-28 truncate">{tab.label}</span>
                   <span
@@ -192,34 +224,6 @@ export function AppShell({ title, description, children }: AppShellProps) {
               );
             })}
 
-            {openTabs.length > 0 ? (
-              <div className="ml-auto flex shrink-0 items-center gap-1 pl-2">
-                <button
-                  type="button"
-                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                  onClick={closeLeftTabs}
-                  title="현재 탭 기준 왼쪽 탭 모두 닫기"
-                >
-                  좌측 닫기
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                  onClick={closeRightTabs}
-                  title="현재 탭 기준 오른쪽 탭 모두 닫기"
-                >
-                  우측 닫기
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-                  onClick={closeAllTabs}
-                  title="모든 탭 닫고 홈으로 이동"
-                >
-                  전체 닫기
-                </button>
-              </div>
-            ) : null}
           </div>
         </header>
 
@@ -232,6 +236,36 @@ export function AppShell({ title, description, children }: AppShellProps) {
       </div>
 
       <ChatAssistantFab />
+
+      {contextMenu ? (
+        <div
+          className="fixed z-[80] min-w-40 rounded-md border border-border bg-card p-1 shadow-lg"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            onClick={() => closeLeftTabs(contextMenu.targetPath)}
+          >
+            좌측 탭 모두 닫기
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            onClick={() => closeRightTabs(contextMenu.targetPath)}
+          >
+            우측 탭 모두 닫기
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            onClick={closeAllTabs}
+          >
+            전체 탭 닫기 (홈 이동)
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
