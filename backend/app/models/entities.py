@@ -694,6 +694,28 @@ class HriRequestCounter(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class HriReqTimAttendance(SQLModel, table=True):
+    """근태신청 상세 (마스터 1:1)."""
+
+    __tablename__ = "hri_req_tim_attendance"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_hri_req_tim_attendance_request_id"),
+        Index("ix_hri_req_tim_attendance_dates", "start_date", "end_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    attendance_code: str = Field(max_length=30)
+    start_date: date
+    end_date: date
+    start_time: Optional[str] = Field(default=None, max_length=5)
+    end_time: Optional[str] = Field(default=None, max_length=5)
+    applied_minutes: int = Field(default=0)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class TimSchedulePattern(SQLModel, table=True):
     __tablename__ = "tim_schedule_patterns"
     __table_args__ = (UniqueConstraint("code", name="uq_tim_schedule_patterns_code"),)
