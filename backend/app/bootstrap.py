@@ -228,6 +228,15 @@ MENU_TREE: list[dict] = [
                     {"code": "tim.work-codes", "name": "근무코드관리", "path": "/tim/work-codes", "icon": "Clock", "sort_order": 404, "roles": ["hr_manager", "admin"]}
                 ],
             },
+            {
+                "code": "tim.reports",
+                "name": "근태리포트",
+                "path": "/tim/reports",
+                "icon": "FileText",
+                "sort_order": 405,
+                "roles": ["hr_manager", "admin"],
+                "children": [],
+            },
         ],
     },
     {

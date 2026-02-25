@@ -146,3 +146,38 @@ export type TimHolidayCopyYearResponse = {
   copied_count: number;
   year_to: number;
 };
+
+// ── 근태 리포트 (Phase 4) ──
+export type TimStatusCount = {
+  present: number;
+  late: number;
+  absent: number;
+  leave: number;
+  remote: number;
+};
+
+export type TimDepartmentSummaryItem = {
+  department_id: number;
+  department_name: string;
+  attendance_count: number;
+  present_rate: number;
+  late_rate: number;
+  absent_rate: number;
+};
+
+export type TimLeaveTypeSummaryItem = {
+  leave_type: string;
+  request_count: number;
+  approved_count: number;
+  pending_count: number;
+};
+
+export type TimReportSummaryResponse = {
+  start_date: string;
+  end_date: string;
+  total_attendance_records: number;
+  total_leave_requests: number;
+  status_counts: TimStatusCount;
+  department_summaries: TimDepartmentSummaryItem[];
+  leave_type_summaries: TimLeaveTypeSummaryItem[];
+};
