@@ -20,6 +20,7 @@ from app.models import (
     HrEmployee,
     HrEmployeeBasicProfile,
     HrEmployeeInfoRecord,
+    HrAnnualLeave,
     HrLeaveRequest,
     OrgDepartment,
     TimAttendanceCode,
@@ -1072,6 +1073,47 @@ def ensure_holidays(session: Session) -> None:
     session.commit()
 
 
+def ensure_annual_leave_seed(session: Session) -> None:
+    year = date.today().year
+    employees = session.exec(select(HrEmployee).order_by(HrEmployee.id)).all()
+
+    for employee in employees:
+        exists = session.exec(
+            select(HrAnnualLeave.id).where(HrAnnualLeave.employee_id == employee.id, HrAnnualLeave.year == year)
+        ).first()
+        if exists is not None:
+            continue
+
+        years = max(0, year - employee.hire_date.year)
+        if years <= 0:
+            granted = 11.0
+        elif years < 3:
+            granted = 15.0
+        else:
+            granted = float(min(15 + ((years - 1) // 2), 25))
+
+        carry = 0.0
+        prev = session.exec(
+            select(HrAnnualLeave).where(HrAnnualLeave.employee_id == employee.id, HrAnnualLeave.year == year - 1)
+        ).first()
+        if prev is not None:
+            carry = min(prev.remaining_days, 5.0)
+
+        session.add(
+            HrAnnualLeave(
+                employee_id=employee.id,
+                year=year,
+                granted_days=granted,
+                used_days=0.0,
+                carried_over_days=carry,
+                remaining_days=granted + carry,
+                grant_type="auto",
+            )
+        )
+
+    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -1121,3 +1163,4 @@ def seed_initial_data(session: Session) -> None:
     ensure_attendance_codes(session)
     ensure_work_schedule_codes(session)
     ensure_holidays(session)
+    ensure_annual_leave_seed(session)

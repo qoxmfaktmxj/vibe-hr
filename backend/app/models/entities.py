@@ -240,6 +240,26 @@ class TimAttendanceCorrection(SQLModel, table=True):
     corrected_at: datetime = Field(default_factory=utc_now)
 
 
+class HrAnnualLeave(SQLModel, table=True):
+    __tablename__ = "tim_annual_leaves"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "year", name="uq_tim_annual_leaves_emp_year"),
+        Index("ix_tim_annual_leaves_emp_year", "employee_id", "year"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    year: int = Field(index=True)
+    granted_days: float = Field(default=15.0)
+    used_days: float = Field(default=0.0)
+    carried_over_days: float = Field(default=0.0)
+    remaining_days: float = Field(default=15.0)
+    grant_type: str = Field(default="auto", max_length=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class TimAttendanceCode(SQLModel, table=True):
     """근태코드 마스터 (연차, 반차, 병가, 출장, 재택 등)"""
 

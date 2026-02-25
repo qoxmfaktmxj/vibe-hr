@@ -192,3 +192,44 @@ export type TimAttendanceCorrectionListResponse = {
   corrections: TimAttendanceCorrectionItem[];
   total_count: number;
 };
+
+// ── 휴가관리 (Phase 3) ──
+export type TimAnnualLeaveItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  year: number;
+  granted_days: number;
+  used_days: number;
+  carried_over_days: number;
+  remaining_days: number;
+  grant_type: string;
+  note: string | null;
+};
+
+export type TimAnnualLeaveResponse = {
+  item: TimAnnualLeaveItem;
+};
+
+export type TimLeaveRequestItem = {
+  id: number;
+  employee_id: number;
+  employee_no: string;
+  employee_name: string;
+  department_name: string;
+  leave_type: "annual" | "sick" | "half_day" | "unpaid" | "other";
+  start_date: string;
+  end_date: string;
+  leave_days: number;
+  reason: string | null;
+  request_status: "pending" | "approved" | "rejected" | "cancelled";
+  approver_employee_id: number | null;
+  approved_at: string | null;
+  created_at: string;
+};
+
+export type TimLeaveRequestListResponse = {
+  items: TimLeaveRequestItem[];
+  total_count: number;
+};
