@@ -22,6 +22,9 @@ from app.models import (
     HrEmployeeInfoRecord,
     HrLeaveRequest,
     OrgDepartment,
+    TimAttendanceCode,
+    TimHoliday,
+    TimWorkScheduleCode,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -220,8 +223,8 @@ MENU_TREE: list[dict] = [
                 "sort_order": 401,
                 "roles": ["hr_manager", "admin"],
                 "children": [
-                    {"code": "hr.leave", "name": "공휴일관리", "path": "/tim/holidays", "icon": "CalendarDays", "sort_order": 402, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.attendance", "name": "근태코드관리", "path": "/tim/codes", "icon": "CalendarCheck2", "sort_order": 403, "roles": ["hr_manager", "admin"]},
+                    {"code": "tim.holidays", "name": "공휴일관리", "path": "/tim/holidays", "icon": "CalendarDays", "sort_order": 402, "roles": ["hr_manager", "admin"]},
+                    {"code": "tim.codes", "name": "근태코드관리", "path": "/tim/codes", "icon": "CalendarCheck2", "sort_order": 403, "roles": ["hr_manager", "admin"]},
                     {"code": "tim.work-codes", "name": "근무코드관리", "path": "/tim/work-codes", "icon": "Clock", "sort_order": 404, "roles": ["hr_manager", "admin"]}
                 ],
             },
@@ -892,6 +895,148 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
     session.commit()
 
 
+ATTENDANCE_CODE_SEEDS = [
+    # (code, name, category, unit, is_requestable, min_days, max_days, deduct_annual, sort_order)
+    ("C01", "연차휴가", "leave", "day", True, 1.0, 25.0, True, 10),
+    ("C01A", "오전반차", "leave", "am", True, 0.5, 0.5, True, 20),
+    ("C01B", "오후반차", "leave", "pm", True, 0.5, 0.5, True, 30),
+    ("C02", "하계휴가", "leave", "day", True, 1.0, 5.0, False, 40),
+    ("C03", "대체휴가", "leave", "day", True, 1.0, 100.0, False, 50),
+    ("C04", "병가", "leave", "day", True, 1.0, 90.0, False, 60),
+    ("C05", "경조휴가", "leave", "day", True, 1.0, 5.0, False, 70),
+    ("C06", "공가", "leave", "day", True, 1.0, 10.0, False, 80),
+    ("C07", "교육", "leave", "day", True, 1.0, 30.0, False, 90),
+    ("C08", "출산휴가", "leave", "day", True, 1.0, 120.0, False, 100),
+    ("C09", "육아휴직", "leave", "day", True, 1.0, 365.0, False, 110),
+    ("W01", "정상출근", "work", "day", False, None, None, False, 200),
+    ("W02", "지각", "work", "day", False, None, None, False, 210),
+    ("W03", "조퇴", "work", "day", False, None, None, False, 220),
+    ("W04", "결근", "work", "day", False, None, None, False, 230),
+    ("W05", "외출", "work", "hour", True, None, None, False, 240),
+    ("W06", "출장", "work", "day", True, 1.0, 30.0, False, 250),
+    ("W07", "재택근무", "work", "day", True, 1.0, 30.0, False, 260),
+]
+
+WORK_SCHEDULE_SEEDS = [
+    # (code, name, work_start, work_end, break_min, is_overnight, work_hours, sort_order)
+    ("WS01", "주간근무(표준)", "09:00", "18:00", 60, False, 8.0, 10),
+    ("WS02", "주간근무(탄력)", "08:00", "17:00", 60, False, 8.0, 20),
+    ("WS03", "시차출퇴근(A)", "07:00", "16:00", 60, False, 8.0, 30),
+    ("WS04", "시차출퇴근(B)", "10:00", "19:00", 60, False, 8.0, 40),
+    ("WS05", "야간근무", "22:00", "07:00", 60, True, 8.0, 50),
+    ("WS06", "교대근무(주간)", "06:00", "14:00", 30, False, 7.5, 60),
+    ("WS07", "교대근무(야간)", "14:00", "22:00", 30, False, 7.5, 70),
+    ("WS08", "유연근무", "06:00", "22:00", 60, False, 8.0, 80),
+]
+
+HOLIDAY_SEEDS = [
+    # 2025
+    (date(2025, 1, 1), "신정", "legal"),
+    (date(2025, 1, 28), "설날 전날", "legal"),
+    (date(2025, 1, 29), "설날", "legal"),
+    (date(2025, 1, 30), "설날 다음날", "legal"),
+    (date(2025, 3, 1), "삼일절", "legal"),
+    (date(2025, 5, 5), "어린이날", "legal"),
+    (date(2025, 5, 6), "대체공휴일(석가탄신일)", "substitute"),
+    (date(2025, 5, 15), "석가탄신일", "legal"),
+    (date(2025, 6, 6), "현충일", "legal"),
+    (date(2025, 8, 15), "광복절", "legal"),
+    (date(2025, 10, 3), "개천절", "legal"),
+    (date(2025, 10, 5), "추석 전날", "legal"),
+    (date(2025, 10, 6), "추석", "legal"),
+    (date(2025, 10, 7), "추석 다음날", "legal"),
+    (date(2025, 10, 8), "대체공휴일(추석)", "substitute"),
+    (date(2025, 10, 9), "한글날", "legal"),
+    (date(2025, 12, 25), "크리스마스", "legal"),
+    # 2026
+    (date(2026, 1, 1), "신정", "legal"),
+    (date(2026, 2, 16), "설날 전날", "legal"),
+    (date(2026, 2, 17), "설날", "legal"),
+    (date(2026, 2, 18), "설날 다음날", "legal"),
+    (date(2026, 3, 1), "삼일절", "legal"),
+    (date(2026, 3, 2), "대체공휴일(삼일절)", "substitute"),
+    (date(2026, 5, 5), "어린이날", "legal"),
+    (date(2026, 5, 24), "석가탄신일", "legal"),
+    (date(2026, 5, 25), "대체공휴일(석가탄신일)", "substitute"),
+    (date(2026, 6, 6), "현충일", "legal"),
+    (date(2026, 8, 15), "광복절", "legal"),
+    (date(2026, 9, 24), "추석 전날", "legal"),
+    (date(2026, 9, 25), "추석", "legal"),
+    (date(2026, 9, 26), "추석 다음날", "legal"),
+    (date(2026, 10, 3), "개천절", "legal"),
+    (date(2026, 10, 5), "대체공휴일(개천절)", "substitute"),
+    (date(2026, 10, 9), "한글날", "legal"),
+    (date(2026, 12, 25), "크리스마스", "legal"),
+]
+
+
+def ensure_attendance_codes(session: Session) -> None:
+    for code, name, category, unit, is_requestable, min_days, max_days, deduct_annual, sort_order in ATTENDANCE_CODE_SEEDS:
+        existing = session.exec(select(TimAttendanceCode).where(TimAttendanceCode.code == code)).first()
+        if existing is None:
+            session.add(TimAttendanceCode(
+                code=code, name=name, category=category, unit=unit,
+                is_requestable=is_requestable, min_days=min_days, max_days=max_days,
+                deduct_annual=deduct_annual, sort_order=sort_order, is_active=True,
+            ))
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.category != category:
+                existing.category = category
+                changed = True
+            if existing.sort_order != sort_order:
+                existing.sort_order = sort_order
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_work_schedule_codes(session: Session) -> None:
+    for code, name, work_start, work_end, break_min, is_overnight, work_hours, sort_order in WORK_SCHEDULE_SEEDS:
+        existing = session.exec(select(TimWorkScheduleCode).where(TimWorkScheduleCode.code == code)).first()
+        if existing is None:
+            session.add(TimWorkScheduleCode(
+                code=code, name=name, work_start=work_start, work_end=work_end,
+                break_minutes=break_min, is_overnight=is_overnight, work_hours=work_hours,
+                sort_order=sort_order, is_active=True,
+            ))
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.sort_order != sort_order:
+                existing.sort_order = sort_order
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_holidays(session: Session) -> None:
+    for holiday_date, name, holiday_type in HOLIDAY_SEEDS:
+        existing = session.exec(select(TimHoliday).where(TimHoliday.holiday_date == holiday_date)).first()
+        if existing is None:
+            session.add(TimHoliday(
+                holiday_date=holiday_date, name=name, holiday_type=holiday_type, is_active=True,
+            ))
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.holiday_type != holiday_type:
+                existing.holiday_type = holiday_type
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_roles(session)
@@ -938,3 +1083,6 @@ def seed_initial_data(session: Session) -> None:
     ensure_menus(session)
     ensure_common_codes(session)
     ensure_hr_basic_seed_data(session)
+    ensure_attendance_codes(session)
+    ensure_work_schedule_codes(session)
+    ensure_holidays(session)

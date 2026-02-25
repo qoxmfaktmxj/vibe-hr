@@ -4,7 +4,14 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import settings
 
-engine = create_engine(settings.database_url, echo=False)
+engine = create_engine(
+    settings.database_url,
+    echo=False,
+    pool_size=20,
+    max_overflow=30,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
 
 
 def init_db() -> None:

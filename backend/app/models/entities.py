@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -86,6 +86,8 @@ class HrAttendanceDaily(SQLModel, table=True):
             "attendance_status IN ('present', 'late', 'absent', 'leave', 'remote')",
             name="ck_hr_attendance_daily_attendance_status",
         ),
+        Index("ix_tim_attendance_daily_emp_date", "employee_id", "work_date"),
+        Index("ix_tim_attendance_daily_date_status", "work_date", "attendance_status"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -202,6 +204,8 @@ class HrLeaveRequest(SQLModel, table=True):
             name="ck_hr_leave_requests_request_status",
         ),
         CheckConstraint("start_date <= end_date", name="ck_hr_leave_requests_date_range"),
+        Index("ix_tim_leave_requests_emp_status", "employee_id", "request_status"),
+        Index("ix_tim_leave_requests_dates", "start_date", "end_date"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -213,5 +217,69 @@ class HrLeaveRequest(SQLModel, table=True):
     request_status: str = Field(default="pending", max_length=20)
     approver_employee_id: Optional[int] = Field(default=None, foreign_key="hr_employees.id")
     approved_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimAttendanceCode(SQLModel, table=True):
+    """근태코드 마스터 (연차, 반차, 병가, 출장, 재택 등)"""
+
+    __tablename__ = "tim_attendance_codes"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_tim_attendance_codes_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    category: str = Field(max_length=20)
+    unit: str = Field(default="day", max_length=20)
+    is_requestable: bool = Field(default=True)
+    min_days: Optional[float] = None
+    max_days: Optional[float] = None
+    deduct_annual: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    description: Optional[str] = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimWorkScheduleCode(SQLModel, table=True):
+    """근무코드 마스터 (주간, 야간, 교대, 유연근무 등)"""
+
+    __tablename__ = "tim_work_schedule_codes"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_tim_work_schedule_codes_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    work_start: str = Field(max_length=5)
+    work_end: str = Field(max_length=5)
+    break_minutes: int = Field(default=60)
+    is_overnight: bool = Field(default=False)
+    work_hours: float = Field(default=8.0)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    description: Optional[str] = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class TimHoliday(SQLModel, table=True):
+    """공휴일 마스터 (법정공휴일, 회사지정휴일, 대체휴일)"""
+
+    __tablename__ = "tim_holidays"
+    __table_args__ = (
+        UniqueConstraint("holiday_date", name="uq_tim_holidays_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    holiday_date: date = Field(index=True)
+    name: str = Field(max_length=100)
+    holiday_type: str = Field(default="legal", max_length=20)
+    is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
