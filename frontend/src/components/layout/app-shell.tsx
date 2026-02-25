@@ -50,7 +50,10 @@ function getFallbackLabel(path: string): string {
   return path;
 }
 
-export function AppShell({ title, description, children }: AppShellProps) {
+export function AppShell({ title: _title, description: _description, children }: AppShellProps) {
+  void _title;
+  void _description;
+
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
@@ -242,11 +245,6 @@ export function AppShell({ title, description, children }: AppShellProps) {
 
           </div>
         </header>
-
-        <section className="border-b border-border bg-card px-6 py-3 lg:px-8">
-          <h1 className="text-lg font-bold text-card-foreground">{title}</h1>
-          {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
-        </section>
 
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
