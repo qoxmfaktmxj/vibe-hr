@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-type PaletteMode = "default" | "vivid" | "earth";
+type PaletteMode = "default" | "vivid";
 type PrimaryTone = "blue" | "skyblue" | "gray" | "green" | "red";
 
 type ThemePreference = {
@@ -27,9 +27,8 @@ const PRIMARY_OPTIONS: Array<{ value: PrimaryTone; label: string; color: string 
 ];
 
 const PALETTE_OPTIONS: Array<{ value: PaletteMode; label: string }> = [
-  { value: "default", label: "기본" },
-  { value: "vivid", label: "Coolors A" },
-  { value: "earth", label: "Coolors B" },
+  { value: "default", label: "A 타입" },
+  { value: "vivid", label: "B 타입" },
 ];
 
 function applyThemePreference(preference: ThemePreference) {
@@ -39,6 +38,11 @@ function applyThemePreference(preference: ThemePreference) {
   root.dataset.primaryTone = preference.primaryTone;
 }
 
+function normalizePaletteMode(mode: string | undefined | null): PaletteMode {
+  if (mode === "vivid") return "vivid";
+  return "default";
+}
+
 function getCurrentPreference(): ThemePreference {
   if (typeof window === "undefined") {
     return { darkMode: false, paletteMode: "default", primaryTone: "blue" };
@@ -46,7 +50,7 @@ function getCurrentPreference(): ThemePreference {
 
   const root = document.documentElement;
   const darkMode = root.classList.contains("dark");
-  const paletteMode = (root.dataset.palette as PaletteMode | undefined) ?? "default";
+  const paletteMode = normalizePaletteMode(root.dataset.palette);
   const primaryTone = (root.dataset.primaryTone as PrimaryTone | undefined) ?? "blue";
   return { darkMode, paletteMode, primaryTone };
 }
@@ -60,7 +64,7 @@ function loadStoredPreference(): ThemePreference | null {
     if (!json) return null;
     return {
       darkMode: Boolean(json.darkMode),
-      paletteMode: (json.paletteMode as PaletteMode) || "default",
+      paletteMode: normalizePaletteMode(json.paletteMode as string | undefined),
       primaryTone: (json.primaryTone as PrimaryTone) || "blue",
     };
   } catch {
