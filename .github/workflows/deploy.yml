@@ -41,9 +41,18 @@ jobs:
           script: |
             set -e
             cd /root/.openclaw/workspace/vibe-hr
+
+            # 배포 서버는 항상 원격 main 기준으로 정렬 (로컬 divergence 방지)
             git fetch origin
             git checkout main
-            git pull --ff-only origin main
+
+            # 혹시 남아있는 서버 로컬 커밋/수정본 백업용 브랜치 생성(실패해도 무시)
+            git branch "backup/deploy-$(date +%Y%m%d-%H%M%S)" >/dev/null 2>&1 || true
+
+            # 원격 main으로 강제 동기화
+            git reset --hard origin/main
+            git clean -fd
+
             if [ ! -f .env.deploy.secret ]; then
               echo "[warn] .env.deploy.secret not found. creating empty file (fill secrets on server)."
               touch .env.deploy.secret

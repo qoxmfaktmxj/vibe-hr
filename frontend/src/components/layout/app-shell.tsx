@@ -102,7 +102,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
     <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-gray-200 bg-white">
+        <header className="border-b border-border bg-card text-card-foreground">
           <div className="grid grid-cols-3 items-center px-4 py-2 lg:px-6">
             <div className="flex items-center gap-2">
               {isAdmin ? <ImpersonationPopover /> : <span className="h-8 w-8" aria-hidden="true" />}
@@ -126,11 +126,11 @@ export function AppShell({ title, description, children }: AppShellProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto border-t border-gray-100 px-3 py-2 lg:px-6">
+          <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6">
             <button
               type="button"
               className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                pathname === "/dashboard" ? "bg-primary/10 text-primary" : "text-slate-600 hover:bg-slate-100"
+                pathname === "/dashboard" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
               }`}
               onClick={() => router.push("/dashboard")}
             >
@@ -146,7 +146,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
                   className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${
                     active
                       ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-gray-200 bg-white text-slate-600 hover:bg-slate-50"
+                      : "border-border bg-card text-muted-foreground hover:bg-accent"
                   }`}
                   onClick={() => router.push(tab.path)}
                 >
@@ -155,7 +155,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
                     role="button"
                     tabIndex={0}
                     aria-label={`${tab.label} 탭 닫기`}
-                    className="rounded p-0.5 hover:bg-white/80"
+                    className="rounded p-0.5 hover:bg-accent"
                     onClick={(event) => {
                       event.stopPropagation();
                       closeTab(tab.path);
@@ -176,9 +176,9 @@ export function AppShell({ title, description, children }: AppShellProps) {
           </div>
         </header>
 
-        <section className="border-b border-gray-200 bg-white px-6 py-3 lg:px-8">
-          <h1 className="text-lg font-bold text-gray-800">{title}</h1>
-          {description ? <p className="mt-0.5 text-sm text-gray-500">{description}</p> : null}
+        <section className="border-b border-border bg-card px-6 py-3 lg:px-8">
+          <h1 className="text-lg font-bold text-card-foreground">{title}</h1>
+          {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
         </section>
 
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>

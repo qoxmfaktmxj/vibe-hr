@@ -1060,7 +1060,7 @@ export function EmployeeMasterManager() {
   return (
     <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
       {/* 검색 영역 */}
-      <div className="border-b border-gray-200 bg-white px-3 py-3 md:px-6">
+      <div className="border-b border-border bg-card px-3 py-3 md:px-6">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div className="grid flex-1 gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
             <div className="space-y-1">
@@ -1124,7 +1124,7 @@ export function EmployeeMasterManager() {
                   }))
                 }
                 onKeyDown={handleSearchFieldEnter}
-                className="h-9 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+                className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
               >
                 <option value="">전체</option>
                 <option value="Y">Y</option>
@@ -1152,9 +1152,9 @@ export function EmployeeMasterManager() {
       </div>
 
       {/* 시트 헤더: 제목 + 버튼 */}
-      <div className="flex flex-col gap-2 border-b border-gray-100 bg-white px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="flex flex-col gap-2 border-b border-border/70 bg-card px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-gray-800">
+          <h2 className="text-sm font-semibold text-foreground">
             {I18N.title}
           </h2>
           <span className="text-xs text-slate-400">

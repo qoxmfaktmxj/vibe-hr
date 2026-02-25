@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -79,12 +79,6 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
 
   const tabRows = activeTab === "basic" ? [] : rowsByTab(detail, activeTab);
 
-  useEffect(() => {
-    const next: Record<number, HrInfoRow> = {};
-    for (const row of tabRows) next[row.id] = row;
-    setDraftRows(next);
-  }, [activeTab, detail]);
-
   async function addRecord() {
     if (!employeeId || activeTab === "basic") return;
     const response = await fetch(`/api/hr/basic/${employeeId}/records`, {
@@ -144,15 +138,18 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   }
 
   return (
-    <div className="mx-4 mt-4 rounded-xl bg-white p-4 shadow-sm lg:mx-8 lg:p-6">
+    <div className="mx-4 mt-4 rounded-xl bg-card p-4 shadow-sm lg:mx-8 lg:p-6">
       <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map(([value, label]) => (
           <button
             key={value}
             type="button"
-            onClick={() => setActiveTab(value)}
+            onClick={() => {
+              setActiveTab(value);
+              setDraftRows({});
+            }}
             className={`rounded-md border px-3 py-1.5 text-sm ${
-              activeTab === value ? "border-primary/40 bg-primary/10 text-primary" : "border-slate-200 bg-white text-slate-600"
+              activeTab === value ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"
             }`}
           >
             {label}
@@ -169,8 +166,8 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
               {basicRows.map(([label, value]) => (
                 <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2">
-                  <p className="text-xs font-medium text-slate-600">{label}</p>
-                  <p className="text-sm font-semibold text-slate-900">{value}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="text-sm font-semibold text-foreground">{value}</p>
                 </div>
               ))}
             </div>
