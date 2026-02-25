@@ -253,7 +253,7 @@ export function DashboardSidebar() {
       <div className="shrink-0 border-t border-gray-200 bg-[var(--vibe-sidebar-bg)] p-3">
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-white"
+          className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-accent"
           onClick={openProfile}
         >
           <Avatar className="h-9 w-9">

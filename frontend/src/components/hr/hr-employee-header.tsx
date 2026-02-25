@@ -41,16 +41,16 @@ export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmploy
   const selected = useMemo(() => employees.find((item) => item.id === selectedEmployeeId) ?? null, [employees, selectedEmployeeId]);
 
   return (
-    <Card className="mx-4 mt-4 border border-slate-200 bg-slate-50/60 shadow-sm lg:mx-8">
+    <Card className="mx-4 mt-4 border border-border bg-card/70 shadow-sm lg:mx-8">
       <CardContent className="p-3 lg:p-4">
         <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 border bg-white">
-            <AvatarFallback className="bg-white text-slate-700"><UserCircle2 className="h-5 w-5" /></AvatarFallback>
+          <Avatar className="h-10 w-10 border border-border bg-card">
+            <AvatarFallback className="bg-card text-foreground"><UserCircle2 className="h-5 w-5" /></AvatarFallback>
           </Avatar>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-base font-bold text-slate-900">{selected?.display_name ?? "-"}</span>
+              <span className="truncate text-base font-bold text-foreground">{selected?.display_name ?? "-"}</span>
               <Badge variant="outline">{selected?.department_name ?? "-"}</Badge>
               <Badge variant="secondary">{selected?.position_title ?? "-"}</Badge>
             </div>
