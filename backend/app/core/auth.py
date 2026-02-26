@@ -88,6 +88,11 @@ def _get_user_role_codes(session: Session, user_id: int) -> set[str]:
     return set(role_codes)
 
 
+def get_user_role_codes(session: Session, user_id: int) -> set[str]:
+    """사용자의 역할 코드 목록을 반환한다. (외부 서비스에서 사용 가능)"""
+    return _get_user_role_codes(session, user_id)
+
+
 def require_roles(*allowed_roles: str) -> Callable:
     """특정 역할이 필요한 API 엔드포인트에 사용하는 의존성 팩토리.
 

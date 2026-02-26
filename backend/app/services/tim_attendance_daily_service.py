@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from math import ceil
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.core.auth import get_user_role_codes
 from app.core.time_utils import business_today, now_utc
-
 from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection, TimEmployeeDailySchedule
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionItem,
@@ -42,13 +42,30 @@ def _to_item(row: HrAttendanceDaily, employee: HrEmployee, user: AuthUser, depar
     )
 
 
+_ATTENDANCE_MANAGE_ROLES = {"admin", "hr_manager"}
+
+
 def _resolve_employee_id(session: Session, current_user: AuthUser, requested_employee_id: int | None) -> int:
+    """요청 employee_id를 검증하고 실제 처리 대상 employee_id를 반환한다.
+
+    - requested_employee_id가 없거나 본인이면 → 본인 employee_id 반환
+    - 타인 지정 시 → admin 또는 hr_manager 역할이 있어야 허용 (없으면 403)
+    """
     employee = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee profile not found.")
 
+    # 요청 대상이 없거나 본인이면 그대로 반환
     if requested_employee_id is None or requested_employee_id == employee.id:
         return employee.id
+
+    # 타인 지정 → 관리자 권한 확인
+    user_roles = get_user_role_codes(session, current_user.id)
+    if not user_roles & _ATTENDANCE_MANAGE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="타인의 근태를 조회하거나 처리할 권한이 없습니다.",
+        )
 
     return requested_employee_id
 
