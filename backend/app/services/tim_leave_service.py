@@ -10,7 +10,28 @@ from app.models import AuthUser, HrAnnualLeave, HrEmployee, HrLeaveRequest, OrgD
 from app.schemas.tim_leave import TimAnnualLeaveItem, TimLeaveRequestItem
 
 
-def _to_leave_item(row: HrLeaveRequest, employee: HrEmployee, user: AuthUser, department: OrgDepartment) -> TimLeaveRequestItem:
+def _working_days(session: Session, start_date: date, end_date: date) -> float:
+    """근무일 수 계산 (주말 + 공휴일 제외). 연차 차감 기준으로 사용."""
+    holidays = session.exec(select(TimHoliday.holiday_date).where(TimHoliday.holiday_date >= start_date, TimHoliday.holiday_date <= end_date)).all()
+    holiday_set = set(holidays)
+    total = 0.0
+    current = start_date
+    while current <= end_date:
+        if current.weekday() < 5 and current not in holiday_set:
+            total += 1.0
+        current += timedelta(days=1)
+    return total
+
+
+def _to_leave_item(session: Session, row: HrLeaveRequest, employee: HrEmployee, user: AuthUser, department: OrgDepartment) -> TimLeaveRequestItem:
+    """HrLeaveRequest → TimLeaveRequestItem 변환.
+
+    - calendar_days: 캘린더 일수 (end - start + 1), 화면 표시용
+    - deduction_days: 실제 차감 일수 (근무일 기준, 주말/공휴일 제외)
+    - leave_days: deduction_days와 동일 (하위 호환 유지)
+    """
+    calendar_days = float((row.end_date - row.start_date).days + 1)
+    deduction_days = _working_days(session, row.start_date, row.end_date)
     return TimLeaveRequestItem(
         id=row.id,
         employee_id=employee.id,
@@ -20,11 +41,16 @@ def _to_leave_item(row: HrLeaveRequest, employee: HrEmployee, user: AuthUser, de
         leave_type=row.leave_type,
         start_date=row.start_date,
         end_date=row.end_date,
-        leave_days=float((row.end_date - row.start_date).days + 1),
+        calendar_days=calendar_days,
+        deduction_days=deduction_days,
+        leave_days=deduction_days,  # 차감 기준으로 통일
         reason=row.reason,
         request_status=row.request_status,
         approver_employee_id=row.approver_employee_id,
         approved_at=row.approved_at,
+        decision_comment=row.decision_comment,
+        decided_by=row.decided_by,
+        decided_at=row.decided_at,
         created_at=row.created_at,
     )
 
@@ -130,18 +156,6 @@ def adjust_annual_leave(session: Session, *, employee_id: int, year: int, adjust
     return get_or_create_annual_leave(session, employee_id, year)
 
 
-def _working_days(session: Session, start_date: date, end_date: date) -> float:
-    holidays = session.exec(select(TimHoliday.holiday_date).where(TimHoliday.holiday_date >= start_date, TimHoliday.holiday_date <= end_date)).all()
-    holiday_set = set(holidays)
-    total = 0.0
-    current = start_date
-    while current <= end_date:
-        if current.weekday() < 5 and current not in holiday_set:
-            total += 1.0
-        current += timedelta(days=1)
-    return total
-
-
 def create_leave_request(session: Session, *, employee_id: int, leave_type: str, start_date: date, end_date: date, reason: str) -> TimLeaveRequestItem:
     if start_date > end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_date는 end_date보다 이후일 수 없습니다.")
@@ -188,7 +202,7 @@ def create_leave_request(session: Session, *, employee_id: int, leave_type: str,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave request not found.")
 
     leave, employee, user, department = detail
-    return _to_leave_item(leave, employee, user, department)
+    return _to_leave_item(session, leave, employee, user, department)
 
 
 def list_leave_requests(session: Session, *, employee_id: int | None = None, status_filter: str | None = None, pending_only: bool = False) -> list[TimLeaveRequestItem]:
@@ -207,7 +221,7 @@ def list_leave_requests(session: Session, *, employee_id: int | None = None, sta
         query = query.where(HrLeaveRequest.request_status == "pending")
 
     rows = session.exec(query.order_by(HrLeaveRequest.created_at.desc())).all()
-    return [_to_leave_item(leave, employee, user, department) for leave, employee, user, department in rows]
+    return [_to_leave_item(session, leave, employee, user, department) for leave, employee, user, department in rows]
 
 
 def decide_leave_request(session: Session, *, request_id: int, approver_employee_id: int, decision: str, reason: str | None = None) -> TimLeaveRequestItem:
@@ -221,8 +235,10 @@ def decide_leave_request(session: Session, *, request_id: int, approver_employee
         row.request_status = "approved"
     elif decision == "reject":
         row.request_status = "rejected"
-        if reason:
-            row.reason = f"{row.reason or ''} | 반려사유: {reason}".strip()
+        # reason → decision_comment 분리 (원래 신청 사유 보존)
+        row.decision_comment = reason
+        row.decided_by = approver_employee_id
+        row.decided_at = now_utc()
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="지원하지 않는 결정입니다.")
 
@@ -256,7 +272,7 @@ def decide_leave_request(session: Session, *, request_id: int, approver_employee
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave request not found.")
 
     leave, employee, user, department = detail
-    return _to_leave_item(leave, employee, user, department)
+    return _to_leave_item(session, leave, employee, user, department)
 
 
 def list_annual_leaves(
@@ -321,8 +337,10 @@ def cancel_leave_request(session: Session, *, request_id: int, actor_employee_id
     row.request_status = "cancelled"
     row.approver_employee_id = actor_employee_id
     row.approved_at = now_utc()
-    if reason:
-        row.reason = f"{row.reason or ''} | 취소사유: {reason}".strip()
+    # reason → decision_comment 분리 (원래 신청 사유 보존)
+    row.decision_comment = reason
+    row.decided_by = actor_employee_id
+    row.decided_at = now_utc()
 
     session.add(row)
     session.commit()
@@ -338,4 +356,4 @@ def cancel_leave_request(session: Session, *, request_id: int, actor_employee_id
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leave request not found.")
 
     leave, employee, user, department = detail
-    return _to_leave_item(leave, employee, user, department)
+    return _to_leave_item(session, leave, employee, user, department)

@@ -219,6 +219,9 @@ class HrLeaveRequest(SQLModel, table=True):
     request_status: str = Field(default="pending", max_length=20)
     approver_employee_id: Optional[int] = Field(default=None, foreign_key="hr_employees.id")
     approved_at: Optional[datetime] = None
+    decision_comment: Optional[str] = Field(default=None)  # 반려/취소 처리자 코멘트 (reason 필드와 분리)
+    decided_by: Optional[int] = Field(default=None, foreign_key="hr_employees.id")  # 처리자 employee_id
+    decided_at: Optional[datetime] = None  # 처리 시각
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 

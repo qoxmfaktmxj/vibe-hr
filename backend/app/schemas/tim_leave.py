@@ -45,11 +45,16 @@ class TimLeaveRequestItem(BaseModel):
     leave_type: str
     start_date: date
     end_date: date
-    leave_days: float
+    calendar_days: float   # 캘린더 일수 (end - start + 1), 표시용
+    deduction_days: float  # 실제 차감 일수 (근무일 기준, 주말/공휴일 제외)
+    leave_days: float      # deduction_days와 동일 (하위 호환 유지)
     reason: str | None = None
     request_status: str
     approver_employee_id: int | None = None
     approved_at: datetime | None = None
+    decision_comment: str | None = None  # 반려/취소 처리자 코멘트
+    decided_by: int | None = None        # 처리자 employee_id
+    decided_at: datetime | None = None   # 처리 시각
     created_at: datetime
 
 
