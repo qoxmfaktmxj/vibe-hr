@@ -1755,8 +1755,25 @@ def ensure_pay_tax_rates(session: Session) -> None:
             if changed:
                 session.add(existing)
     session.commit()
+
+
+def ensure_tim_leave_schema(session: Session) -> None:
+    # SQLModel create_all은 기존 테이블 컬럼 추가를 보장하지 않으므로, 배포 시 스키마 보정
+    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decision_comment VARCHAR(1000)"))
+    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decided_by INTEGER"))
+    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ"))
+    session.commit()
+
+
+def ensure_hri_schema(session: Session) -> None:
+    session.exec(text("ALTER TABLE hri_approval_actor_rules ADD COLUMN IF NOT EXISTS position_keywords_json TEXT"))
+    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
+    ensure_tim_leave_schema(session)
+    ensure_hri_schema(session)
     ensure_roles(session)
     departments = ensure_departments(session)
     department = next((item for item in departments if item.code == "HQ-HR"), departments[0])
