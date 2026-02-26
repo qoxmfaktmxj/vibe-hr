@@ -7,6 +7,7 @@ import type { AuthUser } from "@/types/auth";
 type LoginPayload = {
   loginId: string;
   password: string;
+  remember?: boolean;
 };
 
 type AuthContextValue = {
@@ -67,6 +68,7 @@ export function AuthProvider({
       body: JSON.stringify({
         login_id: payload.loginId,
         password: payload.password,
+        remember: payload.remember ?? false,
       }),
     });
 

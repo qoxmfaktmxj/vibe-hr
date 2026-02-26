@@ -15,11 +15,13 @@ const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
 const AUTH_TOKEN_EXPIRES_MIN =
   Number.isFinite(tokenExpiresEnv) && tokenExpiresEnv > 0 ? tokenExpiresEnv : 480;
 const AUTH_COOKIE_MAX_AGE_SECONDS = Math.max(60, AUTH_TOKEN_EXPIRES_MIN * 60);
+const AUTH_COOKIE_REMEMBER_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30일
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   const loginId = typeof payload?.login_id === "string" ? payload.login_id.trim() : "";
   const password = typeof payload?.password === "string" ? payload.password : "";
+  const remember = payload?.remember === true;
 
   if (!loginId || !password) {
     return NextResponse.json(
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: AUTH_COOKIE_MAX_AGE_SECONDS,
+    maxAge: remember ? AUTH_COOKIE_REMEMBER_MAX_AGE_SECONDS : AUTH_COOKIE_MAX_AGE_SECONDS,
   });
 
   return response;

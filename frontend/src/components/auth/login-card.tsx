@@ -53,6 +53,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
     const formData = new FormData(event.currentTarget);
     const loginId = formData.get("loginId");
     const password = formData.get("password");
+    const remember = formData.get("remember") === "on";
 
     if (typeof loginId !== "string" || typeof password !== "string") {
       setErrorMessage("아이디와 비밀번호를 올바르게 입력해 주세요.");
@@ -63,7 +64,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
     setErrorMessage(null);
 
     try {
-      await login({ loginId, password });
+      await login({ loginId, password, remember });
       await refreshMenus();
       router.replace("/dashboard");
     } catch {
@@ -99,14 +100,9 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="font-semibold text-slate-700">
-              비밀번호
-            </Label>
-            <Link href="/login" className="text-sm font-medium text-primary hover:opacity-80">
-              비밀번호 찾기
-            </Link>
-          </div>
+          <Label htmlFor="password" className="font-semibold text-slate-700">
+            비밀번호
+          </Label>
           <div className="relative">
             <LockKeyhole
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -125,9 +121,9 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         </div>
 
         <div className="flex items-center gap-2">
-          <Checkbox id="remember" />
+          <Checkbox id="remember" name="remember" />
           <Label htmlFor="remember" className="text-sm font-normal text-slate-600">
-            로그인 상태 유지
+            로그인 상태 유지 (30일)
           </Label>
         </div>
 
