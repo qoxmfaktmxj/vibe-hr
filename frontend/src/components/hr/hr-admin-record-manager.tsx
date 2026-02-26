@@ -43,6 +43,10 @@ type AdminGridRow = HrInfoRow & {
   employee_no: string;
   display_name: string;
   department_name: string;
+  employment_status: EmployeeItem["employment_status"];
+  delete_mark?: boolean;
+  _dirty?: boolean;
+  _original?: Pick<HrInfoRow, "record_date" | "type" | "title" | "organization" | "value" | "note">;
 };
 
 const EMPTY_FILTERS: SearchFilters = {
@@ -91,8 +95,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<AdminGridRow[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const totalRows = rows.length;
+  const [saving, setSaving] = useState(false);
 
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
@@ -112,12 +115,6 @@ export function HrAdminRecordManager({ category, title }: Props) {
       if (employee.department_name) set.add(employee.department_name);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
-  }, [employees]);
-
-  const employeeById = useMemo(() => {
-    const map = new Map<number, EmployeeItem>();
-    for (const employee of employees) map.set(employee.id, employee);
-    return map;
   }, [employees]);
 
   const refresh = useCallback(async () => {
@@ -147,6 +144,17 @@ export function HrAdminRecordManager({ category, title }: Props) {
             employee_no: employee.employee_no,
             display_name: employee.display_name,
             department_name: employee.department_name,
+            employment_status: employee.employment_status,
+            delete_mark: false,
+            _dirty: false,
+            _original: {
+              record_date: record.record_date,
+              type: record.type,
+              title: record.title,
+              organization: record.organization,
+              value: record.value,
+              note: record.note,
+            },
           });
         }
       }
@@ -166,40 +174,66 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }, [filteredEmployees, category]);
 
   useEffect(() => {
+    if (employees.length === 0) return;
     void refresh();
-  }, [refresh]);
+  }, [employees.length, refresh]);
 
-  async function updateRow(row: AdminGridRow) {
-    const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        record_date: row.record_date || null,
-        type: row.type || null,
-        title: row.title || null,
-        organization: row.organization || null,
-        value: row.value || null,
-        note: row.note || null,
-      }),
-    });
-    if (!response.ok) return toast.error("저장 실패");
-    toast.success("저장 완료");
-    await refresh();
-  }
+  const saveAll = useCallback(async () => {
+    setSaving(true);
+    try {
+      const toDelete = rows.filter((row) => row.delete_mark);
+      const toUpdate = rows.filter((row) => !row.delete_mark && row._dirty);
 
-  async function deleteRow(row: AdminGridRow) {
-    const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) return toast.error("삭제 실패");
-    toast.success("삭제 완료");
-    await refresh();
-  }
+      for (const row of toDelete) {
+        const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, { method: "DELETE" });
+        if (!response.ok) throw new Error(`${row.employee_no} 삭제 실패`);
+      }
+
+      for (const row of toUpdate) {
+        const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            record_date: row.record_date || null,
+            type: row.type || null,
+            title: row.title || null,
+            organization: row.organization || null,
+            value: row.value || null,
+            note: row.note || null,
+          }),
+        });
+        if (!response.ok) throw new Error(`${row.employee_no} 저장 실패`);
+      }
+
+      toast.success(`저장 완료 (삭제 ${toDelete.length}건 / 수정 ${toUpdate.length}건)`);
+      await refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : "저장 실패");
+    } finally {
+      setSaving(false);
+    }
+  }, [rows, refresh]);
 
   const columns: ColDef<AdminGridRow>[] = [
+    { field: "delete_mark", headerName: "삭제", editable: true, width: 72, cellDataType: "boolean" },
+    {
+      field: "_dirty",
+      headerName: "상태",
+      width: 90,
+      editable: false,
+      valueGetter: (params) => (params.data?.delete_mark ? "삭제" : params.data?._dirty ? "수정" : ""),
+    },
     { field: "employee_no", headerName: "사번", editable: false, width: 120, pinned: "left" },
     { field: "display_name", headerName: "이름", editable: false, width: 120, pinned: "left" },
     { field: "department_name", headerName: "부서", editable: false, width: 140, pinned: "left" },
+    {
+      field: "employment_status",
+      headerName: "재직상태",
+      editable: false,
+      width: 100,
+      valueFormatter: (p) => (p.value === "leave" ? "휴직" : p.value === "resigned" ? "퇴직" : "재직"),
+    },
     { field: "record_date", headerName: "일자", editable: true, flex: 1, minWidth: 120 },
     { field: "type", headerName: "구분", editable: true, flex: 1, minWidth: 120 },
     { field: "title", headerName: "제목", editable: true, flex: 1.2, minWidth: 140 },
@@ -216,23 +250,17 @@ export function HrAdminRecordManager({ category, title }: Props) {
         <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-5">
           <Input
             value={searchFilters.employeeNo}
-            onChange={(event) =>
-              setSearchFilters((prev) => ({ ...prev, employeeNo: event.target.value }))
-            }
+            onChange={(event) => setSearchFilters((prev) => ({ ...prev, employeeNo: event.target.value }))}
             placeholder="사번"
           />
           <Input
             value={searchFilters.name}
-            onChange={(event) =>
-              setSearchFilters((prev) => ({ ...prev, name: event.target.value }))
-            }
+            onChange={(event) => setSearchFilters((prev) => ({ ...prev, name: event.target.value }))}
             placeholder="이름"
           />
           <select
             value={searchFilters.department}
-            onChange={(event) =>
-              setSearchFilters((prev) => ({ ...prev, department: event.target.value }))
-            }
+            onChange={(event) => setSearchFilters((prev) => ({ ...prev, department: event.target.value }))}
             className="h-9 rounded-md border px-2 text-sm"
           >
             <option value="">전체 부서</option>
@@ -254,23 +282,14 @@ export function HrAdminRecordManager({ category, title }: Props) {
             <option value="leave">휴직</option>
             <option value="resigned">퇴직</option>
           </select>
-          <div className="flex gap-2">
-            <Button onClick={() => setAppliedFilters(searchFilters)} disabled={loading}>조회</Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSearchFilters(EMPTY_FILTERS);
-                setAppliedFilters(EMPTY_FILTERS);
-              }}
-              disabled={loading}
-            >
-              초기화
-            </Button>
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setAppliedFilters(searchFilters)} disabled={loading || saving}>조회</Button>
+            <Button variant="save" onClick={() => void saveAll()} disabled={loading || saving}>저장</Button>
           </div>
         </div>
 
         <div className="flex items-center border-t pt-3 text-xs text-slate-500">
-          조회 대상: {filteredEmployees.length}명 / 레코드: {totalRows}건
+          조회 대상: {filteredEmployees.length}명 / 레코드: {rows.length}건
         </div>
       </div>
 
@@ -283,21 +302,30 @@ export function HrAdminRecordManager({ category, title }: Props) {
           suppressRowClickSelection
           onCellValueChanged={(event) => {
             if (!event.data) return;
-            void updateRow(event.data);
-          }}
-          onRowDoubleClicked={(event) => {
-            if (!event.data) return;
-            const employee = employeeById.get(event.data.employee_id);
-            const target = `${employee?.employee_no ?? ""} ${employee?.display_name ?? ""}`.trim();
-            if (confirm(`${target} 행을 삭제할까요?`)) {
-              void deleteRow(event.data);
-            }
+            const current = event.data;
+            const original = current._original;
+            const dirty =
+              !!original &&
+              (original.record_date !== current.record_date ||
+                original.type !== current.type ||
+                original.title !== current.title ||
+                original.organization !== current.organization ||
+                original.value !== current.value ||
+                original.note !== current.note);
+
+            setRows((prev) =>
+              prev.map((row) =>
+                row.employee_id === current.employee_id && row.id === current.id
+                  ? { ...current, _dirty: dirty }
+                  : row,
+              ),
+            );
           }}
         />
       </div>
 
       <p className="px-1 text-xs text-slate-500">
-        관리자 통합 화면 · 다중 사원 조회 가능 · 체크박스 선택 없음 · 셀 수정 시 자동 저장 · 행 더블클릭 삭제
+        관리자 통합 화면 · 전체 인원 조회 · 삭제 체크 후 저장 시 삭제 · 체크박스 선택 없음
       </p>
     </div>
   );
