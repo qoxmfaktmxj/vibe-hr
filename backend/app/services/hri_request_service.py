@@ -23,6 +23,9 @@ from app.models import (
     HriRequestHistory,
     HriRequestMaster,
     HriRequestStepSnapshot,
+    HriReqTimCorrection,
+    HriReqCertEmployment,
+    HriReqLeave,
 )
 from app.schemas.hri_request import (
     HriRequestActionResponse,
@@ -34,6 +37,191 @@ from app.schemas.hri_request import (
 
 EDITABLE_REQUEST_STATUSES = {"DRAFT", "APPROVAL_REJECTED", "RECEIVE_REJECTED"}
 
+# ---------------------------------------------------------------------------
+# 후처리 핸들러 레지스트리
+# ---------------------------------------------------------------------------
+# form_code → callable(session, request) 로 등록.
+# 각 핸들러는 실제 비즈니스 로직(급여 연동, TIM 반영 등)을 담당한다.
+# 승인 완료(COMPLETED) 도달 시 _on_request_completed() 에서 자동 호출된다.
+# ---------------------------------------------------------------------------
+
+def _handle_tim_correction_complete(session: Session, request: HriRequestMaster) -> None:  # noqa: ARG001
+    """근태정정 완료 후처리 — 향후 TIM 연동 구현 예정."""
+    # TODO: hri_req_tim_correction 조회 → tim_attendance_daily 업데이트
+    return
+
+
+def _handle_cert_employment_complete(session: Session, request: HriRequestMaster) -> None:  # noqa: ARG001
+    """재직증명서 발급 완료 후처리 — 향후 문서 발급 연동 예정."""
+    # TODO: 발급 이력 기록, 외부 문서 생성 API 호출 등
+    return
+
+
+def _handle_leave_complete(session: Session, request: HriRequestMaster) -> None:  # noqa: ARG001
+    """휴가 신청 완료 후처리 — 향후 TIM 연동 구현 예정."""
+    # TODO: hri_req_leave 조회 → tim_leave_requests / hr_annual_leave 차감
+    return
+
+
+_POST_PROCESS_HANDLERS: dict[str, Any] = {
+    "TIM_CORRECTION": _handle_tim_correction_complete,
+    "CERT_EMPLOYMENT": _handle_cert_employment_complete,
+    "LEAVE_REQUEST": _handle_leave_complete,
+}
+
+
+def _on_request_completed(session: Session, request: HriRequestMaster) -> None:
+    """COMPLETED 전환 시 form_code 기반 핸들러를 디스패치한다.
+
+    - 실패해도 결재 완료 자체는 롤백하지 않는다(비동기 보정 정책).
+    - 핸들러는 각 form_code 담당자가 직접 구현한다.
+    """
+    form_type = session.get(HriFormType, request.form_type_id)
+    if form_type is None:
+        return
+    handler = _POST_PROCESS_HANDLERS.get(form_type.form_code)
+    if handler is not None:
+        handler(session, request)
+
+
+# ---------------------------------------------------------------------------
+# Dual Write 헬퍼 — 신청서 저장 시 유형별 상세 테이블에 동시 기록
+# ---------------------------------------------------------------------------
+
+def _upsert_detail_tim_correction(
+    session: Session, request_id: int, content: dict[str, Any]
+) -> None:
+    """TIM_CORRECTION 상세 테이블 upsert."""
+    from datetime import date as _date
+
+    def _to_date(v: Any) -> _date:
+        if isinstance(v, _date):
+            return v
+        try:
+            return _date.fromisoformat(str(v))
+        except (ValueError, TypeError):
+            return _date.today()
+
+    existing = session.exec(
+        select(HriReqTimCorrection).where(HriReqTimCorrection.request_id == request_id)
+    ).first()
+
+    now = now_utc()
+    if existing is None:
+        row = HriReqTimCorrection(
+            request_id=request_id,
+            work_date=_to_date(content.get("work_date")),
+            before_status=str(content.get("before_status", "present")),
+            after_status=str(content.get("after_status", "present")),
+            reason=content.get("reason"),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+    else:
+        existing.work_date = _to_date(content.get("work_date", existing.work_date))
+        existing.before_status = str(content.get("before_status", existing.before_status))
+        existing.after_status = str(content.get("after_status", existing.after_status))
+        existing.reason = content.get("reason", existing.reason)
+        existing.updated_at = now
+        session.add(existing)
+
+
+def _upsert_detail_cert_employment(
+    session: Session, request_id: int, content: dict[str, Any]
+) -> None:
+    """CERT_EMPLOYMENT 상세 테이블 upsert."""
+    existing = session.exec(
+        select(HriReqCertEmployment).where(HriReqCertEmployment.request_id == request_id)
+    ).first()
+
+    now = now_utc()
+    if existing is None:
+        row = HriReqCertEmployment(
+            request_id=request_id,
+            purpose=str(content.get("purpose", "")),
+            copies=int(content.get("copies", 1)),
+            recipient=content.get("recipient"),
+            reason=content.get("reason"),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+    else:
+        existing.purpose = str(content.get("purpose", existing.purpose))
+        existing.copies = int(content.get("copies", existing.copies))
+        existing.recipient = content.get("recipient", existing.recipient)
+        existing.reason = content.get("reason", existing.reason)
+        existing.updated_at = now
+        session.add(existing)
+
+
+def _upsert_detail_leave(
+    session: Session, request_id: int, content: dict[str, Any]
+) -> None:
+    """LEAVE_REQUEST 상세 테이블 upsert."""
+    from datetime import date as _date
+
+    def _to_date(v: Any) -> _date:
+        if isinstance(v, _date):
+            return v
+        try:
+            return _date.fromisoformat(str(v))
+        except (ValueError, TypeError):
+            return _date.today()
+
+    existing = session.exec(
+        select(HriReqLeave).where(HriReqLeave.request_id == request_id)
+    ).first()
+
+    now = now_utc()
+    if existing is None:
+        row = HriReqLeave(
+            request_id=request_id,
+            leave_type_code=str(content.get("leave_type_code", "")),
+            start_date=_to_date(content.get("start_date")),
+            end_date=_to_date(content.get("end_date")),
+            start_time=content.get("start_time"),
+            end_time=content.get("end_time"),
+            applied_minutes=int(content.get("applied_minutes", 480)),
+            reason=content.get("reason"),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(row)
+    else:
+        existing.leave_type_code = str(content.get("leave_type_code", existing.leave_type_code))
+        existing.start_date = _to_date(content.get("start_date", existing.start_date))
+        existing.end_date = _to_date(content.get("end_date", existing.end_date))
+        existing.start_time = content.get("start_time", existing.start_time)
+        existing.end_time = content.get("end_time", existing.end_time)
+        existing.applied_minutes = int(content.get("applied_minutes", existing.applied_minutes))
+        existing.reason = content.get("reason", existing.reason)
+        existing.updated_at = now
+        session.add(existing)
+
+
+_DETAIL_WRITERS: dict[str, Any] = {
+    "TIM_CORRECTION": _upsert_detail_tim_correction,
+    "CERT_EMPLOYMENT": _upsert_detail_cert_employment,
+    "LEAVE_REQUEST": _upsert_detail_leave,
+}
+
+
+def _dual_write_detail(
+    session: Session,
+    form_code: str,
+    request_id: int,
+    content: dict[str, Any],
+) -> None:
+    """form_code 에 맞는 상세 테이블에 content 를 upsert 한다 (Dual Write).
+
+    - 지원하지 않는 form_code 는 조용히 skip (content_json fallback 유지).
+    - flush 는 호출자에서 담당한다.
+    """
+    writer = _DETAIL_WRITERS.get(form_code)
+    if writer is not None:
+        writer(session, request_id, content)
 
 
 def _parse_content(value: str | None) -> dict[str, Any]:
@@ -379,6 +567,8 @@ def upsert_request_draft(
         )
         session.add(row)
         session.flush()
+        # Dual Write: 유형별 상세 테이블에 동시 기록
+        _dual_write_detail(session, form_type.form_code, row.id, payload.content_json)
         _record_history(
             session=session,
             request_id=row.id,
@@ -406,6 +596,8 @@ def upsert_request_draft(
         row.current_step_order = None
         row.updated_at = now
         session.add(row)
+        # Dual Write: 유형별 상세 테이블 업데이트
+        _dual_write_detail(session, form_type.form_code, row.id, payload.content_json)
         _record_history(
             session=session,
             request_id=row.id,
@@ -615,6 +807,8 @@ def approve_request(
             request.status_code = "COMPLETED"
             request.current_step_order = None
             request.completed_at = now
+            # 후처리 디스패치 (form_code 기반 핸들러)
+            _on_request_completed(session, request)
 
     request.updated_at = now
     session.add(request)
@@ -725,6 +919,8 @@ def receive_complete_request(
         request.status_code = "COMPLETED"
         request.current_step_order = None
         request.completed_at = now
+        # 후처리 디스패치 (form_code 기반 핸들러)
+        _on_request_completed(session, request)
     else:
         request.current_step_order = next_receive.step_order
     request.updated_at = now

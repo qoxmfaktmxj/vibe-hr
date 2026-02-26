@@ -720,6 +720,83 @@ class HriReqTimAttendance(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class HriReqTimCorrection(SQLModel, table=True):
+    """근태정정 신청 상세 (마스터 1:1).
+
+    form_code = TIM_CORRECTION
+    """
+
+    __tablename__ = "hri_req_tim_correction"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_hri_req_tim_correction_request_id"),
+        Index("ix_hri_req_tim_correction_work_date", "work_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    # 정정 대상 날짜
+    work_date: date
+    # 정정 전/후 근태코드 (예: present, late, absent, early_leave …)
+    before_status: str = Field(max_length=30)
+    after_status: str = Field(max_length=30)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriReqCertEmployment(SQLModel, table=True):
+    """재직증명서 발급 신청 상세 (마스터 1:1).
+
+    form_code = CERT_EMPLOYMENT
+    """
+
+    __tablename__ = "hri_req_cert_employment"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_hri_req_cert_employment_request_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    # 발급 목적 (예: 금융기관 제출, 비자 신청 등)
+    purpose: str = Field(max_length=200)
+    # 발급 부수
+    copies: int = Field(default=1)
+    # 제출처 (예: 국민은행)
+    recipient: Optional[str] = Field(default=None, max_length=200)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HriReqLeave(SQLModel, table=True):
+    """휴가 신청 상세 (마스터 1:1).
+
+    form_code = LEAVE_REQUEST
+    분 단위 정책: HRI_MODULE.md 참조
+    """
+
+    __tablename__ = "hri_req_leave"
+    __table_args__ = (
+        UniqueConstraint("request_id", name="uq_hri_req_leave_request_id"),
+        Index("ix_hri_req_leave_dates", "start_date", "end_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_id: int = Field(foreign_key="hri_request_masters.id", index=True)
+    # 휴가 유형 코드 (연차, 반차, 시간차, 병가 등 — tim_attendance_codes 참조)
+    leave_type_code: str = Field(max_length=30)
+    start_date: date
+    end_date: date
+    # 반차/시간차는 시간 지정
+    start_time: Optional[str] = Field(default=None, max_length=5)
+    end_time: Optional[str] = Field(default=None, max_length=5)
+    # 분 단위 차감량 (480 = 1일, 240 = 반일)
+    applied_minutes: int = Field(default=480)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class TimSchedulePattern(SQLModel, table=True):
     __tablename__ = "tim_schedule_patterns"
     __table_args__ = (UniqueConstraint("code", name="uq_tim_schedule_patterns_code"),)
