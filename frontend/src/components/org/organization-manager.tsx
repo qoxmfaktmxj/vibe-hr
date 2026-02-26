@@ -1,6 +1,5 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
@@ -243,9 +242,6 @@ export function OrganizationManager() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="mr-2 flex items-center gap-2 text-base font-semibold text-slate-700">
-              <Search className="h-5 w-5 text-primary" /> Search
-            </div>
             <div className="space-y-1">
               <Label className="text-xs">조직코드</Label>
               <Input className="h-9 w-36" value={searchCode} onChange={(event) => setSearchCode(event.target.value)} />
