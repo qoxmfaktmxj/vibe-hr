@@ -1,0 +1,29 @@
+{
+  "version": "standard-v1",
+  "screens": {
+    "hr.employee": {
+      "path": "/hr/employee",
+      "pageFile": "frontend/src/app/hr/employee/page.tsx",
+      "componentFile": "frontend/src/components/hr/employee-master-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "ownerModule": "HR"
+    },
+    "settings.common-codes": {
+      "path": "/settings/common-codes",
+      "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
+      "componentFile": "frontend/src/components/settings/common-code-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "ownerModule": "SETTINGS"
+    },
+    "org.departments": {
+      "path": "/org/departments",
+      "pageFile": "frontend/src/app/org/departments/page.tsx",
+      "componentFile": "frontend/src/components/org/organization-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "ownerModule": "ORG"
+    }
+  }
+}
