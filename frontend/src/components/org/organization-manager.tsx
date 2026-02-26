@@ -4,13 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
+import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type {
   OrganizationDepartmentItem,
   OrganizationDepartmentListResponse,
@@ -40,6 +38,7 @@ export function OrganizationManager() {
   const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
 
   const gridApiRef = useRef<GridApi<OrgRow> | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const tempIdRef = useRef(-1);
 
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
@@ -166,6 +165,44 @@ export function OrganizationManager() {
     setNotice("업로드는 다음 단계에서 템플릿 헤더 매핑으로 연결합니다.");
   }
 
+  const handlePasteCapture = useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!containerRef.current?.contains(document.activeElement)) return;
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || !text.includes("\t")) return;
+
+    event.preventDefault();
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (lines.length === 0) return;
+
+    const now = new Date().toISOString();
+    const parsed: OrgRow[] = lines.map((line) => {
+      const cols = line.split("\t").map((cell) => cell.trim());
+      const rowId = tempIdRef.current;
+      tempIdRef.current -= 1;
+      return {
+        id: rowId,
+        code: cols[0] ?? "",
+        name: cols[1] ?? "",
+        parent_id: null,
+        parent_name: cols[2] || null,
+        is_active: (cols[3] ?? "Y").toUpperCase() !== "N",
+        created_at: now,
+        updated_at: now,
+        delete_mark: false,
+        row_status: "입력",
+        _dirty: true,
+      };
+    });
+
+    setRows((prev) => [...parsed, ...prev]);
+    setSelectedId(parsed[0]?.id ?? null);
+    setNoticeType("success");
+    setNotice(`붙여넣기 완료 (${parsed.length}건)`);
+  }, []);
+
   function downloadXlsx() {
     const exportRows = rows.map((row, index) => ({
       No: index + 1,
@@ -238,24 +275,36 @@ export function OrganizationManager() {
   if (loading) return <div className="p-6">불러오는 중...</div>;
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-6" ref={containerRef} onPasteCapture={handlePasteCapture}>
       <Card>
         <CardContent className="pt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <CardTitle>조직코드관리</CardTitle>
+          </div>
           <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">조직코드</Label>
-              <Input className="h-9 w-36" value={searchCode} onChange={(event) => setSearchCode(event.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">조직명</Label>
-              <Input className="h-9 w-44" value={searchName} onChange={(event) => setSearchName(event.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">기준일자</Label>
-              <CustomDatePicker className="w-40" value={referenceDate} onChange={setReferenceDate} holidays={HOLIDAY_DATE_KEYS} />
-            </div>
+            <Input
+              className="h-9 w-36"
+              value={searchCode}
+              onChange={(event) => setSearchCode(event.target.value)}
+              placeholder="조직코드"
+            />
+            <Input
+              className="h-9 w-44"
+              value={searchName}
+              onChange={(event) => setSearchName(event.target.value)}
+              placeholder="조직명"
+            />
+            <Input
+              className="h-9 w-40"
+              value={referenceDate}
+              onChange={(event) => setReferenceDate(event.target.value)}
+              placeholder="기준일자"
+            />
             <div className="ml-auto">
-              <Button variant="query" onClick={() => void runQuery()} disabled={saving}>조회</Button>
+              <Button size="sm" variant="query" onClick={() => void runQuery()} className="h-8 min-w-20 px-3" disabled={saving}>
+                <Search className="h-3 w-3" />
+                조회
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -263,8 +312,7 @@ export function OrganizationManager() {
 
       <Card>
         <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <CardTitle>조직코드관리</CardTitle>
+          <div className="flex items-center justify-end">
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={addRow} disabled={saving}>입력</Button>
               <Button variant="outline" onClick={copyRow} disabled={saving || !selectedRow}>복사</Button>
