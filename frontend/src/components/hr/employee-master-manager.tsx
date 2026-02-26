@@ -197,6 +197,9 @@ const STATUS_LABELS: Record<RowStatus, string> = {
   deleted: I18N.statusDeleted,
 };
 
+const LOCK_MARK = "🔒";
+const lockHeader = (label: string) => `${label} ${LOCK_MARK}`;
+
 /* ------------------------------------------------------------------ */
 /* 공통 보조 함수                                                       */
 /* ------------------------------------------------------------------ */
@@ -511,7 +514,8 @@ export function EmployeeMasterManager() {
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     return [
       {
-        headerName: I18N.colDeleteMark,
+        headerName: lockHeader(I18N.colDeleteMark),
+        headerTooltip: "직접 입력 수정 불가(삭제 체크로만 변경)",
         width: 56,
         pinned: "left",
         sortable: false,
@@ -537,7 +541,8 @@ export function EmployeeMasterManager() {
         },
       },
       {
-        headerName: I18N.colStatus,
+        headerName: lockHeader(I18N.colStatus),
+        headerTooltip: "시스템 상태 컬럼(자동 계산)",
         field: "_status",
         width: 80,
         editable: false,
@@ -551,13 +556,15 @@ export function EmployeeMasterManager() {
         valueFormatter: (params) => STATUS_LABELS[(params.value as RowStatus) ?? "clean"],
       },
       {
-        headerName: I18N.colEmployeeNo,
+        headerName: lockHeader(I18N.colEmployeeNo),
+        headerTooltip: "신규 행에서만 수정 가능",
         field: "employee_no",
         width: 120,
         editable: (params) => params.data?._status === "added",
       },
       {
-        headerName: I18N.colLoginId,
+        headerName: lockHeader(I18N.colLoginId),
+        headerTooltip: "신규 행에서만 수정 가능",
         field: "login_id",
         width: 130,
         editable: (params) => params.data?._status === "added",
