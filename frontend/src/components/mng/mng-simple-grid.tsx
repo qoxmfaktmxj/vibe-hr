@@ -61,6 +61,7 @@ export function MngSimpleGrid<T extends Record<string, unknown>>({
   return (
     <div className="ag-theme-quartz vibe-grid w-full overflow-hidden rounded border border-border" style={{ height }}>
       <AgGridReact<T>
+        theme="legacy"
         rowData={rowData}
         columnDefs={columnDefs}
         defaultColDef={defaultColDef}

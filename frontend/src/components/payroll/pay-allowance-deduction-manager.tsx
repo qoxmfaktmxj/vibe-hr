@@ -518,6 +518,7 @@ export function PayAllowanceDeductionManager() {
             <div className="flex-1 px-6 pb-4 pt-2">
                 <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
                     <AgGridReact<RowData>
+                        theme="legacy"
                         key={gridMountKey}
                         rowData={filteredRows}
                         columnDefs={columnDefs}

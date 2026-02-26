@@ -59,23 +59,8 @@ export function AppShell({ title: _title, description: _description, children }:
   const pathname = usePathname();
   const { user } = useAuth();
   const { menus } = useMenu();
-  const [storedTabs, setStoredTabs] = useState<OpenTab[]>(() => {
-    if (typeof window === "undefined") return [];
-    const raw = window.localStorage.getItem(TAB_STORAGE_KEY);
-    if (!raw) return [];
-    try {
-      const parsed = JSON.parse(raw) as OpenTab[];
-      if (!Array.isArray(parsed)) return [];
-      return parsed.filter(
-        (tab) =>
-          typeof tab.path === "string" &&
-          typeof tab.label === "string" &&
-          tab.path !== "/dashboard",
-      );
-    } catch {
-      return [];
-    }
-  });
+  const [storedTabs, setStoredTabs] = useState<OpenTab[]>([]);
+  const [tabsHydrated, setTabsHydrated] = useState(false);
 
   const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
   const [skipAutoAddPath, setSkipAutoAddPath] = useState<string | null>(null);
@@ -86,6 +71,36 @@ export function AppShell({ title: _title, description: _description, children }:
     (path: string) => findMenuLabel(menus, path) ?? getFallbackLabel(path),
     [menus],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(TAB_STORAGE_KEY);
+    if (!raw) {
+      setTabsHydrated(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as OpenTab[];
+      if (!Array.isArray(parsed)) {
+        setTabsHydrated(true);
+        return;
+      }
+
+      setStoredTabs(
+        parsed.filter(
+          (tab) =>
+            typeof tab.path === "string" &&
+            typeof tab.label === "string" &&
+            tab.path !== "/dashboard",
+        ),
+      );
+    } catch {
+      setStoredTabs([]);
+    } finally {
+      setTabsHydrated(true);
+    }
+  }, []);
 
   const openTabs = useMemo(() => {
     const normalized = storedTabs.map((tab) => ({
@@ -109,9 +124,9 @@ export function AppShell({ title: _title, description: _description, children }:
   }, [pathname, resolveLabel, skipAutoAddPath, storedTabs]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !tabsHydrated) return;
     window.localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(openTabs));
-  }, [openTabs]);
+  }, [openTabs, tabsHydrated]);
 
   function closeTab(path: string) {
     const next = openTabs.filter((tab) => tab.path !== path);

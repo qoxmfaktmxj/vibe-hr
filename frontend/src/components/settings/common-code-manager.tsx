@@ -410,6 +410,7 @@ export function CommonCodeManager() {
         <CardContent className="space-y-4">
           <div className="ag-theme-quartz" style={{ height: 300 }}>
             <AgGridReact<CodeGroupItem>
+              theme="legacy"
               rowData={filteredGroups}
               columnDefs={groupColumns}
               getRowId={(p) => String(p.data.id)}
@@ -462,6 +463,7 @@ export function CommonCodeManager() {
         <CardContent className="space-y-4">
           <div className="ag-theme-quartz" style={{ height: 320 }}>
             <AgGridReact<CodeItem>
+              theme="legacy"
               rowData={filteredCodes}
               columnDefs={codeColumns}
               getRowId={(p) => String(p.data.id)}

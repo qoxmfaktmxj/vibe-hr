@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -54,7 +54,10 @@ def _get_path(data: Any, dotted: str) -> Any:
     current = data
     for part in dotted.split("."):
         if isinstance(current, list):
-            current = current[int(part)]
+            try:
+                current = current[int(part)]
+            except (ValueError, IndexError):
+                return None
         elif isinstance(current, dict):
             current = current.get(part)
         else:
@@ -81,72 +84,115 @@ def call_openai(system_prompt: str, user_prompt: str, model: str, temperature: f
     return response.output_text
 
 
-def call_internal_auth(
+def _post_json(
     *,
-    base_url: str,
-    auth_path: str,
-    llm_path: str,
-    login_id: str,
-    password: str,
-    model: str,
-    system_prompt: str,
-    user_prompt: str,
-    token_field: str,
-    response_text_path: str,
-) -> str:
-    auth_url = f"{base_url.rstrip('/')}{auth_path}"
-    llm_url = f"{base_url.rstrip('/')}{llm_path}"
-
-    auth_payload = json.dumps({"login_id": login_id, "password": password}).encode("utf-8")
-    auth_req = urlrequest.Request(
-        auth_url,
-        data=auth_payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    url: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    timeout_sec: int,
+) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8")
+    req = urlrequest.Request(url, data=data, headers=headers, method="POST")
     try:
-        with urlrequest.urlopen(auth_req, timeout=20) as resp:  # noqa: S310
-            auth_json = json.loads(resp.read().decode("utf-8"))
+        with urlrequest.urlopen(req, timeout=timeout_sec) as resp:  # noqa: S310
+            body = resp.read().decode("utf-8")
     except HTTPError as exc:  # noqa: PERF203
         body = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"auth request failed: {exc.code} {body}") from exc
+        raise RuntimeError(f"{url} failed: HTTP {exc.code} {body}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"{url} failed: {exc}") from exc
 
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{url} returned non-JSON response: {body[:500]}") from exc
+
+
+def _extract_text_from_llm_json(llm_json: dict[str, Any], response_text_path: str) -> str:
+    text = _get_path(llm_json, response_text_path)
+    if isinstance(text, str) and text.strip():
+        return text
+
+    fallback_candidates = [
+        _get_path(llm_json, "output_text"),
+        _get_path(llm_json, "choices.0.message.content"),
+        _get_path(llm_json, "result.text"),
+        _get_path(llm_json, "message.content"),
+    ]
+    for candidate in fallback_candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+
+    if isinstance(_get_path(llm_json, "choices.0.message.content"), list):
+        parts = _get_path(llm_json, "choices.0.message.content")
+        joined = " ".join(item.get("text", "") for item in parts if isinstance(item, dict))
+        if joined.strip():
+            return joined
+
+    raise RuntimeError(f"response text not found: {response_text_path}")
+
+
+def build_internal_auth_token(
+    *,
+    auth_url: str,
+    login_id: str,
+    password: str,
+    token_field: str,
+    timeout_sec: int,
+) -> str:
+    auth_json = _post_json(
+        url=auth_url,
+        payload={"login_id": login_id, "password": password},
+        headers={"Content-Type": "application/json"},
+        timeout_sec=timeout_sec,
+    )
     access_token = _get_path(auth_json, token_field)
     if not access_token:
         raise RuntimeError(f"token field not found: {token_field}")
+    if not isinstance(access_token, str):
+        raise RuntimeError(f"token field is not string: {token_field}")
+    return access_token
 
-    llm_payload = json.dumps(
-        {
+
+def call_internal_auth(
+    *,
+    llm_url: str,
+    access_token: str,
+    model: str,
+    temperature: float,
+    system_prompt: str,
+    user_prompt: str,
+    response_text_path: str,
+    llm_body_style: str,
+    timeout_sec: int,
+) -> str:
+    if llm_body_style == "responses":
+        payload = {
+            "model": model,
+            "instructions": system_prompt,
+            "input": user_prompt,
+            "temperature": temperature,
+        }
+    else:
+        payload = {
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            "temperature": temperature,
         }
-    ).encode("utf-8")
-    llm_req = urlrequest.Request(
-        llm_url,
-        data=llm_payload,
+
+    llm_json = _post_json(
+        url=llm_url,
+        payload=payload,
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {access_token}",
         },
-        method="POST",
+        timeout_sec=timeout_sec,
     )
-    try:
-        with urlrequest.urlopen(llm_req, timeout=60) as resp:  # noqa: S310
-            llm_json = json.loads(resp.read().decode("utf-8"))
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"llm request failed: {exc.code} {body}") from exc
-
-    text = _get_path(llm_json, response_text_path)
-    if not text:
-        # fallback paths
-        text = _get_path(llm_json, "choices.0.message.content") or llm_json.get("output_text")
-    if not text:
-        raise RuntimeError(f"response text not found: {response_text_path}")
-    return text
+    return _extract_text_from_llm_json(llm_json, response_text_path)
 
 
 def mock_response(agent: str, task: dict[str, Any], planner_output: str | None = None) -> str:
@@ -221,16 +267,15 @@ def run_agent(
             if not internal_config:
                 raise RuntimeError("internal-auth config is missing")
             output = call_internal_auth(
-                base_url=internal_config["base_url"],
-                auth_path=internal_config["auth_path"],
-                llm_path=internal_config["llm_path"],
-                login_id=internal_config["login_id"],
-                password=internal_config["password"],
+                llm_url=internal_config["llm_url"],
+                access_token=internal_config["access_token"],
                 model=model,
+                temperature=temperature,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                token_field=internal_config["token_field"],
                 response_text_path=internal_config["response_text_path"],
+                llm_body_style=internal_config["llm_body_style"],
+                timeout_sec=int(internal_config["llm_timeout_sec"]),
             )
         else:
             output = mock_response(agent, task, planner_output)
@@ -261,6 +306,10 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def _join_base_and_path(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="VIBE-HR multi-agent orchestration scaffold.")
     parser.add_argument("--task-file", required=True, help="Path to task JSON file.")
@@ -269,27 +318,55 @@ def main() -> int:
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--max-workers", type=int, default=3)
     parser.add_argument("--base-url", default=os.environ.get("VIBE_BASE_URL", "http://127.0.0.1:8000"))
+    parser.add_argument("--auth-url", default=os.environ.get("VIBE_AUTH_URL", ""))
     parser.add_argument("--auth-path", default=os.environ.get("VIBE_AUTH_PATH", "/api/v1/auth/login"))
+    parser.add_argument("--llm-url", default=os.environ.get("VIBE_LLM_URL", ""))
     parser.add_argument("--llm-path", default=os.environ.get("VIBE_LLM_PATH", "/api/v1/llm/chat"))
-    parser.add_argument("--login-id", default=os.environ.get("VIBE_LOGIN_ID", "admin-local"))
-    parser.add_argument("--password", default=os.environ.get("VIBE_PASSWORD", "admin"))
+    parser.add_argument("--login-id", default=os.environ.get("VIBE_LOGIN_ID", ""))
+    parser.add_argument("--password", default=os.environ.get("VIBE_PASSWORD", ""))
+    parser.add_argument("--access-token", default=os.environ.get("VIBE_ACCESS_TOKEN", ""))
     parser.add_argument("--token-field", default=os.environ.get("VIBE_TOKEN_FIELD", "access_token"))
     parser.add_argument("--response-text-path", default=os.environ.get("VIBE_RESPONSE_TEXT_PATH", "choices.0.message.content"))
+    parser.add_argument("--auth-timeout-sec", type=int, default=int(os.environ.get("VIBE_AUTH_TIMEOUT_SEC", "20")))
+    parser.add_argument("--llm-timeout-sec", type=int, default=int(os.environ.get("VIBE_LLM_TIMEOUT_SEC", "60")))
+    parser.add_argument("--llm-body-style", choices=["chat", "responses"], default=os.environ.get("VIBE_LLM_BODY_STYLE", "chat"))
     args = parser.parse_args()
 
     task_path = Path(args.task_file).resolve()
     task = read_json(task_path)
     validate_task(task)
 
-    internal_config = {
-        "base_url": args.base_url,
-        "auth_path": args.auth_path,
-        "llm_path": args.llm_path,
-        "login_id": args.login_id,
-        "password": args.password,
-        "token_field": args.token_field,
-        "response_text_path": args.response_text_path,
-    }
+    internal_config: dict[str, str] | None = None
+    try:
+        if args.mode == "internal-auth":
+            auth_url = args.auth_url.strip() or _join_base_and_path(args.base_url, args.auth_path)
+            llm_url = args.llm_url.strip() or _join_base_and_path(args.base_url, args.llm_path)
+
+            access_token = args.access_token.strip()
+            if not access_token:
+                if not args.login_id.strip() or not args.password:
+                    raise ValueError(
+                        "internal-auth mode requires either --access-token (or VIBE_ACCESS_TOKEN) "
+                        "or both --login-id/--password."
+                    )
+                access_token = build_internal_auth_token(
+                    auth_url=auth_url,
+                    login_id=args.login_id.strip(),
+                    password=args.password,
+                    token_field=args.token_field,
+                    timeout_sec=args.auth_timeout_sec,
+                )
+
+            internal_config = {
+                "llm_url": llm_url,
+                "access_token": access_token,
+                "response_text_path": args.response_text_path,
+                "llm_body_style": args.llm_body_style,
+                "llm_timeout_sec": str(args.llm_timeout_sec),
+            }
+    except Exception as exc:  # noqa: BLE001
+        print(f"Startup failed: {exc}")
+        return 2
 
     run_id = f"{task['task_id']}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
     run_dir = RUNS_DIR / run_id
@@ -379,6 +456,12 @@ def main() -> int:
         },
     }
     write_file(run_dir / "summary.json", json.dumps(summary, ensure_ascii=False, indent=2))
+
+    all_results = [planner_result, *worker_results.values(), reviewer_result]
+    has_error = any(result.error for result in all_results)
+    if has_error:
+        print(f"Run completed with errors: {run_dir}")
+        return 2
 
     print(f"Run completed: {run_dir}")
     return 0

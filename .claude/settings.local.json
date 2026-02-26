@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git pull:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(powershell -Command \"Get-ChildItem ''C:\\\\Users\\\\kms\\\\Downloads\\\\vibehr_favicon_pack'' -Force\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(echo:*)",
+      "Bash(py -m py_compile:*)",
+      "Bash(where:*)",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -m py_compile app/core/pagination.py)",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/core/pagination.py''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/core/pagination.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''pagination OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/services/tim_attendance_daily_service.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''attendance OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/services/hri_approval_template_service.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''approval OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/services/mng_dev_service.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''mng OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''app/services/auth_service.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''auth OK''\\)\")",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"import ast; ast.parse\\(open\\(''C:/Users/kms/Desktop/dev/vibe-hr/backend/app/services/hri_request_service.py'', encoding=''utf-8''\\).read\\(\\)\\); print\\(''OK''\\)\")",
+      "Bash(dir \"C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\frontend\\\\src\\\\components\" /B /S)",
+      "Bash(findstr:*)",
+      "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\frontend\\\\src\" -Filter \"*.tsx\")",
+      "Bash(Where-Object {$_Name -match \"employee|master\"})",
+      "Bash(Select-Object FullName)",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"\nimport ast\nfor f in [\n    ''backend/app/models/entities.py'',\n    ''backend/app/models/__init__.py'',\n    ''backend/app/services/hri_request_service.py'',\n]:\n    try:\n        ast.parse\\(open\\(f, encoding=''utf-8''\\).read\\(\\)\\)\n        print\\(f''OK: {f}''\\)\n    except SyntaxError as e:\n        print\\(f''FAIL: {f} - {e}''\\)\n\")",
+      "Bash(dir:*)",
+      "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"\nimport ast\nfor f in [\n    ''backend/app/schemas/hri_request.py'',\n    ''backend/app/services/hri_request_service.py'',\n    ''backend/app/api/hri_request.py'',\n]:\n    try:\n        ast.parse\\(open\\(f, encoding=''utf-8''\\).read\\(\\)\\)\n        print\\(f''OK: {f}''\\)\n    except SyntaxError as e:\n        print\\(f''FAIL: {f} - {e}''\\)\n\")",
+      "Bash(git rm:*)"
+    ]
+  }
+}

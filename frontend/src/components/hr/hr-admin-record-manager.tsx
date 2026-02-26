@@ -439,6 +439,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
 
         <div className="ag-theme-quartz" style={{ height: 620 }}>
           <AgGridReact<AdminGridRow>
+            theme="legacy"
             rowData={rows}
             columnDefs={columns}
             getRowId={(params) => `${params.data.employee_id}-${params.data.id}`}

@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  Search,
   Plus,
   Copy,
   FileDown,
@@ -29,23 +28,29 @@ import {
   type GridApi,
   type GridReadyEvent,
   type ICellEditorParams,
-  type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
+import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
-import { Button } from "@/components/ui/button";
+import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
   hasRowPatchChanges,
   isRowRevertedToOriginal,
-  resolveRestoredStatus,
   snapshotFields,
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
+import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
+import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
   EmployeeBatchResponse,
@@ -127,7 +132,7 @@ const I18N = {
   requiredDepartment: "부서를 선택해야 합니다.",
   requiredPosition: "직책은 필수입니다.",
   savePartial: "일괄 저장은 완료되었지만 일부 행이 실패했습니다.",
-  title: "사원 마스터",
+  title: "사원관리",
   searchPlaceholder: "사번 / 이름 / 부서 검색",
   query: "조회",
   addRow: "입력",
@@ -326,7 +331,6 @@ export function EmployeeMasterManager() {
   );
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [pageInput, setPageInput] = useState("1");
   const [saving, setSaving] = useState(false);
 
   const gridApiRef = useRef<GridApi<EmployeeGridRow> | null>(null);
@@ -352,14 +356,22 @@ export function EmployeeMasterManager() {
   );
 
   const changeSummary = useMemo(() => {
-    const s = { added: 0, updated: 0, deleted: 0 };
-    for (const r of rows) {
-      if (r._status === "added") s.added += 1;
-      else if (r._status === "updated") s.updated += 1;
-      else if (r._status === "deleted") s.deleted += 1;
-    }
-    return s;
+    return summarizeGridStatuses(rows, (row) => row._status);
   }, [rows]);
+
+  const {
+    totalPages,
+    pageInput,
+    setPageInput,
+    goPrev,
+    goNext,
+    goToPage,
+  } = useGridPagination({
+    page,
+    totalCount,
+    pageSize,
+    onPageChange: setPage,
+  });
 
   const positionNames = useMemo(() => positionOptions.map((option) => option.name), [positionOptions]);
   const employmentStatusValues = useMemo(
@@ -458,43 +470,12 @@ export function EmployeeMasterManager() {
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) => {
-        const next: EmployeeGridRow[] = [];
-        for (const row of prev) {
-          if (row.id !== rowId) {
-            next.push(row);
-            continue;
-          }
-
-          if (!checked) {
-            if (row._status === "deleted") {
-              const restoredStatus = resolveRestoredStatus(
-                row,
-                (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
-              );
-              next.push({
-                ...row,
-                _status: restoredStatus,
-                _prevStatus: undefined,
-              });
-            } else {
-              next.push(row);
-            }
-            continue;
-          }
-
-          if (row._status === "added") {
-            continue;
-          }
-
-          if (row._status !== "deleted") {
-            next.push({ ...row, _status: "deleted", _prevStatus: row._status });
-          } else {
-            next.push(row);
-          }
-        }
-        return next;
-      });
+      setRows((prev) =>
+        toggleDeletedStatus(prev, rowId, checked, {
+          removeAddedRow: true,
+          shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+        }),
+      );
 
       setTimeout(refreshGridRows, 0);
     },
@@ -572,13 +553,7 @@ export function EmployeeMasterManager() {
         field: "_status",
         width: 80,
         editable: false,
-        cellClass: (params) => {
-          const s = params.value as RowStatus;
-          if (s === "added") return "vibe-status-added";
-          if (s === "updated") return "vibe-status-updated";
-          if (s === "deleted") return "vibe-status-deleted";
-          return "";
-        },
+        cellClass: (params) => getGridStatusCellClass(params.value as RowStatus),
         valueFormatter: (params) => STATUS_LABELS[(params.value as RowStatus) ?? "clean"],
       },
       {
@@ -672,12 +647,8 @@ export function EmployeeMasterManager() {
   );
 
   /* -- 클래스 기반 행 스타일 ---------------------------------- */
-  const getRowClass = useCallback((params: RowClassParams<EmployeeGridRow>) => {
-    if (!params.data) return "";
-    if (params.data._status === "added") return "vibe-row-added";
-    if (params.data._status === "updated") return "vibe-row-updated";
-    if (params.data._status === "deleted") return "vibe-row-deleted";
-    return "";
+  const getRowClass = useCallback((params: { data?: EmployeeGridRow }) => {
+    return getGridRowClass(params.data?._status);
   }, []);
 
   /* -- 그리드 이벤트 ------------------------------------------------ */
@@ -726,11 +697,9 @@ export function EmployeeMasterManager() {
             next.employee_no = String(event.newValue ?? "").trim();
           }
 
-          if (next._status !== "added" && next._status !== "deleted") {
-            next._status = isRevertedToOriginal(next) && !next.password ? "clean" : "updated";
-          }
-
-          return next;
+          return reconcileUpdatedStatus(next, {
+            shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+          });
         }),
       );
 
@@ -750,10 +719,9 @@ export function EmployeeMasterManager() {
           const next: EmployeeGridRow = { ...row, ...patch };
           if ("_status" in patch) return next;
 
-          if (next._status !== "added" && next._status !== "deleted") {
-            next._status = isRevertedToOriginal(next) && !next.password ? "clean" : "updated";
-          }
-          return next;
+          return reconcileUpdatedStatus(next, {
+            shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
+          });
         }),
       );
       setTimeout(refreshGridRows, 0);
@@ -1051,9 +1019,47 @@ export function EmployeeMasterManager() {
     setSearchFilters((prev) => ({ ...prev, positions: values }));
   }, []);
 
-  useEffect(() => {
-    setPageInput(String(page));
-  }, [page]);
+  const toolbarActions = [
+    {
+      key: "add",
+      label: I18N.addRow,
+      icon: Plus,
+      onClick: () => addRows(1),
+    },
+    {
+      key: "copy",
+      label: I18N.copy,
+      icon: Copy,
+      onClick: copySelectedRows,
+    },
+    {
+      key: "template",
+      label: I18N.templateDownload,
+      icon: FileDown,
+      onClick: () => void downloadTemplateExcel(),
+    },
+    {
+      key: "upload",
+      label: I18N.upload,
+      icon: Upload,
+      onClick: () => uploadInputRef.current?.click(),
+    },
+    {
+      key: "download",
+      label: I18N.download,
+      icon: Download,
+      onClick: () => void downloadCurrentSheetExcel(),
+    },
+  ];
+
+  const toolbarSaveAction = {
+    key: "save",
+    label: saving ? `${I18N.saveAll}...` : I18N.saveAll,
+    icon: Save,
+    onClick: saveAllChanges,
+    disabled: saving,
+    variant: "save" as const,
+  };
 
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
     if (event.key !== "Enter") return;
@@ -1070,174 +1076,115 @@ export function EmployeeMasterManager() {
     );
   }
 
-  const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
-
   return (
-    <div className="flex h-[calc(100vh-73px)] flex-col" ref={containerRef} onPasteCapture={handlePasteCapture}>
-      {/* 검색 영역 */}
-      <div className="border-b border-border bg-card px-3 py-3 md:px-6">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-          <div className="grid flex-1 gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">사번</div>
-              <Input
-                value={searchFilters.employeeNo}
-                onChange={(e) => setSearchFilters((prev) => ({ ...prev, employeeNo: e.target.value }))}
-                onKeyDown={handleSearchFieldEnter}
-                placeholder="사번"
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">이름</div>
-              <Input
-                value={searchFilters.name}
-                onChange={(e) => setSearchFilters((prev) => ({ ...prev, name: e.target.value }))}
-                onKeyDown={handleSearchFieldEnter}
-                placeholder="이름"
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">부서</div>
-              <Input
-                value={searchFilters.department}
-                onChange={(e) => setSearchFilters((prev) => ({ ...prev, department: e.target.value }))}
-                onKeyDown={handleSearchFieldEnter}
-                placeholder="부서"
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">직책</div>
-              <MultiSelectFilter
-                options={positionFilterOptions}
-                values={searchFilters.positions}
-                onChange={handlePositionChange}
-                placeholder="전체"
-                searchPlaceholder="직책 검색"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">입사일</div>
-              <CustomDatePicker
-                value={searchFilters.hireDateTo}
-                onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
-                holidays={HOLIDAY_DATE_KEYS}
-                placeholder="입사일 이전"
-                className="w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">활성상태</div>
-              <select
-                value={searchFilters.active}
-                onChange={(e) =>
-                  setSearchFilters((prev) => ({
-                    ...prev,
-                    active: e.target.value as ActiveFilter,
-                  }))
-                }
-                onKeyDown={handleSearchFieldEnter}
-                className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
-              >
-                <option value="">전체</option>
-                <option value="Y">Y</option>
-                <option value="N">N</option>
-              </select>
-            </div>
-            <div className="space-y-1">
-              <div className="text-xs text-slate-500">재직상태</div>
-              <MultiSelectFilter
-                options={statusOptions}
-                values={searchFilters.employmentStatuses}
-                onChange={handleEmploymentStatusChange}
-                placeholder="전체"
-                searchPlaceholder="재직상태 검색"
-              />
-            </div>
+    <ManagerPageShell containerRef={containerRef} onPasteCapture={handlePasteCapture}>
+      <ManagerSearchSection
+        title={I18N.title}
+        onQuery={() => {
+          void handleQuery();
+        }}
+        queryLabel={I18N.query}
+      >
+        <SearchFieldGrid className="xl:grid-cols-4 2xl:grid-cols-7">
+          <div>
+            <SearchTextField
+              value={searchFilters.employeeNo}
+              onChange={(value) => setSearchFilters((prev) => ({ ...prev, employeeNo: value }))}
+              onKeyDown={handleSearchFieldEnter}
+              placeholder={SEARCH_PLACEHOLDERS.employeeNo}
+            />
           </div>
-          <div className="flex justify-end">
-            <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-8 min-w-20 px-3">
-              <Search className="h-3 w-3" />
-              조회
-            </Button>
+          <div>
+            <SearchTextField
+              value={searchFilters.name}
+              onChange={(value) => setSearchFilters((prev) => ({ ...prev, name: value }))}
+              onKeyDown={handleSearchFieldEnter}
+              placeholder={SEARCH_PLACEHOLDERS.employeeName}
+            />
           </div>
-        </div>
-      </div>
+          <div>
+            <SearchTextField
+              value={searchFilters.department}
+              onChange={(value) => setSearchFilters((prev) => ({ ...prev, department: value }))}
+              onKeyDown={handleSearchFieldEnter}
+              placeholder={SEARCH_PLACEHOLDERS.departmentName}
+            />
+          </div>
+          <div>
+            <MultiSelectFilter
+              options={positionFilterOptions}
+              values={searchFilters.positions}
+              onChange={handlePositionChange}
+              placeholder="전체"
+              searchPlaceholder={`${SEARCH_PLACEHOLDERS.position} 검색`}
+            />
+          </div>
+          <div>
+            <CustomDatePicker
+              value={searchFilters.hireDateTo}
+              onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
+              holidays={HOLIDAY_DATE_KEYS}
+              placeholder={SEARCH_PLACEHOLDERS.hireDateTo}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <select
+              value={searchFilters.active}
+              onChange={(e) =>
+                setSearchFilters((prev) => ({
+                  ...prev,
+                  active: e.target.value as ActiveFilter,
+                }))
+              }
+              onKeyDown={handleSearchFieldEnter}
+              aria-label={SEARCH_PLACEHOLDERS.active}
+              className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"
+            >
+              <option value="">전체</option>
+              <option value="Y">Y</option>
+              <option value="N">N</option>
+            </select>
+          </div>
+          <div>
+            <MultiSelectFilter
+              options={statusOptions}
+              values={searchFilters.employmentStatuses}
+              onChange={handleEmploymentStatusChange}
+              placeholder="전체"
+              searchPlaceholder={`${SEARCH_PLACEHOLDERS.employmentStatus} 검색`}
+            />
+          </div>
+        </SearchFieldGrid>
+      </ManagerSearchSection>
 
-      {/* 시트 헤더: 제목 + 버튼 */}
-      <div className="mx-3 flex flex-col gap-2 rounded-lg border bg-white px-3 py-3 md:mx-6 md:flex-row md:items-center md:justify-between md:px-6">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-foreground">
-            {I18N.title}
-          </h2>
-          <span className="text-xs text-slate-400">
-            총 {totalCount.toLocaleString()}건 · {page} / {Math.max(1, Math.ceil(totalCount / pageSize))}페이지
-          </span>
-          {hasChanges && (
-            <div className="flex items-center gap-2 ml-2">
-              {changeSummary.added > 0 && (
-                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  +{changeSummary.added}
-                </span>
-              )}
-              {changeSummary.updated > 0 && (
-                <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                  ~{changeSummary.updated}
-                </span>
-              )}
-              {changeSummary.deleted > 0 && (
-                <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                  -{changeSummary.deleted}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => addRows(1)}>
-            <Plus className="h-3.5 w-3.5" />
-            {I18N.addRow}
-          </Button>
-          <Button size="sm" variant="outline" onClick={copySelectedRows}>
-            <Copy className="h-3.5 w-3.5" />
-            {I18N.copy}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void downloadTemplateExcel()}>
-            <FileDown className="h-3.5 w-3.5" />
-            {I18N.templateDownload}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => uploadInputRef.current?.click()}>
-            <Upload className="h-3.5 w-3.5" />
-            {I18N.upload}
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void downloadCurrentSheetExcel()}>
-            <Download className="h-3.5 w-3.5" />
-            {I18N.download}
-          </Button>
-
-          {/* Separator */}
-          <div className="mx-1 h-6 w-px bg-gray-200" />
-
-          <Button size="sm" variant="save" onClick={saveAllChanges} disabled={saving}>
-            <Save className="h-3.5 w-3.5" />
-            {saving ? `${I18N.saveAll}...` : I18N.saveAll}
-          </Button>
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleUploadFile(file);
-              e.currentTarget.value = "";
-            }}
-          />
-        </div>
-      </div>
+      <ManagerGridSection
+        headerLeft={(
+          <>
+            <span className="text-xs text-slate-400">
+              총 {totalCount.toLocaleString()}건 · {page} / {Math.max(1, Math.ceil(totalCount / pageSize))}페이지
+            </span>
+            <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
+          </>
+        )}
+        headerRight={(
+          <>
+            <GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} />
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleUploadFile(file);
+                e.currentTarget.value = "";
+              }}
+            />
+          </>
+        )}
+        contentClassName="flex min-h-0 flex-1 flex-col"
+      >
 
       {/* 모바일 카드 영역 */}
       <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
@@ -1328,9 +1275,10 @@ export function EmployeeMasterManager() {
       </div>
 
       {/* AG Grid (데스크톱) */}
-      <div className="hidden flex-1 px-6 pb-4 pt-2 md:block">
+      <div className="hidden min-h-0 flex-1 px-3 pb-4 pt-2 md:flex md:flex-col md:px-6 md:pt-0">
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<EmployeeGridRow>
+            theme="legacy"
             key={gridMountKey}
             rowData={filteredRows}
             columnDefs={columnDefs}
@@ -1350,39 +1298,19 @@ export function EmployeeMasterManager() {
             rowHeight={34}
           />
         </div>
-        <div className="mt-2 flex items-center justify-end gap-2 text-xs text-slate-500">
-          <Button size="sm" variant="outline" disabled={page <= 1 || loading || saving} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>이전</Button>
-          <span>{page} / {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
-          <Button size="sm" variant="outline" disabled={page >= Math.max(1, Math.ceil(totalCount / pageSize)) || loading || saving} onClick={() => setPage((prev) => Math.min(Math.max(1, Math.ceil(totalCount / pageSize)), prev + 1))}>다음</Button>
-          <Input
-            value={pageInput}
-            onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-              const next = Number(pageInput || "1");
-              if (!Number.isFinite(next)) return;
-              setPage(Math.min(totalPages, Math.max(1, next)));
-            }}
-            className="h-8 w-16"
-            placeholder="페이지"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={loading || saving}
-            onClick={() => {
-              const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-              const next = Number(pageInput || "1");
-              if (!Number.isFinite(next)) return;
-              setPage(Math.min(totalPages, Math.max(1, next)));
-            }}
-          >
-            이동
-          </Button>
-        </div>
+        <GridPaginationControls
+          page={page}
+          totalPages={totalPages}
+          pageInput={pageInput}
+          setPageInput={setPageInput}
+          goPrev={goPrev}
+          goNext={goNext}
+          goToPage={goToPage}
+          disabled={loading || saving}
+        />
       </div>
-    </div>
+      </ManagerGridSection>
+    </ManagerPageShell>
   );
 }
 

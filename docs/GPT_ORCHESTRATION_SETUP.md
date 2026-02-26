@@ -50,7 +50,36 @@ python orchestration/run_orchestrator.py \
   --model gpt-5-mini
 ```
 
+Internal auth mode (no API key):
+
+```bash
+python orchestration/run_orchestrator.py \
+  --task-file orchestration/tasks/tim-phase3-sample.json \
+  --mode internal-auth \
+  --base-url http://127.0.0.1:8000 \
+  --auth-path /api/v1/auth/login \
+  --llm-path /api/v1/llm/chat \
+  --login-id admin-local \
+  --password admin \
+  --token-field access_token \
+  --response-text-path choices.0.message.content
+```
+
+Token reuse mode:
+
+```bash
+python orchestration/run_orchestrator.py \
+  --task-file orchestration/tasks/tim-phase3-sample.json \
+  --mode internal-auth \
+  --llm-url https://your-gateway.example.com/api/v1/llm/chat \
+  --access-token "<your_token>"
+```
+
+Where to confirm auth format in this repo:
+- Backend bearer auth parser: `backend/app/core/auth.py`
+- Login token endpoint: `backend/app/api/auth.py` (`POST /api/v1/auth/login`)
+- Frontend token forwarding example: `frontend/src/app/api/hri/requests/my/route.ts`
+
 ## Output location
 
 `orchestration/runs/<task_id>_<timestamp>/`
-

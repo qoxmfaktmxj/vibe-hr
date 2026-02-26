@@ -1,4 +1,4 @@
-# GPT Orchestration Scaffold
+﻿# GPT Orchestration Scaffold
 
 This folder is a runnable scaffold for a multi-agent workflow aligned to `WORKFLOW.md`:
 
@@ -56,10 +56,11 @@ python orchestration/run_orchestrator.py \
   --model gpt-5-mini
 ```
 
-## Internal auth mode (API key 없이)
+## Internal auth mode (no API key)
 
-사내 게이트웨이/프록시를 쓰는 경우 `internal-auth` 모드를 사용할 수 있습니다.
+Use this mode when your team has an auth-protected LLM gateway.
 
+Option A: login/password -> token -> LLM
 ```bash
 python orchestration/run_orchestrator.py \
   --task-file orchestration/tasks/tim-phase3-sample.json \
@@ -73,9 +74,20 @@ python orchestration/run_orchestrator.py \
   --response-text-path choices.0.message.content
 ```
 
-- 인증은 `POST {base-url}{auth-path}`로 토큰 발급 후 Bearer로 LLM 호출
-- 요청 바디 기본 포맷: `{ model, messages[] }`
-- 응답 텍스트 경로는 `--response-text-path`로 조정
+Option B: use existing token directly
+```bash
+python orchestration/run_orchestrator.py \
+  --task-file orchestration/tasks/tim-phase3-sample.json \
+  --mode internal-auth \
+  --llm-url https://your-gateway.example.com/api/v1/llm/chat \
+  --access-token "<your_token>" \
+  --response-text-path choices.0.message.content
+```
+
+Notes:
+- `--auth-url` and `--llm-url` override base/path composition.
+- `--llm-body-style` supports `chat` and `responses`.
+- The run exits with non-zero code when any agent call fails.
 
 ## Output files
 
@@ -92,4 +104,3 @@ python orchestration/run_orchestrator.py \
 - Worker jobs run in parallel (`ThreadPoolExecutor`) to model sub-agent fan-out.
 - Reviewer receives all worker outputs and performs gate checks before final summary.
 - Replace prompt files to tune behavior without changing orchestrator code.
-
