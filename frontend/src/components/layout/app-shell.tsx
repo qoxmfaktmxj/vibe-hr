@@ -1,6 +1,7 @@
 "use client";
 
-import { Home, UsersRound, X } from "lucide-react";
+import { Home, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -180,7 +181,13 @@ export function AppShell({ title: _title, description: _description, children }:
                 aria-label="대시보드로 이동"
                 title="대시보드로 이동"
               >
-                <UsersRound className="h-4 w-4" />
+                <Image
+                  src="/vibehr_logo-256x256.png"
+                  alt="Vibe-HR"
+                  width={16}
+                  height={16}
+                  className="h-4 w-4"
+                />
                 <span>Vibe-HR</span>
               </Link>
             </div>

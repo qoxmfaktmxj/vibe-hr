@@ -22,6 +22,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
@@ -244,8 +245,15 @@ export function DashboardSidebar() {
     <>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-3 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-            <UsersRound className="h-5 w-5" aria-hidden="true" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+            <Image
+              src="/vibehr_logo-256x256.png"
+              alt="Vibe-HR"
+              width={20}
+              height={20}
+              className="h-5 w-5"
+              priority
+            />
           </div>
           <div>
             <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
