@@ -26,9 +26,25 @@ function getKoreaDateTime() {
   return `${pick("year")}-${pick("month")}-${pick("day")} (${pick("weekday")}) ${pick("hour")}:${pick("minute")}:${pick("second")}`;
 }
 
-function fmtDateTime(value: string | null) {
+function fmtTimeOnly(value: string | null) {
   if (!value) return "-";
-  return new Date(value).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function toAttendanceStatusLabel(status: string | null | undefined) {
+  if (!status) return "-";
+  if (status === "present") return "정상출근";
+  if (status === "late") return "지각";
+  if (status === "absent") return "결근";
+  if (status === "leave") return "휴가";
+  if (status === "remote") return "원격";
+  return status;
 }
 
 type DashboardAttendancePanelProps = {
@@ -107,10 +123,10 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-        <div className="rounded-md border bg-muted/20 p-2">출근: {fmtDateTime(data?.attendance?.check_in_at ?? null)}</div>
-        <div className="rounded-md border bg-muted/20 p-2">퇴근: {fmtDateTime(data?.attendance?.check_out_at ?? null)}</div>
+        <div className="rounded-md border bg-muted/20 p-2">출근: {fmtTimeOnly(data?.attendance?.check_in_at ?? null)}</div>
+        <div className="rounded-md border bg-muted/20 p-2">퇴근: {fmtTimeOnly(data?.attendance?.check_out_at ?? null)}</div>
         <div className="rounded-md border bg-muted/20 p-2">근무시간: {workedLabel}</div>
-        <div className="rounded-md border bg-muted/20 p-2">상태: {data?.attendance?.attendance_status ?? "-"}</div>
+        <div className="rounded-md border bg-muted/20 p-2">상태: {toAttendanceStatusLabel(data?.attendance?.attendance_status)}</div>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-3">
