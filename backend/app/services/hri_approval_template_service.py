@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections import defaultdict
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.core.time_utils import now_utc
 from app.models import HriApprovalLineStep, HriApprovalLineTemplate
 from app.schemas.hri_approval_template import (
     HriApprovalTemplateBatchItem,
@@ -14,10 +15,6 @@ from app.schemas.hri_approval_template import (
     HriApprovalTemplateStepBatchItem,
     HriApprovalTemplateStepItem,
 )
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def _to_step_item(row: HriApprovalLineStep) -> HriApprovalTemplateStepItem:
@@ -36,6 +33,7 @@ def _to_step_item(row: HriApprovalLineStep) -> HriApprovalTemplateStepItem:
 
 
 def _list_template_steps(session: Session, template_id: int) -> list[HriApprovalTemplateStepItem]:
+    """단일 템플릿 steps 조회 (단건 조회 시 사용)."""
     rows = session.exec(
         select(HriApprovalLineStep)
         .where(HriApprovalLineStep.template_id == template_id)
@@ -44,7 +42,7 @@ def _list_template_steps(session: Session, template_id: int) -> list[HriApproval
     return [_to_step_item(row) for row in rows]
 
 
-def _to_item(session: Session, row: HriApprovalLineTemplate) -> HriApprovalTemplateItem:
+def _to_item_with_steps(row: HriApprovalLineTemplate, steps: list[HriApprovalTemplateStepItem]) -> HriApprovalTemplateItem:
     return HriApprovalTemplateItem(
         id=row.id,
         template_code=row.template_code,
@@ -56,19 +54,37 @@ def _to_item(session: Session, row: HriApprovalLineTemplate) -> HriApprovalTempl
         priority=row.priority,
         created_at=row.created_at,
         updated_at=row.updated_at,
-        steps=_list_template_steps(session, row.id),
+        steps=steps,
     )
 
 
 def list_approval_templates(session: Session) -> list[HriApprovalTemplateItem]:
-    rows = session.exec(
+    """N+1 없이 템플릿 + 전체 스텝을 2번의 쿼리로 로드한다."""
+    templates = session.exec(
         select(HriApprovalLineTemplate).order_by(
             HriApprovalLineTemplate.scope_type,
             HriApprovalLineTemplate.priority.desc(),
             HriApprovalLineTemplate.id,
         )
     ).all()
-    return [_to_item(session, row) for row in rows]
+
+    if not templates:
+        return []
+
+    # 모든 스텝을 한 번에 로드
+    template_ids = [t.id for t in templates]
+    all_steps = session.exec(
+        select(HriApprovalLineStep)
+        .where(HriApprovalLineStep.template_id.in_(template_ids))
+        .order_by(HriApprovalLineStep.template_id, HriApprovalLineStep.step_order, HriApprovalLineStep.id)
+    ).all()
+
+    # template_id → steps 그룹핑
+    steps_by_template: dict[int, list[HriApprovalTemplateStepItem]] = defaultdict(list)
+    for step in all_steps:
+        steps_by_template[step.template_id].append(_to_step_item(step))
+
+    return [_to_item_with_steps(t, steps_by_template[t.id]) for t in templates]
 
 
 def _apply_template_fields(row: HriApprovalLineTemplate, item: HriApprovalTemplateBatchItem) -> None:
@@ -79,7 +95,7 @@ def _apply_template_fields(row: HriApprovalLineTemplate, item: HriApprovalTempla
     row.is_default = item.is_default
     row.is_active = item.is_active
     row.priority = item.priority
-    row.updated_at = _utc_now()
+    row.updated_at = now_utc()
 
 
 def _replace_template_steps(
@@ -103,8 +119,8 @@ def _replace_template_steps(
             actor_user_id=step.actor_user_id,
             allow_delegate=step.allow_delegate,
             required_action=step.required_action,
-            created_at=_utc_now(),
-            updated_at=_utc_now(),
+            created_at=now_utc(),
+            updated_at=now_utc(),
         )
         session.add(row)
 
@@ -151,7 +167,7 @@ def batch_save_approval_templates(
                 detail=f"template_code '{template_code}' already exists.",
             )
 
-        row = HriApprovalLineTemplate(created_at=_utc_now())
+        row = HriApprovalLineTemplate(created_at=now_utc())
         _apply_template_fields(row, item)
         session.add(row)
         session.flush()

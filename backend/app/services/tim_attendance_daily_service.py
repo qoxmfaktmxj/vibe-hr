@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
-from math import ceil
+from datetime import date, datetime
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_user_role_codes
+from app.core.pagination import calc_total_pages, count_query
 from app.core.time_utils import business_today, now_utc
 from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection, TimEmployeeDailySchedule
 from app.schemas.tim_attendance_daily import (
@@ -94,8 +94,7 @@ def list_attendance_daily(
     if status_filter:
         base = base.where(HrAttendanceDaily.attendance_status == status_filter)
 
-    rows_all = session.exec(base).all()
-    total_count = len(rows_all)
+    total_count = count_query(session, base)
 
     offset = (page - 1) * limit
     rows = session.exec(base.order_by(HrAttendanceDaily.work_date.desc(), HrAttendanceDaily.id.desc()).offset(offset).limit(limit)).all()
@@ -106,7 +105,7 @@ def list_attendance_daily(
         total_count=total_count,
         page=page,
         limit=limit,
-        total_pages=max(1, ceil(total_count / limit)) if limit > 0 else 1,
+        total_pages=calc_total_pages(total_count, limit),
     )
 
 

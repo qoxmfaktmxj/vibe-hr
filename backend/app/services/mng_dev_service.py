@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
-from app.core.time_utils import business_today
+from app.core.time_utils import business_today, now_utc
 
 from app.models import (
     AuthUser,
@@ -33,9 +33,35 @@ from app.schemas.mng import (
 )
 
 
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+# ──────────────────────────────────────────────
+#  일괄 이름 조회 헬퍼 (N+1 방지)
+# ──────────────────────────────────────────────
 
+def _load_company_name_map(session: Session, company_ids: list[int]) -> dict[int, str]:
+    """company_id → company_name 매핑을 한 번의 쿼리로 로드한다."""
+    if not company_ids:
+        return {}
+    rows = session.exec(
+        select(MngCompany.id, MngCompany.company_name).where(MngCompany.id.in_(company_ids))
+    ).all()
+    return {row[0]: row[1] for row in rows}
+
+
+def _load_employee_display_name_map(session: Session, employee_ids: list[int]) -> dict[int, str]:
+    """employee_id → display_name 매핑을 한 번의 쿼리로 로드한다 (HrEmployee + AuthUser JOIN)."""
+    if not employee_ids:
+        return {}
+    rows = session.exec(
+        select(HrEmployee.id, AuthUser.display_name)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .where(HrEmployee.id.in_(employee_ids))
+    ).all()
+    return {row[0]: row[1] for row in rows}
+
+
+# ──────────────────────────────────────────────
+#  단건 조회 헬퍼 (get/create/update 용)
+# ──────────────────────────────────────────────
 
 def _resolve_employee_name(session: Session, employee_id: int | None) -> str | None:
     if employee_id is None:
@@ -86,6 +112,40 @@ def _build_dev_request_item(r: MngDevRequest, session: Session) -> MngDevRequest
     )
 
 
+def _build_dev_request_item_from_maps(
+    r: MngDevRequest,
+    company_map: dict[int, str],
+    employee_map: dict[int, str],
+) -> MngDevRequestItem:
+    return MngDevRequestItem(
+        id=r.id,
+        company_id=r.company_id,
+        company_name=company_map.get(r.company_id),
+        request_ym=r.request_ym,
+        request_seq=r.request_seq,
+        status_code=r.status_code,
+        part_code=r.part_code,
+        requester_name=r.requester_name,
+        request_content=r.request_content,
+        manager_employee_id=r.manager_employee_id,
+        manager_name=employee_map.get(r.manager_employee_id) if r.manager_employee_id else None,
+        developer_employee_id=r.developer_employee_id,
+        developer_name=employee_map.get(r.developer_employee_id) if r.developer_employee_id else None,
+        is_paid=r.is_paid,
+        paid_content=r.paid_content,
+        has_tax_bill=r.has_tax_bill,
+        start_ym=r.start_ym,
+        end_ym=r.end_ym,
+        dev_start_date=r.dev_start_date,
+        dev_end_date=r.dev_end_date,
+        paid_man_months=r.paid_man_months,
+        actual_man_months=r.actual_man_months,
+        note=r.note,
+        created_at=r.created_at,
+        updated_at=r.updated_at,
+    )
+
+
 def list_dev_requests(
     session: Session,
     *,
@@ -98,7 +158,22 @@ def list_dev_requests(
     if status_code:
         stmt = stmt.where(MngDevRequest.status_code == status_code)
     rows = session.exec(stmt).all()
-    return [_build_dev_request_item(r, session) for r in rows]
+
+    if not rows:
+        return []
+
+    # N+1 방지: 사용되는 ID를 미리 수집해 일괄 로드
+    company_ids = list({r.company_id for r in rows if r.company_id is not None})
+    employee_ids = list({
+        eid
+        for r in rows
+        for eid in (r.manager_employee_id, r.developer_employee_id)
+        if eid is not None
+    })
+    company_map = _load_company_name_map(session, company_ids)
+    employee_map = _load_employee_display_name_map(session, employee_ids)
+
+    return [_build_dev_request_item_from_maps(r, company_map, employee_map) for r in rows]
 
 
 def get_dev_request(session: Session, request_id: int) -> MngDevRequestItem:
@@ -140,8 +215,8 @@ def create_dev_request(session: Session, payload: MngDevRequestCreateRequest) ->
         paid_man_months=payload.paid_man_months,
         actual_man_months=payload.actual_man_months,
         note=payload.note,
-        created_at=_utc_now(),
-        updated_at=_utc_now(),
+        created_at=now_utc(),
+        updated_at=now_utc(),
     )
     session.add(r)
     session.commit()
@@ -157,7 +232,7 @@ def update_dev_request(session: Session, request_id: int, payload: MngDevRequest
     for field_name in payload.model_fields_set:
         setattr(r, field_name, getattr(payload, field_name))
 
-    r.updated_at = _utc_now()
+    r.updated_at = now_utc()
     session.add(r)
     session.commit()
     session.refresh(r)
@@ -232,6 +307,28 @@ def _build_dev_project_item(p: MngDevProject, session: Session) -> MngDevProject
     )
 
 
+def _build_dev_project_item_from_map(p: MngDevProject, company_map: dict[int, str]) -> MngDevProjectItem:
+    return MngDevProjectItem(
+        id=p.id,
+        project_name=p.project_name,
+        company_id=p.company_id,
+        company_name=company_map.get(p.company_id),
+        part_code=p.part_code,
+        assigned_staff=p.assigned_staff,
+        contract_start_date=p.contract_start_date,
+        contract_end_date=p.contract_end_date,
+        dev_start_date=p.dev_start_date,
+        dev_end_date=p.dev_end_date,
+        inspection_status=p.inspection_status,
+        has_tax_bill=p.has_tax_bill,
+        actual_man_months=p.actual_man_months,
+        contract_amount=p.contract_amount,
+        note=p.note,
+        created_at=p.created_at,
+        updated_at=p.updated_at,
+    )
+
+
 def list_dev_projects(
     session: Session,
     *,
@@ -241,7 +338,14 @@ def list_dev_projects(
     if company_id:
         stmt = stmt.where(MngDevProject.company_id == company_id)
     rows = session.exec(stmt).all()
-    return [_build_dev_project_item(p, session) for p in rows]
+
+    if not rows:
+        return []
+
+    company_ids = list({p.company_id for p in rows if p.company_id is not None})
+    company_map = _load_company_name_map(session, company_ids)
+
+    return [_build_dev_project_item_from_map(p, company_map) for p in rows]
 
 
 def get_dev_project(session: Session, project_id: int) -> MngDevProjectItem:
@@ -266,8 +370,8 @@ def create_dev_project(session: Session, payload: MngDevProjectCreateRequest) ->
         actual_man_months=payload.actual_man_months,
         contract_amount=payload.contract_amount,
         note=payload.note,
-        created_at=_utc_now(),
-        updated_at=_utc_now(),
+        created_at=now_utc(),
+        updated_at=now_utc(),
     )
     session.add(p)
     session.commit()
@@ -286,7 +390,7 @@ def update_dev_project(session: Session, project_id: int, payload: MngDevProject
             val = val.strip()
         setattr(p, field_name, val)
 
-    p.updated_at = _utc_now()
+    p.updated_at = now_utc()
     session.add(p)
     session.commit()
     session.refresh(p)
@@ -324,6 +428,25 @@ def _build_dev_inquiry_item(q: MngDevInquiry, session: Session) -> MngDevInquiry
     )
 
 
+def _build_dev_inquiry_item_from_map(q: MngDevInquiry, company_map: dict[int, str]) -> MngDevInquiryItem:
+    return MngDevInquiryItem(
+        id=q.id,
+        company_id=q.company_id,
+        company_name=company_map.get(q.company_id),
+        inquiry_content=q.inquiry_content,
+        hoped_start_date=q.hoped_start_date,
+        estimated_man_months=q.estimated_man_months,
+        sales_rep_name=q.sales_rep_name,
+        client_contact_name=q.client_contact_name,
+        progress_code=q.progress_code,
+        is_confirmed=q.is_confirmed,
+        project_name=q.project_name,
+        note=q.note,
+        created_at=q.created_at,
+        updated_at=q.updated_at,
+    )
+
+
 def list_dev_inquiries(
     session: Session,
     *,
@@ -336,7 +459,14 @@ def list_dev_inquiries(
     if progress_code:
         stmt = stmt.where(MngDevInquiry.progress_code == progress_code)
     rows = session.exec(stmt).all()
-    return [_build_dev_inquiry_item(q, session) for q in rows]
+
+    if not rows:
+        return []
+
+    company_ids = list({q.company_id for q in rows if q.company_id is not None})
+    company_map = _load_company_name_map(session, company_ids)
+
+    return [_build_dev_inquiry_item_from_map(q, company_map) for q in rows]
 
 
 def get_dev_inquiry(session: Session, inquiry_id: int) -> MngDevInquiryItem:
@@ -358,8 +488,8 @@ def create_dev_inquiry(session: Session, payload: MngDevInquiryCreateRequest) ->
         is_confirmed=payload.is_confirmed,
         project_name=payload.project_name,
         note=payload.note,
-        created_at=_utc_now(),
-        updated_at=_utc_now(),
+        created_at=now_utc(),
+        updated_at=now_utc(),
     )
     session.add(q)
     session.commit()
@@ -375,7 +505,7 @@ def update_dev_inquiry(session: Session, inquiry_id: int, payload: MngDevInquiry
     for field_name in payload.model_fields_set:
         setattr(q, field_name, getattr(payload, field_name))
 
-    q.updated_at = _utc_now()
+    q.updated_at = now_utc()
     session.add(q)
     session.commit()
     session.refresh(q)
@@ -403,12 +533,19 @@ def list_dev_staff_projects(
     if company_id:
         stmt = stmt.where(MngDevProject.company_id == company_id)
     rows = session.exec(stmt).all()
+
+    if not rows:
+        return []
+
+    company_ids = list({row.company_id for row in rows if row.company_id is not None})
+    company_map = _load_company_name_map(session, company_ids)
+
     return [
         MngDevStaffProjectItem(
             project_id=row.id,
             project_name=row.project_name,
             company_id=row.company_id,
-            company_name=_resolve_company_name(session, row.company_id),
+            company_name=company_map.get(row.company_id),
             assigned_staff=row.assigned_staff,
             contract_start_date=row.contract_start_date,
             contract_end_date=row.contract_end_date,

@@ -1,10 +1,8 @@
-from datetime import datetime, timezone
-
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from app.core.auth import build_access_token
 from app.core.security import hash_password, verify_password
-from app.core.time_utils import business_today
+from app.core.time_utils import business_today, now_utc
 from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
 from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
 
@@ -36,8 +34,8 @@ def build_login_user(session: Session, user: AuthUser) -> LoginUser:
 
 
 def build_login_response(session: Session, user: AuthUser) -> LoginResponse:
-    user.last_login_at = datetime.now(timezone.utc)
-    user.updated_at = datetime.now(timezone.utc)
+    user.last_login_at = now_utc()
+    user.updated_at = now_utc()
     session.add(user)
     session.commit()
 
@@ -54,32 +52,37 @@ def list_impersonation_candidates(
     query: str = "",
     limit: int = 20,
 ) -> list[ImpersonationCandidate]:
-    normalized_query = query.strip().lower()
+    """DB ILIKE를 사용하여 임퍼소네이션 후보를 검색한다 (Python 필터 제거)."""
     max_limit = min(max(limit, 1), 100)
+    normalized_query = query.strip()
 
-    users = session.exec(
+    stmt = (
         select(AuthUser)
         .where(AuthUser.is_active == True, AuthUser.id != current_user_id)  # noqa: E712
         .order_by(AuthUser.login_id)
-    ).all()
+        .limit(max_limit)
+    )
 
-    filtered = []
-    for user in users:
-        if normalized_query:
-            haystack = f"{user.login_id} {user.display_name} {user.email}".lower()
-            if normalized_query not in haystack:
-                continue
-        filtered.append(
-            ImpersonationCandidate(
-                id=user.id,
-                login_id=user.login_id,
-                display_name=user.display_name,
+    if normalized_query:
+        like_pattern = f"%{normalized_query}%"
+        stmt = stmt.where(
+            or_(
+                AuthUser.login_id.ilike(like_pattern),
+                AuthUser.display_name.ilike(like_pattern),
+                AuthUser.email.ilike(like_pattern),
             )
         )
-        if len(filtered) >= max_limit:
-            break
 
-    return filtered
+    users = session.exec(stmt).all()
+
+    return [
+        ImpersonationCandidate(
+            id=user.id,
+            login_id=user.login_id,
+            display_name=user.display_name,
+        )
+        for user in users
+    ]
 
 
 def impersonate_user(session: Session, *, target_user_id: int) -> LoginResponse:
