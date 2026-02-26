@@ -325,6 +325,8 @@ export function EmployeeMasterManager() {
     FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })),
   );
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [pageInput, setPageInput] = useState("1");
   const [saving, setSaving] = useState(false);
 
   const gridApiRef = useRef<GridApi<EmployeeGridRow> | null>(null);
@@ -529,6 +531,7 @@ export function EmployeeMasterManager() {
         toast.error(error instanceof Error ? error.message : I18N.initError);
       } finally {
         setLoading(false);
+        setInitialLoading(false);
       }
     })();
   }, [appliedFilters, fetchEmployeePage, loadDepartments, page]);
@@ -1048,6 +1051,10 @@ export function EmployeeMasterManager() {
     setSearchFilters((prev) => ({ ...prev, positions: values }));
   }, []);
 
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
@@ -1055,7 +1062,7 @@ export function EmployeeMasterManager() {
   }
 
   /* -- 렌더링 ----------------------------------------------------- */
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-12">
         <p className="text-sm text-slate-500">{I18N.loading}</p>
@@ -1336,6 +1343,7 @@ export function EmployeeMasterManager() {
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
+            loading={loading}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
             headerHeight={36}
@@ -1346,6 +1354,32 @@ export function EmployeeMasterManager() {
           <Button size="sm" variant="outline" disabled={page <= 1 || loading || saving} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>이전</Button>
           <span>{page} / {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
           <Button size="sm" variant="outline" disabled={page >= Math.max(1, Math.ceil(totalCount / pageSize)) || loading || saving} onClick={() => setPage((prev) => Math.min(Math.max(1, Math.ceil(totalCount / pageSize)), prev + 1))}>다음</Button>
+          <Input
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ""))}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+              const next = Number(pageInput || "1");
+              if (!Number.isFinite(next)) return;
+              setPage(Math.min(totalPages, Math.max(1, next)));
+            }}
+            className="h-8 w-16"
+            placeholder="페이지"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading || saving}
+            onClick={() => {
+              const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+              const next = Number(pageInput || "1");
+              if (!Number.isFinite(next)) return;
+              setPage(Math.min(totalPages, Math.max(1, next)));
+            }}
+          >
+            이동
+          </Button>
         </div>
       </div>
     </div>
