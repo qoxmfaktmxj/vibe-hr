@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 import secrets
 import string
 
@@ -9,6 +9,7 @@ from sqlalchemy import delete as sa_delete
 from sqlmodel import Session, select
 
 from app.core.security import hash_password
+from app.core.time_utils import business_today
 from app.models import (
     AuthRole,
     AuthUser,
@@ -138,7 +139,7 @@ def _create_employee_no_commit(session: Session, payload: EmployeeCreateRequest)
         employee_no=_generate_employee_no(session),
         department_id=payload.department_id,
         position_title=payload.position_title,
-        hire_date=payload.hire_date or date.today(),
+        hire_date=payload.hire_date or business_today(),
         employment_status=payload.employment_status,
         created_at=_utc_now(),
         updated_at=_utc_now(),

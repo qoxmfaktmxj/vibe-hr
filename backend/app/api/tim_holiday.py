@@ -1,10 +1,9 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
+from app.core.time_utils import business_today
 from app.schemas.tim_holiday import (
     TimHolidayBatchRequest,
     TimHolidayBatchResponse,
@@ -31,7 +30,7 @@ def get_holidays(
     session: Session = Depends(get_session),
 ) -> TimHolidayListResponse:
     if year is None:
-        year = date.today().year
+        year = business_today().year
     items = list_holidays(session, year)
     return TimHolidayListResponse(items=items, total_count=len(items), year=year)
 
@@ -47,7 +46,7 @@ def save_holidays_batch(
     session: Session = Depends(get_session),
 ) -> TimHolidayBatchResponse:
     if year is None:
-        year = date.today().year
+        year = business_today().year
     return batch_save_holidays(session, payload, year)
 
 

@@ -1,10 +1,9 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.time_utils import business_today
 from app.models import AuthUser, HrEmployee
 from app.schemas.tim_leave import (
     TimAnnualLeaveAdjustRequest,
@@ -35,12 +34,12 @@ def _current_employee(session: Session, current_user: AuthUser) -> HrEmployee:
 
 
 @router.get("/annual-leave/employee/{employee_id}", response_model=TimAnnualLeaveResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
-def annual_leave_by_employee(employee_id: int, year: int = Query(default_factory=lambda: date.today().year), session: Session = Depends(get_session)) -> TimAnnualLeaveResponse:
+def annual_leave_by_employee(employee_id: int, year: int = Query(default_factory=lambda: business_today().year), session: Session = Depends(get_session)) -> TimAnnualLeaveResponse:
     return TimAnnualLeaveResponse(item=get_or_create_annual_leave(session, employee_id, year))
 
 
 @router.get("/annual-leave/my", response_model=TimAnnualLeaveResponse)
-def annual_leave_my(year: int = Query(default_factory=lambda: date.today().year), session: Session = Depends(get_session), current_user: AuthUser = Depends(get_current_user)) -> TimAnnualLeaveResponse:
+def annual_leave_my(year: int = Query(default_factory=lambda: business_today().year), session: Session = Depends(get_session), current_user: AuthUser = Depends(get_current_user)) -> TimAnnualLeaveResponse:
     employee = _current_employee(session, current_user)
     return TimAnnualLeaveResponse(item=get_or_create_annual_leave(session, employee.id, year))
 
@@ -59,7 +58,7 @@ def annual_leave_adjust(payload: TimAnnualLeaveAdjustRequest, session: Session =
 
 @router.get("/annual-leave/list", response_model=TimAnnualLeaveListResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
 def annual_leave_list(
-    year: int = Query(default_factory=lambda: date.today().year),
+    year: int = Query(default_factory=lambda: business_today().year),
     department_id: int | None = Query(default=None),
     keyword: str | None = Query(default=None),
     session: Session = Depends(get_session),

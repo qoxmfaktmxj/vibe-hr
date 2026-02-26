@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlmodel import Session, select
+
+from app.core.time_utils import business_today
 
 from app.models import (
     AuthRole,
@@ -201,7 +203,7 @@ def _next_request_no(session: Session, form_type: HriFormType) -> str:
 
 
 def _select_approval_template(session: Session, form_type_id: int) -> HriApprovalLineTemplate:
-    today = date.today()
+    today = business_today()
     mapped_rows = session.exec(
         select(HriFormTypeApprovalMap)
         .where(

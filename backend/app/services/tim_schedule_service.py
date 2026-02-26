@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import datetime, time
 
 from sqlmodel import Session, select
+
+from app.core.time_utils import business_today
 
 from app.models import (
     HrEmployee,
@@ -158,7 +160,7 @@ def generate_employee_daily_schedules(session: Session, payload: TimScheduleGene
 
 
 def get_my_today_schedule(session: Session, employee_id: int) -> TimScheduleTodayItem:
-    today = date.today()
+    today = business_today()
     row = session.exec(
         select(TimEmployeeDailySchedule).where(
             TimEmployeeDailySchedule.employee_id == employee_id,

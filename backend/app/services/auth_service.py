@@ -1,9 +1,10 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
 from app.core.auth import build_access_token
 from app.core.security import hash_password, verify_password
+from app.core.time_utils import business_today
 from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
 from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
 
@@ -151,7 +152,7 @@ def social_exchange_login(session: Session, payload: SocialExchangeRequest) -> L
             employee_no=employee_no,
             department_id=department.id,
             position_title="사원",
-            hire_date=date.today(),
+            hire_date=business_today(),
             employment_status="active",
         )
         session.add(employee)

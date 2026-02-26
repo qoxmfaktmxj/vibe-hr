@@ -1,14 +1,13 @@
-from datetime import date
-
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from app.core.time_utils import business_today
 from app.models import HrAttendanceDaily, HrEmployee, HrLeaveRequest, OrgDepartment
 from app.schemas.dashboard import DashboardSummaryResponse
 
 
 def load_dashboard_summary(session: Session) -> DashboardSummaryResponse:
-    today = date.today()
+    today = business_today()
 
     total_employees = session.exec(select(func.count(HrEmployee.id))).one()
     total_departments = session.exec(select(func.count(OrgDepartment.id))).one()

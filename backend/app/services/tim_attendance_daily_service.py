@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from math import ceil
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
+
+from app.core.time_utils import business_today, now_utc
 
 from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection, TimEmployeeDailySchedule
 from app.schemas.tim_attendance_daily import (
@@ -108,7 +110,7 @@ def get_attendance_by_id(session: Session, attendance_id: int) -> TimAttendanceD
 
 
 def get_today_attendance(session: Session, employee_id: int) -> TimAttendanceDailyItem | None:
-    today = date.today()
+    today = business_today()
     row = session.exec(
         select(HrAttendanceDaily, HrEmployee, AuthUser, OrgDepartment)
         .join(HrEmployee, HrAttendanceDaily.employee_id == HrEmployee.id)
@@ -125,8 +127,8 @@ def get_today_attendance(session: Session, employee_id: int) -> TimAttendanceDai
 
 
 def check_in(session: Session, employee_id: int) -> TimAttendanceDailyItem:
-    now = datetime.now(timezone.utc)
-    today = now.date()
+    now = now_utc()
+    today = business_today()
 
     daily_schedule = session.exec(
         select(TimEmployeeDailySchedule).where(
@@ -171,8 +173,8 @@ def check_in(session: Session, employee_id: int) -> TimAttendanceDailyItem:
 
 
 def check_out(session: Session, employee_id: int) -> TimAttendanceDailyItem:
-    now = datetime.now(timezone.utc)
-    today = now.date()
+    now = now_utc()
+    today = business_today()
 
     row = session.exec(select(HrAttendanceDaily).where(HrAttendanceDaily.employee_id == employee_id, HrAttendanceDaily.work_date == today)).first()
     if row is None or row.check_in_at is None:

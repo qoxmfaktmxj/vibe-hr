@@ -1,10 +1,9 @@
-from datetime import date
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.time_utils import business_today
 from app.models import AuthUser, HrEmployee, TimEmployeeDailySchedule, TimHoliday, TimSchedulePattern, TimWorkScheduleCode
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionListResponse,
@@ -73,7 +72,7 @@ def attendance_today_schedule(
     current_user: AuthUser = Depends(get_current_user),
 ) -> TimTodayScheduleResponse:
     target_employee_id = resolve_target_employee_id(session, current_user, employee_id)
-    today = date.today()
+    today = business_today()
 
     holiday = session.exec(select(TimHoliday).where(TimHoliday.holiday_date == today)).first()
     daily = session.exec(

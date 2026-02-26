@@ -7,6 +7,8 @@ from datetime import date, datetime, timezone
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.core.time_utils import business_today
+
 from app.models import (
     AuthUser,
     HrEmployee,
@@ -421,7 +423,7 @@ def list_dev_staff_projects(
 
 def _to_month(value: date | None) -> date:
     if value is None:
-        today = datetime.now(timezone.utc).date()
+        today = business_today()
         return date(today.year, today.month, 1)
     return date(value.year, value.month, 1)
 

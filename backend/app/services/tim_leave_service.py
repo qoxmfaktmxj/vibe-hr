@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.core.time_utils import now_utc
 from app.models import AuthUser, HrAnnualLeave, HrEmployee, HrLeaveRequest, OrgDepartment, TimHoliday
 from app.schemas.tim_leave import TimAnnualLeaveItem, TimLeaveRequestItem
 
@@ -74,7 +75,7 @@ def get_or_create_annual_leave(session: Session, employee_id: int, year: int) ->
             carried_over_days=carried_over,
             remaining_days=granted + carried_over,
             grant_type="auto",
-            updated_at=datetime.now(timezone.utc),
+            updated_at=now_utc(),
         )
         session.add(created)
         session.commit()
@@ -122,7 +123,7 @@ def adjust_annual_leave(session: Session, *, employee_id: int, year: int, adjust
     row.remaining_days += adjustment_days
     row.grant_type = "adjustment"
     row.note = reason
-    row.updated_at = datetime.now(timezone.utc)
+    row.updated_at = now_utc()
     session.add(row)
     session.commit()
 
@@ -226,7 +227,7 @@ def decide_leave_request(session: Session, *, request_id: int, approver_employee
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="지원하지 않는 결정입니다.")
 
     row.approver_employee_id = approver_employee_id
-    row.approved_at = datetime.now(timezone.utc)
+    row.approved_at = now_utc()
 
     if decision == "approve" and row.leave_type == "annual":
         days = _working_days(session, row.start_date, row.end_date)
@@ -238,7 +239,7 @@ def decide_leave_request(session: Session, *, request_id: int, approver_employee
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="연차 잔여가 부족합니다.")
         annual.used_days += days
         annual.remaining_days -= days
-        annual.updated_at = datetime.now(timezone.utc)
+        annual.updated_at = now_utc()
         session.add(annual)
 
     session.add(row)
@@ -314,12 +315,12 @@ def cancel_leave_request(session: Session, *, request_id: int, actor_employee_id
         if annual is not None:
             annual.used_days = max(0.0, annual.used_days - days)
             annual.remaining_days += days
-            annual.updated_at = datetime.now(timezone.utc)
+            annual.updated_at = now_utc()
             session.add(annual)
 
     row.request_status = "cancelled"
     row.approver_employee_id = actor_employee_id
-    row.approved_at = datetime.now(timezone.utc)
+    row.approved_at = now_utc()
     if reason:
         row.reason = f"{row.reason or ''} | 취소사유: {reason}".strip()
 
