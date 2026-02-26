@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Building2, LockKeyhole, User } from "lucide-react";
+import { LockKeyhole, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
@@ -26,8 +26,14 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 function AuthCardIntro() {
   return (
     <CardHeader className="space-y-3 px-8 pb-4 pt-8 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        <Building2 className="h-8 w-8" aria-hidden="true" />
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#EEF2FF]">
+        <Image
+          src="/vibehr_logo-256x256.png"
+          alt="Vibe-HR"
+          width={48}
+          height={48}
+          priority
+        />
       </div>
       <h1 className="text-3xl font-black tracking-tight text-[#111318]">Vibe-HR</h1>
     </CardHeader>
