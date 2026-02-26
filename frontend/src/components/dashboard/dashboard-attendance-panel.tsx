@@ -26,6 +26,11 @@ function getKoreaDateTime() {
   return `${pick("year")}-${pick("month")}-${pick("day")} (${pick("weekday")}) ${pick("hour")}:${pick("minute")}:${pick("second")}`;
 }
 
+function parseUtcDate(value: string): Date {
+  const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+  return new Date(hasTimezone ? value : `${value}Z`);
+}
+
 function fmtTimeOnly(value: string | null) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("ko-KR", {
@@ -34,7 +39,7 @@ function fmtTimeOnly(value: string | null) {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-  }).format(new Date(value));
+  }).format(parseUtcDate(value));
 }
 
 function toAttendanceStatusLabel(status: string | null | undefined) {
@@ -109,24 +114,21 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
 
   return (
     <div className={`rounded-xl border bg-card p-4 ${compact ? "h-full" : ""}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground">대한민국 표준시 (KST)</p>
-          <p className="font-mono text-lg font-semibold tracking-wide">{clock}</p>
-        </div>
-        <div className="text-right text-xs text-muted-foreground">
-          <p>오늘 구분: {dayTypeLabel ?? "-"}</p>
+      <div className="space-y-1">
+        <p className="font-mono text-lg font-semibold tracking-wide">{clock}</p>
+        <div className="text-xs text-muted-foreground">
+          <p>구분: {dayTypeLabel ?? "-"}</p>
           <p>
-            오늘 스케줄: {data?.schedule.schedule_name ?? "-"} ({data?.schedule.work_start ?? "--:--"} ~ {data?.schedule.work_end ?? "--:--"})
+            스케줄: {data?.schedule.schedule_name ?? "-"} ({data?.schedule.work_start ?? "--:--"} ~ {data?.schedule.work_end ?? "--:--"})
           </p>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-        <div className="rounded-md border bg-muted/20 p-2">출근: {fmtTimeOnly(data?.attendance?.check_in_at ?? null)}</div>
-        <div className="rounded-md border bg-muted/20 p-2">퇴근: {fmtTimeOnly(data?.attendance?.check_out_at ?? null)}</div>
-        <div className="rounded-md border bg-muted/20 p-2">근무시간: {workedLabel}</div>
-        <div className="rounded-md border bg-muted/20 p-2">상태: {toAttendanceStatusLabel(data?.attendance?.attendance_status)}</div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-md border bg-muted/20 p-3">출근: {fmtTimeOnly(data?.attendance?.check_in_at ?? null)}</div>
+        <div className="rounded-md border bg-muted/20 p-3">근무시간: {workedLabel}</div>
+        <div className="rounded-md border bg-muted/20 p-3">퇴근: {fmtTimeOnly(data?.attendance?.check_out_at ?? null)}</div>
+        <div className="rounded-md border bg-muted/20 p-3">상태: {toAttendanceStatusLabel(data?.attendance?.attendance_status)}</div>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-3">
