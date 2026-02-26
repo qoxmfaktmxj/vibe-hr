@@ -284,6 +284,7 @@ export function OrganizationManager() {
               columnDefs={columns}
               getRowId={(params) => String(params.data.id)}
               rowSelection={{ mode: "singleRow", checkboxes: false }}
+              singleClickEdit
               onGridReady={(event) => {
                 gridApiRef.current = event.api;
               }}

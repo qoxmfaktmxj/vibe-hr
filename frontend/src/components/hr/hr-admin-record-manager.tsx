@@ -454,6 +454,18 @@ export function HrAdminRecordManager({ category, title }: Props) {
             <Button variant="query" onClick={() => void handleQuery()} disabled={loading || saving}>
               <Search className="h-3.5 w-3.5" />조회
             </Button>
+          </div>
+        </div>
+
+        <div className="flex items-center border-t pt-3 text-xs text-slate-500">
+          조회 대상: {filteredEmployees.length}명 / 레코드: {rows.length}건
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-white p-3">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-base font-semibold">{title}</h3>
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={addRow} disabled={loading || saving}>
               <Plus className="h-3.5 w-3.5" />입력
             </Button>
@@ -469,37 +481,34 @@ export function HrAdminRecordManager({ category, title }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center border-t pt-3 text-xs text-slate-500">
-          조회 대상: {filteredEmployees.length}명 / 레코드: {rows.length}건
+        <div className="ag-theme-quartz" style={{ height: 620 }}>
+          <AgGridReact<AdminGridRow>
+            rowData={rows}
+            columnDefs={columns}
+            getRowId={(params) => `${params.data.employee_id}-${params.data.id}`}
+            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: false }}
+            suppressRowClickSelection
+            singleClickEdit
+            onGridReady={(event: GridReadyEvent<AdminGridRow>) => setGridApi(event.api)}
+            onCellValueChanged={(event) => {
+              if (!event.data) return;
+              const current = event.data;
+
+              setRows((prev) =>
+                prev.map((row) => {
+                  if (row.employee_id !== current.employee_id || row.id !== current.id) return row;
+                  if (row._status === "added") return { ...current, _status: "added" };
+                  const nextStatus = sameAsOriginal(current) ? "clean" : "updated";
+                  return { ...current, _status: nextStatus };
+                }),
+              );
+            }}
+            getRowStyle={(params) => {
+              if (params.data?._status === "deleted") return { backgroundColor: "#fef2f2", opacity: 0.75 };
+              return undefined;
+            }}
+          />
         </div>
-      </div>
-
-      <div className="ag-theme-quartz" style={{ height: 620 }}>
-        <AgGridReact<AdminGridRow>
-          rowData={rows}
-          columnDefs={columns}
-          getRowId={(params) => `${params.data.employee_id}-${params.data.id}`}
-          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: false }}
-          suppressRowClickSelection
-          onGridReady={(event: GridReadyEvent<AdminGridRow>) => setGridApi(event.api)}
-          onCellValueChanged={(event) => {
-            if (!event.data) return;
-            const current = event.data;
-
-            setRows((prev) =>
-              prev.map((row) => {
-                if (row.employee_id !== current.employee_id || row.id !== current.id) return row;
-                if (row._status === "added") return { ...current, _status: "added" };
-                const nextStatus = sameAsOriginal(current) ? "clean" : "updated";
-                return { ...current, _status: nextStatus };
-              }),
-            );
-          }}
-          getRowStyle={(params) => {
-            if (params.data?._status === "deleted") return { backgroundColor: "#fef2f2", opacity: 0.75 };
-            return undefined;
-          }}
-        />
       </div>
 
       <p className="px-1 text-xs text-slate-500">입력/복사/삭제 후 저장 시 일괄 반영됩니다.</p>

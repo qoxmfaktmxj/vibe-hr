@@ -1163,7 +1163,7 @@ export function EmployeeMasterManager() {
       </div>
 
       {/* 시트 헤더: 제목 + 버튼 */}
-      <div className="flex flex-col gap-2 border-b border-border/70 bg-card px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6">
+      <div className="mx-3 flex flex-col gap-2 rounded-lg border bg-white px-3 py-3 md:mx-6 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-foreground">
             {I18N.title}
@@ -1333,6 +1333,7 @@ export function EmployeeMasterManager() {
             defaultColDef={defaultColDef}
             rowSelection="multiple"
             suppressRowClickSelection={false}
+            singleClickEdit={true}
             animateRows={false}
             getRowClass={getRowClass}
             getRowId={(params) => String(params.data.id)}
