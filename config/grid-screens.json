@@ -6,7 +6,15 @@
       "pageFile": "frontend/src/app/hr/employee/page.tsx",
       "componentFile": "frontend/src/components/hr/employee-master-manager.tsx",
       "engine": "ag-grid",
-      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
       "ownerModule": "HR"
     },
     "settings.common-codes": {
@@ -14,7 +22,15 @@
       "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
       "componentFile": "frontend/src/components/settings/common-code-manager.tsx",
       "engine": "ag-grid",
-      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
       "ownerModule": "SETTINGS"
     },
     "org.departments": {
@@ -22,8 +38,144 @@
       "pageFile": "frontend/src/app/org/departments/page.tsx",
       "componentFile": "frontend/src/components/org/organization-manager.tsx",
       "engine": "ag-grid",
-      "toolbar": ["query", "create", "copy", "template", "upload", "save", "download"],
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
       "ownerModule": "ORG"
+    },
+    "hr.admin.appointments": {
+      "path": "/hr/admin/appointments",
+      "pageFile": "frontend/src/app/hr/admin/appointments/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.rewards": {
+      "path": "/hr/admin/rewards",
+      "pageFile": "frontend/src/app/hr/admin/rewards/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.contacts": {
+      "path": "/hr/admin/contacts",
+      "pageFile": "frontend/src/app/hr/admin/contacts/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.educations": {
+      "path": "/hr/admin/educations",
+      "pageFile": "frontend/src/app/hr/admin/educations/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.careers": {
+      "path": "/hr/admin/careers",
+      "pageFile": "frontend/src/app/hr/admin/careers/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.certificates": {
+      "path": "/hr/admin/certificates",
+      "pageFile": "frontend/src/app/hr/admin/certificates/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.military": {
+      "path": "/hr/admin/military",
+      "pageFile": "frontend/src/app/hr/admin/military/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "hr.admin.evaluations": {
+      "path": "/hr/admin/evaluations",
+      "pageFile": "frontend/src/app/hr/admin/evaluations/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+      "engine": "ag-grid",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
     }
   }
 }
