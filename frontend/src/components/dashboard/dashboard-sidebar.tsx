@@ -245,7 +245,7 @@ export function DashboardSidebar() {
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-3 p-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
-            <CalendarCheck2 className="h-5 w-5" aria-hidden="true" />
+            <UsersRound className="h-5 w-5" aria-hidden="true" />
           </div>
           <div>
             <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>

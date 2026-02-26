@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck2, Home, X } from "lucide-react";
+import { Home, UsersRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -180,7 +180,7 @@ export function AppShell({ title: _title, description: _description, children }:
                 aria-label="대시보드로 이동"
                 title="대시보드로 이동"
               >
-                <CalendarCheck2 className="h-4 w-4" />
+                <UsersRound className="h-4 w-4" />
                 <span>Vibe-HR</span>
               </Link>
             </div>
