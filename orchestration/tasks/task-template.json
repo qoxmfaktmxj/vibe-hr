@@ -1,0 +1,27 @@
+{
+  "task_id": "TASK-0000",
+  "title": "Short task title",
+  "goal": "What outcome should be achieved.",
+  "context": [
+    "Reference docs or constraints."
+  ],
+  "constraints": [
+    "Coding style, timeline, platform constraints."
+  ],
+  "targets": {
+    "frontend": [
+      "frontend/path/example.tsx"
+    ],
+    "backend": [
+      "backend/path/example.py"
+    ],
+    "qa": [
+      "test scenario to run"
+    ]
+  },
+  "definition_of_done": [
+    "lint/build/test pass",
+    "docs updated"
+  ]
+}
+

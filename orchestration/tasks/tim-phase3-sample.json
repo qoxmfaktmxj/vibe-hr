@@ -1,0 +1,37 @@
+{
+  "task_id": "TIM-PHASE3-001",
+  "title": "TIM phase3 rollout planning and implementation split",
+  "goal": "Split the phase3 scope into actionable frontend/backend/qa execution plan with merge gates.",
+  "context": [
+    "Must follow AGENTS.md and WORKFLOW.md.",
+    "If AG Grid screen is in scope, preserve standard toolbar order and registry requirements.",
+    "Current planning docs: TIM_PHASE3_PLAN.md, TIM_PHASE3_TEST.md."
+  ],
+  "constraints": [
+    "Keep main branch releasable.",
+    "Prefer small and reviewable pull requests.",
+    "Do not skip validation gates."
+  ],
+  "targets": {
+    "frontend": [
+      "frontend/src/app/tim/**",
+      "frontend/src/components/**"
+    ],
+    "backend": [
+      "backend/app/api/**",
+      "backend/app/services/**",
+      "backend/app/schemas/**"
+    ],
+    "qa": [
+      "TIM_PHASE3_TEST.md scenarios",
+      "Regression around existing TIM routes"
+    ]
+  },
+  "definition_of_done": [
+    "validate:grid pass for AG Grid scope",
+    "lint pass",
+    "build pass",
+    "test scenarios documented and executed"
+  ]
+}
+
