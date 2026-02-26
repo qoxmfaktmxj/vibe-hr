@@ -1342,6 +1342,9 @@ export function EmployeeMasterManager() {
             suppressRowClickSelection={false}
             singleClickEdit={true}
             animateRows={false}
+            pagination={true}
+            paginationPageSize={100}
+            paginationPageSizeSelector={[50, 100, 200]}
             getRowClass={getRowClass}
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
