@@ -56,6 +56,27 @@ python orchestration/run_orchestrator.py \
   --model gpt-5-mini
 ```
 
+## Internal auth mode (API key 없이)
+
+사내 게이트웨이/프록시를 쓰는 경우 `internal-auth` 모드를 사용할 수 있습니다.
+
+```bash
+python orchestration/run_orchestrator.py \
+  --task-file orchestration/tasks/tim-phase3-sample.json \
+  --mode internal-auth \
+  --base-url http://127.0.0.1:8000 \
+  --auth-path /api/v1/auth/login \
+  --llm-path /api/v1/llm/chat \
+  --login-id admin-local \
+  --password admin \
+  --token-field access_token \
+  --response-text-path choices.0.message.content
+```
+
+- 인증은 `POST {base-url}{auth-path}`로 토큰 발급 후 Bearer로 LLM 호출
+- 요청 바디 기본 포맷: `{ model, messages[] }`
+- 응답 텍스트 경로는 `--response-text-path`로 조정
+
 ## Output files
 
 - `00_planner.md`

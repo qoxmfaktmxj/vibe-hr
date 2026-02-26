@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type {
-  OrganizationDepartmentDetailResponse,
   OrganizationDepartmentItem,
   OrganizationDepartmentListResponse,
 } from "@/types/organization";
