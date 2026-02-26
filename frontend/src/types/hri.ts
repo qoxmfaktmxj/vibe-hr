@@ -164,6 +164,26 @@ export type HriRequestDetailResponse = {
   request: HriRequestItem;
 };
 
+export type HriRequestStepSnapshotItem = {
+  id: number;
+  step_order: number;
+  step_type: "APPROVAL" | "RECEIVE" | "REFERENCE";
+  actor_name: string;
+  action_status: "WAITING" | "APPROVED" | "REJECTED" | "RECEIVED";
+  acted_at: string | null;
+  comment: string | null;
+};
+
+export type HriRequestDetailFull = HriRequestItem & {
+  form_code: string | null;
+  steps: HriRequestStepSnapshotItem[];
+  detail_data: Record<string, unknown>;
+};
+
+export type HriRequestDetailFullResponse = {
+  request: HriRequestDetailFull;
+};
+
 export type HriRequestSubmitResponse = {
   request_id: number;
   status_code: string;

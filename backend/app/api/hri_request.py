@@ -7,6 +7,7 @@ from app.models import AuthUser
 from app.schemas.hri_request import (
     HriRequestActionRequest,
     HriRequestActionResponse,
+    HriRequestDetailFullResponse,
     HriRequestDetailResponse,
     HriRequestDraftUpsertRequest,
     HriRequestListResponse,
@@ -15,6 +16,7 @@ from app.schemas.hri_request import (
 )
 from app.services.hri_request_service import (
     approve_request,
+    get_request_detail,
     list_my_approval_tasks,
     list_my_receive_tasks,
     list_my_requests,
@@ -123,6 +125,20 @@ def receive_reject(
     current_user: AuthUser = Depends(get_current_user),
 ) -> HriRequestActionResponse:
     return receive_reject_request(session, current_user.id, request_id, payload.comment)
+
+
+@router.get(
+    "/requests/{request_id}",
+    response_model=HriRequestDetailFullResponse,
+    dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
+)
+def get_detail(
+    request_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> HriRequestDetailFullResponse:
+    detail = get_request_detail(session, request_id, current_user.id)
+    return HriRequestDetailFullResponse(request=detail)
 
 
 @router.get(

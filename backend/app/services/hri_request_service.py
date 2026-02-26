@@ -29,8 +29,10 @@ from app.models import (
 )
 from app.schemas.hri_request import (
     HriRequestActionResponse,
+    HriRequestDetailFull,
     HriRequestDraftUpsertRequest,
     HriRequestItem,
+    HriRequestStepSnapshotItem,
     HriRequestSubmitResponse,
     HriTaskItem,
 )
@@ -986,6 +988,111 @@ def receive_reject_request(
 
     session.commit()
     return HriRequestActionResponse(request_id=request.id, status_code=request.status_code)
+
+
+def _dual_read_detail(session: Session, form_code: str, request_id: int) -> dict:
+    """form_code 에 맞는 상세 테이블을 우선 조회한다 (Dual Read).
+
+    상세 테이블 레코드가 없으면 빈 dict 반환 → 호출자에서 content_json fallback.
+    """
+    if form_code == "TIM_CORRECTION":
+        row = session.exec(
+            select(HriReqTimCorrection).where(HriReqTimCorrection.request_id == request_id)
+        ).first()
+        if row:
+            return {
+                "work_date": str(row.work_date),
+                "before_status": row.before_status,
+                "after_status": row.after_status,
+                "reason": row.reason,
+            }
+    elif form_code == "CERT_EMPLOYMENT":
+        row = session.exec(
+            select(HriReqCertEmployment).where(HriReqCertEmployment.request_id == request_id)
+        ).first()
+        if row:
+            return {
+                "purpose": row.purpose,
+                "copies": row.copies,
+                "recipient": row.recipient,
+                "reason": row.reason,
+            }
+    elif form_code == "LEAVE_REQUEST":
+        row = session.exec(
+            select(HriReqLeave).where(HriReqLeave.request_id == request_id)
+        ).first()
+        if row:
+            return {
+                "leave_type_code": row.leave_type_code,
+                "start_date": str(row.start_date),
+                "end_date": str(row.end_date),
+                "start_time": row.start_time,
+                "end_time": row.end_time,
+                "applied_minutes": row.applied_minutes,
+                "reason": row.reason,
+            }
+    return {}
+
+
+def get_request_detail(session: Session, request_id: int, requester_user_id: int) -> HriRequestDetailFull:
+    """단건 신청서 상세 조회 — 마스터 + 결재선 스냅샷 + 유형별 상세 데이터."""
+    row = session.get(HriRequestMaster, request_id)
+    if row is None or row.requester_id != requester_user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found.")
+
+    form_type = session.get(HriFormType, row.form_type_id)
+    form_code = form_type.form_code if form_type else None
+    form_name = form_type.form_name_ko if form_type else None
+
+    # 결재선 스냅샷 (step_order 순)
+    step_rows = session.exec(
+        select(HriRequestStepSnapshot)
+        .where(HriRequestStepSnapshot.request_id == request_id)
+        .order_by(HriRequestStepSnapshot.step_order)
+    ).all()
+    steps = [
+        HriRequestStepSnapshotItem(
+            id=s.id,
+            step_order=s.step_order,
+            step_type=s.step_type,
+            actor_name=s.actor_name,
+            action_status=s.action_status,
+            acted_at=s.acted_at,
+            comment=s.comment,
+        )
+        for s in step_rows
+    ]
+
+    # 현재 결재자 이름
+    current_actor_name: str | None = None
+    if row.current_step_order is not None:
+        cur = next((s for s in step_rows if s.step_order == row.current_step_order), None)
+        if cur:
+            current_actor_name = cur.actor_name
+
+    # Dual Read — 상세 테이블 우선, 없으면 content_json fallback
+    content = _parse_content(row.content_json)
+    detail_data = _dual_read_detail(session, form_code or "", request_id) or content
+
+    return HriRequestDetailFull(
+        id=row.id,
+        request_no=row.request_no,
+        form_type_id=row.form_type_id,
+        form_code=form_code,
+        form_name=form_name,
+        requester_id=row.requester_id,
+        title=row.title,
+        status_code=row.status_code,
+        current_step_order=row.current_step_order,
+        current_actor_name=current_actor_name,
+        submitted_at=row.submitted_at,
+        completed_at=row.completed_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        content_json=content,
+        steps=steps,
+        detail_data=detail_data,
+    )
 
 
 def list_my_requests(session: Session, requester_user_id: int) -> list[HriRequestItem]:
