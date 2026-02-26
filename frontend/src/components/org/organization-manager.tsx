@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
@@ -167,6 +168,24 @@ export function OrganizationManager() {
     setNotice("업로드는 다음 단계에서 템플릿 헤더 매핑으로 연결합니다.");
   }
 
+  function downloadXlsx() {
+    const exportRows = rows.map((row, index) => ({
+      No: index + 1,
+      삭제: row.delete_mark ? "Y" : "N",
+      상태: row.delete_mark ? "삭제" : row.row_status || "",
+      조직코드: row.code,
+      조직명: row.name,
+      상위조직: row.parent_name ?? "",
+      사용: row.is_active ? "Y" : "N",
+      수정일: row.updated_at ? new Date(row.updated_at).toLocaleString() : "",
+    }));
+
+    const sheet = XLSX.utils.json_to_sheet(exportRows);
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, "조직코드");
+    XLSX.writeFile(book, "org-codes.xlsx");
+  }
+
   async function saveAll() {
     setSaving(true);
     try {
@@ -225,8 +244,8 @@ export function OrganizationManager() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="mr-1 flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Search className="h-4 w-4 text-primary" /> Search
+            <div className="mr-2 flex items-center gap-2 text-base font-semibold text-slate-700">
+              <Search className="h-5 w-5 text-primary" /> Search
             </div>
             <div className="space-y-1">
               <Label className="text-xs">조직코드</Label>
@@ -240,6 +259,9 @@ export function OrganizationManager() {
               <Label className="text-xs">기준일자</Label>
               <CustomDatePicker className="w-40" value={referenceDate} onChange={setReferenceDate} holidays={HOLIDAY_DATE_KEYS} />
             </div>
+            <div className="ml-auto">
+              <Button variant="query" onClick={() => void runQuery()} disabled={saving}>조회</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -249,13 +271,12 @@ export function OrganizationManager() {
           <div className="flex items-center justify-between">
             <CardTitle>조직코드관리</CardTitle>
             <div className="flex justify-end gap-2">
-              <Button variant="query" onClick={() => void runQuery()} disabled={saving}>조회</Button>
               <Button variant="outline" onClick={addRow} disabled={saving}>입력</Button>
               <Button variant="outline" onClick={copyRow} disabled={saving || !selectedRow}>복사</Button>
               <Button variant="outline" onClick={downloadTemplate} disabled={saving}>양식다운로드</Button>
               <Button variant="outline" onClick={uploadTemplate} disabled={saving}>업로드</Button>
               <Button variant="save" onClick={() => void saveAll()} disabled={saving}>저장</Button>
-              <Button variant="outline" onClick={() => gridApiRef.current?.exportDataAsCsv({ fileName: "org-codes.csv" })} disabled={saving}>다운로드</Button>
+              <Button variant="outline" onClick={downloadXlsx} disabled={saving}>다운로드</Button>
             </div>
           </div>
           {notice ? <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p> : null}
