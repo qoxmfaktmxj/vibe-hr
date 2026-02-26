@@ -511,16 +511,6 @@ export function EmployeeMasterManager() {
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     return [
       {
-        headerName: "선택",
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        width: 56,
-        pinned: "left",
-        sortable: false,
-        filter: false,
-        suppressMenu: true,
-      },
-      {
         headerName: I18N.colDeleteMark,
         width: 56,
         pinned: "left",
@@ -1342,7 +1332,7 @@ export function EmployeeMasterManager() {
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowSelection="multiple"
-            suppressRowClickSelection={true}
+            suppressRowClickSelection={false}
             animateRows={false}
             getRowClass={getRowClass}
             getRowId={(params) => String(params.data.id)}
