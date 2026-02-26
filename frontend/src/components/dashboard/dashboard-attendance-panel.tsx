@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import useSWR, { mutate } from "swr";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { fetcher } from "@/lib/fetcher";
 import type { TimTodayScheduleResponse } from "@/types/tim";
@@ -57,8 +58,10 @@ type DashboardAttendancePanelProps = {
 };
 
 export function DashboardAttendancePanel({ compact = false }: DashboardAttendancePanelProps) {
+  const { user } = useAuth();
   const [clock, setClock] = useState(getKoreaDateTime());
-  const { data, isLoading } = useSWR<TimTodayScheduleResponse>("/api/tim/attendance-daily/today-schedule", fetcher, {
+  const scheduleKey = user?.id ? `/api/tim/attendance-daily/today-schedule?user_id=${user.id}` : "/api/tim/attendance-daily/today-schedule";
+  const { data, isLoading } = useSWR<TimTodayScheduleResponse>(scheduleKey, fetcher, {
     revalidateOnFocus: false,
   });
 
@@ -88,7 +91,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
       return toast.error(json?.detail ?? "출근 처리 실패");
     }
     toast.success("출근 처리 완료");
-    await mutate("/api/tim/attendance-daily/today-schedule");
+    await mutate(scheduleKey);
   }
 
   async function doCheckOut() {
@@ -102,7 +105,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
       return toast.error(json?.detail ?? "퇴근 처리 실패");
     }
     toast.success("퇴근 처리 완료");
-    await mutate("/api/tim/attendance-daily/today-schedule");
+    await mutate(scheduleKey);
   }
 
   const dayTypeLabel =
