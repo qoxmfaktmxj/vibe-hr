@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -19,40 +20,6 @@ function AuthCard({ children }: { children: React.ReactNode }) {
     <Card className="overflow-hidden border-white/20 bg-white/95 shadow-2xl backdrop-blur dark:bg-slate-900/95">
       {children}
     </Card>
-  );
-}
-
-function KakaoSymbolIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M12 3C6.477 3 2 6.545 2 10.917c0 2.865 1.924 5.377 4.808 6.754l-.961 3.243a.53.53 0 0 0 .791.594l3.851-2.564a12.6 12.6 0 0 0 1.511.09c5.523 0 10-3.545 10-7.917S17.523 3 12 3Z"
-      />
-    </svg>
-  );
-}
-
-function GoogleLogoIcon() {
-  return (
-    <svg viewBox="0 0 48 48" className="h-7 w-7" aria-hidden="true">
-      <path
-        fill="#FFC107"
-        d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.232 36 24 36c-6.627 0-12-5.373-12-12S17.373 12 24 12c3.059 0 5.842 1.153 7.959 3.041l5.657-5.657C34.046 6.053 29.277 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20c0-1.341-.138-2.65-.389-3.917Z"
-      />
-      <path
-        fill="#FF3D00"
-        d="m6.306 14.691 6.571 4.819A11.96 11.96 0 0 1 24 12c3.059 0 5.842 1.153 7.959 3.041l5.657-5.657C34.046 6.053 29.277 4 24 4c-7.68 0-14.41 4.337-17.694 10.691Z"
-      />
-      <path
-        fill="#4CAF50"
-        d="M24 44c5.176 0 9.846-1.977 13.38-5.197l-6.181-5.238C29.125 35.091 26.673 36 24 36c-5.211 0-9.622-3.327-11.28-7.953l-6.53 5.033C9.441 39.556 16.199 44 24 44Z"
-      />
-      <path
-        fill="#1976D2"
-        d="M43.611 20.083H42V20H24v8h11.303c-.793 2.721-2.52 5.046-4.869 6.565l6.181 5.238C36.178 40.198 44 34 44 24c0-1.341-.138-2.65-.389-3.917Z"
-      />
-    </svg>
   );
 }
 
@@ -171,29 +138,36 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
 
       <Separator />
 
-      <div className="flex items-center justify-center gap-5 pt-1">
-        <Link
-          href="/api/auth/social/login/kakao"
-          className="group flex flex-col items-center gap-2"
-          aria-label="Kakao login"
-          title="Kakao login"
-        >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FEE500] text-[#000000] shadow-sm ring-1 ring-black/10 transition group-hover:scale-105">
-            <KakaoSymbolIcon />
-          </span>
-          <span className="text-xs font-medium text-black/85">Kakao</span>
-        </Link>
-
+      <div className="flex flex-col items-center gap-3 pt-1">
         <Link
           href="/api/auth/social/login/google"
-          className="group flex flex-col items-center gap-2"
+          className="block"
           aria-label="Google login"
           title="Google login"
         >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-slate-300 transition group-hover:scale-105">
-            <GoogleLogoIcon />
-          </span>
-          <span className="text-xs font-medium text-slate-600">Google</span>
+          <Image
+            src="/images/google_login.png"
+            alt="Continue with Google"
+            width={189}
+            height={40}
+            className="h-10 w-[189px]"
+            priority
+          />
+        </Link>
+
+        <Link
+          href="/api/auth/social/login/kakao"
+          className="block"
+          aria-label="Kakao login"
+          title="Kakao login"
+        >
+          <Image
+            src="/images/kakao_login.png"
+            alt="Login with Kakao"
+            width={189}
+            height={40}
+            className="h-10 w-[189px]"
+          />
         </Link>
       </div>
     </CardContent>
