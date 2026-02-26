@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GridStandardToolbar } from "@/components/grid/grid-standard-toolbar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Input } from "@/components/ui/input";
@@ -138,7 +138,20 @@ export function OrganizationManager() {
   }, [isCreateMode, selectedDepartment]);
 
   function runSearch() {
+    setIsCreateMode(false);
+    setNotice(null);
+    setNoticeType(null);
     void loadBase();
+  }
+
+  function handleTemplateDownload() {
+    setNoticeType("success");
+    setNotice("양식다운로드는 다음 단계에서 화면별 xlsx 템플릿으로 연결합니다.");
+  }
+
+  function handleUpload() {
+    setNoticeType("success");
+    setNotice("업로드는 다음 단계에서 표준 템플릿 매핑으로 연결합니다.");
   }
 
   function startCreate() {
@@ -243,7 +256,7 @@ export function OrganizationManager() {
   return (
     <div className="space-y-4 p-6">
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="space-y-3 pt-6">
           <div className="flex flex-wrap items-end gap-3">
             <div className="mr-1 flex items-center gap-2 text-sm font-semibold text-slate-700">
               <Search className="h-4 w-4 text-primary" /> Search
@@ -260,21 +273,24 @@ export function OrganizationManager() {
               <Label className="text-xs">기준일자</Label>
               <CustomDatePicker className="w-40" value={referenceDate} onChange={setReferenceDate} holidays={HOLIDAY_DATE_KEYS} />
             </div>
-            <Button variant="query" className="h-9 px-5" onClick={runSearch}>조회</Button>
           </div>
+          <GridStandardToolbar
+            onQuery={runSearch}
+            onCreate={startCreate}
+            onCopy={copyDepartment}
+            onTemplateDownload={handleTemplateDownload}
+            onUpload={handleUpload}
+            onSave={saveDepartment}
+            onDownload={() => gridApiRef.current?.exportDataAsCsv({ fileName: "org-codes.csv" })}
+            disabled={{ copy: !selectedDepartmentId || isCreateMode, save: saving }}
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>조직코드관리</CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => gridApiRef.current?.exportDataAsCsv({ fileName: "org-codes.csv" })}>엑셀 다운로드</Button>
-            <Button variant="outline" onClick={copyDepartment} disabled={!selectedDepartmentId || isCreateMode}>복사</Button>
-            <Button variant="outline" onClick={startCreate} disabled={saving}>입력</Button>
-            <Button variant="save" onClick={saveDepartment} disabled={saving}>저장</Button>
-            <Button variant="destructive" onClick={removeDepartment} disabled={saving || !selectedDepartmentId}>삭제</Button>
-          </div>
+          <div className="text-xs text-slate-500">표준 툴바는 상단 공통 버튼을 사용합니다.</div>
         </CardHeader>
         <CardContent className="space-y-4">
           {notice ? <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p> : null}

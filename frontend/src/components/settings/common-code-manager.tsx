@@ -6,6 +6,7 @@ import { AgGridReact } from "ag-grid-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GridStandardToolbar } from "@/components/grid/grid-standard-toolbar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -355,6 +356,16 @@ export function CommonCodeManager() {
     }
   }
 
+  const handleTemplateDownload = () => {
+    setNoticeType("success");
+    setNotice("양식다운로드는 다음 단계에서 화면별 xlsx 템플릿으로 연결합니다.");
+  };
+
+  const handleUpload = () => {
+    setNoticeType("success");
+    setNotice("업로드는 다음 단계에서 표준 템플릿 매핑으로 연결합니다.");
+  };
+
   if (loading) return <div className="p-6">{T.loading}</div>;
 
   return (
@@ -362,25 +373,39 @@ export function CommonCodeManager() {
       {notice ? <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p> : null}
 
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
+        <CardContent className="space-y-3 pt-6">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr]">
             <Input placeholder="그룹코드" value={groupCodeQuery} onChange={(e) => setGroupCodeQuery(e.target.value)} />
             <Input placeholder="그룹코드명" value={groupNameQuery} onChange={(e) => setGroupNameQuery(e.target.value)} />
-            <Button variant="query" type="button">조회</Button>
           </div>
+          <GridStandardToolbar
+            onQuery={() => {
+              setGroupCreateMode(false);
+              setCodeCreateMode(false);
+              setSelectedGroupId(filteredGroups[0]?.id ?? null);
+              setSelectedCodeId(null);
+              setNotice("조회 완료");
+              setNoticeType("success");
+            }}
+            onCreate={() => {
+              setGroupCreateMode(true);
+              setSelectedGroupId(null);
+              setNotice(null);
+            }}
+            onCopy={copyGroup}
+            onTemplateDownload={handleTemplateDownload}
+            onUpload={handleUpload}
+            onSave={saveGroup}
+            onDownload={() => groupGridApiRef.current?.exportDataAsCsv({ fileName: "group-codes.csv" })}
+            disabled={{ copy: !selectedGroup, save: saving }}
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>그룹코드 관리</CardTitle>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => groupGridApiRef.current?.exportDataAsCsv({ fileName: "group-codes.csv" })}>엑셀 다운로드</Button>
-            <Button size="sm" variant="outline" onClick={copyGroup} disabled={!selectedGroup}>복사</Button>
-            <Button size="sm" variant="outline" onClick={() => { setGroupCreateMode(true); setSelectedGroupId(null); setNotice(null); }}>입력</Button>
-            <Button size="sm" variant="save" onClick={saveGroup} disabled={saving}>저장</Button>
-            <Button size="sm" variant="destructive" onClick={deleteGroup} disabled={saving || !selectedGroupId || groupCreateMode}>삭제</Button>
-          </div>
+          <div className="text-xs text-slate-500">표준 툴바는 상단 공통 버튼을 사용합니다.</div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="ag-theme-quartz" style={{ height: 300 }}>
