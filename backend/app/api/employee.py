@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, require_roles
@@ -31,9 +31,39 @@ router = APIRouter(prefix="/employees", tags=["employees"])
     response_model=EmployeeListResponse,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
-def employee_list(session: Session = Depends(get_session)) -> EmployeeListResponse:
-    employees = list_employees(session)
-    return EmployeeListResponse(employees=employees, total_count=len(employees))
+def employee_list(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    all: bool = Query(default=False),
+    employee_no: str | None = Query(default=None),
+    name: str | None = Query(default=None),
+    department: str | None = Query(default=None),
+    employment_status: str | None = Query(default=None),
+    active: bool | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> EmployeeListResponse:
+    if all:
+        employees, total_count = list_employees(
+            session,
+            employee_no=employee_no,
+            name=name,
+            department=department,
+            employment_status=employment_status,
+            active=active,
+        )
+        return EmployeeListResponse(employees=employees, total_count=total_count)
+
+    employees, total_count = list_employees(
+        session,
+        page=page,
+        limit=limit,
+        employee_no=employee_no,
+        name=name,
+        department=department,
+        employment_status=employment_status,
+        active=active,
+    )
+    return EmployeeListResponse(employees=employees, total_count=total_count, page=page, limit=limit)
 
 
 @router.get(

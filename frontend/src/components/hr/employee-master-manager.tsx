@@ -37,7 +37,6 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
-import { fetchEmployeeBaseData, setEmployeeBaseDataCache } from "@/lib/hr/employee-api";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
   hasRowPatchChanges,
@@ -260,6 +259,17 @@ async function parseErrorDetail(response: Response, fallback: string): Promise<s
   return json?.detail ?? fallback;
 }
 
+function buildEmployeeQuery(filters: SearchFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
+  if (filters.name.trim()) params.set("name", filters.name.trim());
+  if (filters.department.trim()) params.set("department", filters.department.trim());
+  if (filters.employmentStatuses.length === 1) params.set("employment_status", filters.employmentStatuses[0]);
+  if (filters.active === "Y") params.set("active", "true");
+  if (filters.active === "N") params.set("active", "false");
+  return params;
+}
+
 type HireDateEditorProps = ICellEditorParams<EmployeeGridRow, string>;
 
 const HireDateCellEditor = forwardRef<
@@ -306,6 +316,9 @@ export function EmployeeMasterManager() {
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(100);
+  const [totalCount, setTotalCount] = useState(0);
   const [gridMountKey, setGridMountKey] = useState(0);
   const [positionOptions, setPositionOptions] = useState<CommonCodeOption[]>([]);
   const [employmentOptions, setEmploymentOptions] = useState<CommonCodeOption[]>(
@@ -487,28 +500,38 @@ export function EmployeeMasterManager() {
   );
 
   /* -- 초기 로딩 ------------------------------------------------------- */
-  const loadBase = useCallback(async () => {
-    setLoading(true);
-    const baseData = await fetchEmployeeBaseData({
-      loadEmployeeError: I18N.loadEmployeeError,
-      loadDepartmentError: I18N.loadDepartmentError,
-    });
+  const fetchEmployeePage = useCallback(async (filters: SearchFilters, pageNo: number) => {
+    const query = buildEmployeeQuery(filters);
+    query.set("page", String(pageNo));
+    query.set("limit", String(pageSize));
 
-    setDepartments(baseData.departments);
-    setRows(baseData.employees.map((employee) => toGridRow(employee)));
-    setLoading(false);
+    const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store" });
+    if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadEmployeeError));
+    return response.json() as Promise<{ employees: EmployeeItem[]; total_count: number }>;
+  }, [pageSize]);
+
+  const loadDepartments = useCallback(async () => {
+    const response = await fetch("/api/employees/departments", { cache: "no-store" });
+    if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadDepartmentError));
+    const json = (await response.json()) as { departments: DepartmentItem[] };
+    setDepartments(json.departments ?? []);
   }, []);
 
   useEffect(() => {
     void (async () => {
       try {
-        await loadBase();
+        setLoading(true);
+        await loadDepartments();
+        const data = await fetchEmployeePage(appliedFilters, page);
+        setRows(data.employees.map((employee) => toGridRow(employee)));
+        setTotalCount(data.total_count ?? data.employees.length);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : I18N.initError);
+      } finally {
         setLoading(false);
       }
     })();
-  }, [loadBase]);
+  }, [appliedFilters, fetchEmployeePage, loadDepartments, page]);
 
   /* -- 컬럼 정의 ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
@@ -855,19 +878,22 @@ export function EmployeeMasterManager() {
   async function downloadCurrentSheetExcel() {
     try {
       const headers = ["사번", "로그인ID", "이름", "부서", "직책", "입사일", "재직상태", "이메일", "활성"];
-      const data = rows
-        .filter((r) => r._status !== "deleted")
-        .map((r) => [
-          r.employee_no,
-          r.login_id,
-          r.display_name,
-          r.department_name || departmentNameById.get(r.department_id) || "",
-          r.position_title,
-          r.hire_date,
-          toDisplayEmploymentStatus(r.employment_status, employmentLabelByCode),
-          r.email,
-          r.is_active ? "Y" : "N",
-        ]);
+      const query = buildEmployeeQuery(appliedFilters);
+      query.set("all", "true");
+      const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store" });
+      if (!response.ok) throw new Error("다운로드 조회 실패");
+      const json = (await response.json()) as { employees: EmployeeItem[] };
+      const data = (json.employees ?? []).map((r) => [
+        r.employee_no,
+        r.login_id,
+        r.display_name,
+        r.department_name || "",
+        r.position_title,
+        r.hire_date,
+        toDisplayEmploymentStatus(r.employment_status, employmentLabelByCode),
+        r.email,
+        r.is_active ? "Y" : "N",
+      ]);
 
       const { utils, writeFileXLSX } = await import("xlsx");
       const sheet = utils.aoa_to_sheet([headers, ...data]);
@@ -930,21 +956,10 @@ export function EmployeeMasterManager() {
       employmentStatuses: [...searchFilters.employmentStatuses],
     };
     setAppliedFilters(nextFilters);
-
-    try {
-      const baseData = await fetchEmployeeBaseData({
-        loadEmployeeError: I18N.loadEmployeeError,
-        loadDepartmentError: I18N.loadDepartmentError,
-      }, { force: true });
-
-      setDepartments(baseData.departments);
-      setRows(baseData.employees.map((employee) => toGridRow(employee)));
-      tempIdRef.current = -1;
-      gridApiRef.current = null;
-      setGridMountKey((prev) => prev + 1);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : I18N.initError);
-    }
+    setPage(1);
+    tempIdRef.current = -1;
+    gridApiRef.current = null;
+    setGridMountKey((prev) => prev + 1);
   }
 
   /* -- 검증 및 저장 ------------------------------------------ */
@@ -993,11 +1008,9 @@ export function EmployeeMasterManager() {
       }
 
       const json = (await res.json()) as EmployeeBatchResponse;
-      setRows(json.employees.map((employee) => toGridRow(employee)));
-      setEmployeeBaseDataCache({
-        employees: json.employees,
-        departments,
-      });
+      const pageData = await fetchEmployeePage(appliedFilters, page);
+      setRows(pageData.employees.map((employee) => toGridRow(employee)));
+      setTotalCount(pageData.total_count ?? pageData.employees.length);
       gridApiRef.current = null;
       setGridMountKey((prev) => prev + 1);
 
@@ -1011,31 +1024,8 @@ export function EmployeeMasterManager() {
     }
   }
 
-  const filteredRows = useMemo(() => {
-    const employeeNo = appliedFilters.employeeNo.trim().toLowerCase();
-    const name = appliedFilters.name.trim().toLowerCase();
-    const department = appliedFilters.department.trim().toLowerCase();
-    const hireDateTo = appliedFilters.hireDateTo.trim();
-    const active = appliedFilters.active;
-    const positionFilter = new Set(appliedFilters.positions);
-    const statusFilter = new Set(appliedFilters.employmentStatuses);
+  const filteredRows = rows;
 
-    return rows.filter((row) => {
-      const departmentName = (row.department_name || departmentNameById.get(row.department_id) || "").toLowerCase();
-      const hireDate = normalizeDateKey(row.hire_date);
-
-      if (employeeNo && !row.employee_no.toLowerCase().includes(employeeNo)) return false;
-      if (name && !row.display_name.toLowerCase().includes(name)) return false;
-      if (department && !departmentName.includes(department)) return false;
-      if (positionFilter.size > 0 && !positionFilter.has(row.position_title)) return false;
-      if (hireDateTo && (!hireDate || hireDate > hireDateTo)) return false;
-      if (statusFilter.size > 0 && !statusFilter.has(row.employment_status)) return false;
-      if (active === "Y" && !row.is_active) return false;
-      if (active === "N" && row.is_active) return false;
-
-      return true;
-    });
-  }, [appliedFilters, departmentNameById, rows]);
 
   const mobileRows = filteredRows;
   const statusOptions = employmentOptions
@@ -1176,7 +1166,7 @@ export function EmployeeMasterManager() {
             {I18N.title}
           </h2>
           <span className="text-xs text-slate-400">
-            {filteredRows.length.toLocaleString()} / {rows.length.toLocaleString()}건
+            총 {totalCount.toLocaleString()}건 · {page} / {Math.max(1, Math.ceil(totalCount / pageSize))}페이지
           </span>
           {hasChanges && (
             <div className="flex items-center gap-2 ml-2">
@@ -1342,9 +1332,6 @@ export function EmployeeMasterManager() {
             suppressRowClickSelection={false}
             singleClickEdit={true}
             animateRows={false}
-            pagination={true}
-            paginationPageSize={100}
-            paginationPageSizeSelector={[50, 100, 200]}
             getRowClass={getRowClass}
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
@@ -1354,6 +1341,11 @@ export function EmployeeMasterManager() {
             headerHeight={36}
             rowHeight={34}
           />
+        </div>
+        <div className="mt-2 flex items-center justify-end gap-2 text-xs text-slate-500">
+          <Button size="sm" variant="outline" disabled={page <= 1 || loading || saving} onClick={() => setPage((prev) => Math.max(1, prev - 1))}>이전</Button>
+          <span>{page} / {Math.max(1, Math.ceil(totalCount / pageSize))}</span>
+          <Button size="sm" variant="outline" disabled={page >= Math.max(1, Math.ceil(totalCount / pageSize)) || loading || saving} onClick={() => setPage((prev) => Math.min(Math.max(1, Math.ceil(totalCount / pageSize)), prev + 1))}>다음</Button>
         </div>
       </div>
     </div>

@@ -33,6 +33,8 @@ class EmployeeItem(BaseModel):
 class EmployeeListResponse(BaseModel):
     employees: list[EmployeeItem]
     total_count: int
+    page: int | None = None
+    limit: int | None = None
 
 
 class EmployeeDetailResponse(BaseModel):

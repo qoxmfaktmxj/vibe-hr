@@ -81,15 +81,45 @@ def list_departments(session: Session) -> list[DepartmentItem]:
     return [DepartmentItem(id=row.id, code=row.code, name=row.name) for row in rows]
 
 
-def list_employees(session: Session) -> list[EmployeeItem]:
-    rows = session.exec(
+def list_employees(
+    session: Session,
+    *,
+    page: int | None = None,
+    limit: int | None = None,
+    employee_no: str | None = None,
+    name: str | None = None,
+    department: str | None = None,
+    employment_status: str | None = None,
+    active: bool | None = None,
+) -> tuple[list[EmployeeItem], int]:
+    stmt = (
         select(HrEmployee, AuthUser, OrgDepartment)
         .join(AuthUser, HrEmployee.user_id == AuthUser.id)
         .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
-        .order_by(HrEmployee.id)
-    ).all()
+    )
 
-    return [_build_employee_item(employee, user, department) for employee, user, department in rows]
+    if employee_no:
+        stmt = stmt.where(HrEmployee.employee_no.ilike(f"%{employee_no.strip()}%"))
+    if name:
+        stmt = stmt.where(AuthUser.display_name.ilike(f"%{name.strip()}%"))
+    if department:
+        stmt = stmt.where(OrgDepartment.name.ilike(f"%{department.strip()}%"))
+    if employment_status:
+        stmt = stmt.where(HrEmployee.employment_status == employment_status)
+    if active is not None:
+        stmt = stmt.where(AuthUser.is_active == active)  # noqa: E712
+
+    rows_all = session.exec(stmt.order_by(HrEmployee.id)).all()
+    total_count = len(rows_all)
+
+    if page is not None and limit is not None and limit > 0:
+        start = max(0, (page - 1) * limit)
+        end = start + limit
+        rows = rows_all[start:end]
+    else:
+        rows = rows_all
+
+    return ([_build_employee_item(employee, user, department) for employee, user, department in rows], total_count)
 
 
 def get_employee_by_user_id(session: Session, user_id: int) -> EmployeeItem:
@@ -298,7 +328,7 @@ def batch_save_employees(session: Session, payload: EmployeeBatchRequest) -> Emp
             detail=f"Batch save failed: {str(exc)}",
         ) from exc
 
-    employees = list_employees(session)
+    employees, _ = list_employees(session)
     return EmployeeBatchResponse(
         inserted_count=inserted_count,
         updated_count=updated_count,

@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/employees`, {
+  const search = request.nextUrl.search || "";
+  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/employees${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
