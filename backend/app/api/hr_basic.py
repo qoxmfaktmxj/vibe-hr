@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
 from app.schemas.hr_basic import (
+    HrAdminRecordListResponse,
     HrBasicDetailResponse,
     HrBasicProfile,
     HrBasicProfileUpdateRequest,
@@ -15,11 +16,31 @@ from app.services.hr_basic_service import (
     create_hr_basic_record,
     delete_hr_basic_record,
     get_hr_basic_detail,
+    list_hr_admin_records,
     update_hr_basic_profile,
     update_hr_basic_record,
 )
 
 router = APIRouter(prefix="/hr/basic", tags=["hr-basic"])
+
+
+@router.get("/admin-records", response_model=HrAdminRecordListResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
+def hr_admin_records(
+    category: str = Query(...),
+    employee_no: str | None = Query(default=None),
+    name: str | None = Query(default=None),
+    department: str | None = Query(default=None),
+    employment_status: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> HrAdminRecordListResponse:
+    return list_hr_admin_records(
+        session,
+        category=category,
+        employee_no=employee_no,
+        name=name,
+        department=department,
+        employment_status=employment_status,
+    )
 
 
 @router.get("/{employee_id}", response_model=HrBasicDetailResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])

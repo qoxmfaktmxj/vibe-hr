@@ -5,6 +5,8 @@ from sqlmodel import Session, select
 
 from app.models import AuthUser, HrEmployee, HrEmployeeBasicProfile, HrEmployeeInfoRecord, OrgDepartment
 from app.schemas.hr_basic import (
+    HrAdminRecordItem,
+    HrAdminRecordListResponse,
     HrBasicDetailResponse,
     HrBasicProfile,
     HrBasicProfileUpdateRequest,
@@ -183,3 +185,59 @@ def delete_hr_basic_record(session: Session, employee_id: int, record_id: int) -
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Record not found.")
     session.delete(row)
     session.commit()
+
+
+def list_hr_admin_records(
+    session: Session,
+    *,
+    category: str,
+    employee_no: str | None = None,
+    name: str | None = None,
+    department: str | None = None,
+    employment_status: str | None = None,
+) -> HrAdminRecordListResponse:
+    if category not in ALLOWED_CATEGORIES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid category.")
+
+    stmt = (
+        select(HrEmployeeInfoRecord, HrEmployee, AuthUser, OrgDepartment)
+        .join(HrEmployee, HrEmployeeInfoRecord.employee_id == HrEmployee.id)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .join(OrgDepartment, HrEmployee.department_id == OrgDepartment.id)
+        .where(HrEmployeeInfoRecord.category == category)
+    )
+
+    if employee_no:
+        stmt = stmt.where(HrEmployee.employee_no.ilike(f"%{employee_no.strip()}%"))
+    if name:
+        stmt = stmt.where(AuthUser.display_name.ilike(f"%{name.strip()}%"))
+    if department:
+        stmt = stmt.where(OrgDepartment.name.ilike(f"%{department.strip()}%"))
+    if employment_status:
+        stmt = stmt.where(HrEmployee.employment_status == employment_status)
+
+    rows = session.exec(
+        stmt.order_by(HrEmployee.employee_no.asc(), HrEmployeeInfoRecord.record_date.desc(), HrEmployeeInfoRecord.id.desc())
+    ).all()
+
+    items = [
+        HrAdminRecordItem(
+            id=record.id,
+            category=record.category,
+            record_date=record.record_date,
+            title=record.title,
+            type=record.type,
+            organization=record.organization,
+            value=record.value,
+            note=record.note,
+            created_at=record.created_at,
+            employee_id=employee.id,
+            employee_no=employee.employee_no,
+            display_name=user.display_name,
+            department_name=department_row.name,
+            employment_status=employee.employment_status,
+        )
+        for record, employee, user, department_row in rows
+    ]
+
+    return HrAdminRecordListResponse(items=items)

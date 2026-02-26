@@ -83,3 +83,24 @@ class HrBasicDetailResponse(BaseModel):
     certificates: list[HrBasicRecordItem]
     military: list[HrBasicRecordItem]
     evaluations: list[HrBasicRecordItem]
+
+
+class HrAdminRecordItem(BaseModel):
+    id: int
+    category: str
+    record_date: date | None = None
+    title: str | None = None
+    type: str | None = None
+    organization: str | None = None
+    value: str | None = None
+    note: str | None = None
+    created_at: datetime
+    employee_id: int
+    employee_no: str
+    display_name: str
+    department_name: str
+    employment_status: str
+
+
+class HrAdminRecordListResponse(BaseModel):
+    items: list[HrAdminRecordItem]

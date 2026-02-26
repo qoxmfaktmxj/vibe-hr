@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import type { EmployeeItem } from "@/types/employee";
-import type { HrBasicDetailResponse, HrInfoRow } from "@/types/hr-employee-profile";
+import type { HrInfoRow } from "@/types/hr-employee-profile";
 
 let registered = false;
 if (!registered) {
@@ -65,28 +65,6 @@ const STATUS_LABEL: Record<RowStatus, string> = {
   updated: "수정",
   deleted: "삭제",
 };
-
-function pickRows(detail: HrBasicDetailResponse | null, category: Props["category"]): HrInfoRow[] {
-  if (!detail) return [];
-  switch (category) {
-    case "appointment":
-      return detail.appointments;
-    case "reward_penalty":
-      return detail.rewards_penalties;
-    case "contact":
-      return detail.contacts;
-    case "education":
-      return detail.educations;
-    case "career":
-      return detail.careers;
-    case "certificate":
-      return detail.certificates;
-    case "military":
-      return detail.military;
-    default:
-      return detail.evaluations;
-  }
-}
 
 function matches(employee: EmployeeItem, filters: SearchFilters): boolean {
   const employeeNo = filters.employeeNo.trim().toLowerCase();
@@ -142,52 +120,33 @@ export function HrAdminRecordManager({ category, title }: Props) {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
   }, [employees]);
 
-  const refresh = useCallback(async (targetEmployees?: EmployeeItem[]) => {
-    const queryEmployees = targetEmployees ?? filteredEmployees;
-    if (queryEmployees.length === 0) {
-      setRows([]);
-      return;
-    }
+  const refresh = useCallback(async (targetFilters?: SearchFilters) => {
+    const filters = targetFilters ?? appliedFilters;
 
     setLoading(true);
     try {
-      const detailResults = await Promise.all(
-        queryEmployees.map(async (employee) => {
-          const response = await fetch(`/api/hr/basic/${employee.id}`, { cache: "no-store" });
-          if (!response.ok) throw new Error(`${employee.employee_no} 조회 실패`);
-          const detail = (await response.json()) as HrBasicDetailResponse;
-          return { employee, detail };
-        }),
-      );
+      const params = new URLSearchParams({ category });
+      if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
+      if (filters.name.trim()) params.set("name", filters.name.trim());
+      if (filters.department.trim()) params.set("department", filters.department.trim());
+      if (filters.employmentStatus) params.set("employment_status", filters.employmentStatus);
 
-      const mergedRows: AdminGridRow[] = [];
-      for (const { employee, detail } of detailResults) {
-        const records = pickRows(detail, category);
-        for (const record of records) {
-          mergedRows.push({
-            ...record,
-            employee_id: employee.id,
-            employee_no: employee.employee_no,
-            display_name: employee.display_name,
-            department_name: employee.department_name,
-            employment_status: employee.employment_status,
-            _status: "clean",
-            _original: {
-              record_date: record.record_date,
-              type: record.type,
-              title: record.title,
-              organization: record.organization,
-              value: record.value,
-              note: record.note,
-            },
-          });
-        }
-      }
+      const response = await fetch(`/api/hr/basic/admin-records?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("조회 실패");
 
-      mergedRows.sort((a, b) => {
-        if (a.employee_no !== b.employee_no) return a.employee_no.localeCompare(b.employee_no);
-        return (b.record_date ?? "").localeCompare(a.record_date ?? "");
-      });
+      const data = (await response.json()) as { items?: AdminGridRow[] };
+      const mergedRows = (data.items ?? []).map((row) => ({
+        ...row,
+        _status: "clean" as RowStatus,
+        _original: {
+          record_date: row.record_date,
+          type: row.type,
+          title: row.title,
+          organization: row.organization,
+          value: row.value,
+          note: row.note,
+        },
+      }));
 
       setRows(mergedRows);
     } catch (error) {
@@ -196,14 +155,13 @@ export function HrAdminRecordManager({ category, title }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [filteredEmployees, category]);
+  }, [appliedFilters, category]);
 
   const handleQuery = useCallback(async () => {
     const nextApplied = { ...searchFilters };
     setAppliedFilters(nextApplied);
-    const nextEmployees = employees.filter((employee) => matches(employee, nextApplied));
-    await refresh(nextEmployees);
-  }, [employees, refresh, searchFilters]);
+    await refresh(nextApplied);
+  }, [refresh, searchFilters]);
 
   const addRow = useCallback(() => {
     const selected = gridApi?.getSelectedRows() ?? [];
@@ -263,10 +221,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
   }, [gridApi, tempId]);
 
   useEffect(() => {
-    if (employees.length === 0) return;
-    const initialEmployees = employees.filter((employee) => matches(employee, appliedFilters));
-    void refresh(initialEmployees);
-  }, [appliedFilters, employees, refresh]);
+    void refresh(appliedFilters);
+  }, [appliedFilters, refresh]);
 
   const toggleDeleteSelected = useCallback(() => {
     const selected = gridApi?.getSelectedRows() ?? [];
