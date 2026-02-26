@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlmodel import Session, select
 
-from app.core.time_utils import business_today
+from app.core.time_utils import business_today, now_utc
 
 from app.models import (
     AuthRole,
     AuthUser,
     AuthUserRole,
     HrEmployee,
+    HriApprovalActorRule,
     HriApprovalLineStep,
     HriApprovalLineTemplate,
     HriFormType,
@@ -34,9 +34,6 @@ from app.schemas.hri_request import (
 
 EDITABLE_REQUEST_STATUSES = {"DRAFT", "APPROVAL_REJECTED", "RECEIVE_REJECTED"}
 
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def _parse_content(value: str | None) -> dict[str, Any]:
@@ -79,61 +76,110 @@ def _resolve_admin_fallback_user_id(session: Session) -> int:
     return int(admin_user_id)
 
 
+def _parse_keywords(keywords_json: str | None) -> list[str]:
+    """position_keywords_json 컬럼 값을 파싱해 키워드 목록으로 반환한다."""
+    if not keywords_json:
+        return []
+    try:
+        parsed = json.loads(keywords_json)
+        if isinstance(parsed, list):
+            return [str(k) for k in parsed if k]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
 def _resolve_role_actor_user_id(session: Session, requester_user_id: int, role_code: str) -> int:
-    fallback_user_id = _resolve_admin_fallback_user_id(session)
+    """HriApprovalActorRule 설정 테이블을 기반으로 결재자 user_id를 결정한다.
+
+    resolve_method:
+    - ORG_CHAIN  : 신청자와 같은 부서 내에서 position_keywords 키워드로 매칭
+    - JOB_POSITION: 회사 전체에서 position_keywords 키워드로 매칭
+    - FIXED_USER : admin role 사용자 중 첫 번째 (HR_ADMIN 용)
+
+    fallback_rule (매칭 실패 시):
+    - ESCALATE   : 명확한 에러를 반환 (조용한 폴백 없음)
+    - HR_ADMIN   : admin 사용자로 폴백
+    - SKIP       : None → 호출부에서 건너뜀 (현재는 admin 폴백으로 처리)
+    """
+    # 규칙 테이블 조회
+    rule = session.exec(
+        select(HriApprovalActorRule)
+        .where(HriApprovalActorRule.role_code == role_code, HriApprovalActorRule.is_active == True)  # noqa: E712
+    ).first()
+
+    if rule is None:
+        # 설정에 없는 role_code → 에러
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"결재자 역할 '{role_code}'에 대한 설정이 없습니다. HriApprovalActorRule 테이블을 확인하세요.",
+        )
+
+    keywords = _parse_keywords(rule.position_keywords_json)
+
+    # 신청자의 사원 정보 조회
     requester_emp = session.exec(
         select(HrEmployee).where(HrEmployee.user_id == requester_user_id)
     ).first()
     if requester_emp is None:
-        return fallback_user_id
+        return _apply_fallback(session, role_code, rule.fallback_rule, "신청자 사원 정보를 찾을 수 없습니다.")
 
-    if role_code == "TEAM_LEADER":
-        team_leader = session.exec(
+    # resolve_method 분기
+    if rule.resolve_method == "FIXED_USER":
+        # HR_ADMIN: admin 역할 사용자 첫 번째
+        return _resolve_admin_fallback_user_id(session)
+
+    if not keywords:
+        return _apply_fallback(
+            session, role_code, rule.fallback_rule,
+            f"역할 '{role_code}'의 position_keywords 설정이 비어있습니다.",
+        )
+
+    # 키워드 OR 조건 구성 (ilike 사용 → 대소문자 무관)
+    keyword_conditions = [HrEmployee.position_title.ilike(f"%{kw}%") for kw in keywords]
+
+    if rule.resolve_method == "ORG_CHAIN":
+        # 같은 부서 내에서 검색
+        found = session.exec(
             select(HrEmployee)
             .where(
                 HrEmployee.department_id == requester_emp.department_id,
                 HrEmployee.employment_status == "active",
-                HrEmployee.position_title.contains("팀장"),
+                or_(*keyword_conditions),
             )
             .order_by(HrEmployee.id)
         ).first()
-        if team_leader is not None:
-            return team_leader.user_id
-
-    if role_code == "DEPT_HEAD":
-        dept_head = session.exec(
-            select(HrEmployee)
-            .where(
-                HrEmployee.department_id == requester_emp.department_id,
-                HrEmployee.employment_status == "active",
-                or_(
-                    HrEmployee.position_title.contains("부서장"),
-                    HrEmployee.position_title.contains("본부장"),
-                    HrEmployee.position_title.contains("실장"),
-                ),
-            )
-            .order_by(HrEmployee.id)
-        ).first()
-        if dept_head is not None:
-            return dept_head.user_id
-
-    if role_code == "CEO":
-        ceo = session.exec(
+    elif rule.resolve_method == "JOB_POSITION":
+        # 전사 검색
+        found = session.exec(
             select(HrEmployee)
             .where(
                 HrEmployee.employment_status == "active",
-                or_(
-                    HrEmployee.position_title.contains("대표"),
-                    HrEmployee.position_title.ilike("%CEO%"),
-                    HrEmployee.position_title.contains("사장"),
-                ),
+                or_(*keyword_conditions),
             )
             .order_by(HrEmployee.id)
         ).first()
-        if ceo is not None:
-            return ceo.user_id
+    else:
+        found = None
 
-    return fallback_user_id
+    if found is not None:
+        return found.user_id
+
+    return _apply_fallback(
+        session, role_code, rule.fallback_rule,
+        f"역할 '{role_code}'에 해당하는 결재자를 찾지 못했습니다 (키워드: {keywords}).",
+    )
+
+
+def _apply_fallback(session: Session, role_code: str, fallback_rule: str, reason: str) -> int:
+    """fallback_rule에 따라 admin 폴백 또는 에러 반환."""
+    if fallback_rule in ("HR_ADMIN", "SKIP"):
+        return _resolve_admin_fallback_user_id(session)
+    # ESCALATE: 명확한 에러
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"결재자 resolve 실패 [{role_code}]: {reason}",
+    )
 
 
 def _record_history(
@@ -152,7 +198,7 @@ def _record_history(
         to_status=to_status,
         actor_user_id=actor_user_id,
         event_payload_json=_serialize_content(payload or {}),
-        created_at=_utc_now(),
+        created_at=now_utc(),
     )
     session.add(history)
 
@@ -189,7 +235,7 @@ def _build_request_item(session: Session, row: HriRequestMaster) -> HriRequestIt
 
 
 def _next_request_no(session: Session, form_type: HriFormType) -> str:
-    now = _utc_now()
+    now = now_utc()
     counter_key = f"{now:%Y%m}:{form_type.form_code.upper()}"
     counter = session.get(HriRequestCounter, counter_key)
     if counter is None:
@@ -279,7 +325,7 @@ def _create_snapshot_from_template(
         actor_org_id = _resolve_requester_org_id(session, actor_user_id)
 
         action_status = "RECEIVED" if template_step.step_type == "REFERENCE" else "WAITING"
-        acted_at = _utc_now() if action_status == "RECEIVED" else None
+        acted_at = now_utc() if action_status == "RECEIVED" else None
         comment = "AUTO_REFERENCE" if action_status == "RECEIVED" else None
         snapshot = HriRequestStepSnapshot(
             request_id=request_id,
@@ -292,8 +338,8 @@ def _create_snapshot_from_template(
             action_status=action_status,
             acted_at=acted_at,
             comment=comment,
-            created_at=_utc_now(),
-            updated_at=_utc_now(),
+            created_at=now_utc(),
+            updated_at=now_utc(),
         )
         session.add(snapshot)
 
@@ -318,7 +364,7 @@ def upsert_request_draft(
     if form_type is None or not form_type.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form type not found.")
 
-    now = _utc_now()
+    now = now_utc()
     if payload.request_id is None:
         row = HriRequestMaster(
             request_no=_next_request_no(session, form_type),
@@ -398,7 +444,7 @@ def submit_request(session: Session, requester_user_id: int, request_id: int) ->
         template_id=template.id,
     )
 
-    now = _utc_now()
+    now = now_utc()
     row.submitted_at = now
     row.completed_at = None
     if first_waiting is None:
@@ -447,7 +493,7 @@ def withdraw_request(session: Session, requester_user_id: int, request_id: int) 
             detail="Withdraw is disabled for this form type.",
         )
 
-    now = _utc_now()
+    now = now_utc()
     from_status = row.status_code
     row.status_code = "WITHDRAWN"
     row.current_step_order = None
@@ -533,7 +579,7 @@ def approve_request(
         step_type="APPROVAL",
     )
 
-    now = _utc_now()
+    now = now_utc()
     step.action_status = "APPROVED"
     step.acted_at = now
     step.comment = comment
@@ -609,7 +655,7 @@ def reject_request(
         step_type="APPROVAL",
     )
 
-    now = _utc_now()
+    now = now_utc()
     step.action_status = "REJECTED"
     step.acted_at = now
     step.comment = comment
@@ -658,7 +704,7 @@ def receive_complete_request(
         step_type="RECEIVE",
     )
 
-    now = _utc_now()
+    now = now_utc()
     step.action_status = "RECEIVED"
     step.acted_at = now
     step.comment = comment
@@ -720,7 +766,7 @@ def receive_reject_request(
         step_type="RECEIVE",
     )
 
-    now = _utc_now()
+    now = now_utc()
     step.action_status = "REJECTED"
     step.acted_at = now
     step.comment = comment

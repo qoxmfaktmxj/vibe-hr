@@ -1404,11 +1404,15 @@ HRI_FORM_TYPE_POLICY_SEEDS = {
 }
 
 HRI_APPROVAL_ACTOR_RULE_SEEDS = [
-    # role_code, resolve_method, fallback_rule
-    ("TEAM_LEADER", "ORG_CHAIN", "ESCALATE"),
-    ("DEPT_HEAD", "ORG_CHAIN", "ESCALATE"),
-    ("CEO", "JOB_POSITION", "HR_ADMIN"),
-    ("HR_ADMIN", "FIXED_USER", "HR_ADMIN"),
+    # role_code, resolve_method, fallback_rule, position_keywords (JSON)
+    # TEAM_LEADER: 같은 부서 내 팀장 직함 보유자
+    ("TEAM_LEADER", "ORG_CHAIN", "ESCALATE", '["팀장"]'),
+    # DEPT_HEAD: 같은 부서 내 부서장/본부장/실장 직함 보유자
+    ("DEPT_HEAD", "ORG_CHAIN", "ESCALATE", '["부서장","본부장","실장"]'),
+    # CEO: 회사 전체에서 대표/CEO/사장 직함 보유자 (fallback: HR_ADMIN)
+    ("CEO", "JOB_POSITION", "HR_ADMIN", '["대표","CEO","사장"]'),
+    # HR_ADMIN: admin 역할 사용자 중 첫 번째 (고정 resolve)
+    ("HR_ADMIN", "FIXED_USER", "HR_ADMIN", None),
 ]
 
 HRI_APPROVAL_TEMPLATE_SEEDS = [
@@ -1616,7 +1620,7 @@ def ensure_hri_form_type_policies(session: Session) -> None:
 
 
 def ensure_hri_approval_actor_rules(session: Session) -> None:
-    for role_code, resolve_method, fallback_rule in HRI_APPROVAL_ACTOR_RULE_SEEDS:
+    for role_code, resolve_method, fallback_rule, position_keywords_json in HRI_APPROVAL_ACTOR_RULE_SEEDS:
         existing = session.exec(select(HriApprovalActorRule).where(HriApprovalActorRule.role_code == role_code)).first()
         if existing is None:
             session.add(
@@ -1624,6 +1628,7 @@ def ensure_hri_approval_actor_rules(session: Session) -> None:
                     role_code=role_code,
                     resolve_method=resolve_method,
                     fallback_rule=fallback_rule,
+                    position_keywords_json=position_keywords_json,
                     is_active=True,
                 )
             )
@@ -1634,6 +1639,9 @@ def ensure_hri_approval_actor_rules(session: Session) -> None:
                 changed = True
             if existing.fallback_rule != fallback_rule:
                 existing.fallback_rule = fallback_rule
+                changed = True
+            if existing.position_keywords_json != position_keywords_json:
+                existing.position_keywords_json = position_keywords_json
                 changed = True
             if not existing.is_active:
                 existing.is_active = True

@@ -567,6 +567,9 @@ class HriApprovalActorRule(SQLModel, table=True):
     role_code: str = Field(max_length=30, index=True)
     resolve_method: str = Field(max_length=30, default="ORG_CHAIN")
     fallback_rule: str = Field(max_length=30, default="ESCALATE")
+    # position_title 키워드 목록 (JSON 배열 문자열). 예: '["팀장"]', '["부서장","본부장","실장"]'
+    # resolve_method=JOB_POSITION 일 때 DB에서 읽어 ilike 매칭에 사용
+    position_keywords_json: Optional[str] = Field(default=None)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
