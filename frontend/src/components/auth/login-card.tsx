@@ -138,36 +138,40 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
 
       <Separator />
 
-      <div className="flex flex-col items-center gap-3 pt-1">
+      <div className="flex items-center justify-center gap-5 pt-1">
         <Link
           href="/api/auth/social/login/google"
-          className="block"
+          className="block transition hover:opacity-85"
           aria-label="Google login"
           title="Google login"
         >
-          <Image
-            src="/images/google_login.png"
-            alt="Continue with Google"
-            width={189}
-            height={40}
-            className="h-10 w-[189px]"
-            priority
-          />
+          <span className="relative block h-[35px] w-[34px]">
+            <Image
+              src="/images/google_login.png"
+              alt="Continue with Google"
+              fill
+              sizes="34px"
+              className="object-contain"
+              priority
+            />
+          </span>
         </Link>
 
         <Link
           href="/api/auth/social/login/kakao"
-          className="block"
+          className="block transition hover:opacity-85"
           aria-label="Kakao login"
           title="Kakao login"
         >
-          <Image
-            src="/images/kakao_login.png"
-            alt="Login with Kakao"
-            width={189}
-            height={40}
-            className="h-10 w-[189px]"
-          />
+          <span className="relative block h-[35px] w-[34px]">
+            <Image
+              src="/images/kakao_login.png"
+              alt="Login with Kakao"
+              fill
+              sizes="34px"
+              className="object-contain"
+            />
+          </span>
         </Link>
       </div>
     </CardContent>
