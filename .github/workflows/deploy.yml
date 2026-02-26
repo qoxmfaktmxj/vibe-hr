@@ -31,6 +31,28 @@ jobs:
             exit 1
           fi
 
+      - name: SSH preflight (connectivity/auth)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          keyfile=$(mktemp)
+          trap 'rm -f "$keyfile"' EXIT
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > "$keyfile"
+          chmod 600 "$keyfile"
+
+          echo "[preflight] checking TCP connectivity to ${DEPLOY_HOST}:${DEPLOY_PORT}"
+          timeout 10 bash -c "</dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}" || {
+            echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from GitHub runner (network/firewall/host down)."
+            exit 1
+          }
+
+          echo "[preflight] checking SSH authentication"
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -i "$keyfile" -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
