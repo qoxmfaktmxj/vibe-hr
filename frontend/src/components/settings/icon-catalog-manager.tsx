@@ -48,12 +48,12 @@ export function IconCatalogManager() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-slate-600">
-            기본은 엔터프라이즈 화이트리스트 아이콘만 보여줘. 고급검색을 켜면 Lucide 전체 아이콘 탐색이 가능해.
+            기본은 사전 승인된 아이콘만 보여줘. 고급 검색을 켜면 Lucide 전체 아이콘을 탐색할 수 있어.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="max-w-md"
-              placeholder={advanced ? "Lucide 전체 아이콘 검색" : "화이트리스트 아이콘 검색"}
+              placeholder={advanced ? "전체 아이콘 검색" : "기본 아이콘 검색"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -62,7 +62,7 @@ export function IconCatalogManager() {
               variant={advanced ? "action" : "outline"}
               onClick={() => setAdvanced((prev) => !prev)}
             >
-              {advanced ? "고급검색 ON" : "고급검색 OFF"}
+              {advanced ? "고급 검색 사용 중" : "고급 검색 켜기"}
             </Button>
             <span className="text-xs text-slate-500">{items.length.toLocaleString()}개</span>
           </div>
