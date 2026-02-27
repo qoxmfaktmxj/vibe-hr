@@ -82,6 +82,9 @@ export function ImpersonationPopover() {
         return;
       }
 
+      // 계정 전환 시 열려 있던 탭 초기화 (권한 없는 탭 잔존 방지)
+      window.localStorage.removeItem("vibe_hr_open_tabs");
+
       await refreshSession();
       await refreshMenus();
       setOpen(false);

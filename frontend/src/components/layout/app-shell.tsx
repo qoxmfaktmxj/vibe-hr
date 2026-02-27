@@ -128,6 +128,13 @@ export function AppShell({ title: _title, description: _description, children }:
     window.localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(openTabs));
   }, [openTabs, tabsHydrated]);
 
+  // 메뉴(권한) 변경 시: 새 메뉴에 없는 탭 자동 제거
+  // - 계정 전환 후 이전 계정의 탭이 남아 경로 문자열 그대로 노출되는 현상 방지
+  useEffect(() => {
+    if (!tabsHydrated || menus.length === 0) return;
+    setStoredTabs((prev) => prev.filter((tab) => findMenuLabel(menus, tab.path) !== null));
+  }, [menus, tabsHydrated]);
+
   function closeTab(path: string) {
     const next = openTabs.filter((tab) => tab.path !== path);
     setStoredTabs(next);
