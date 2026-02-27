@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ColDef,
   type GridApi,
@@ -28,11 +26,7 @@ import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/l
 import type { EmployeeItem } from "@/types/employee";
 import type { HrInfoRow } from "@/types/hr-employee-profile";
 
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
+// AG Grid modules are provided globally via <AgGridProvider>.
 
 type Props = {
   category:

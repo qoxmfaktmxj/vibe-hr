@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ModuleRegistry, AllCommunityModule, type ColDef, type GridApi } from "ag-grid-community";
+import { type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,7 @@ import type {
   CodeListResponse,
 } from "@/types/common-code";
 
-let registered = false;
-if (!registered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  registered = true;
-}
+// AG Grid modules are provided globally via <AgGridProvider>.
 
 const T = {
   loading: "공통코드를 불러오는 중...",

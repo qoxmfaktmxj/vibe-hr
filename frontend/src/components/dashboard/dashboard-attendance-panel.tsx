@@ -59,15 +59,14 @@ type DashboardAttendancePanelProps = {
 
 export function DashboardAttendancePanel({ compact = false }: DashboardAttendancePanelProps) {
   const { user } = useAuth();
-  // SSR hydration mismatch 방지: 초기값 null, 클라이언트 마운트 후 설정
-  const [clock, setClock] = useState<string | null>(null);
+  // SSR hydration mismatch 방지: 초기값은 함수로 지연 계산
+  const [clock, setClock] = useState<string>(() => getKoreaDateTime());
   const scheduleKey = user?.id ? `/api/tim/attendance-daily/today-schedule?user_id=${user.id}` : "/api/tim/attendance-daily/today-schedule";
   const { data, isLoading } = useSWR<TimTodayScheduleResponse>(scheduleKey, fetcher, {
     revalidateOnFocus: false,
   });
 
   useEffect(() => {
-    setClock(getKoreaDateTime());
     const timer = window.setInterval(() => {
       setClock(getKoreaDateTime());
     }, 1000);

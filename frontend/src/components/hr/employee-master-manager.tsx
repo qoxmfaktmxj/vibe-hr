@@ -20,8 +20,6 @@ import {
 import { toast } from "sonner";
 
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ICellRendererParams,
   type ColDef,
@@ -58,14 +56,7 @@ import type {
   EmployeeItem,
 } from "@/types/employee";
 
-/* ------------------------------------------------------------------ */
-/* 그리드 모듈 등록(최초 1회)                                           */
-/* ------------------------------------------------------------------ */
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
+/* AG Grid modules are provided globally via <AgGridProvider>. */
 
 /* ------------------------------------------------------------------ */
 /* 타입 정의                                                           */

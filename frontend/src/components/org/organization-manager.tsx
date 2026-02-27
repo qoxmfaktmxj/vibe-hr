@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ColDef,
   type GridApi,
@@ -30,11 +28,7 @@ import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-sta
 import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import type { OrganizationDepartmentItem, OrganizationDepartmentListResponse } from "@/types/organization";
 
-let registered = false;
-if (!registered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  registered = true;
-}
+// AG Grid modules are provided globally via <AgGridProvider>.
 
 type RowStatus = GridRowStatus;
 

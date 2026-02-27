@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MenuNode } from "@/types/menu";
 
@@ -49,6 +49,7 @@ export function MenuProvider({
   const pathname = usePathname();
   const [menus, setMenus] = useState<MenuNode[]>(initialMenus);
   const [isLoading, setIsLoading] = useState(false);
+  const hasTriedRefreshRef = useRef(false);
 
   const refreshMenus = useCallback(async () => {
     setIsLoading(true);
@@ -74,6 +75,7 @@ export function MenuProvider({
 
   useEffect(() => {
     setMenus(initialMenus);
+    hasTriedRefreshRef.current = initialMenus.length > 0;
   }, [initialMenus]);
 
   useEffect(() => {
@@ -81,7 +83,8 @@ export function MenuProvider({
       return;
     }
 
-    if (menus.length === 0) {
+    if (menus.length === 0 && !hasTriedRefreshRef.current) {
+      hasTriedRefreshRef.current = true;
       void refreshMenus();
     }
   }, [menus.length, pathname, refreshMenus]);
