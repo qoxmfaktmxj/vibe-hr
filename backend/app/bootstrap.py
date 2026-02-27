@@ -560,7 +560,8 @@ MENU_TREE: list[dict] = [
                 "roles": ["admin"],
                 "children": [
                     {"code": "settings.menus", "name": "메뉴관리", "path": "/settings/menus", "icon": "PanelLeft", "sort_order": 902, "roles": ["admin"]},
-                    {"code": "settings.common-codes", "name": "공통코드관리", "path": "/settings/common-codes", "icon": "ListOrdered", "sort_order": 903, "roles": ["admin"]}
+                    {"code": "settings.common-codes", "name": "공통코드관리", "path": "/settings/common-codes", "icon": "ListOrdered", "sort_order": 903, "roles": ["admin"]},
+                    {"code": "settings.icons", "name": "아이콘관리", "path": "/settings/icons", "icon": "ListPlus", "sort_order": 904, "roles": ["admin"]}
                 ],
             },
             {
