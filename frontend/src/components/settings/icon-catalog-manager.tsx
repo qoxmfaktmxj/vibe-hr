@@ -1,7 +1,7 @@
 "use client";
 
 import * as LucideIcons from "lucide-react";
-import { type ComponentType, useMemo, useState } from "react";
+import { type ElementType, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import { renderMenuIcon } from "@/lib/menu-icon-render";
 function isLucideComponentName(name: string): boolean {
   if (!/^[A-Z][A-Za-z0-9]+$/.test(name)) return false;
   const v = (LucideIcons as Record<string, unknown>)[name];
-  return typeof v === "function";
+  const type = typeof v;
+  return v != null && (type === "function" || type === "object");
 }
 
 const ALL_LUCIDE_ICON_NAMES = Object.keys(LucideIcons)
@@ -72,8 +73,9 @@ export function IconCatalogManager() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         {items.map((name) => {
           const iconEntry = (LucideIcons as unknown as Record<string, unknown>)[name];
-          const Icon = typeof iconEntry === "function"
-            ? (iconEntry as ComponentType<{ className?: string; "aria-hidden"?: boolean }>)
+          const iconType = typeof iconEntry;
+          const Icon = iconEntry != null && (iconType === "function" || iconType === "object")
+            ? (iconEntry as ElementType)
             : null;
           return (
             <button
