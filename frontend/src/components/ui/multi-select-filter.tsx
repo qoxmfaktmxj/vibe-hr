@@ -18,6 +18,8 @@ type MultiSelectFilterProps<T extends string = string> = {
   values: T[];
   onChange: (values: T[]) => void;
   placeholder?: string;
+  /** 라벨 앞 접두어(예: "직책"). 미지정 시 searchPlaceholder에서 자동 추론 */
+  summaryPrefix?: string;
   searchPlaceholder?: string;
   className?: string;
 };
@@ -27,6 +29,7 @@ export function MultiSelectFilter<T extends string = string>({
   values,
   onChange,
   placeholder = "전체",
+  summaryPrefix,
   searchPlaceholder = "검색",
   className,
 }: MultiSelectFilterProps<T>) {
@@ -39,11 +42,29 @@ export function MultiSelectFilter<T extends string = string>({
     if (!keyword) return options;
     return options.filter((option) => option.label.toLowerCase().includes(keyword));
   }, [options, query]);
+  const resolvedSummaryPrefix = useMemo(() => {
+    const explicit = summaryPrefix?.trim();
+    if (explicit) return explicit;
+
+    const placeholderText = searchPlaceholder.trim();
+    if (!placeholderText || placeholderText === "검색") return "";
+
+    const suffix = "검색";
+    if (!placeholderText.endsWith(suffix)) return "";
+
+    return placeholderText.slice(0, -suffix.length).trim();
+  }, [searchPlaceholder, summaryPrefix]);
 
   const summaryLabel = useMemo(() => {
-    if (values.length === 0) return placeholder;
+    const prefix = resolvedSummaryPrefix;
+    if (values.length === 0) {
+      return prefix ? `${prefix} ${placeholder}` : placeholder;
+    }
+    if (prefix) {
+      return `${prefix} ${values.length}개 선택`;
+    }
     return `${values.length}개 선택`;
-  }, [placeholder, values.length]);
+  }, [placeholder, resolvedSummaryPrefix, values.length]);
 
   function toggleOption(value: T) {
     const next = new Set(valueSet);
