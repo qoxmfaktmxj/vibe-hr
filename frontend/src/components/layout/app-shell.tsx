@@ -232,7 +232,10 @@ export function AppShell({ title: _title, description: _description, children }:
 
             <div className="flex items-center justify-end gap-2">
               <ThemeSettingsPopover />
-              {isAdmin ? <ImpersonationPopover /> : null}
+              {/* user 로드 전: 자리 유지(DOM 구조 고정)하여 Radix ID mismatch 방지 */}
+              <span className={isAdmin ? undefined : "invisible pointer-events-none"}>
+                <ImpersonationPopover />
+              </span>
               <LogoutButton />
             </div>
           </div>
