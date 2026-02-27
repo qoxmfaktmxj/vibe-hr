@@ -91,10 +91,19 @@ function toEmploymentStatusLabel(status: EmployeeItem["employment_status"]): str
 }
 
 function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    if (isActive && ref.current) {
+      ref.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [isActive]);
+
   if (!node.path) return null;
 
   return (
     <Link
+      ref={ref}
       href={node.path}
       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
         isActive ? "bg-primary/10 text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
@@ -121,6 +130,32 @@ function collectActiveCodes(nodes: MenuNode[], currentPath: string, acc: Set<str
     }
   }
   return acc;
+}
+
+const OPEN_CODES_STORAGE_KEY = "vibe_hr_sidebar_open_codes";
+
+/** sessionStorage에서 열린 그룹 코드 Set 복원 */
+function loadOpenCodes(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.sessionStorage.getItem(OPEN_CODES_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return new Set(parsed as string[]);
+  } catch {
+    // 파싱 실패 시 무시
+  }
+  return new Set();
+}
+
+/** sessionStorage에 열린 그룹 코드 Set 저장 */
+function saveOpenCodes(codes: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(OPEN_CODES_STORAGE_KEY, JSON.stringify([...codes]));
+  } catch {
+    // 저장 실패 시 무시
+  }
 }
 
 function MenuGroupItem({
@@ -155,7 +190,7 @@ function MenuGroupItem({
       </button>
 
       {isOpen ? (
-        <div className={`mt-0.5 space-y-0.5 ${depth >= 0 ? "ml-4 border-l border-gray-200 pl-3" : ""}`}>
+        <div className="mt-0.5 space-y-0.5 ml-4 border-l border-gray-200 pl-3">
           {node.children.map((child) =>
             child.children.length > 0 ? (
               <MenuGroupItem
@@ -190,19 +225,37 @@ export function DashboardSidebar() {
   const [menuExpanded, setMenuExpanded] = useState(true);
 
   // 열림 상태를 그룹 code의 Set으로 관리
-  // - 초기값: 현재 경로를 포함하는 상위 그룹들만 열림
-  const [openCodes, setOpenCodes] = useState<Set<string>>(() => collectActiveCodes([], pathname));
+  // - SSR/CSR hydration mismatch 방지: 초기값은 빈 Set (서버와 동일)
+  // - 클라이언트 마운트 후 sessionStorage에서 복원
+  const [openCodes, setOpenCodes] = useState<Set<string>>(new Set());
+  const [sidebarHydrated, setSidebarHydrated] = useState(false);
+
+  // 클라이언트 마운트 후 sessionStorage에서 열림 상태 복원
+  useEffect(() => {
+    const stored = loadOpenCodes();
+    setOpenCodes(stored);
+    setSidebarHydrated(true);
+  }, []);
+
+  // openCodes 변경 시 sessionStorage에 저장 (hydration 완료 후에만)
+  useEffect(() => {
+    if (!sidebarHydrated) return;
+    saveOpenCodes(openCodes);
+  }, [openCodes, sidebarHydrated]);
 
   // menus 로드 완료 시 현재 경로의 상위 그룹 열기 (초기 마운트 대응)
+  const menusInitializedRef = useRef(false);
   useEffect(() => {
-    if (menus.length === 0) return;
+    if (!sidebarHydrated || menus.length === 0) return;
+    if (menusInitializedRef.current) return;
+    menusInitializedRef.current = true;
     setOpenCodes((prev) => {
       const active = collectActiveCodes(menus, pathname);
       // 기존에 사용자가 열어둔 것 + 현재 경로 상위 그룹 합산
       return new Set([...prev, ...active]);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menus]);
+  }, [menus, sidebarHydrated]);
 
   // pathname 변경 시: 새 경로의 상위 그룹을 추가로 열기 (기존 열린 그룹은 유지)
   const prevPathnameRef = useRef(pathname);

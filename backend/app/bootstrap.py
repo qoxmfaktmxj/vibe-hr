@@ -20,6 +20,8 @@ from app.models import (
     HrEmployee,
     HrEmployeeBasicProfile,
     HrEmployeeInfoRecord,
+    PapFinalResult,
+    PapAppraisalMaster,
     HrAnnualLeave,
     HrLeaveRequest,
     OrgDepartment,
@@ -198,21 +200,49 @@ MENU_TREE: list[dict] = [
             },
             {
                 "code": "hr.admin",
-                "name": "인사관리",
+                "name": "\uC778\uC0AC\uAD00\uB9AC",
                 "path": None,
                 "icon": "UsersRound",
                 "sort_order": 204,
                 "roles": ["hr_manager", "admin"],
                 "children": [
-                    {"code": "hr.admin.appointments", "name": "발령관리", "path": "/hr/admin/appointments", "icon": "UserRound", "sort_order": 205, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.rewards", "name": "상벌관리", "path": "/hr/admin/rewards", "icon": "UserRound", "sort_order": 206, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.contacts", "name": "주소연락처관리", "path": "/hr/admin/contacts", "icon": "UserRound", "sort_order": 207, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.educations", "name": "학력관리", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 208, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.careers", "name": "경력관리", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 209, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.certificates", "name": "자격증관리", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 210, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.military", "name": "병역관리", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 211, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.evaluations", "name": "평가관리", "path": "/hr/admin/evaluations", "icon": "UserRound", "sort_order": 212, "roles": ["hr_manager", "admin"]}
+                    {"code": "hr.admin.rewards", "name": "\uC0C1\uBC8C\uAD00\uB9AC", "path": "/hr/admin/rewards", "icon": "UserRound", "sort_order": 205, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.contacts", "name": "\uC8FC\uC18C\uC5F0\uB77D\uCC98\uAD00\uB9AC", "path": "/hr/admin/contacts", "icon": "UserRound", "sort_order": 206, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.educations", "name": "\uD559\uB825\uAD00\uB9AC", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 207, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.careers", "name": "\uACBD\uB825\uAD00\uB9AC", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 208, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.certificates", "name": "\uC790\uACA9\uC99D\uAD00\uB9AC", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 209, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.military", "name": "\uBCD1\uC5ED\uAD00\uB9AC", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 210, "roles": ["hr_manager", "admin"]}
                 ],
+            },
+            {
+                "code": "hr.appointment",
+                "name": "\uBC1C\uB839\uAD00\uB9AC",
+                "path": None,
+                "icon": "FileText",
+                "sort_order": 212,
+                "roles": ["hr_manager", "admin"],
+                "children": [
+                    {"code": "hr.appointment.codes", "name": "\uBC1C\uB839\uCF54\uB4DC\uAD00\uB9AC", "path": "/hr/appointment/codes", "icon": "ListOrdered", "sort_order": 213, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.appointment.records", "name": "\uBC1C\uB839\uCC98\uB9AC\uAD00\uB9AC", "path": "/hr/appointment/records", "icon": "UserRound", "sort_order": 214, "roles": ["hr_manager", "admin"]}
+                ],
+            },
+        ],
+    },
+    {
+        "code": "pap",
+        "name": "\uC131\uACFC\uAD00\uB9AC",
+        "path": None,
+        "icon": "FileText",
+        "sort_order": 250,
+        "roles": ["hr_manager", "admin"],
+        "children": [
+            {
+                "code": "pap.appraisals",
+                "name": "\uD3C9\uAC00\uAE30\uC900\uAD00\uB9AC",
+                "path": "/pap/appraisals",
+                "icon": "ListOrdered",
+                "sort_order": 251,
+                "roles": ["hr_manager", "admin"],
             },
         ],
     },
@@ -472,6 +502,7 @@ COMMON_CODE_GROUP_SEEDS = [
     ("MNG_INQUIRY_STATUS", "문의진행상태", "추가개발 문의 진행상태", 105),
     ("MNG_INSPECTION", "검수상태", "검수 완료 여부", 106),
     ("MNG_SERVICE_TYPE", "서비스구분", "인프라 서비스 구분", 107),
+    ("HR_APPOINTMENT_CODE", "발령코드", "발령처리 코드", 120),
 ]
 
 COMMON_CODE_ITEM_SEEDS = {
@@ -535,6 +566,18 @@ COMMON_CODE_ITEM_SEEDS = {
         ("GROUPWARE", "그룹웨어", 4),
         ("PORTAL", "포털", 5),
         ("ETC", "기타", 6),
+    ],
+    "HR_APPOINTMENT_CODE": [
+        ("NEW_HIRE", "신규채용", 1),
+        ("CAREER_HIRE", "경력채용", 2),
+        ("RESIGNATION", "퇴사", 3),
+        ("JOB_FAMILY_CHANGE", "직군변경", 4),
+        ("DEPT_TRANSFER", "부서이동", 5),
+        ("SUSPENSION", "정직", 6),
+        ("LEAVE_OF_ABSENCE", "휴직", 7),
+        ("PROMOTION", "승진", 8),
+        ("DEMOTION", "강등", 9),
+        ("REINSTATEMENT", "복직", 10),
     ],
 }
 
@@ -1097,7 +1140,6 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
             continue
 
         seed_rows = [
-            ("appointment", "정기 발령", "전보", "인사본부", "개발1팀", "정기 인사이동"),
             ("reward_penalty", "우수사원", "상", "대표이사", "표창", "분기 우수사원 선정"),
             ("contact", "연락처", "개인전화", None, "010-1234-56{:02d}".format(index), "개인 연락처"),
             ("education", "학력", "학사", "한국대학교", "컴퓨터공학", "졸업"),
@@ -1120,6 +1162,13 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
                 )
             )
 
+    session.commit()
+
+
+def ensure_remove_legacy_appointment_records(session: Session) -> None:
+    # 발령처리 데이터를 전용 테이블로 분리하기 위한 정리 단계.
+    # 기존 hr_employee_info_records(category='appointment') 데이터는 제거한다.
+    session.exec(text("DELETE FROM hr_employee_info_records WHERE category = 'appointment'"))
     session.commit()
 
 
@@ -1480,6 +1529,160 @@ HRI_FORM_TYPE_TEMPLATE_MAP_SEEDS = [
 ]
 
 
+PAP_FINAL_RESULT_SEEDS = [
+    # result_code, result_name, score_grade, sort_order, description
+    ("S", "Outstanding", 100.0, 10, "Top performance"),
+    ("A", "Exceeds Expectations", 90.0, 20, "High performance"),
+    ("B", "Meets Expectations", 80.0, 30, "Normal performance"),
+    ("C", "Needs Improvement", 70.0, 40, "Improvement required"),
+]
+
+PAP_APPRAISAL_SEEDS = [
+    # code, name, year, final_result_code, type, start, end, active, sort, description
+    (
+        "ANNUAL_2026",
+        "2026 Annual Appraisal",
+        2026,
+        "A",
+        "annual",
+        "2026-01-01",
+        "2026-12-31",
+        True,
+        10,
+        "Temporary seed for PAP module",
+    ),
+    (
+        "H1_2026",
+        "2026 H1 Appraisal",
+        2026,
+        "B",
+        "half_year",
+        "2026-01-01",
+        "2026-06-30",
+        True,
+        20,
+        "Temporary seed for PAP module",
+    ),
+]
+
+
+def ensure_pap_final_results(session: Session) -> None:
+    for result_code, result_name, score_grade, sort_order, description in PAP_FINAL_RESULT_SEEDS:
+        existing = session.exec(
+            select(PapFinalResult).where(PapFinalResult.result_code == result_code),
+        ).first()
+        if existing is None:
+            session.add(
+                PapFinalResult(
+                    result_code=result_code,
+                    result_name=result_name,
+                    score_grade=score_grade,
+                    sort_order=sort_order,
+                    is_active=True,
+                    description=description,
+                ),
+            )
+            continue
+
+        changed = False
+        if existing.result_name != result_name:
+            existing.result_name = result_name
+            changed = True
+        if existing.score_grade != score_grade:
+            existing.score_grade = score_grade
+            changed = True
+        if existing.sort_order != sort_order:
+            existing.sort_order = sort_order
+            changed = True
+        if existing.description != description:
+            existing.description = description
+            changed = True
+        if not existing.is_active:
+            existing.is_active = True
+            changed = True
+        if changed:
+            session.add(existing)
+    session.commit()
+
+
+def ensure_pap_appraisal_masters(session: Session) -> None:
+    final_result_by_code = {
+        row.result_code: row
+        for row in session.exec(select(PapFinalResult).where(PapFinalResult.is_active)).all()
+    }
+
+    for (
+        appraisal_code,
+        appraisal_name,
+        appraisal_year,
+        final_result_code,
+        appraisal_type,
+        start_date_raw,
+        end_date_raw,
+        is_active,
+        sort_order,
+        description,
+    ) in PAP_APPRAISAL_SEEDS:
+        final_result = final_result_by_code.get(final_result_code)
+        if final_result is None:
+            continue
+
+        start_date = date.fromisoformat(start_date_raw)
+        end_date = date.fromisoformat(end_date_raw)
+        existing = session.exec(
+            select(PapAppraisalMaster).where(
+                PapAppraisalMaster.appraisal_year == appraisal_year,
+                PapAppraisalMaster.appraisal_code == appraisal_code,
+            ),
+        ).first()
+
+        if existing is None:
+            session.add(
+                PapAppraisalMaster(
+                    appraisal_code=appraisal_code,
+                    appraisal_name=appraisal_name,
+                    appraisal_year=appraisal_year,
+                    final_result_id=final_result.id,
+                    appraisal_type=appraisal_type,
+                    start_date=start_date,
+                    end_date=end_date,
+                    is_active=is_active,
+                    sort_order=sort_order,
+                    description=description,
+                ),
+            )
+            continue
+
+        changed = False
+        if existing.appraisal_name != appraisal_name:
+            existing.appraisal_name = appraisal_name
+            changed = True
+        if existing.final_result_id != final_result.id:
+            existing.final_result_id = final_result.id
+            changed = True
+        if existing.appraisal_type != appraisal_type:
+            existing.appraisal_type = appraisal_type
+            changed = True
+        if existing.start_date != start_date:
+            existing.start_date = start_date
+            changed = True
+        if existing.end_date != end_date:
+            existing.end_date = end_date
+            changed = True
+        if existing.is_active != is_active:
+            existing.is_active = is_active
+            changed = True
+        if existing.sort_order != sort_order:
+            existing.sort_order = sort_order
+            changed = True
+        if existing.description != description:
+            existing.description = description
+            changed = True
+        if changed:
+            session.add(existing)
+    session.commit()
+
+
 def ensure_pay_payroll_codes(session: Session) -> None:
     for code, name, pay_type, payment_day, tax_ded, social_ded in PAY_PAYROLL_CODE_SEEDS:
         existing = session.exec(select(PayPayrollCode).where(PayPayrollCode.code == code)).first()
@@ -1821,10 +2024,55 @@ def ensure_hri_schema(session: Session) -> None:
     session.commit()
 
 
+def ensure_hr_appointment_schema(session: Session) -> None:
+    # THRM191 + THRM221 통합 리팩터링:
+    # - hr_appointment_order_items에 임시발령 식별 컬럼 추가
+    # - legacy hr_temporary_appointments 데이터 병합 후 테이블 제거
+    session.exec(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF to_regclass('hr_appointment_order_items') IS NOT NULL THEN
+                    ALTER TABLE hr_appointment_order_items ADD COLUMN IF NOT EXISTS appointment_kind VARCHAR(20);
+                    ALTER TABLE hr_appointment_order_items ADD COLUMN IF NOT EXISTS temporary_reason VARCHAR(500);
+                    UPDATE hr_appointment_order_items
+                    SET appointment_kind = 'permanent'
+                    WHERE appointment_kind IS NULL OR TRIM(appointment_kind) = '';
+                    CREATE INDEX IF NOT EXISTS ix_hr_appointment_order_items_kind
+                        ON hr_appointment_order_items (appointment_kind);
+                END IF;
+            END $$;
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF to_regclass('hr_temporary_appointments') IS NOT NULL
+                   AND to_regclass('hr_appointment_order_items') IS NOT NULL THEN
+                    UPDATE hr_appointment_order_items oi
+                    SET appointment_kind = 'temporary',
+                        end_date = COALESCE(ta.end_date, oi.end_date),
+                        temporary_reason = COALESCE(ta.reason, oi.temporary_reason)
+                    FROM hr_temporary_appointments ta
+                    WHERE ta.source_item_id = oi.id;
+                END IF;
+            END $$;
+            """
+        )
+    )
+    session.exec(text("DROP TABLE IF EXISTS hr_temporary_appointments"))
+    session.commit()
+
+
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
     ensure_tim_leave_schema(session)
     ensure_hri_schema(session)
+    ensure_hr_appointment_schema(session)
     ensure_roles(session)
     departments = ensure_departments(session)
     department = next((item for item in departments if item.code == "HQ-HR"), departments[0])
@@ -1868,6 +2116,9 @@ def seed_initial_data(session: Session) -> None:
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
     ensure_common_codes(session)
+    ensure_pap_final_results(session)
+    ensure_pap_appraisal_masters(session)
+    ensure_remove_legacy_appointment_records(session)
     ensure_hr_basic_seed_data(session)
     ensure_attendance_codes(session)
     ensure_work_schedule_codes(session)

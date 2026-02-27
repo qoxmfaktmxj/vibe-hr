@@ -194,6 +194,148 @@ class HrEmployeeInfoRecord(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class HrAppointmentOrder(SQLModel, table=True):
+    """발령처리 마스터 (THRM191 대응)."""
+
+    __tablename__ = "hr_appointment_orders"
+    __table_args__ = (
+        UniqueConstraint("appointment_no", name="uq_hr_appointment_orders_no"),
+        CheckConstraint(
+            "status IN ('draft', 'confirmed', 'cancelled')",
+            name="ck_hr_appointment_orders_status",
+        ),
+        Index("ix_hr_appointment_orders_status_effective", "status", "effective_date"),
+        Index("ix_hr_appointment_orders_effective_date", "effective_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    appointment_no: str = Field(max_length=30, index=True)
+    appointment_code_id: Optional[int] = Field(default=None, foreign_key="app_codes.id")
+    title: str = Field(max_length=120)
+    description: Optional[str] = Field(default=None, max_length=500)
+    effective_date: date = Field(index=True)
+    status: str = Field(default="draft", max_length=20)
+    confirmed_at: Optional[datetime] = None
+    confirmed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrAppointmentOrderItem(SQLModel, table=True):
+    """발령처리 대상자 상세 (THRM191 + THRM221 통합)."""
+
+    __tablename__ = "hr_appointment_order_items"
+    __table_args__ = (
+        UniqueConstraint("order_id", "employee_id", name="uq_hr_appointment_order_items_order_employee"),
+        CheckConstraint(
+            "appointment_kind IN ('permanent', 'temporary')",
+            name="ck_hr_appointment_order_items_kind",
+        ),
+        CheckConstraint(
+            "apply_status IN ('pending', 'applied', 'cancelled')",
+            name="ck_hr_appointment_order_items_apply_status",
+        ),
+        CheckConstraint(
+            "(appointment_kind = 'permanent') OR (appointment_kind = 'temporary' AND end_date IS NOT NULL)",
+            name="ck_hr_appointment_order_items_temporary_end_date",
+        ),
+        Index("ix_hr_appointment_order_items_employee_start", "employee_id", "start_date"),
+        Index("ix_hr_appointment_order_items_order_apply", "order_id", "apply_status"),
+        Index("ix_hr_appointment_order_items_kind", "appointment_kind"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    order_id: int = Field(foreign_key="hr_appointment_orders.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    appointment_code_id: Optional[int] = Field(default=None, foreign_key="app_codes.id")
+    appointment_kind: str = Field(default="permanent", max_length=20)
+    action_type: str = Field(max_length=30)
+    start_date: date = Field(index=True)
+    end_date: Optional[date] = Field(default=None, index=True)
+    from_department_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    to_department_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    from_position_title: Optional[str] = Field(default=None, max_length=80)
+    to_position_title: Optional[str] = Field(default=None, max_length=80)
+    from_employment_status: Optional[str] = Field(default=None, max_length=20)
+    to_employment_status: Optional[str] = Field(default=None, max_length=20)
+    apply_status: str = Field(default="pending", max_length=20)
+    applied_at: Optional[datetime] = None
+    temporary_reason: Optional[str] = Field(default=None, max_length=500)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrPersonnelHistory(SQLModel, table=True):
+    """인사이력 테이블 (THRM151 대응)."""
+
+    __tablename__ = "hr_personnel_histories"
+    __table_args__ = (
+        Index("ix_hr_personnel_histories_employee_effective", "employee_id", "effective_date"),
+        Index("ix_hr_personnel_histories_source", "source_table", "source_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    history_type: str = Field(max_length=30, index=True)
+    source_table: str = Field(max_length=50)
+    source_id: int = Field(index=True)
+    appointment_order_id: Optional[int] = Field(default=None, foreign_key="hr_appointment_orders.id")
+    effective_date: date = Field(index=True)
+    field_name: Optional[str] = Field(default=None, max_length=60)
+    before_value: Optional[str] = Field(default=None, max_length=200)
+    after_value: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class PapFinalResult(SQLModel, table=True):
+    __tablename__ = "PAP_FINAL_RESULTS"
+    __table_args__ = (
+        UniqueConstraint("result_code", name="uq_pap_final_results_code"),
+        Index("ix_pap_final_results_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    result_code: str = Field(max_length=30, index=True)
+    result_name: str = Field(max_length=120)
+    score_grade: Optional[float] = None
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    description: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PapAppraisalMaster(SQLModel, table=True):
+    __tablename__ = "PAP_APPRAISAL_MASTERS"
+    __table_args__ = (
+        UniqueConstraint(
+            "appraisal_year",
+            "appraisal_code",
+            name="uq_pap_appraisal_masters_year_code",
+        ),
+        Index("ix_pap_appraisal_masters_year_active", "appraisal_year", "is_active"),
+        Index("ix_pap_appraisal_masters_final_result_id", "final_result_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    appraisal_code: str = Field(max_length=30, index=True)
+    appraisal_name: str = Field(max_length=120)
+    appraisal_year: int = Field(index=True)
+    final_result_id: Optional[int] = Field(default=None, foreign_key="PAP_FINAL_RESULTS.id")
+    appraisal_type: Optional[str] = Field(default=None, max_length=40)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    description: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "tim_leave_requests"
     __table_args__ = (

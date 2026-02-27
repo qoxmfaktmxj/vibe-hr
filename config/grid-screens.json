@@ -52,10 +52,10 @@
       ],
       "ownerModule": "ORG"
     },
-    "hr.admin.appointments": {
-      "path": "/hr/admin/appointments",
-      "pageFile": "frontend/src/app/hr/admin/appointments/page.tsx",
-      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
+    "hr.appointment.codes": {
+      "path": "/hr/appointment/codes",
+      "pageFile": "frontend/src/app/hr/appointment/codes/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-appointment-code-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -68,6 +68,40 @@
         "download"
       ],
       "ownerModule": "HR"
+    },
+    "hr.appointment.records": {
+      "path": "/hr/appointment/records",
+      "pageFile": "frontend/src/app/hr/appointment/records/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-appointment-record-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "pap.appraisals": {
+      "path": "/pap/appraisals",
+      "pageFile": "frontend/src/app/pap/appraisals/page.tsx",
+      "componentFile": "frontend/src/components/pap/pap-appraisal-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAP"
     },
     "hr.admin.rewards": {
       "path": "/hr/admin/rewards",
