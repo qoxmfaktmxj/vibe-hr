@@ -112,29 +112,38 @@ function hasActiveDescendant(node: MenuNode, currentPath: string): boolean {
   return node.children.some((child) => hasActiveDescendant(child, currentPath));
 }
 
+/** 현재 경로를 포함하는 모든 상위 그룹의 code를 수집한다 */
+function collectActiveCodes(nodes: MenuNode[], currentPath: string, acc: Set<string> = new Set()): Set<string> {
+  for (const node of nodes) {
+    if (node.children.length > 0 && hasActiveDescendant(node, currentPath)) {
+      acc.add(node.code);
+      collectActiveCodes(node.children, currentPath, acc);
+    }
+  }
+  return acc;
+}
+
 function MenuGroupItem({
   node,
   currentPath,
   depth = 0,
-  menuControlVersion,
-  menuControlMode,
+  openCodes,
+  onToggle,
 }: {
   node: MenuNode;
   currentPath: string;
   depth?: number;
-  menuControlVersion: number;
-  menuControlMode: "expand" | "collapse" | null;
+  openCodes: Set<string>;
+  onToggle: (code: string) => void;
 }) {
   const active = hasActiveDescendant(node, currentPath);
-  const [isOpen, setIsOpen] = useState(
-    menuControlMode === "expand" ? true : menuControlMode === "collapse" ? false : active,
-  );
+  const isOpen = openCodes.has(node.code);
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => onToggle(node.code)}
         className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
           active ? "text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
         }`}
@@ -150,12 +159,12 @@ function MenuGroupItem({
           {node.children.map((child) =>
             child.children.length > 0 ? (
               <MenuGroupItem
-                key={`${child.code}-${menuControlVersion}`}
+                key={child.code}
                 node={child}
                 currentPath={currentPath}
                 depth={depth + 1}
-                menuControlVersion={menuControlVersion}
-                menuControlMode={menuControlMode}
+                openCodes={openCodes}
+                onToggle={onToggle}
               />
             ) : (
               <MenuLeafItem
@@ -178,22 +187,43 @@ export function DashboardSidebar() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [menuControlVersion, setMenuControlVersion] = useState(0);
-  const [menuControlMode, setMenuControlMode] = useState<"expand" | "collapse" | null>(null);
+  const [menuExpanded, setMenuExpanded] = useState(true);
 
-  // pathname이 바뀌면(메뉴 클릭 후 이동) menuControlMode를 null로 리셋
-  // → 이전에 전체 접기/펼치기를 눌렀더라도 개별 열림 상태가 active 기준으로 복원됨
-  // pathname이 바뀌면(메뉴 클릭 후 이동) menuControlMode를 null로 리셋하고
-  // version을 올려 MenuGroupItem을 리마운트 → active 기준으로 열림 상태 재계산
+  // 열림 상태를 그룹 code의 Set으로 관리
+  // - 초기값: 현재 경로를 포함하는 상위 그룹들만 열림
+  const [openCodes, setOpenCodes] = useState<Set<string>>(() => collectActiveCodes([], pathname));
+
+  // menus 로드 완료 시 현재 경로의 상위 그룹 열기 (초기 마운트 대응)
+  useEffect(() => {
+    if (menus.length === 0) return;
+    setOpenCodes((prev) => {
+      const active = collectActiveCodes(menus, pathname);
+      // 기존에 사용자가 열어둔 것 + 현재 경로 상위 그룹 합산
+      return new Set([...prev, ...active]);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menus]);
+
+  // pathname 변경 시: 새 경로의 상위 그룹을 추가로 열기 (기존 열린 그룹은 유지)
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    if (prevPathnameRef.current !== pathname) {
-      prevPathnameRef.current = pathname;
-      setMenuControlMode(null);
-      setMenuControlVersion((v) => v + 1);
-    }
-  }, [pathname]);
-  const [menuExpanded, setMenuExpanded] = useState(true);
+    if (prevPathnameRef.current === pathname) return;
+    prevPathnameRef.current = pathname;
+    if (menus.length === 0) return;
+    setOpenCodes((prev) => {
+      const active = collectActiveCodes(menus, pathname);
+      return new Set([...prev, ...active]);
+    });
+  }, [pathname, menus]);
+
+  const toggleGroup = useCallback((code: string) => {
+    setOpenCodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }, []);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileEmployee, setProfileEmployee] = useState<EmployeeItem | null>(null);
@@ -282,11 +312,22 @@ export function DashboardSidebar() {
             className="h-6 w-6"
             onClick={() => {
               if (menuExpanded) {
-                setMenuControlMode("collapse");
+                // 전체 접기: openCodes 비우기
+                setOpenCodes(new Set());
               } else {
-                setMenuControlMode("expand");
+                // 전체 펼치기: 모든 그룹 code 추가
+                const allCodes = new Set<string>();
+                function collectAll(nodes: MenuNode[]) {
+                  for (const n of nodes) {
+                    if (n.children.length > 0) {
+                      allCodes.add(n.code);
+                      collectAll(n.children);
+                    }
+                  }
+                }
+                collectAll(menus);
+                setOpenCodes(allCodes);
               }
-              setMenuControlVersion((prev) => prev + 1);
               setMenuExpanded((prev) => !prev);
             }}
             title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
@@ -300,11 +341,11 @@ export function DashboardSidebar() {
           {menus.map((node) =>
             node.children.length > 0 ? (
               <MenuGroupItem
-                key={`${node.code}-${menuControlVersion}`}
+                key={node.code}
                 node={node}
                 currentPath={pathname}
-                menuControlVersion={menuControlVersion}
-                menuControlMode={menuControlMode}
+                openCodes={openCodes}
+                onToggle={toggleGroup}
               />
             ) : (
               <MenuLeafItem
