@@ -69,7 +69,101 @@ type ProfileCardMeta = {
   mono?: boolean;
 };
 
+type TabColumnLabels = {
+  tableTitle: string;
+  emptyMessage: string;
+  recordDate: string;
+  type: string;
+  title: string;
+  organization: string;
+  value: string;
+  note: string;
+};
+
 const APPOINTMENT_PAGE_SIZE = 5;
+
+const TAB_COLUMN_LABELS: Record<Exclude<TabKey, "basic">, TabColumnLabels> = {
+  appointment: {
+    tableTitle: "발령 이력",
+    emptyMessage: "발령 데이터가 없습니다.",
+    recordDate: "발령일",
+    type: "발령유형",
+    title: "발령명",
+    organization: "발령부서",
+    value: "발령값",
+    note: "비고",
+  },
+  reward: {
+    tableTitle: "상벌 이력",
+    emptyMessage: "상벌 데이터가 없습니다.",
+    recordDate: "조치일",
+    type: "상벌구분",
+    title: "상벌명",
+    organization: "주관부서",
+    value: "금액/점수",
+    note: "비고",
+  },
+  contact: {
+    tableTitle: "주소/연락처 이력",
+    emptyMessage: "주소/연락처 데이터가 없습니다.",
+    recordDate: "유효시작일",
+    type: "연락처유형",
+    title: "주소/연락처",
+    organization: "비상연락인",
+    value: "전화/이메일",
+    note: "비고",
+  },
+  education: {
+    tableTitle: "학력 이력",
+    emptyMessage: "학력 데이터가 없습니다.",
+    recordDate: "졸업(수료)일",
+    type: "학력구분",
+    title: "학교명",
+    organization: "전공",
+    value: "학위/상태",
+    note: "비고",
+  },
+  career: {
+    tableTitle: "경력 이력",
+    emptyMessage: "경력 데이터가 없습니다.",
+    recordDate: "시작일",
+    type: "경력구분",
+    title: "회사명",
+    organization: "부서/직무",
+    value: "종료일/재직여부",
+    note: "비고",
+  },
+  certificate: {
+    tableTitle: "자격증 이력",
+    emptyMessage: "자격증 데이터가 없습니다.",
+    recordDate: "취득일",
+    type: "자격유형",
+    title: "자격명",
+    organization: "발급기관",
+    value: "자격번호/등급",
+    note: "비고",
+  },
+  military: {
+    tableTitle: "병역 이력",
+    emptyMessage: "병역 데이터가 없습니다.",
+    recordDate: "복무시작일",
+    type: "군별/병과",
+    title: "계급",
+    organization: "복무구분",
+    value: "전역일/면제사유",
+    note: "비고",
+  },
+  evaluation: {
+    tableTitle: "평가 이력",
+    emptyMessage: "평가 데이터가 없습니다.",
+    recordDate: "평가일",
+    type: "평가구분",
+    title: "평가항목",
+    organization: "평가기관",
+    value: "평가결과",
+    note: "비고",
+  },
+};
 
 function asInputValue(value?: string | null): string {
   return value ?? "";
@@ -78,6 +172,26 @@ function asInputValue(value?: string | null): string {
 function asNullable(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function stringifyErrorDetail(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.length > 0 ? text : null;
+  }
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => stringifyErrorDetail(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" / ") : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.msg === "string") {
+    const loc = Array.isArray(record.loc) ? record.loc.map((part) => String(part)).join(".") : "";
+    return loc ? `${loc}: ${record.msg}` : record.msg;
+  }
+  return stringifyErrorDetail(record.detail) ?? stringifyErrorDetail(record.message) ?? stringifyErrorDetail(record.error);
 }
 
 function buildProfileDraft(detail: HrBasicDetailResponse | null): BasicProfileDraft {
@@ -112,11 +226,11 @@ function formatDateTime(value: Date): string {
 function toCategory(tab: Exclude<TabKey, "basic">): string {
   return {
     appointment: "appointment",
-    reward: "reward_penalty",
-    contact: "contact",
+    reward: "reward_punish",
+    contact: "contact_points",
     education: "education",
-    career: "career",
-    certificate: "certificate",
+    career: "careers",
+    certificate: "licenses",
     military: "military",
     evaluation: "evaluation",
   }[tab];
@@ -232,6 +346,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   );
 
   const tabRows = activeTab === "basic" ? [] : rowsByTab(detail, activeTab);
+  const activeTabLabels = activeTab === "basic" ? null : TAB_COLUMN_LABELS[activeTab];
 
   const appointmentRows = useMemo(() => rowsByTab(detail, "appointment"), [detail]);
   const appointmentTotalPages = Math.max(1, Math.ceil(appointmentRows.length / APPOINTMENT_PAGE_SIZE));
@@ -283,8 +398,8 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
       });
 
       if (!response.ok) {
-        const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-        toast.error(json?.detail ?? "기본정보 저장에 실패했습니다.");
+        const json = (await response.json().catch(() => null)) as unknown;
+        toast.error(stringifyErrorDetail(json) ?? "기본정보 저장에 실패했습니다.");
         return;
       }
 
@@ -318,11 +433,12 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   }
 
   async function saveRow(rowId: number) {
-    if (!employeeId) return;
+    if (!employeeId || activeTab === "basic") return;
+    const category = toCategory(activeTab);
     const row = draftRows[rowId];
     if (!row) return;
 
-    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, {
+    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}?category=${encodeURIComponent(category)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -343,8 +459,11 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   }
 
   async function removeRecord(row: HrInfoRow) {
-    if (!employeeId) return;
-    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, { method: "DELETE" });
+    if (!employeeId || activeTab === "basic") return;
+    const category = toCategory(activeTab);
+    const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}?category=${encodeURIComponent(category)}`, {
+      method: "DELETE",
+    });
     if (!response.ok) {
       toast.error("삭제에 실패했습니다.");
       return;
@@ -493,7 +612,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
         <Card className="rounded-3xl border-border shadow-sm">
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">발령 이력</CardTitle>
+              <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">{TAB_COLUMN_LABELS.appointment.tableTitle}</CardTitle>
               <p className="mt-1 text-sm text-[color:var(--vibe-nav-text-muted)]">소량 데이터 테이블 모드 (비 AG Grid)</p>
             </div>
             <div className="text-sm font-medium text-[color:var(--vibe-nav-text-muted)]">
@@ -516,12 +635,12 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
                 <thead>
                   <tr className="bg-muted/50 text-xs uppercase tracking-wide text-[color:var(--vibe-nav-text)]">
                     <th className="border-b border-border px-3 py-2 text-center">순번</th>
-                    <th className="border-b border-border px-3 py-2 text-left">일자</th>
-                    <th className="border-b border-border px-3 py-2 text-left">구분</th>
-                    <th className="border-b border-border px-3 py-2 text-left">제목</th>
-                    <th className="border-b border-border px-3 py-2 text-left">소속</th>
-                    <th className="border-b border-border px-3 py-2 text-left">값</th>
-                    <th className="border-b border-border px-3 py-2 text-left">비고</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.recordDate}</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.type}</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.title}</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.organization}</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.value}</th>
+                    <th className="border-b border-border px-3 py-2 text-left">{TAB_COLUMN_LABELS.appointment.note}</th>
                     <th className="border-b border-border px-3 py-2 text-left">작업</th>
                   </tr>
                 </thead>
@@ -529,7 +648,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
                   {appointmentPagedRows.length === 0 ? (
                     <tr>
                       <td className="px-3 py-8 text-center text-[color:var(--vibe-nav-text-muted)]" colSpan={8}>
-                        발령 데이터가 없습니다.
+                        {TAB_COLUMN_LABELS.appointment.emptyMessage}
                       </td>
                     </tr>
                   ) : (
@@ -618,7 +737,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
       ) : (
         <Card className="rounded-3xl border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">이력 관리</CardTitle>
+            <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">{activeTabLabels?.tableTitle ?? "이력 관리"}</CardTitle>
             <div className="mt-2 flex gap-2">
               <Input
                 value={newTitle}
@@ -634,12 +753,12 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr className="text-[color:var(--vibe-nav-text-strong)]">
-                    <th className="px-2 py-2 text-left font-semibold">일자</th>
-                    <th className="px-2 py-2 text-left font-semibold">구분</th>
-                    <th className="px-2 py-2 text-left font-semibold">제목</th>
-                    <th className="px-2 py-2 text-left font-semibold">소속</th>
-                    <th className="px-2 py-2 text-left font-semibold">값</th>
-                    <th className="px-2 py-2 text-left font-semibold">비고</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.recordDate ?? "일자"}</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.type ?? "구분"}</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.title ?? "제목"}</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.organization ?? "소속"}</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.value ?? "값"}</th>
+                    <th className="px-2 py-2 text-left font-semibold">{activeTabLabels?.note ?? "비고"}</th>
                     <th className="px-2 py-2 text-left font-semibold">작업</th>
                   </tr>
                 </thead>
@@ -647,7 +766,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
                   {tabRows.length === 0 ? (
                     <tr>
                       <td className="px-2 py-6 text-center text-[color:var(--vibe-nav-text-muted)]" colSpan={7}>
-                        데이터가 없습니다.
+                        {activeTabLabels?.emptyMessage ?? "데이터가 없습니다."}
                       </td>
                     </tr>
                   ) : (
