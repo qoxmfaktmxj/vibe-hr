@@ -481,6 +481,60 @@ POST /api/v1/wel/loan/interest-generate     → 이자 생성 (월말 배치)
 
 ---
 
+## AG Grid v2 준수 섹션 (필수)
+
+복리후생 모듈에서 `AgGridReact`를 사용하는 모든 화면은 아래를 반드시 준수한다.
+
+### 1) 페이지 메타데이터
+각 페이지 파일(`frontend/src/app/**/page.tsx`)에 다음 메타데이터를 선언한다.
+
+```ts
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "wel.<screen-key>",
+} as const;
+```
+
+- `registryKey`는 `config/grid-screens.json`의 키와 정확히 일치해야 한다.
+
+### 2) 공통 컴포넌트/훅 강제
+다음 공유 모듈을 우선 사용한다.
+
+- 레이아웃/검색: `ManagerPageShell`, `ManagerSearchSection`, `ManagerGridSection`, `SearchFieldGrid`, `SearchTextField`
+- 툴바/배지: `GridToolbarActions`, `GridChangeSummaryBadges`
+- 상태/변경추적: `grid-change-tracker`, `grid-status`, `grid-status-mutations`
+- 페이징: `use-grid-pagination`, `GridPaginationControls`
+
+> 화면별 임의 커스텀 툴바/상태전이/페이징 로직 구현 금지.
+
+### 3) 행 상태 계약(Row Status Contract)
+모든 row 모델은 아래 필드를 포함한다.
+
+- `_status: "clean" | "added" | "updated" | "deleted"`
+- `_original?: Record<string, unknown>`
+- `_prevStatus?: "clean" | "added" | "updated" | "deleted"`
+
+삭제/복구/수정 상태 전이는 공통 mutation 유틸을 사용한다.
+
+### 4) 툴바 순서 고정
+툴바 순서는 아래와 같이 고정한다.
+
+`query -> create -> copy -> template -> upload -> save -> download`
+
+### 5) 레지스트리 등록 의무
+신규/수정 AG Grid 화면은 같은 작업에서 다음을 함께 반영한다.
+
+1. `config/grid-screens.json` 등록/수정
+2. 페이지 `GRID_SCREEN` 메타데이터 선언
+
+### 6) 검증 게이트
+PR/머지 전 반드시 아래를 통과한다.
+
+1. `npm run validate:grid`
+2. `npm run lint`
+3. `npm run build`
+
 ## 완료 기준 (Definition of Done)
 
 - [ ] DB 테이블 생성 (`create_all` 자동 적용)
@@ -488,5 +542,6 @@ POST /api/v1/wel/loan/interest-generate     → 이자 생성 (월말 배치)
 - [ ] Backend API 통합 테스트 (Swagger)
 - [ ] 급여 연동 확인 (승인 후 PaySlipDetail 자동 생성)
 - [ ] Frontend AG Grid 표준 7버튼 적용
+- [ ] `config/grid-screens.json` + 각 page `GRID_SCREEN` 메타데이터 정합성 확인
 - [ ] `npm run validate:grid` 통과
 - [ ] `npm run lint && npm run build` 통과
