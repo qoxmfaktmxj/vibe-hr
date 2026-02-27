@@ -4,7 +4,7 @@ import { requireMenuAccess } from "@/lib/guard";
 
 export const GRID_SCREEN = {
   engine: "ag-grid",
-  profile: "standard-v1",
+  profile: "standard-v2",
   registryKey: "hr.admin.appointments",
 } as const;
 

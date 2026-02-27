@@ -1,8 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Loader2, Search, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -41,12 +41,14 @@ export function ImpersonationPopover() {
         `/api/auth/impersonation/users?query=${encodeURIComponent(searchQuery)}&limit=30`,
         { cache: "no-store" },
       );
+
       const json = (await response.json().catch(() => null)) as CandidateResponse | null;
       if (!response.ok) {
         setUsers([]);
         toast.error(json?.detail ?? "전환 대상 목록을 불러오지 못했습니다.");
         return;
       }
+
       const nextUsers = json?.users ?? [];
       setUsers(nextUsers);
       if (nextUsers.length > 0) {
@@ -64,6 +66,7 @@ export function ImpersonationPopover() {
     const handle = window.setTimeout(() => {
       void loadUsers(query);
     }, 180);
+
     return () => window.clearTimeout(handle);
   }, [loadUsers, open, query]);
 
@@ -76,13 +79,13 @@ export function ImpersonationPopover() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: selectedUserId }),
       });
+
       const json = (await response.json().catch(() => null)) as { detail?: string } | null;
       if (!response.ok) {
         toast.error(json?.detail ?? "전환 로그인에 실패했습니다.");
         return;
       }
 
-      // 계정 전환 시 열려 있던 탭 초기화 (권한 없는 탭 잔존 방지)
       window.localStorage.removeItem("vibe_hr_open_tabs");
 
       await refreshSession();
@@ -99,7 +102,13 @@ export function ImpersonationPopover() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="icon" aria-label="다른 사용자로 로그인" title="다른 사용자로 로그인">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="다른 사용자로 로그인"
+          title="다른 사용자로 로그인"
+        >
           <UsersRound className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>

@@ -3,9 +3,9 @@
 import { Bot, Check, Moon, Palette, Settings2, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { CHATBOT_FAB_EVENT, CHATBOT_FAB_VISIBLE_KEY } from "@/components/layout/chat-assistant-fab";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { CHATBOT_FAB_EVENT, CHATBOT_FAB_VISIBLE_KEY } from "@/components/layout/chat-assistant-fab";
 import { cn } from "@/lib/utils";
 
 type PaletteMode = "default" | "vivid";
@@ -62,6 +62,7 @@ function loadStoredPreference(): ThemePreference | null {
   if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
+
   try {
     const json = JSON.parse(raw) as Partial<ThemePreference>;
     if (!json) return null;
@@ -81,12 +82,8 @@ function loadStoredPreference(): ThemePreference | null {
 
 export function ThemeSettingsPopover() {
   const [open, setOpen] = useState(false);
-  const [applied, setApplied] = useState<ThemePreference>(
-    () => loadStoredPreference() ?? getCurrentPreference(),
-  );
-  const [draft, setDraft] = useState<ThemePreference>(
-    () => loadStoredPreference() ?? getCurrentPreference(),
-  );
+  const [applied, setApplied] = useState<ThemePreference>(() => loadStoredPreference() ?? getCurrentPreference());
+  const [draft, setDraft] = useState<ThemePreference>(() => loadStoredPreference() ?? getCurrentPreference());
 
   useEffect(() => {
     applyThemePreference(applied);

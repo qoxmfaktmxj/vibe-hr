@@ -57,7 +57,7 @@
       "pageFile": "frontend/src/app/hr/admin/appointments/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -74,7 +74,7 @@
       "pageFile": "frontend/src/app/hr/admin/rewards/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -91,7 +91,7 @@
       "pageFile": "frontend/src/app/hr/admin/contacts/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -108,7 +108,7 @@
       "pageFile": "frontend/src/app/hr/admin/educations/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -125,7 +125,7 @@
       "pageFile": "frontend/src/app/hr/admin/careers/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -142,7 +142,7 @@
       "pageFile": "frontend/src/app/hr/admin/certificates/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -159,7 +159,7 @@
       "pageFile": "frontend/src/app/hr/admin/military/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -176,7 +176,7 @@
       "pageFile": "frontend/src/app/hr/admin/evaluations/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",

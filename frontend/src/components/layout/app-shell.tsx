@@ -1,6 +1,7 @@
 "use client";
 
 import { Home, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,9 +12,23 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { useMenu } from "@/components/auth/menu-provider";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { ChatAssistantFab } from "@/components/layout/chat-assistant-fab";
-import { ImpersonationPopover } from "@/components/layout/impersonation-popover";
-import { ThemeSettingsPopover } from "@/components/layout/theme-settings-popover";
 import type { MenuNode } from "@/types/menu";
+
+const ThemeSettingsPopoverNoSsr = dynamic(
+  () => import("@/components/layout/theme-settings-popover").then((mod) => mod.ThemeSettingsPopover),
+  {
+    ssr: false,
+    loading: () => <span className="inline-block h-9 w-9" aria-hidden="true" />,
+  },
+);
+
+const ImpersonationPopoverNoSsr = dynamic(
+  () => import("@/components/layout/impersonation-popover").then((mod) => mod.ImpersonationPopover),
+  {
+    ssr: false,
+    loading: () => <span className="inline-block h-9 w-9" aria-hidden="true" />,
+  },
+);
 
 type AppShellProps = {
   title: string;
@@ -71,7 +86,7 @@ export function AppShell({ title: _title, description: _description, children }:
   const prevUserIdRef = useRef<number | null | undefined>(undefined);
   useEffect(() => {
     const currentId = user?.id ?? null;
-    // undefined → 최초 마운트는 스킵, null/숫자 → 실제 값이 들어온 이후 변경만 감지
+    // undefined => 최초 마운트는 스킵, null/숫자 => 실제 값이 들어온 이후 변경만 감지
     if (prevUserIdRef.current === undefined) {
       prevUserIdRef.current = currentId;
       return;
@@ -145,7 +160,7 @@ export function AppShell({ title: _title, description: _description, children }:
   }, [openTabs, tabsHydrated]);
 
   // 메뉴(권한) 변경 시: 새 메뉴에 없는 탭 자동 제거
-  // - 계정 전환 후 이전 계정의 탭이 남아 경로 문자열 그대로 노출되는 현상 방지
+  // - 계정 전환 후 이전 계정 탭명이 그대로 노출되는 현상 방지
   useEffect(() => {
     if (!tabsHydrated || menus.length === 0) return;
     setStoredTabs((prev) => prev.filter((tab) => findMenuLabel(menus, tab.path) !== null));
@@ -231,10 +246,10 @@ export function AppShell({ title: _title, description: _description, children }:
             </div>
 
             <div className="flex items-center justify-end gap-2">
-              <ThemeSettingsPopover />
-              {/* user 로드 전: 자리 유지(DOM 구조 고정)하여 Radix ID mismatch 방지 */}
+              <ThemeSettingsPopoverNoSsr />
+              {/* user 로드 전 자리 유지 (DOM 구조 고정) */}
               <span className={isAdmin ? undefined : "invisible pointer-events-none"}>
-                <ImpersonationPopover />
+                <ImpersonationPopoverNoSsr />
               </span>
               <LogoutButton />
             </div>
