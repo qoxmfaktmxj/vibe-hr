@@ -36,9 +36,9 @@ type RowStatus = GridRowStatus;
 
 const STATUS_LABELS: Record<RowStatus, string> = {
   clean: "",
-  added: "Added",
-  updated: "Updated",
-  deleted: "Deleted",
+  added: "추가",
+  updated: "수정",
+  deleted: "삭제",
 };
 
 type TraResourceManagerProps = {
@@ -197,7 +197,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
   const copyRows = useCallback(() => {
     const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
     if (selected.length === 0) {
-      toast.error("Select rows to copy.");
+      toast.error("복사할 행을 선택해 주세요.");
       return;
     }
 
@@ -238,7 +238,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       .map((row) => normalizeForApi(row));
 
     if (dirtyRows.length === 0) {
-      toast.info("No changed rows.");
+      toast.info("변경된 행이 없습니다.");
       return;
     }
 
@@ -252,13 +252,13 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       });
       const result = (await response.json().catch(() => null)) as unknown;
       if (!response.ok) {
-        throw new Error(stringifyErrorDetail(result) ?? "Save failed.");
+        throw new Error(stringifyErrorDetail(result) ?? "저장에 실패했습니다.");
       }
       const batch = result as TraResourceBatchResponse;
-      toast.success(`Saved. Added ${batch.created}, Updated ${batch.updated}, Deleted ${batch.deleted}`);
+      toast.success(`저장 완료 (추가 ${batch.created}, 수정 ${batch.updated}, 삭제 ${batch.deleted})`);
       await mutate();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Save failed.");
+      toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
@@ -277,13 +277,13 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       utils.book_append_sheet(book, sheet, "template");
       writeFileXLSX(book, `tra-${config.resource}-template.xlsx`);
     } catch {
-      toast.error("Failed to download template.");
+      toast.error("양식 다운로드에 실패했습니다.");
     }
   }, [config.columns, config.defaultRow, config.resource]);
 
   const downloadCurrentSheet = useCallback(async () => {
     try {
-      const headers = ["Status", ...config.columns.map((column) => column.headerName)];
+      const headers = ["상태", ...config.columns.map((column) => column.headerName)];
       const dataRows = filteredRows.map((row) => [row._status, ...config.columns.map((column) => row[column.field] ?? "")]);
       const { utils, writeFileXLSX } = await import("xlsx");
       const sheet = utils.aoa_to_sheet([headers, ...dataRows]);
@@ -291,7 +291,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       utils.book_append_sheet(book, sheet, "data");
       writeFileXLSX(book, `tra-${config.resource}-${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch {
-      toast.error("Failed to download.");
+      toast.error("다운로드에 실패했습니다.");
     }
   }, [config.columns, config.resource, filteredRows]);
 
@@ -323,14 +323,14 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
         }
 
         if (parsed.length === 0) {
-          toast.error("No valid upload rows.");
+          toast.error("업로드 가능한 행이 없습니다.");
           return;
         }
 
         commitRows((prevRows) => [...parsed, ...prevRows]);
-        toast.success(`Uploaded ${parsed.length} row(s).`);
+        toast.success(`${parsed.length}건 업로드되었습니다.`);
       } catch {
-        toast.error("Upload failed.");
+        toast.error("업로드에 실패했습니다.");
       }
     },
     [commitRows, config.columns, issueTempId],
@@ -380,7 +380,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
 
     return [
       {
-        headerName: "Delete",
+        headerName: "삭제",
         width: 64,
         pinned: "left",
         sortable: false,
@@ -406,7 +406,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       },
       {
         field: "_status",
-        headerName: "Status",
+        headerName: "상태",
         width: 88,
         pinned: "left",
         editable: false,
@@ -434,35 +434,35 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
   const toolbarActions = [
     {
       key: "create",
-      label: "Create",
+      label: "입력",
       icon: Plus,
       onClick: addRow,
       disabled: isLoading || saving,
     },
     {
       key: "copy",
-      label: "Copy",
+      label: "복사",
       icon: Copy,
       onClick: copyRows,
       disabled: isLoading || saving,
     },
     {
       key: "template",
-      label: "Template",
+      label: "양식 다운로드",
       icon: FileDown,
       onClick: () => void downloadTemplate(),
       disabled: isLoading || saving,
     },
     {
       key: "upload",
-      label: "Upload",
+      label: "업로드",
       icon: Upload,
       onClick: () => uploadInputRef.current?.click(),
       disabled: isLoading || saving,
     },
     {
       key: "save",
-      label: saving ? "Saving..." : "Save",
+      label: saving ? "저장중..." : "저장",
       icon: Save,
       onClick: () => void saveAll(),
       disabled: isLoading || saving,
@@ -470,7 +470,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
     },
     {
       key: "download",
-      label: "Download",
+      label: "다운로드",
       icon: Download,
       onClick: () => void downloadCurrentSheet(),
       disabled: isLoading || saving,
@@ -493,7 +493,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title={config.title} onQuery={handleQuery} queryLabel="Query" queryDisabled={isLoading || saving}>
+      <ManagerSearchSection title={config.title} onQuery={handleQuery} queryLabel="조회" queryDisabled={isLoading || saving}>
         <SearchFieldGrid className={config.searchFields.length >= 3 ? "xl:grid-cols-3" : undefined}>
           {config.searchFields.map((searchField) => (
             <SearchTextField
@@ -510,7 +510,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       <ManagerGridSection
         headerLeft={(
           <>
-            <span className="text-xs text-slate-500">Total {filteredRows.length.toLocaleString()} rows</span>
+            <span className="text-xs text-slate-500">총 {filteredRows.length.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
           </>
         )}
@@ -550,7 +550,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
               loading={isLoading}
               headerHeight={36}
               rowHeight={34}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">No data.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-slate-400">데이터가 없습니다.</span>'
             />
           </div>
         </div>
