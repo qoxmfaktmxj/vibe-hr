@@ -80,9 +80,6 @@ jobs:
               touch .env.deploy.secret
             fi
 
-            # 이전 중단/실패 배포에서 남은 stale container reference 정리
-            docker compose -f docker-compose.deploy.yml down --remove-orphans || true
-            docker rm -f vibehr-backend vibehr-frontend 2>/dev/null || true
-
-            docker compose -f docker-compose.deploy.yml up -d --build --force-recreate
+            # 무중단 우선: 먼저 build+up 시도(실패 시 기존 컨테이너 유지)
+            docker compose -f docker-compose.deploy.yml up -d --build --remove-orphans --force-recreate
             docker compose -f docker-compose.deploy.yml ps
