@@ -205,7 +205,6 @@ class HrAppointmentOrder(SQLModel, table=True):
             name="ck_hr_appointment_orders_status",
         ),
         Index("ix_hr_appointment_orders_status_effective", "status", "effective_date"),
-        Index("ix_hr_appointment_orders_effective_date", "effective_date"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
