@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 import random
 import string
 
@@ -58,6 +58,15 @@ from app.models import (
     MngInfraMaster,
     MngInfraConfig,
     WelBenefitType,
+    TraOrganization,
+    TraCourse,
+    TraEvent,
+    TraRequiredRule,
+    TraRequiredTarget,
+    TraApplication,
+    TraHistory,
+    TraElearningWindow,
+    TraCyberUpload,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -158,6 +167,34 @@ WEL_BENEFIT_TYPE_SEEDS = [
     {"code": "RESORT", "name": "리조트", "module_path": "/wel/resort", "is_deduction": False, "pay_item_code": None, "sort_order": 60},
     {"code": "CLUB", "name": "동호회", "module_path": "/wel/club", "is_deduction": True, "pay_item_code": "CLUB_DEDUCT", "sort_order": 70},
     {"code": "HEALTH_CHECK", "name": "건강검진", "module_path": "/wel/health-check", "is_deduction": False, "pay_item_code": None, "sort_order": 80},
+]
+
+TRA_ORGANIZATION_SEEDS = [
+    {"code": "TRORG00001", "name": "Vibe Academy", "business_no": "123-45-67890"},
+    {"code": "TRORG00002", "name": "External Learning Lab", "business_no": "222-22-22222"},
+]
+
+TRA_COURSE_SEEDS = [
+    {
+        "course_code": "TRAC00001",
+        "course_name": "신입사원 필수 온보딩",
+        "in_out_type": "INTERNAL",
+        "method_code": "OFFLINE",
+        "status_code": "open",
+        "mandatory_yn": True,
+        "edu_level": "A",
+        "organization_code": "TRORG00001",
+    },
+    {
+        "course_code": "TRAC00002",
+        "course_name": "직무 심화 이러닝",
+        "in_out_type": "EXTERNAL",
+        "method_code": "ONLINE",
+        "status_code": "open",
+        "mandatory_yn": False,
+        "edu_level": "B",
+        "organization_code": "TRORG00002",
+    },
 ]
 
 HR_RETIRE_CHECKLIST_SEEDS: list[tuple[str, str, bool, int, str]] = [
@@ -428,6 +465,23 @@ MENU_TREE: list[dict] = [
                     {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]}
                 ],
             },
+        ],
+    },
+    {
+        "code": "tra",
+        "name": "교육",
+        "path": None,
+        "icon": "FileText",
+        "sort_order": 600,
+        "roles": ["employee", "hr_manager", "admin"],
+        "children": [
+            {"code": "tra.course-events", "name": "과정/차수 관리", "path": "/tra/course-events", "icon": "ListOrdered", "sort_order": 601, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.applications", "name": "교육신청 관리", "path": "/tra/applications", "icon": "ListOrdered", "sort_order": 602, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.required-standards", "name": "필수교육 기준", "path": "/tra/required-standards", "icon": "ListOrdered", "sort_order": 603, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.required-targets", "name": "필수교육 대상", "path": "/tra/required-targets", "icon": "ListOrdered", "sort_order": 604, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.elearning-windows", "name": "이러닝 기간", "path": "/tra/elearning-windows", "icon": "ListOrdered", "sort_order": 605, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.histories", "name": "교육이력 관리", "path": "/tra/histories", "icon": "ListOrdered", "sort_order": 606, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.cyber-upload", "name": "사이버 업로드 반영", "path": "/tra/cyber-upload", "icon": "ListOrdered", "sort_order": 607, "roles": ["employee", "hr_manager", "admin"]},
         ],
     },
     {
@@ -2444,6 +2498,480 @@ def ensure_wel_benefit_types(session: Session) -> None:
     session.commit()
 
 
+def ensure_tra_seed_data(session: Session) -> None:
+    now_utc = datetime.utcnow()
+
+    organizations = {
+        row.code: row
+        for row in session.exec(select(TraOrganization)).all()
+    }
+    for seed in TRA_ORGANIZATION_SEEDS:
+        row = organizations.get(seed["code"])
+        if row is None:
+            session.add(
+                TraOrganization(
+                    code=seed["code"],
+                    name=seed["name"],
+                    business_no=seed["business_no"],
+                    is_active=True,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        for key in ("name", "business_no"):
+            value = seed[key]
+            if getattr(row, key) != value:
+                setattr(row, key, value)
+                changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    organizations = {
+        row.code: row
+        for row in session.exec(select(TraOrganization)).all()
+    }
+    courses = {
+        row.course_code: row
+        for row in session.exec(select(TraCourse)).all()
+    }
+    for seed in TRA_COURSE_SEEDS:
+        row = courses.get(seed["course_code"])
+        organization_code = seed.get("organization_code")
+        organization = organizations.get(organization_code) if organization_code else None
+        organization_id = organization.id if organization is not None else None
+
+        if row is None:
+            session.add(
+                TraCourse(
+                    course_code=seed["course_code"],
+                    course_name=seed["course_name"],
+                    in_out_type=seed["in_out_type"],
+                    method_code=seed["method_code"],
+                    status_code=seed["status_code"],
+                    organization_id=organization_id,
+                    mandatory_yn=seed["mandatory_yn"],
+                    edu_level=seed["edu_level"],
+                    is_active=True,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        for key in ("course_name", "in_out_type", "method_code", "status_code", "mandatory_yn", "edu_level"):
+            value = seed[key]
+            if getattr(row, key) != value:
+                setattr(row, key, value)
+                changed = True
+        if row.organization_id != organization_id:
+            row.organization_id = organization_id
+            changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    course_rows = session.exec(select(TraCourse).order_by(TraCourse.id)).all()
+    if not course_rows:
+        return
+
+    current_year = date.today().year
+    for idx, course in enumerate(course_rows[:2], start=1):
+        if course.id is None:
+            continue
+        event_code = f"{current_year}{idx:02d}A"
+        start_date = date(current_year, idx, 10)
+        end_date = start_date + timedelta(days=1)
+        row = session.exec(
+            select(TraEvent).where(
+                TraEvent.course_id == course.id,
+                TraEvent.event_code == event_code,
+            )
+        ).first()
+
+        if row is None:
+            session.add(
+                TraEvent(
+                    course_id=course.id,
+                    event_code=event_code,
+                    event_name=f"{course.course_name} {idx}차",
+                    status_code="open",
+                    organization_id=course.organization_id,
+                    place="HQ Training Room",
+                    start_date=start_date,
+                    end_date=end_date,
+                    appl_start_date=start_date - timedelta(days=14),
+                    appl_end_date=start_date - timedelta(days=1),
+                    edu_day=2,
+                    edu_hour=8.0,
+                    max_person=40,
+                    is_active=True,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        expected_name = f"{course.course_name} {idx}차"
+        if row.event_name != expected_name:
+            row.event_name = expected_name
+            changed = True
+        if row.status_code != "open":
+            row.status_code = "open"
+            changed = True
+        if row.organization_id != course.organization_id:
+            row.organization_id = course.organization_id
+            changed = True
+        if row.start_date != start_date:
+            row.start_date = start_date
+            changed = True
+        if row.end_date != end_date:
+            row.end_date = end_date
+            changed = True
+        if row.appl_start_date != start_date - timedelta(days=14):
+            row.appl_start_date = start_date - timedelta(days=14)
+            changed = True
+        if row.appl_end_date != start_date - timedelta(days=1):
+            row.appl_end_date = start_date - timedelta(days=1)
+            changed = True
+        if row.edu_day != 2:
+            row.edu_day = 2
+            changed = True
+        if row.edu_hour != 8.0:
+            row.edu_hour = 8.0
+            changed = True
+        if row.max_person != 40:
+            row.max_person = 40
+            changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    mandatory_courses = [course for course in course_rows if course.id is not None and course.mandatory_yn]
+    for order_seq, course in enumerate(mandatory_courses, start=1):
+        if course.id is None:
+            continue
+        row = session.exec(
+            select(TraRequiredRule).where(
+                TraRequiredRule.year == current_year,
+                TraRequiredRule.rule_code == "MANDATORY",
+                TraRequiredRule.order_seq == order_seq,
+                TraRequiredRule.course_id == course.id,
+            )
+        ).first()
+        if row is None:
+            session.add(
+                TraRequiredRule(
+                    year=current_year,
+                    rule_code="MANDATORY",
+                    order_seq=order_seq,
+                    start_month=1,
+                    end_month=12,
+                    entry_month=1,
+                    course_id=course.id,
+                    edu_level=course.edu_level,
+                    is_active=True,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        if row.start_month != 1:
+            row.start_month = 1
+            changed = True
+        if row.end_month != 12:
+            row.end_month = 12
+            changed = True
+        if row.entry_month != 1:
+            row.entry_month = 1
+            changed = True
+        if row.edu_level != course.edu_level:
+            row.edu_level = course.edu_level
+            changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
+    ).all()
+    if not employees:
+        return
+
+    primary_employee = employees[0]
+    if primary_employee.id is None:
+        return
+
+    primary_course = next((course for course in course_rows if course.id is not None), None)
+    if primary_course is None or primary_course.id is None:
+        return
+
+    primary_event = session.exec(
+        select(TraEvent)
+        .where(TraEvent.course_id == primary_course.id)
+        .order_by(TraEvent.start_date, TraEvent.id)
+    ).first()
+
+    application_no = f"TRA-SEED-{current_year}-0001"
+    application = session.exec(
+        select(TraApplication).where(TraApplication.application_no == application_no)
+    ).first()
+    if application is None:
+        application = TraApplication(
+            application_no=application_no,
+            employee_id=primary_employee.id,
+            course_id=primary_course.id,
+            event_id=primary_event.id if primary_event else None,
+            in_out_type=primary_course.in_out_type,
+            year_plan_yn=True,
+            status="approved",
+            note="Seed application",
+            created_at=now_utc,
+            updated_at=now_utc,
+        )
+        session.add(application)
+        session.flush()
+    else:
+        changed = False
+        if application.employee_id != primary_employee.id:
+            application.employee_id = primary_employee.id
+            changed = True
+        if application.course_id != primary_course.id:
+            application.course_id = primary_course.id
+            changed = True
+        expected_event_id = primary_event.id if primary_event else None
+        if application.event_id != expected_event_id:
+            application.event_id = expected_event_id
+            changed = True
+        if application.status != "approved":
+            application.status = "approved"
+            changed = True
+        if not application.year_plan_yn:
+            application.year_plan_yn = True
+            changed = True
+        if changed:
+            application.updated_at = now_utc
+            session.add(application)
+    session.commit()
+
+    rule = session.exec(
+        select(TraRequiredRule)
+        .where(TraRequiredRule.year == current_year, TraRequiredRule.course_id == primary_course.id)
+        .order_by(TraRequiredRule.id)
+    ).first()
+    edu_month = f"{current_year}01"
+    if rule is not None and rule.id is not None:
+        target = session.exec(
+            select(TraRequiredTarget).where(
+                TraRequiredTarget.year == current_year,
+                TraRequiredTarget.employee_id == primary_employee.id,
+                TraRequiredTarget.rule_code == rule.rule_code,
+                TraRequiredTarget.course_id == primary_course.id,
+                TraRequiredTarget.edu_month == edu_month,
+            )
+        ).first()
+        if target is None:
+            session.add(
+                TraRequiredTarget(
+                    year=current_year,
+                    employee_id=primary_employee.id,
+                    rule_code=rule.rule_code,
+                    course_id=primary_course.id,
+                    edu_month=edu_month,
+                    event_id=primary_event.id if primary_event else None,
+                    application_id=application.id,
+                    standard_rule_id=rule.id,
+                    edu_level=rule.edu_level,
+                    completion_status="pending",
+                    completed_count=0,
+                    note="Seed target",
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+        else:
+            changed = False
+            expected_event_id = primary_event.id if primary_event else None
+            if target.event_id != expected_event_id:
+                target.event_id = expected_event_id
+                changed = True
+            if target.application_id != application.id:
+                target.application_id = application.id
+                changed = True
+            if target.standard_rule_id != rule.id:
+                target.standard_rule_id = rule.id
+                changed = True
+            if target.completion_status != "pending":
+                target.completion_status = "pending"
+                changed = True
+            if changed:
+                target.updated_at = now_utc
+                session.add(target)
+
+    if primary_event is not None and primary_event.id is not None:
+        history = session.exec(
+            select(TraHistory).where(
+                TraHistory.employee_id == primary_employee.id,
+                TraHistory.course_id == primary_course.id,
+                TraHistory.event_id == primary_event.id,
+            )
+        ).first()
+        if history is None:
+            session.add(
+                TraHistory(
+                    employee_id=primary_employee.id,
+                    course_id=primary_course.id,
+                    event_id=primary_event.id,
+                    application_id=application.id,
+                    confirm_type="1",
+                    app_point=8.0,
+                    note="Seed history",
+                    completed_at=primary_event.end_date,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+        else:
+            changed = False
+            if history.application_id != application.id:
+                history.application_id = application.id
+                changed = True
+            if history.confirm_type != "1":
+                history.confirm_type = "1"
+                changed = True
+            if history.app_point != 8.0:
+                history.app_point = 8.0
+                changed = True
+            if history.completed_at != primary_event.end_date:
+                history.completed_at = primary_event.end_date
+                changed = True
+            if changed:
+                history.updated_at = now_utc
+                session.add(history)
+
+    for month in (1, 2):
+        year_month = f"{current_year}{month:02d}"
+        start_date = date(current_year, month, 1)
+        while start_date.weekday() != 0:
+            start_date += timedelta(days=1)
+        end_date = start_date + timedelta(days=4)
+        window = session.exec(
+            select(TraElearningWindow).where(TraElearningWindow.year_month == year_month)
+        ).first()
+        if window is None:
+            session.add(
+                TraElearningWindow(
+                    year_month=year_month,
+                    start_date=start_date,
+                    end_date=end_date,
+                    app_count=2,
+                    note="Seed e-learning window",
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        if window.start_date != start_date:
+            window.start_date = start_date
+            changed = True
+        if window.end_date != end_date:
+            window.end_date = end_date
+            changed = True
+        if window.app_count != 2:
+            window.app_count = 2
+            changed = True
+        if changed:
+            window.updated_at = now_utc
+            session.add(window)
+
+    upload_ym = date.today().strftime("%Y%m")
+    upload = session.exec(
+        select(TraCyberUpload).where(
+            TraCyberUpload.upload_ym == upload_ym,
+            TraCyberUpload.employee_no == primary_employee.employee_no,
+            TraCyberUpload.course_name == primary_course.course_name,
+        )
+    ).first()
+    if upload is None:
+        session.add(
+            TraCyberUpload(
+                upload_ym=upload_ym,
+                employee_no=primary_employee.employee_no,
+                employee_id=primary_employee.id,
+                course_name=primary_course.course_name,
+                start_date=primary_event.start_date if primary_event else None,
+                end_date=primary_event.end_date if primary_event else None,
+                reward_hour=8.0,
+                edu_hour=8.0,
+                labor_apply_yn=False,
+                labor_amount=0.0,
+                per_expense_amount=0.0,
+                real_expense_amount=0.0,
+                confirm_type="1",
+                organization_name="Vibe Academy",
+                mandatory_yn=primary_course.mandatory_yn,
+                in_out_type=primary_course.in_out_type,
+                method_code=primary_course.method_code,
+                edu_level=primary_course.edu_level,
+                event_name=primary_event.event_name if primary_event else None,
+                place=primary_event.place if primary_event else None,
+                close_yn=False,
+                note="Seed cyber upload row",
+                created_at=now_utc,
+                updated_at=now_utc,
+            )
+        )
+    else:
+        changed = False
+        if upload.close_yn:
+            upload.close_yn = False
+            changed = True
+        if upload.employee_id != primary_employee.id:
+            upload.employee_id = primary_employee.id
+            changed = True
+        if upload.event_name != (primary_event.event_name if primary_event else None):
+            upload.event_name = primary_event.event_name if primary_event else None
+            changed = True
+        if upload.start_date != (primary_event.start_date if primary_event else None):
+            upload.start_date = primary_event.start_date if primary_event else None
+            changed = True
+        if upload.end_date != (primary_event.end_date if primary_event else None):
+            upload.end_date = primary_event.end_date if primary_event else None
+            changed = True
+        if changed:
+            upload.updated_at = now_utc
+            session.add(upload)
+
+    session.commit()
+
+
 def ensure_tim_leave_schema(session: Session) -> None:
     # SQLModel create_all은 기존 테이블 컬럼 추가를 보장하지 않으므로, 배포 시 스키마 보정
     session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decision_comment VARCHAR(1000)"))
@@ -2570,4 +3098,5 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_approval_templates(session)
     ensure_hri_form_type_template_maps(session)
     ensure_wel_benefit_types(session)
+    ensure_tra_seed_data(session)
 

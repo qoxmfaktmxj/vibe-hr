@@ -238,6 +238,125 @@
         "download"
       ],
       "ownerModule": "HR"
+    },
+    "tra.course-events": {
+      "path": "/tra/course-events",
+      "pageFile": "frontend/src/app/tra/course-events/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.applications": {
+      "path": "/tra/applications",
+      "pageFile": "frontend/src/app/tra/applications/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.required-standards": {
+      "path": "/tra/required-standards",
+      "pageFile": "frontend/src/app/tra/required-standards/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.required-targets": {
+      "path": "/tra/required-targets",
+      "pageFile": "frontend/src/app/tra/required-targets/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.elearning-windows": {
+      "path": "/tra/elearning-windows",
+      "pageFile": "frontend/src/app/tra/elearning-windows/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.histories": {
+      "path": "/tra/histories",
+      "pageFile": "frontend/src/app/tra/histories/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.cyber-upload": {
+      "path": "/tra/cyber-upload",
+      "pageFile": "frontend/src/app/tra/cyber-upload/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
     }
   }
 }
