@@ -10,7 +10,10 @@ import { Input } from "@/components/ui/input";
 import { MENU_ICON_OPTIONS } from "@/lib/menu-icon-options";
 import { renderMenuIcon } from "@/lib/menu-icon-render";
 
+const LUCIDE_NON_ICON_EXPORTS = new Set(["Icon", "DynamicIcon", "DynamicIconComponent"]);
+
 function isLucideComponentName(name: string): boolean {
+  if (LUCIDE_NON_ICON_EXPORTS.has(name)) return false;
   if (!/^[A-Z][A-Za-z0-9]+$/.test(name)) return false;
   const v = (LucideIcons as Record<string, unknown>)[name];
   const type = typeof v;
