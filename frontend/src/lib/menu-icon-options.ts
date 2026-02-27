@@ -13,7 +13,7 @@ export const MENU_ICON_OPTIONS = [
   "IdCard",
   "Building2",
   "FolderTree",
-  "Sitemap",
+  "Network",
 
   // HR / attendance
   "CalendarCheck2",

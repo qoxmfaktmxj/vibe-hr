@@ -27,7 +27,7 @@ import {
   Server,
   Settings,
   Shield,
-  Sitemap,
+  Network,
   UserCheck,
   UserPlus,
   UserRound,
@@ -61,8 +61,8 @@ export function renderMenuIcon(iconName: string | null | undefined, className: s
       return <Building2 className={className} aria-hidden="true" />;
     case "FolderTree":
       return <FolderTree className={className} aria-hidden="true" />;
-    case "Sitemap":
-      return <Sitemap className={className} aria-hidden="true" />;
+    case "Network":
+      return <Network className={className} aria-hidden="true" />;
     case "CalendarCheck2":
       return <CalendarCheck2 className={className} aria-hidden="true" />;
     case "CalendarDays":

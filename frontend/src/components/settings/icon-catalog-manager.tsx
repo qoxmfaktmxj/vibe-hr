@@ -71,7 +71,10 @@ export function IconCatalogManager() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         {items.map((name) => {
-          const Icon = (LucideIcons as Record<string, ComponentType<{ className?: string; "aria-hidden"?: boolean }>>)[name];
+          const iconEntry = (LucideIcons as unknown as Record<string, unknown>)[name];
+          const Icon = typeof iconEntry === "function"
+            ? (iconEntry as ComponentType<{ className?: string; "aria-hidden"?: boolean }>)
+            : null;
           return (
             <button
               key={name}
@@ -81,7 +84,7 @@ export function IconCatalogManager() {
             >
               {advanced
                 ? Icon
-                  ? <Icon className="h-5 w-5" aria-hidden="true" />
+                  ? <Icon className="h-5 w-5" aria-hidden={true} />
                   : renderMenuIcon(name, "h-5 w-5")
                 : renderMenuIcon(name, "h-5 w-5")}
               <span className="font-mono text-xs">{name}</span>
