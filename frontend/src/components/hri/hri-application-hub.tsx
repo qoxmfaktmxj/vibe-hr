@@ -274,8 +274,12 @@ function FormDetailView({
         <DetailField label="차감" value={minsLabel} />
         <DetailField label="시작일" value={String(data.start_date ?? "-")} />
         <DetailField label="종료일" value={String(data.end_date ?? "-")} />
-        {data.start_time && <DetailField label="시작 시간" value={String(data.start_time)} />}
-        {data.end_time && <DetailField label="종료 시간" value={String(data.end_time)} />}
+        {data.start_time != null && String(data.start_time) !== "" && (
+          <DetailField label="시작 시간" value={String(data.start_time)} />
+        )}
+        {data.end_time != null && String(data.end_time) !== "" && (
+          <DetailField label="종료 시간" value={String(data.end_time)} />
+        )}
         <div className="col-span-2 sm:col-span-3">
           <DetailField label="사유" value={String(data.reason ?? "-")} />
         </div>
