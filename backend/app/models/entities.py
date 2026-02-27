@@ -1097,3 +1097,22 @@ class MngInfraConfig(SQLModel, table=True):
     sort_order: int = Field(default=0)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class WelBenefitType(SQLModel, table=True):
+    __tablename__ = "wel_benefit_types"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_wel_benefit_types_code"),
+        UniqueConstraint("module_path", name="uq_wel_benefit_types_module_path"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(index=True, max_length=40)
+    name: str = Field(max_length=100)
+    module_path: str = Field(max_length=200)
+    is_deduction: bool = Field(default=False)
+    pay_item_code: Optional[str] = Field(default=None, max_length=60)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)

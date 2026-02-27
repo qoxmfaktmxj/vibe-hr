@@ -51,6 +51,7 @@ from app.models.entities import (
     MngOutsourceAttendance,
     MngInfraMaster,
     MngInfraConfig,
+    WelBenefitType,
 )
 
 __all__ = [
@@ -106,5 +107,6 @@ __all__ = [
     "MngOutsourceAttendance",
     "MngInfraMaster",
     "MngInfraConfig",
+    "WelBenefitType",
 ]
 

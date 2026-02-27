@@ -49,6 +49,7 @@ from app.models import (
     MngOutsourceAttendance,
     MngInfraMaster,
     MngInfraConfig,
+    WelBenefitType,
 )
 
 DEV_EMPLOYEE_TOTAL = 2000
@@ -138,6 +139,17 @@ DEPARTMENT_SEEDS = [
     ("HQ-FIN", "\uC7AC\uBB34\uBCF8\uBD80"),
     ("HQ-OPS", "\uC6B4\uC601\uBCF8\uBD80"),
     *[(f"ORG-{index:04d}", f"\uC870\uC9C1{index:02d}") for index in range(1, 46)],
+]
+
+WEL_BENEFIT_TYPE_SEEDS = [
+    {"code": "SCHOLARSHIP", "name": "학자금", "module_path": "/wel/scholarship", "is_deduction": False, "pay_item_code": "SCHOLARSHIP_GRANT", "sort_order": 10},
+    {"code": "CONDOLENCE", "name": "경조금", "module_path": "/wel/condolence", "is_deduction": False, "pay_item_code": "CONDOLENCE_GRANT", "sort_order": 20},
+    {"code": "MEDICAL", "name": "의료비", "module_path": "/wel/medical", "is_deduction": False, "pay_item_code": "MEDICAL_GRANT", "sort_order": 30},
+    {"code": "LOAN", "name": "사내대출", "module_path": "/wel/loan", "is_deduction": True, "pay_item_code": "LOAN_REPAY", "sort_order": 40},
+    {"code": "PENSION", "name": "개인연금", "module_path": "/wel/pension", "is_deduction": True, "pay_item_code": "PENSION_DEDUCT", "sort_order": 50},
+    {"code": "RESORT", "name": "리조트", "module_path": "/wel/resort", "is_deduction": False, "pay_item_code": None, "sort_order": 60},
+    {"code": "CLUB", "name": "동호회", "module_path": "/wel/club", "is_deduction": True, "pay_item_code": "CLUB_DEDUCT", "sort_order": 70},
+    {"code": "HEALTH_CHECK", "name": "건강검진", "module_path": "/wel/health-check", "is_deduction": False, "pay_item_code": None, "sort_order": 80},
 ]
 
 MENU_TREE: list[dict] = [
@@ -1757,6 +1769,45 @@ def ensure_pay_tax_rates(session: Session) -> None:
     session.commit()
 
 
+def ensure_wel_benefit_types(session: Session) -> None:
+    existing = {
+        row.code: row
+        for row in session.exec(select(WelBenefitType)).all()
+    }
+
+    for seed in WEL_BENEFIT_TYPE_SEEDS:
+        row = existing.get(seed["code"])
+        if row is None:
+            session.add(
+                WelBenefitType(
+                    code=seed["code"],
+                    name=seed["name"],
+                    module_path=seed["module_path"],
+                    is_deduction=seed["is_deduction"],
+                    pay_item_code=seed["pay_item_code"],
+                    is_active=True,
+                    sort_order=seed["sort_order"],
+                )
+            )
+            continue
+
+        changed = False
+        for key in ("name", "module_path", "is_deduction", "pay_item_code", "sort_order"):
+            value = seed[key]
+            if getattr(row, key) != value:
+                setattr(row, key, value)
+                changed = True
+
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+
+        if changed:
+            session.add(row)
+
+    session.commit()
+
+
 def ensure_tim_leave_schema(session: Session) -> None:
     # SQLModel create_all은 기존 테이블 컬럼 추가를 보장하지 않으므로, 배포 시 스키마 보정
     session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decision_comment VARCHAR(1000)"))
@@ -1832,3 +1883,4 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_approval_actor_rules(session)
     ensure_hri_approval_templates(session)
     ensure_hri_form_type_template_maps(session)
+    ensure_wel_benefit_types(session)
