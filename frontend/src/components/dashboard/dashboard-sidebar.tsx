@@ -25,7 +25,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -180,6 +180,19 @@ export function DashboardSidebar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuControlVersion, setMenuControlVersion] = useState(0);
   const [menuControlMode, setMenuControlMode] = useState<"expand" | "collapse" | null>(null);
+
+  // pathname이 바뀌면(메뉴 클릭 후 이동) menuControlMode를 null로 리셋
+  // → 이전에 전체 접기/펼치기를 눌렀더라도 개별 열림 상태가 active 기준으로 복원됨
+  // pathname이 바뀌면(메뉴 클릭 후 이동) menuControlMode를 null로 리셋하고
+  // version을 올려 MenuGroupItem을 리마운트 → active 기준으로 열림 상태 재계산
+  const prevPathnameRef = useRef(pathname);
+  useEffect(() => {
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      setMenuControlMode(null);
+      setMenuControlVersion((v) => v + 1);
+    }
+  }, [pathname]);
   const [menuExpanded, setMenuExpanded] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
