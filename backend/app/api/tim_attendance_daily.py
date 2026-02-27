@@ -1,11 +1,12 @@
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
-from app.core.time_utils import business_today
+from app.core.time_utils import APP_TZ, business_today
 from app.models import AuthUser, HrEmployee, TimEmployeeDailySchedule, TimHoliday, TimSchedulePattern, TimWorkScheduleCode
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionListResponse,
@@ -112,9 +113,19 @@ def attendance_today_schedule(
     if daily is not None:
         day_type = "holiday" if daily.is_holiday else ("workday" if daily.is_workday else "weekend")
 
+    def _fmt_kst(dt: datetime) -> str:
+        """datetime → KST HH:MM 문자열.
+        - UTC aware: UTC → KST 변환 후 포맷
+        - naive (구 데이터): KST 로 간주하여 그대로 포맷
+        """
+        if dt.tzinfo is None:
+            return dt.strftime("%H:%M")
+        return dt.astimezone(APP_TZ).strftime("%H:%M")
+
     attendance = get_today_attendance(session, target_employee_id)
-    work_start = daily.planned_start_at.strftime("%H:%M") if daily and daily.planned_start_at else default_schedule.work_start
-    work_end = daily.planned_end_at.strftime("%H:%M") if daily and daily.planned_end_at else default_schedule.work_end
+    # planned_start_at/planned_end_at 은 UTC aware datetime 으로 저장됨 → 표시 시 KST 변환
+    work_start = _fmt_kst(daily.planned_start_at) if daily and daily.planned_start_at else default_schedule.work_start
+    work_end = _fmt_kst(daily.planned_end_at) if daily and daily.planned_end_at else default_schedule.work_end
     schedule = TimTodayScheduleItem(
         work_date=today,
         day_type=day_type,
@@ -134,10 +145,23 @@ def attendance_today_schedule(
 
     planned_start = daily.planned_start_at if daily else None
     planned_end = daily.planned_end_at if daily else None
+
+    def _to_utc_aware(dt: datetime | None) -> datetime | None:
+        """naive datetime 이면 KST 로 가정하여 UTC aware 로 변환, 이미 aware 면 UTC 로 변환."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=APP_TZ).astimezone(ZoneInfo("UTC"))
+        return dt.astimezone(ZoneInfo("UTC"))
+
     if attendance and attendance.check_in_at and planned_start:
-        is_late = attendance.check_in_at > planned_start
+        check_in_utc = _to_utc_aware(attendance.check_in_at)
+        planned_start_utc = _to_utc_aware(planned_start)
+        is_late = check_in_utc > planned_start_utc
     if attendance and attendance.check_out_at and planned_end:
-        overtime_minutes = max(int((attendance.check_out_at - planned_end).total_seconds() // 60), 0)
+        check_out_utc = _to_utc_aware(attendance.check_out_at)
+        planned_end_utc = _to_utc_aware(planned_end)
+        overtime_minutes = max(int((check_out_utc - planned_end_utc).total_seconds() // 60), 0)
     if attendance and attendance.check_in_at and (day_type in {"weekend", "holiday"}):
         is_weekend_work = True
 

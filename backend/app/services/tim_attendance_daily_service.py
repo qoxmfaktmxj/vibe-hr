@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
 from app.core.auth import get_user_role_codes
 from app.core.pagination import calc_total_pages, count_query
-from app.core.time_utils import business_today, now_utc
+from app.core.time_utils import APP_TZ, business_today, now_utc
 from app.models import AuthUser, HrAttendanceDaily, HrEmployee, OrgDepartment, TimAttendanceCorrection, TimEmployeeDailySchedule
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionItem,
@@ -155,7 +156,11 @@ def check_in(session: Session, employee_id: int) -> TimAttendanceDailyItem:
 
     is_late = False
     if daily_schedule and daily_schedule.planned_start_at:
-        is_late = now > daily_schedule.planned_start_at
+        planned = daily_schedule.planned_start_at
+        # DB 에 naive datetime 이 남아 있으면 KST 로 가정하여 UTC aware 로 변환
+        if planned.tzinfo is None:
+            planned = planned.replace(tzinfo=APP_TZ).astimezone(ZoneInfo("UTC"))
+        is_late = now > planned
 
     row = session.exec(select(HrAttendanceDaily).where(HrAttendanceDaily.employee_id == employee_id, HrAttendanceDaily.work_date == today)).first()
     if row is None:

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 from sqlmodel import Session, select
 
-from app.core.time_utils import business_today
+from app.core.time_utils import APP_TZ, business_today
 
 from app.models import (
     HrEmployee,
@@ -26,6 +27,18 @@ from app.schemas.tim_schedule import (
 )
 
 
+def _fmt_kst(dt: datetime) -> str:
+    """datetime 을 KST HH:MM 문자열로 변환한다.
+
+    - UTC aware datetime: UTC → KST 변환 후 포맷
+    - naive datetime (구 데이터 호환): KST 로 가정하여 그대로 포맷
+    """
+    if dt.tzinfo is None:
+        # 구 방식으로 저장된 naive datetime: KST 로 간주
+        return dt.strftime("%H:%M")
+    return dt.astimezone(APP_TZ).strftime("%H:%M")
+
+
 def _in_range(target: date, start: date, end: date | None) -> bool:
     if target < start:
         return False
@@ -35,10 +48,18 @@ def _in_range(target: date, start: date, end: date | None) -> bool:
 
 
 def _to_datetime(work_date: date, hhmm: str | None) -> datetime | None:
+    """KST 기준 HH:MM 문자열을 UTC aware datetime으로 변환한다.
+
+    planned_start_at/planned_end_at 은 DB 의 다른 타임스탬프(check_in_at 등)와
+    동일하게 UTC aware 로 저장하여 비교 시 timezone 불일치를 방지한다.
+    """
     if not hhmm:
         return None
     h, m = hhmm.split(":")
-    return datetime.combine(work_date, time(int(h), int(m)))
+    # 1) KST aware datetime 생성
+    kst_dt = datetime.combine(work_date, time(int(h), int(m)), tzinfo=APP_TZ)
+    # 2) UTC 로 변환하여 반환
+    return kst_dt.astimezone(ZoneInfo("UTC"))
 
 
 def _resolve_assignment(session: Session, employee: HrEmployee, work_date: date):
@@ -178,8 +199,8 @@ def get_my_today_schedule(session: Session, employee_id: int) -> TimScheduleToda
         schedule_source=row.schedule_source if row else "company_default",
         pattern_code=pattern.code if pattern else None,
         pattern_name=pattern.name if pattern else None,
-        work_start=row.planned_start_at.strftime("%H:%M") if row and row.planned_start_at else None,
-        work_end=row.planned_end_at.strftime("%H:%M") if row and row.planned_end_at else None,
+        work_start=_fmt_kst(row.planned_start_at) if row and row.planned_start_at else None,
+        work_end=_fmt_kst(row.planned_end_at) if row and row.planned_end_at else None,
         break_minutes=row.break_minutes if row else 60,
         expected_minutes=row.expected_minutes if row else 0,
         is_holiday=row.is_holiday if row else False,
