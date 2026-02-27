@@ -89,18 +89,6 @@ function isRevertedToOriginal(row: AdminGridRow): boolean {
   return isRowRevertedToOriginal(row, TRACKED_FIELDS);
 }
 
-function matchesEmployeeFilters(employee: EmployeeItem, filters: SearchFilters): boolean {
-  const employeeNo = filters.employeeNo.trim().toLowerCase();
-  const name = filters.name.trim().toLowerCase();
-  const department = filters.department.trim().toLowerCase();
-
-  if (employeeNo && !employee.employee_no.toLowerCase().includes(employeeNo)) return false;
-  if (name && !employee.display_name.toLowerCase().includes(name)) return false;
-  if (department && !employee.department_name.toLowerCase().includes(department)) return false;
-  if (filters.employmentStatus && employee.employment_status !== filters.employmentStatus) return false;
-  return true;
-}
-
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
   const json = (await response.json().catch(() => null)) as unknown;
   return stringifyErrorDetail(json) ?? fallback;
@@ -164,11 +152,6 @@ export function HrAdminRecordManager({ category, title }: Props) {
     }
     return map;
   }, [employees]);
-
-  const filteredEmployees = useMemo(
-    () => employees.filter((employee) => matchesEmployeeFilters(employee, appliedFilters)),
-    [appliedFilters, employees],
-  );
 
   const departmentOptions = useMemo(() => {
     const options = new Set<string>();
@@ -770,14 +753,6 @@ export function HrAdminRecordManager({ category, title }: Props) {
       <ManagerGridSection
         headerLeft={(
           <>
-            <span className="text-xs text-slate-400">
-              조회 대상 {filteredEmployees.length.toLocaleString()}명 / 레코드 {rows.length.toLocaleString()}건 · {page} / {totalPages}페이지
-            </span>
-            <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
-          </>
-        )}
-        headerRight={(
-          <>
             <GridPaginationControls
               page={page}
               totalPages={totalPages}
@@ -789,6 +764,12 @@ export function HrAdminRecordManager({ category, title }: Props) {
               disabled={loading || saving}
               className="mt-0 justify-start"
             />
+            <span className="text-xs text-slate-500">총 {rows.length.toLocaleString()}건</span>
+            <GridChangeSummaryBadges summary={changeSummary} />
+          </>
+        )}
+        headerRight={(
+          <>
             <GridToolbarActions actions={toolbarActions} />
             <input
               ref={uploadInputRef}
