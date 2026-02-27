@@ -4,26 +4,17 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   Building2,
-  Calculator,
-  CalendarCheck2,
   CalendarDays,
   ChevronDown,
   IdCard,
   Clock,
   Minus,
   Plus,
-  FileText,
-  FolderTree,
-  LayoutDashboard,
-  ListOrdered,
   Mail,
-  Menu,
   PanelLeft,
   Settings,
   Shield,
   UserRound,
-  UsersRound,
-  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -35,44 +26,12 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { renderMenuIcon } from "@/lib/menu-icon-render";
 import type { EmployeeItem } from "@/types/employee";
 import type { MenuNode } from "@/types/menu";
 
 function renderIcon(iconName: string | null, className: string) {
-  switch (iconName) {
-    case "UsersRound":
-      return <UsersRound className={className} aria-hidden="true" />;
-    case "UserRound":
-      return <UserRound className={className} aria-hidden="true" />;
-    case "Clock":
-      return <Clock className={className} aria-hidden="true" />;
-    case "CalendarCheck2":
-      return <CalendarCheck2 className={className} aria-hidden="true" />;
-    case "CalendarDays":
-      return <CalendarDays className={className} aria-hidden="true" />;
-    case "Wallet":
-      return <Wallet className={className} aria-hidden="true" />;
-    case "Calculator":
-      return <Calculator className={className} aria-hidden="true" />;
-    case "FileText":
-      return <FileText className={className} aria-hidden="true" />;
-    case "Building2":
-      return <Building2 className={className} aria-hidden="true" />;
-    case "FolderTree":
-      return <FolderTree className={className} aria-hidden="true" />;
-    case "Settings":
-      return <Settings className={className} aria-hidden="true" />;
-    case "Shield":
-      return <Shield className={className} aria-hidden="true" />;
-    case "Menu":
-      return <Menu className={className} aria-hidden="true" />;
-    case "ListOrdered":
-      return <ListOrdered className={className} aria-hidden="true" />;
-    case "PanelLeft":
-      return <PanelLeft className={className} aria-hidden="true" />;
-    default:
-      return <LayoutDashboard className={className} aria-hidden="true" />;
-  }
+  return renderMenuIcon(iconName, className);
 }
 
 function getInitials(name: string): string {

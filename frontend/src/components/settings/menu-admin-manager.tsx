@@ -1,25 +1,5 @@
 "use client";
 
-import {
-  BriefcaseBusiness,
-  Building2,
-  Calculator,
-  CalendarCheck2,
-  CalendarDays,
-  Clock,
-  FileText,
-  FolderTree,
-  LayoutDashboard,
-  ListOrdered,
-  Mail,
-  Menu,
-  PanelLeft,
-  Settings,
-  Shield,
-  UserRound,
-  UsersRound,
-  Wallet,
-} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -27,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MENU_ICON_OPTIONS } from "@/lib/menu-icon-options";
+import { normalizeMenuIconName, MENU_ICON_OPTIONS } from "@/lib/menu-icon-options";
+import { renderMenuIcon } from "@/lib/menu-icon-render";
 import type { MenuAdminItem, RoleItem } from "@/types/menu-admin";
 
 type FlatMenu = {
@@ -56,56 +37,6 @@ const initialForm: MenuFormState = {
   sort_order: "0",
   is_active: true,
 };
-
-function renderMenuIcon(iconName: string, className: string) {
-  switch (iconName) {
-    case "Briefcase":
-    case "Code":
-      return <BriefcaseBusiness className={className} aria-hidden="true" />;
-    case "Building":
-    case "Building2":
-      return <Building2 className={className} aria-hidden="true" />;
-    case "Calculator":
-      return <Calculator className={className} aria-hidden="true" />;
-    case "CalendarCheck":
-    case "CalendarCheck2":
-      return <CalendarCheck2 className={className} aria-hidden="true" />;
-    case "CalendarDays":
-      return <CalendarDays className={className} aria-hidden="true" />;
-    case "Clock":
-      return <Clock className={className} aria-hidden="true" />;
-    case "FileText":
-      return <FileText className={className} aria-hidden="true" />;
-    case "FolderKanban":
-    case "FolderTree":
-      return <FolderTree className={className} aria-hidden="true" />;
-    case "ListOrdered":
-    case "ListPlus":
-      return <ListOrdered className={className} aria-hidden="true" />;
-    case "Menu":
-      return <Menu className={className} aria-hidden="true" />;
-    case "MessageSquare":
-      return <Mail className={className} aria-hidden="true" />;
-    case "PanelLeft":
-      return <PanelLeft className={className} aria-hidden="true" />;
-    case "Server":
-    case "Settings":
-      return <Settings className={className} aria-hidden="true" />;
-    case "Shield":
-      return <Shield className={className} aria-hidden="true" />;
-    case "UserCheck":
-    case "Users":
-    case "UsersRound":
-      return <UsersRound className={className} aria-hidden="true" />;
-    case "UserPlus":
-    case "UserRound":
-      return <UserRound className={className} aria-hidden="true" />;
-    case "Wallet":
-      return <Wallet className={className} aria-hidden="true" />;
-    default:
-      return <LayoutDashboard className={className} aria-hidden="true" />;
-  }
-}
 
 function flattenMenus(nodes: MenuAdminItem[], depth = 0): FlatMenu[] {
   return nodes.flatMap((node) => [
@@ -230,7 +161,7 @@ export function MenuAdminManager() {
       name: selectedMenu.name,
       parent_id: selectedMenu.parent_id ? String(selectedMenu.parent_id) : "",
       path: selectedMenu.path ?? "",
-      icon: selectedMenu.icon ?? "",
+      icon: normalizeMenuIconName(selectedMenu.icon) ?? "",
       sort_order: String(selectedMenu.sort_order),
       is_active: selectedMenu.is_active,
     });
@@ -248,7 +179,7 @@ export function MenuAdminManager() {
           name: form.name,
           parent_id: form.parent_id ? Number(form.parent_id) : null,
           path: form.path || null,
-          icon: form.icon || null,
+          icon: normalizeMenuIconName(form.icon),
           sort_order: Number(form.sort_order),
           is_active: form.is_active,
         }),
@@ -281,7 +212,7 @@ export function MenuAdminManager() {
           name: form.name,
           parent_id: form.parent_id ? Number(form.parent_id) : null,
           path: form.path || null,
-          icon: form.icon || null,
+          icon: normalizeMenuIconName(form.icon),
           sort_order: Number(form.sort_order),
           is_active: form.is_active,
         }),
