@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import { type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GridStandardToolbar } from "@/components/grid/grid-standard-toolbar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fetcher } from "@/lib/fetcher";
 import type {
   CodeDetailResponse,
   CodeGroupDetailResponse,
@@ -18,8 +22,6 @@ import type {
   CodeItem,
   CodeListResponse,
 } from "@/types/common-code";
-
-// AG Grid modules are provided globally via <AgGridProvider>.
 
 const T = {
   loading: "공통코드를 불러오는 중...",
@@ -54,10 +56,13 @@ const EMPTY_CODE = {
   extra_value2: "",
 };
 
+type DeleteTarget =
+  | { kind: "group"; groupId: number }
+  | { kind: "code"; groupId: number; codeId: number }
+  | null;
+
 export function CommonCodeManager() {
-  const [groups, setGroups] = useState<CodeGroupItem[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const [codes, setCodes] = useState<CodeItem[]>([]);
   const [selectedCodeId, setSelectedCodeId] = useState<number | null>(null);
 
   const [groupForm, setGroupForm] = useState(EMPTY_GROUP);
@@ -67,17 +72,44 @@ export function CommonCodeManager() {
   const [codeCreateMode, setCodeCreateMode] = useState(false);
 
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [noticeType, setNoticeType] = useState<"success" | "error" | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   const [groupCodeQuery, setGroupCodeQuery] = useState("");
   const [groupNameQuery, setGroupNameQuery] = useState("");
   const [detailCodeQuery, setDetailCodeQuery] = useState("");
   const [detailNameQuery, setDetailNameQuery] = useState("");
 
+  const groupCodeQueryD = useDeferredValue(groupCodeQuery);
+  const groupNameQueryD = useDeferredValue(groupNameQuery);
+  const detailCodeQueryD = useDeferredValue(detailCodeQuery);
+  const detailNameQueryD = useDeferredValue(detailNameQuery);
+
   const groupGridApiRef = useRef<GridApi<CodeGroupItem> | null>(null);
   const codeGridApiRef = useRef<GridApi<CodeItem> | null>(null);
+
+  const {
+    data: groupData,
+    error: groupError,
+    isLoading: groupLoading,
+    mutate: mutateGroups,
+  } = useSWR<CodeGroupListResponse>("/api/codes/groups", fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const groups = groupData?.groups ?? [];
+
+  const {
+    data: codeData,
+    error: codeError,
+    isLoading: codeLoading,
+    mutate: mutateCodes,
+  } = useSWR<CodeListResponse>(
+    selectedGroupId ? `/api/codes/groups/${selectedGroupId}/items` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const codes = codeData?.codes ?? [];
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
@@ -90,24 +122,24 @@ export function CommonCodeManager() {
   );
 
   const filteredGroups = useMemo(() => {
-    const codeQuery = groupCodeQuery.trim().toLowerCase();
-    const nameQuery = groupNameQuery.trim().toLowerCase();
+    const codeQuery = groupCodeQueryD.trim().toLowerCase();
+    const nameQuery = groupNameQueryD.trim().toLowerCase();
     return groups.filter((group) => {
       const byCode = !codeQuery || group.code.toLowerCase().includes(codeQuery);
       const byName = !nameQuery || group.name.toLowerCase().includes(nameQuery);
       return byCode && byName;
     });
-  }, [groupCodeQuery, groupNameQuery, groups]);
+  }, [groupCodeQueryD, groupNameQueryD, groups]);
 
   const filteredCodes = useMemo(() => {
-    const codeQuery = detailCodeQuery.trim().toLowerCase();
-    const nameQuery = detailNameQuery.trim().toLowerCase();
+    const codeQuery = detailCodeQueryD.trim().toLowerCase();
+    const nameQuery = detailNameQueryD.trim().toLowerCase();
     return codes.filter((code) => {
       const byCode = !codeQuery || code.code.toLowerCase().includes(codeQuery);
       const byName = !nameQuery || code.name.toLowerCase().includes(nameQuery);
       return byCode && byName;
     });
-  }, [codes, detailCodeQuery, detailNameQuery]);
+  }, [codes, detailCodeQueryD, detailNameQueryD]);
 
   const groupColumns: ColDef<CodeGroupItem>[] = [
     { field: "code", headerName: "그룹코드", flex: 1, minWidth: 140 },
@@ -127,46 +159,27 @@ export function CommonCodeManager() {
     { field: "is_active", headerName: "사용", width: 90, valueFormatter: (p) => (p.value ? "Y" : "N") },
   ];
 
-  async function loadGroups() {
-    const res = await fetch("/api/codes/groups", { cache: "no-store" });
-    if (!res.ok) throw new Error(T.loadGroupsError);
-    const data = (await res.json()) as CodeGroupListResponse;
-    setGroups(data.groups);
-    setSelectedGroupId((prev) => prev ?? data.groups[0]?.id ?? null);
-  }
-
-  async function loadCodes(groupId: number) {
-    const res = await fetch(`/api/codes/groups/${groupId}/items`, { cache: "no-store" });
-    if (!res.ok) {
-      setCodes([]);
-      setSelectedCodeId(null);
-      return;
-    }
-    const data = (await res.json()) as CodeListResponse;
-    setCodes(data.codes);
-    setSelectedCodeId((prev) => prev ?? data.codes[0]?.id ?? null);
-  }
-
   useEffect(() => {
-    void (async () => {
-      try {
-        await loadGroups();
-      } catch (error) {
-        setNoticeType("error");
-        setNotice(error instanceof Error ? error.message : T.initLoadError);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
+    if (groupCreateMode) return;
     if (!selectedGroupId) {
-      setCodes([]);
+      setSelectedGroupId(groups[0]?.id ?? null);
       return;
     }
-    void loadCodes(selectedGroupId);
-  }, [selectedGroupId]);
+    if (!groups.some((g) => g.id === selectedGroupId)) {
+      setSelectedGroupId(groups[0]?.id ?? null);
+    }
+  }, [groups, selectedGroupId, groupCreateMode]);
+
+  useEffect(() => {
+    if (codeCreateMode) return;
+    if (!selectedCodeId) {
+      setSelectedCodeId(codes[0]?.id ?? null);
+      return;
+    }
+    if (!codes.some((c) => c.id === selectedCodeId)) {
+      setSelectedCodeId(codes[0]?.id ?? null);
+    }
+  }, [codes, selectedCodeId, codeCreateMode]);
 
   useEffect(() => {
     if (groupCreateMode) {
@@ -230,7 +243,6 @@ export function CommonCodeManager() {
 
   async function saveGroup() {
     setSaving(true);
-    setNotice(null);
     try {
       const payload = {
         code: groupForm.code.trim(),
@@ -249,39 +261,31 @@ export function CommonCodeManager() {
       const data = (await res.json().catch(() => null)) as CodeGroupDetailResponse | { detail?: string } | null;
       if (!res.ok) throw new Error((data as { detail?: string } | null)?.detail ?? T.saveFailed);
 
-      await loadGroups();
+      await mutateGroups();
       if (data && "group" in data) setSelectedGroupId(data.group.id);
       setGroupCreateMode(false);
-      setNoticeType("success");
-      setNotice(T.groupSaved);
+      toast.success(T.groupSaved);
     } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : T.saveFailed);
+      toast.error(error instanceof Error ? error.message : T.saveFailed);
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteGroup() {
-    if (!selectedGroupId || groupCreateMode) return;
-    if (!confirm(T.askDeleteGroup)) return;
-
+  async function doDeleteGroup(groupId: number) {
     setSaving(true);
-    setNotice(null);
     try {
-      const res = await fetch(`/api/codes/groups/${selectedGroupId}`, { method: "DELETE" });
+      const res = await fetch(`/api/codes/groups/${groupId}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
         throw new Error(data?.detail ?? T.deleteFailed);
       }
-      await loadGroups();
+      await mutateGroups();
       setSelectedGroupId(null);
-      setCodes([]);
-      setNoticeType("success");
-      setNotice(T.groupDeleted);
+      setSelectedCodeId(null);
+      toast.success(T.groupDeleted);
     } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : T.deleteFailed);
+      toast.error(error instanceof Error ? error.message : T.deleteFailed);
     } finally {
       setSaving(false);
     }
@@ -290,7 +294,6 @@ export function CommonCodeManager() {
   async function saveCode() {
     if (!selectedGroupId) return;
     setSaving(true);
-    setNotice(null);
     try {
       const payload = {
         code: codeForm.code.trim(),
@@ -315,59 +318,48 @@ export function CommonCodeManager() {
       const data = (await res.json().catch(() => null)) as CodeDetailResponse | { detail?: string } | null;
       if (!res.ok) throw new Error((data as { detail?: string } | null)?.detail ?? T.saveFailed);
 
-      await loadCodes(selectedGroupId);
+      await mutateCodes();
       if (data && "code" in data) setSelectedCodeId(data.code.id);
       setCodeCreateMode(false);
-      setNoticeType("success");
-      setNotice(T.codeSaved);
+      toast.success(T.codeSaved);
     } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : T.saveFailed);
+      toast.error(error instanceof Error ? error.message : T.saveFailed);
     } finally {
       setSaving(false);
     }
   }
 
-  async function deleteCode() {
-    if (!selectedGroupId || !selectedCodeId || codeCreateMode) return;
-    if (!confirm(T.askDeleteCode)) return;
-
+  async function doDeleteCode(groupId: number, codeId: number) {
     setSaving(true);
-    setNotice(null);
     try {
-      const res = await fetch(`/api/codes/groups/${selectedGroupId}/items/${selectedCodeId}`, { method: "DELETE" });
+      const res = await fetch(`/api/codes/groups/${groupId}/items/${codeId}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { detail?: string } | null;
         throw new Error(data?.detail ?? T.deleteFailed);
       }
-      await loadCodes(selectedGroupId);
+      await mutateCodes();
       setSelectedCodeId(null);
-      setNoticeType("success");
-      setNotice(T.codeDeleted);
+      toast.success(T.codeDeleted);
     } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : T.deleteFailed);
+      toast.error(error instanceof Error ? error.message : T.deleteFailed);
     } finally {
       setSaving(false);
     }
   }
 
   const handleTemplateDownload = () => {
-    setNoticeType("success");
-    setNotice("양식다운로드는 다음 단계에서 화면별 xlsx 템플릿으로 연결합니다.");
+    toast.success("양식다운로드는 다음 단계에서 화면별 xlsx 템플릿으로 연결합니다.");
   };
 
   const handleUpload = () => {
-    setNoticeType("success");
-    setNotice("업로드는 다음 단계에서 표준 템플릿 매핑으로 연결합니다.");
+    toast.success("업로드는 다음 단계에서 표준 템플릿 매핑으로 연결합니다.");
   };
 
-  if (loading) return <div className="p-6">{T.loading}</div>;
+  if (groupLoading) return <div className="p-6">{T.loading}</div>;
+  if (groupError) return <div className="p-6 text-red-500">{T.initLoadError}: {String(groupError)}</div>;
 
   return (
     <div className="space-y-4 p-6">
-      {notice ? <p className={`text-sm ${noticeType === "success" ? "text-emerald-600" : "text-red-500"}`}>{notice}</p> : null}
-
       <Card>
         <CardContent className="space-y-3 pt-6">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr]">
@@ -375,18 +367,10 @@ export function CommonCodeManager() {
             <Input placeholder="그룹코드명" value={groupNameQuery} onChange={(e) => setGroupNameQuery(e.target.value)} />
           </div>
           <GridStandardToolbar
-            onQuery={() => {
-              setGroupCreateMode(false);
-              setCodeCreateMode(false);
-              setSelectedGroupId(filteredGroups[0]?.id ?? null);
-              setSelectedCodeId(null);
-              setNotice("조회 완료");
-              setNoticeType("success");
-            }}
+            onQuery={() => void mutateGroups()}
             onCreate={() => {
               setGroupCreateMode(true);
               setSelectedGroupId(null);
-              setNotice(null);
             }}
             onCopy={copyGroup}
             onTemplateDownload={handleTemplateDownload}
@@ -418,7 +402,6 @@ export function CommonCodeManager() {
                 if (!event.data) return;
                 setGroupCreateMode(false);
                 setSelectedGroupId(event.data.id);
-                setNotice(null);
               }}
             />
           </div>
@@ -432,6 +415,14 @@ export function CommonCodeManager() {
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={groupForm.is_active} onCheckedChange={(v) => setGroupForm((p) => ({ ...p, is_active: Boolean(v) }))} />사용
           </label>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => selectedGroupId && setDeleteTarget({ kind: "group", groupId: selectedGroupId })}
+            disabled={saving || !selectedGroupId || groupCreateMode}
+          >
+            그룹 삭제
+          </Button>
         </CardContent>
       </Card>
 
@@ -440,7 +431,9 @@ export function CommonCodeManager() {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
             <Input placeholder="세부코드" value={detailCodeQuery} onChange={(e) => setDetailCodeQuery(e.target.value)} />
             <Input placeholder="세부코드명" value={detailNameQuery} onChange={(e) => setDetailNameQuery(e.target.value)} />
-            <Button variant="query" type="button">조회</Button>
+            <Button variant="query" type="button" onClick={() => void mutateCodes()} disabled={!selectedGroupId || codeLoading}>
+              조회
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -453,10 +446,18 @@ export function CommonCodeManager() {
             <Button size="sm" variant="outline" onClick={copyCode} disabled={!selectedCode}>복사</Button>
             <Button size="sm" variant="outline" onClick={() => { setCodeCreateMode(true); setSelectedCodeId(null); }} disabled={!selectedGroupId}>입력</Button>
             <Button size="sm" variant="save" onClick={saveCode} disabled={saving || !selectedGroupId}>저장</Button>
-            <Button size="sm" variant="destructive" onClick={deleteCode} disabled={saving || !selectedCodeId || codeCreateMode}>삭제</Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => selectedGroupId && selectedCodeId && setDeleteTarget({ kind: "code", groupId: selectedGroupId, codeId: selectedCodeId })}
+              disabled={saving || !selectedCodeId || codeCreateMode}
+            >
+              삭제
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {codeError ? <div className="text-sm text-red-500">{String(codeError)}</div> : null}
           <div className="ag-theme-quartz" style={{ height: 320 }}>
             <AgGridReact<CodeItem>
               theme="legacy"
@@ -489,6 +490,27 @@ export function CommonCodeManager() {
           </label>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="삭제 확인"
+        description={deleteTarget?.kind === "group" ? T.askDeleteGroup : T.askDeleteCode}
+        confirmLabel="삭제"
+        confirmVariant="destructive"
+        busy={saving}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          if (deleteTarget.kind === "group") {
+            await doDeleteGroup(deleteTarget.groupId);
+          } else {
+            await doDeleteCode(deleteTarget.groupId, deleteTarget.codeId);
+          }
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

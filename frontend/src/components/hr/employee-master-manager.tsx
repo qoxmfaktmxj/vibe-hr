@@ -49,6 +49,7 @@ import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-sta
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useMediaQuery } from "@/lib/use-media-query";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
   EmployeeBatchResponse,
@@ -85,6 +86,7 @@ type EmployeeGridRow = EmployeeItem & {
 type CommonCodeOption = { code: string; name: string };
 let cachedPositionOptions: CommonCodeOption[] | null = null;
 let cachedEmploymentOptions: CommonCodeOption[] | null = null;
+let cachedDepartments: DepartmentItem[] | null = null;
 
 const FALLBACK_EMPLOYMENT_OPTIONS: Array<{ code: EmployeeItem["employment_status"]; name: string }> = [
   { code: "active", name: "재직" },
@@ -309,13 +311,12 @@ const HireDateCellEditor = forwardRef<
 /* ------------------------------------------------------------------ */
 export function EmployeeMasterManager() {
   const [rows, setRows] = useState<EmployeeGridRow[]>([]);
-  const [departments, setDepartments] = useState<DepartmentItem[]>([]);
+  const [departments, setDepartments] = useState<DepartmentItem[]>(() => cachedDepartments ?? []);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(100);
   const [totalCount, setTotalCount] = useState(0);
-  const [gridMountKey, setGridMountKey] = useState(0);
   const [positionOptions, setPositionOptions] = useState<CommonCodeOption[]>([]);
   const [employmentOptions, setEmploymentOptions] = useState<CommonCodeOption[]>(
     FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })),
@@ -328,6 +329,7 @@ export function EmployeeMasterManager() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  const isDesktop = useMediaQuery("(min-width: 768px)", true);
 
   /* -- 파생값 ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
@@ -474,12 +476,12 @@ export function EmployeeMasterManager() {
   );
 
   /* -- 초기 로딩 ------------------------------------------------------- */
-  const fetchEmployeePage = useCallback(async (filters: SearchFilters, pageNo: number) => {
+  const fetchEmployeePage = useCallback(async (filters: SearchFilters, pageNo: number, signal?: AbortSignal) => {
     const query = buildEmployeeQuery(filters);
     query.set("page", String(pageNo));
     query.set("limit", String(pageSize));
 
-    const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store" });
+    const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store", signal });
     if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadEmployeeError));
     return response.json() as Promise<{ employees: EmployeeItem[]; total_count: number }>;
   }, [pageSize]);
@@ -488,25 +490,46 @@ export function EmployeeMasterManager() {
     const response = await fetch("/api/employees/departments", { cache: "no-store" });
     if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadDepartmentError));
     const json = (await response.json()) as { departments: DepartmentItem[] };
-    setDepartments(json.departments ?? []);
+    const list = json.departments ?? [];
+    cachedDepartments = list;
+    setDepartments(list);
   }, []);
 
   useEffect(() => {
+    if (cachedDepartments && cachedDepartments.length > 0) return;
+
+    void (async () => {
+      try {
+        await loadDepartments();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : I18N.loadDepartmentError);
+      }
+    })();
+  }, [loadDepartments]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
     void (async () => {
       try {
         setLoading(true);
-        await loadDepartments();
-        const data = await fetchEmployeePage(appliedFilters, page);
+        const data = await fetchEmployeePage(appliedFilters, page, controller.signal);
+        if (controller.signal.aborted) return;
         setRows(data.employees.map((employee) => toGridRow(employee)));
         setTotalCount(data.total_count ?? data.employees.length);
-      } catch (error) {
+      } catch (error: unknown) {
+        if ((error as { name?: string } | null)?.name === "AbortError") return;
         toast.error(error instanceof Error ? error.message : I18N.initError);
       } finally {
-        setLoading(false);
-        setInitialLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setInitialLoading(false);
+        }
       }
     })();
-  }, [appliedFilters, fetchEmployeePage, loadDepartments, page]);
+
+    return () => controller.abort();
+  }, [appliedFilters, fetchEmployeePage, page]);
 
   /* -- 컬럼 정의 ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
@@ -912,6 +935,9 @@ export function EmployeeMasterManager() {
 
   /* -- 조회: 전체 화면 로딩 없이 데이터만 재조회 ------- */
   async function handleQuery() {
+    gridApiRef.current?.stopEditing();
+    gridApiRef.current?.deselectAll();
+
     const nextFilters: SearchFilters = {
       ...searchFilters,
       positions: [...searchFilters.positions],
@@ -920,8 +946,6 @@ export function EmployeeMasterManager() {
     setAppliedFilters(nextFilters);
     setPage(1);
     tempIdRef.current = -1;
-    gridApiRef.current = null;
-    setGridMountKey((prev) => prev + 1);
   }
 
   /* -- 검증 및 저장 ------------------------------------------ */
@@ -973,8 +997,8 @@ export function EmployeeMasterManager() {
       const pageData = await fetchEmployeePage(appliedFilters, page);
       setRows(pageData.employees.map((employee) => toGridRow(employee)));
       setTotalCount(pageData.total_count ?? pageData.employees.length);
-      gridApiRef.current = null;
-      setGridMountKey((prev) => prev + 1);
+      gridApiRef.current?.deselectAll();
+      gridApiRef.current?.stopEditing();
 
       toast.success(
         `${I18N.saveDone} (입력 ${json.inserted_count}건 / 수정 ${json.updated_count}건 / 삭제 ${json.deleted_count}건)`,
@@ -1010,12 +1034,15 @@ export function EmployeeMasterManager() {
     setSearchFilters((prev) => ({ ...prev, positions: values }));
   }, []);
 
+  const departmentsReady = departments.length > 0;
+
   const toolbarActions = [
     {
       key: "add",
       label: I18N.addRow,
       icon: Plus,
       onClick: () => addRows(1),
+      disabled: !departmentsReady,
     },
     {
       key: "copy",
@@ -1177,129 +1204,128 @@ export function EmployeeMasterManager() {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
 
-      {/* 모바일 카드 영역 */}
-      <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
-        <div className="space-y-2">
-          {mobileRows.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
-              {I18N.noRows}
-            </div>
-          ) : (
-            mobileRows.map((row) => {
-              const deptName = row.department_name || departmentNameById.get(row.department_id) || "";
-              const isDeleted = row._status === "deleted";
-              return (
-                <div key={row.id} className={`rounded-lg border bg-white p-3 ${isDeleted ? "border-red-300 bg-red-50/40" : "border-slate-200"}`}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
-                      {row.employee_no || "신규"} · {deptName || "부서 미지정"}
-                    </div>
-                    <label className="flex items-center gap-1 text-xs text-red-600">
-                      <input
-                        type="checkbox"
-                        checked={isDeleted}
-                        onChange={(e) => toggleDeleteById(row.id, e.target.checked)}
-                      />
-                      삭제
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={row.display_name}
-                      disabled={isDeleted}
-                      onChange={(e) => patchRow(row.id, { display_name: e.target.value })}
-                      placeholder="이름"
-                      className="h-9"
-                    />
-                    <select
-                      value={String(row.department_id)}
-                      disabled={isDeleted}
-                      onChange={(e) => {
-                        const dId = Number(e.target.value);
-                        patchRow(row.id, {
-                          department_id: dId,
-                          department_name: departmentNameById.get(dId) ?? "",
-                        });
-                      }}
-                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-                    >
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={row.position_title}
-                      disabled={isDeleted}
-                      onChange={(e) => patchRow(row.id, { position_title: e.target.value })}
-                      className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-                    >
-                      {(positionNames.length > 0 ? positionNames : [row.position_title || "사원"]).map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className={`col-span-2 ${isDeleted ? "pointer-events-none opacity-60" : ""}`}>
-                      <CustomDatePicker
-                        className="w-full"
-                        value={row.hire_date}
-                        onChange={(value) => patchRow(row.id, { hire_date: value })}
-                        holidays={HOLIDAY_DATE_KEYS}
-                      />
-                    </div>
-                    <Input
-                      value={row.email}
-                      disabled={isDeleted}
-                      onChange={(e) => patchRow(row.id, { email: e.target.value })}
-                      placeholder="이메일"
-                      className="col-span-2 h-9"
-                    />
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* AG Grid (데스크톱) */}
-      <div className="hidden min-h-0 flex-1 px-3 pb-4 pt-2 md:flex md:flex-col md:px-6 md:pt-0">
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
-          <AgGridReact<EmployeeGridRow>
-            theme="legacy"
-            key={gridMountKey}
-            rowData={filteredRows}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            rowSelection="multiple"
-            suppressRowClickSelection={false}
-            singleClickEdit={true}
-            animateRows={false}
-            getRowClass={getRowClass}
-            getRowId={(params) => String(params.data.id)}
-            onGridReady={onGridReady}
-            onCellValueChanged={onCellValueChanged}
-            loading={loading}
-            localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
-            headerHeight={36}
-            rowHeight={34}
+      {isDesktop ? (
+        <div className="min-h-0 flex flex-1 flex-col px-3 pb-4 pt-2 md:px-6 md:pt-0">
+          <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+            <AgGridReact<EmployeeGridRow>
+              theme="legacy"
+              rowData={filteredRows}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              rowSelection="multiple"
+              suppressRowClickSelection={false}
+              singleClickEdit={true}
+              animateRows={false}
+              getRowClass={getRowClass}
+              getRowId={(params) => String(params.data.id)}
+              onGridReady={onGridReady}
+              onCellValueChanged={onCellValueChanged}
+              loading={loading}
+              localeText={AG_GRID_LOCALE_KO}
+              overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+              headerHeight={36}
+              rowHeight={34}
+            />
+          </div>
+          <GridPaginationControls
+            page={page}
+            totalPages={totalPages}
+            pageInput={pageInput}
+            setPageInput={setPageInput}
+            goPrev={goPrev}
+            goNext={goNext}
+            goToPage={goToPage}
+            disabled={loading || saving}
           />
         </div>
-        <GridPaginationControls
-          page={page}
-          totalPages={totalPages}
-          pageInput={pageInput}
-          setPageInput={setPageInput}
-          goPrev={goPrev}
-          goNext={goNext}
-          goToPage={goToPage}
-          disabled={loading || saving}
-        />
-      </div>
+      ) : (
+        <div className="flex-1 overflow-auto px-3 pb-4 pt-2">
+          <div className="space-y-2">
+            {mobileRows.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
+                {I18N.noRows}
+              </div>
+            ) : (
+              mobileRows.map((row) => {
+                const deptName = row.department_name || departmentNameById.get(row.department_id) || "";
+                const isDeleted = row._status === "deleted";
+                return (
+                  <div key={row.id} className={`rounded-lg border bg-white p-3 ${isDeleted ? "border-red-300 bg-red-50/40" : "border-slate-200"}`}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-xs text-slate-500">
+                        {row.employee_no || "신규"} · {deptName || "부서 미지정"}
+                      </div>
+                      <label className="flex items-center gap-1 text-xs text-red-600">
+                        <input
+                          type="checkbox"
+                          checked={isDeleted}
+                          onChange={(e) => toggleDeleteById(row.id, e.target.checked)}
+                        />
+                        삭제
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={row.display_name}
+                        disabled={isDeleted}
+                        onChange={(e) => patchRow(row.id, { display_name: e.target.value })}
+                        placeholder="이름"
+                        className="h-9"
+                      />
+                      <select
+                        value={String(row.department_id)}
+                        disabled={isDeleted}
+                        onChange={(e) => {
+                          const dId = Number(e.target.value);
+                          patchRow(row.id, {
+                            department_id: dId,
+                            department_name: departmentNameById.get(dId) ?? "",
+                          });
+                        }}
+                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                      >
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={row.position_title}
+                        disabled={isDeleted}
+                        onChange={(e) => patchRow(row.id, { position_title: e.target.value })}
+                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                      >
+                        {(positionNames.length > 0 ? positionNames : [row.position_title || "사원"]).map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className={`col-span-2 ${isDeleted ? "pointer-events-none opacity-60" : ""}`}>
+                        <CustomDatePicker
+                          className="w-full"
+                          value={row.hire_date}
+                          onChange={(value) => patchRow(row.id, { hire_date: value })}
+                          holidays={HOLIDAY_DATE_KEYS}
+                        />
+                      </div>
+                      <Input
+                        value={row.email}
+                        disabled={isDeleted}
+                        onChange={(e) => patchRow(row.id, { email: e.target.value })}
+                        placeholder="이메일"
+                        className="col-span-2 h-9"
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
       </ManagerGridSection>
     </ManagerPageShell>
   );
