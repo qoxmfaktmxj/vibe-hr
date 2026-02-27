@@ -11,7 +11,6 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { useMenu } from "@/components/auth/menu-provider";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
-import { ChatAssistantFab } from "@/components/layout/chat-assistant-fab";
 import type { MenuNode } from "@/types/menu";
 
 const ThemeSettingsPopoverNoSsr = dynamic(
@@ -29,6 +28,43 @@ const ImpersonationPopoverNoSsr = dynamic(
     loading: () => <span className="inline-block h-9 w-9" aria-hidden="true" />,
   },
 );
+
+const ChatAssistantFabNoSsr = dynamic(
+  () => import("@/components/layout/chat-assistant-fab").then((mod) => mod.ChatAssistantFab),
+  { ssr: false },
+);
+
+function useIdleMount() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) setReady(true);
+    };
+
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(run, { timeout: 1500 });
+      return () => {
+        cancelled = true;
+        if (typeof w.cancelIdleCallback === "function") w.cancelIdleCallback(id);
+      };
+    }
+
+    const id = window.setTimeout(run, 1);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(id);
+    };
+  }, []);
+
+  return ready;
+}
 
 type AppShellProps = {
   title: string;
@@ -81,6 +117,7 @@ export function AppShell({ title: _title, description: _description, children }:
   const [skipAutoAddPath, setSkipAutoAddPath] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
+  const idleReady = useIdleMount();
 
   // 로그인 사용자가 바뀌면(계정 전환/로그아웃 후 재로그인) 탭 전체 초기화
   const prevUserIdRef = useRef<number | null | undefined>(undefined);
@@ -201,6 +238,8 @@ export function AppShell({ title: _title, description: _description, children }:
   }
 
   useEffect(() => {
+    if (!contextMenu) return;
+
     function handleClose() {
       setContextMenu(null);
     }
@@ -215,7 +254,7 @@ export function AppShell({ title: _title, description: _description, children }:
       window.removeEventListener("click", handleClose);
       window.removeEventListener("keydown", handleEsc);
     };
-  }, []);
+  }, [contextMenu]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
@@ -313,7 +352,7 @@ export function AppShell({ title: _title, description: _description, children }:
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
 
-      <ChatAssistantFab />
+      {idleReady ? <ChatAssistantFabNoSsr /> : null}
 
       {contextMenu ? (
         <div

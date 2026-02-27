@@ -1,4 +1,3 @@
-import { AppShell } from "@/components/layout/app-shell";
 import { DashboardAttendancePanel } from "@/components/dashboard/dashboard-attendance-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardSummary } from "@/lib/api";
@@ -35,7 +34,6 @@ export default async function DashboardPage() {
   const maxLeave = Math.max(...leaveTrend, 1);
 
   return (
-    <AppShell title="대시보드" description="업무 핵심 지표">
       <div className="space-y-6 p-6 lg:p-8">
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <div className="xl:col-span-1">
@@ -137,6 +135,5 @@ export default async function DashboardPage() {
           </Card>
         </section>
       </div>
-    </AppShell>
   );
 }
