@@ -186,7 +186,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   const [profileDraft, setProfileDraft] = useState<BasicProfileDraft>(() => buildProfileDraft(detail));
   const [profileEditMode, setProfileEditMode] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(new Date());
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!profileEditMode) {
@@ -486,7 +486,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
           </div>
 
           <div className="mt-5 text-right text-xs text-[color:var(--vibe-nav-text-muted)]">
-            마지막 갱신: {formatDateTime(lastUpdatedAt)}
+            마지막 갱신: {lastUpdatedAt ? formatDateTime(lastUpdatedAt) : "-"}
           </div>
         </section>
       ) : activeTab === "appointment" ? (
