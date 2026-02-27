@@ -2,11 +2,12 @@
 
 ## 🔒 AI 개발 시작 전 필독 순서
 
-1. `AGENTS.md`
-2. `config/grid-screens.json`
-3. `docs/GRID_SCREEN_STANDARD.md`
-4. `docs/MENU_ACTION_PERMISSION_PLAN.md`
-5. 작업 대상 화면의 `page.tsx` + 컴포넌트 파일
+1. `docs/DEVELOPMENT_PRECHECK.md`
+2. `AGENTS.md`
+3. `config/grid-screens.json`
+4. `docs/GRID_SCREEN_STANDARD.md`
+5. `docs/MENU_ACTION_PERMISSION_PLAN.md`
+6. 작업 대상 화면의 `page.tsx` + 컴포넌트 파일
 
 Vibe-HR은 **한국어 사용 환경을 기본으로 하는 인사(HR) 시스템 프로젝트**입니다.
 

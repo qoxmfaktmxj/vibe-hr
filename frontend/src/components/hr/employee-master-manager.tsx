@@ -18,6 +18,7 @@ import {
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
+import useSWR from "swr";
 
 import {
   type CellValueChangedEvent,
@@ -26,6 +27,7 @@ import {
   type GridApi,
   type GridReadyEvent,
   type ICellEditorParams,
+  type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
@@ -35,6 +37,7 @@ import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-b
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
@@ -43,9 +46,9 @@ import {
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
-import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
-import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
@@ -54,7 +57,7 @@ import type {
   EmployeeItem,
 } from "@/types/employee";
 
-/* AG Grid modules are provided globally via <AgGridProvider>. */
+/* AG Grid modules are provided by ManagerPageShell via AgGridModulesProvider. */
 
 /* ------------------------------------------------------------------ */
 /* 타입 정의                                                           */
@@ -71,6 +74,11 @@ type SearchFilters = {
   active: ActiveFilter;
 };
 
+type EmployeePageResponse = {
+  employees: EmployeeItem[];
+  total_count: number;
+};
+
 type EmployeeGridRow = EmployeeItem & {
   password: string;
   _status: RowStatus;
@@ -80,10 +88,22 @@ type EmployeeGridRow = EmployeeItem & {
   _prevStatus?: RowStatus;
 };
 
+type PendingReloadAction =
+  | { type: "page"; page: number }
+  | { type: "query"; filters: SearchFilters };
+
+type EmployeeMasterViewState = {
+  rows: EmployeeGridRow[];
+  searchFilters: SearchFilters;
+  appliedFilters: SearchFilters;
+  page: number;
+  totalCount: number;
+  tempId: number;
+  syncedPageKey: string | null;
+};
+
 type CommonCodeOption = { code: string; name: string };
-let cachedPositionOptions: CommonCodeOption[] | null = null;
-let cachedEmploymentOptions: CommonCodeOption[] | null = null;
-let cachedDepartments: DepartmentItem[] | null = null;
+let cachedEmployeeMasterViewState: EmployeeMasterViewState | null = null;
 
 const FALLBACK_EMPLOYMENT_OPTIONS: Array<{ code: EmployeeItem["employment_status"]; name: string }> = [
   { code: "active", name: "재직" },
@@ -249,9 +269,59 @@ function toDisplayEmploymentStatus(
   return labelByCode.get(status) ?? status;
 }
 
+async function fetchDepartments(url: string): Promise<DepartmentItem[]> {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadDepartmentError));
+  const json = (await response.json()) as { departments: DepartmentItem[] };
+  return json.departments ?? [];
+}
+
+async function fetchActiveCodeOptions(url: string): Promise<CommonCodeOption[]> {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return [];
+    const json = (await response.json()) as ActiveCodeListResponse;
+    return json.options ?? [];
+  } catch {
+    return [];
+  }
+}
+
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
-  const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-  return json?.detail ?? fallback;
+  const json = (await response.json().catch(() => null)) as unknown;
+  return stringifyErrorDetail(json) ?? fallback;
+}
+
+function stringifyErrorDetail(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.length > 0 ? text : null;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => stringifyErrorDetail(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" / ") : null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.msg === "string") {
+    const loc = Array.isArray(record.loc)
+      ? record.loc.map((part) => String(part)).join(".")
+      : "";
+    return loc ? `${loc}: ${record.msg}` : record.msg;
+  }
+
+  return (
+    stringifyErrorDetail(record.detail) ??
+    stringifyErrorDetail(record.message) ??
+    stringifyErrorDetail(record.error)
+  );
 }
 
 function buildEmployeeQuery(filters: SearchFilters): URLSearchParams {
@@ -263,6 +333,14 @@ function buildEmployeeQuery(filters: SearchFilters): URLSearchParams {
   if (filters.active === "Y") params.set("active", "true");
   if (filters.active === "N") params.set("active", "false");
   return params;
+}
+
+function cloneFilters(filters: SearchFilters): SearchFilters {
+  return {
+    ...filters,
+    positions: [...filters.positions],
+    employmentStatuses: [...filters.employmentStatuses],
+  };
 }
 
 type HireDateEditorProps = ICellEditorParams<EmployeeGridRow, string>;
@@ -307,25 +385,77 @@ const HireDateCellEditor = forwardRef<
 /* 컴포넌트                                                            */
 /* ------------------------------------------------------------------ */
 export function EmployeeMasterManager() {
-  const [rows, setRows] = useState<EmployeeGridRow[]>([]);
-  const [departments, setDepartments] = useState<DepartmentItem[]>(() => cachedDepartments ?? []);
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_SEARCH_FILTERS);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(100);
-  const [totalCount, setTotalCount] = useState(0);
-  const [positionOptions, setPositionOptions] = useState<CommonCodeOption[]>([]);
-  const [employmentOptions, setEmploymentOptions] = useState<CommonCodeOption[]>(
-    FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({ code: option.code, name: option.name })),
+  const restoredViewState = cachedEmployeeMasterViewState;
+  const [rows, setRows] = useState<EmployeeGridRow[]>(() => restoredViewState?.rows ?? []);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() =>
+    restoredViewState ? cloneFilters(restoredViewState.searchFilters) : EMPTY_SEARCH_FILTERS,
   );
-  const [loading, setLoading] = useState(true);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(() =>
+    restoredViewState ? cloneFilters(restoredViewState.appliedFilters) : EMPTY_SEARCH_FILTERS,
+  );
+  const [page, setPage] = useState(() => restoredViewState?.page ?? 1);
+  const [pageSize] = useState(100);
+  const [totalCount, setTotalCount] = useState(() => restoredViewState?.totalCount ?? 0);
+  const [initialLoading, setInitialLoading] = useState(() => (restoredViewState?.rows.length ?? 0) === 0);
   const [saving, setSaving] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [pendingReloadAction, setPendingReloadAction] = useState<PendingReloadAction | null>(null);
+  const [syncedPageKey, setSyncedPageKey] = useState<string | null>(() => restoredViewState?.syncedPageKey ?? null);
 
   const gridApiRef = useRef<GridApi<EmployeeGridRow> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const tempIdRef = useRef(-1);
+  const tempIdRef = useRef(restoredViewState?.tempId ?? -1);
+  const rowsRef = useRef<EmployeeGridRow[]>(restoredViewState?.rows ?? []);
+  const departmentErrorToastRef = useRef<string | null>(null);
+  const pageQueryKey = useMemo(
+    () => JSON.stringify({ filters: appliedFilters, page, pageSize }),
+    [appliedFilters, page, pageSize],
+  );
+
+  const { data: departments = [], error: departmentLoadError } = useSWR<DepartmentItem[], Error>(
+    "/api/employees/departments",
+    fetchDepartments,
+    {
+      revalidateOnFocus: true,
+      revalidateIfStale: true,
+      dedupingInterval: 60_000,
+      shouldRetryOnError: false,
+    },
+  );
+  const { data: positionOptions = [] } = useSWR<CommonCodeOption[]>(
+    "/api/codes/groups/by-code/POSITION/active",
+    fetchActiveCodeOptions,
+    {
+      revalidateOnFocus: true,
+      revalidateIfStale: true,
+      dedupingInterval: 60_000,
+    },
+  );
+  const { data: employmentCodeOptions = [] } = useSWR<CommonCodeOption[]>(
+    "/api/codes/groups/by-code/EMPLOYMENT_STATUS/active",
+    fetchActiveCodeOptions,
+    {
+      revalidateOnFocus: true,
+      revalidateIfStale: true,
+      dedupingInterval: 60_000,
+    },
+  );
+  const employmentOptions = useMemo(() => {
+    const normalized = employmentCodeOptions.filter(
+      (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
+        option.code === "active" || option.code === "leave" || option.code === "resigned",
+    );
+
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    return FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({
+      code: option.code,
+      name: option.name,
+    }));
+  }, [employmentCodeOptions]);
 
   /* -- 파생값 ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
@@ -347,6 +477,40 @@ export function EmployeeMasterManager() {
   const changeSummary = useMemo(() => {
     return summarizeGridStatuses(rows, (row) => row._status);
   }, [rows]);
+  const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
+
+  const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
+    gridApiRef.current?.stopEditing();
+    gridApiRef.current?.deselectAll();
+
+    if (discardDirtyRows) {
+      rowsRef.current = [];
+      setRows([]);
+      setSyncedPageKey(null);
+    }
+
+    if (action.type === "page") {
+      setPage(action.page);
+      return;
+    }
+
+    setAppliedFilters(action.filters);
+    setPage(1);
+    tempIdRef.current = -1;
+  }, []);
+
+  const requestReloadAction = useCallback(
+    (action: PendingReloadAction) => {
+      if (action.type === "page" && action.page === page) return;
+      if (hasDirtyRows) {
+        setPendingReloadAction(action);
+        setDiscardDialogOpen(true);
+        return;
+      }
+      runReloadAction(action, false);
+    },
+    [hasDirtyRows, page, runReloadAction],
+  );
 
   const {
     totalPages,
@@ -359,7 +523,7 @@ export function EmployeeMasterManager() {
     page,
     totalCount,
     pageSize,
-    onPageChange: setPage,
+    onPageChange: (nextPage) => requestReloadAction({ type: "page", page: nextPage }),
   });
 
   const positionNames = useMemo(() => positionOptions.map((option) => option.name), [positionOptions]);
@@ -404,128 +568,136 @@ export function EmployeeMasterManager() {
   }, [departmentNameById, departments, issueTempId, positionNames]);
 
   useEffect(() => {
-    if (cachedPositionOptions) {
-      setPositionOptions(cachedPositionOptions);
-    }
-    if (cachedEmploymentOptions) {
-      setEmploymentOptions(cachedEmploymentOptions);
-    }
-    if (cachedPositionOptions && cachedEmploymentOptions) {
+    if (!departmentLoadError) {
+      departmentErrorToastRef.current = null;
       return;
     }
 
-    async function loadActiveCodes(groupCode: string): Promise<CommonCodeOption[]> {
-      const res = await fetch(`/api/codes/groups/by-code/${groupCode}/active`, { cache: "no-store" });
-      if (!res.ok) return [];
-      const data = (await res.json()) as ActiveCodeListResponse;
-      return data.options;
-    }
+    const message = departmentLoadError.message || I18N.loadDepartmentError;
+    if (departmentErrorToastRef.current === message) return;
+    departmentErrorToastRef.current = message;
+    toast.error(message);
+  }, [departmentLoadError]);
 
-    void (async () => {
-      const [positions, employment] = await Promise.all([
-        loadActiveCodes("POSITION"),
-        loadActiveCodes("EMPLOYMENT_STATUS"),
-      ]);
+  const getRowKey = useCallback((row: EmployeeGridRow) => String(row.id), []);
 
-      if (positions.length > 0) {
-        cachedPositionOptions = positions;
-        setPositionOptions(positions);
-      }
+  const applyGridTransaction = useCallback(
+    (prevRows: EmployeeGridRow[], nextRows: EmployeeGridRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
 
-      let nextEmploymentOptions = FALLBACK_EMPLOYMENT_OPTIONS.map((option) => ({
-        code: option.code,
-        name: option.name,
-      }));
-      if (employment.length > 0) {
-        const normalized = employment.filter(
-          (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
-            option.code === "active" || option.code === "leave" || option.code === "resigned",
-        );
-        if (normalized.length > 0) {
-          nextEmploymentOptions = normalized;
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: EmployeeGridRow[] = [];
+      const update: EmployeeGridRow[] = [];
+      const remove: EmployeeGridRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
         }
+        if (previous !== row) update.push(row);
       }
 
-      cachedEmploymentOptions = nextEmploymentOptions;
-      setEmploymentOptions(nextEmploymentOptions);
-    })();
-  }, []);
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) remove.push(row);
+      }
 
-  /* -- 데이터 변경 후 그리드 행 스타일 갱신 ------------------ */
-  const refreshGridRows = useCallback(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.redrawRows();
-  }, []);
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: EmployeeGridRow[]) => EmployeeGridRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
         }),
       );
-
-      refreshGridRows();
     },
-    [refreshGridRows],
+    [commitRows],
   );
 
   /* -- 초기 로딩 ------------------------------------------------------- */
-  const fetchEmployeePage = useCallback(async (filters: SearchFilters, pageNo: number, signal?: AbortSignal) => {
+  const fetchEmployeePage = useCallback(async (filters: SearchFilters, pageNo: number) => {
     const query = buildEmployeeQuery(filters);
     query.set("page", String(pageNo));
     query.set("limit", String(pageSize));
 
-    const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store", signal });
+    const response = await fetch("/api/employees?" + query.toString(), { cache: "no-store" });
     if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadEmployeeError));
-    return response.json() as Promise<{ employees: EmployeeItem[]; total_count: number }>;
+    return response.json() as Promise<EmployeePageResponse>;
   }, [pageSize]);
 
-  const loadDepartments = useCallback(async () => {
-    const response = await fetch("/api/employees/departments", { cache: "no-store" });
-    if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadDepartmentError));
-    const json = (await response.json()) as { departments: DepartmentItem[] };
-    const list = json.departments ?? [];
-    cachedDepartments = list;
-    setDepartments(list);
-  }, []);
+  const {
+    data: employeePageData,
+    error: employeePageError,
+    isLoading: employeePageLoading,
+    isValidating: employeePageValidating,
+    mutate: mutateEmployeePage,
+  } = useSWR<EmployeePageResponse, Error>(
+    ["employee-master-page", appliedFilters, page],
+    ([, filters, pageNo]) => fetchEmployeePage(filters as SearchFilters, pageNo as number),
+    {
+      revalidateOnFocus: false,
+      keepPreviousData: true,
+      dedupingInterval: 15_000,
+    },
+  );
+  const loading = employeePageLoading || employeePageValidating;
 
   useEffect(() => {
-    if (cachedDepartments && cachedDepartments.length > 0) return;
-
-    void (async () => {
-      try {
-        await loadDepartments();
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : I18N.loadDepartmentError);
-      }
-    })();
-  }, [loadDepartments]);
+    if (!employeePageData) return;
+    setInitialLoading(false);
+    setTotalCount(employeePageData.total_count ?? employeePageData.employees.length);
+    if (hasDirtyRows && syncedPageKey === pageQueryKey) {
+      return;
+    }
+    const nextRows = employeePageData.employees.map((employee) => toGridRow(employee));
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+    setSyncedPageKey(pageQueryKey);
+  }, [employeePageData, hasDirtyRows, pageQueryKey, syncedPageKey]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (!employeePageError) return;
+    setInitialLoading(false);
+    toast.error(employeePageError.message || I18N.initError);
+  }, [employeePageError]);
 
-    void (async () => {
-      try {
-        setLoading(true);
-        const data = await fetchEmployeePage(appliedFilters, page, controller.signal);
-        if (controller.signal.aborted) return;
-        setRows(data.employees.map((employee) => toGridRow(employee)));
-        setTotalCount(data.total_count ?? data.employees.length);
-      } catch (error: unknown) {
-        if ((error as { name?: string } | null)?.name === "AbortError") return;
-        toast.error(error instanceof Error ? error.message : I18N.initError);
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setInitialLoading(false);
-        }
-      }
-    })();
-
-    return () => controller.abort();
-  }, [appliedFilters, fetchEmployeePage, page]);
+  useEffect(() => {
+    cachedEmployeeMasterViewState = {
+      rows,
+      searchFilters: cloneFilters(searchFilters),
+      appliedFilters: cloneFilters(appliedFilters),
+      page,
+      totalCount,
+      tempId: tempIdRef.current,
+      syncedPageKey,
+    };
+  }, [appliedFilters, page, rows, searchFilters, syncedPageKey, totalCount]);
 
   /* -- 컬럼 정의 ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
@@ -657,9 +829,8 @@ export function EmployeeMasterManager() {
   );
 
   /* -- 클래스 기반 행 스타일 ---------------------------------- */
-  const getRowClass = useCallback((params: { data?: EmployeeGridRow }) => {
-    return getGridRowClass(params.data?._status);
-  }, []);
+  const rowClassRules = useMemo(() => buildGridRowClassRules<EmployeeGridRow>(), []);
+  const getRowClass = useCallback((params: RowClassParams<EmployeeGridRow>) => getGridRowClass(params.data?._status), []);
 
   /* -- 그리드 이벤트 ------------------------------------------------ */
   const onGridReady = useCallback((event: GridReadyEvent<EmployeeGridRow>) => {
@@ -674,7 +845,7 @@ export function EmployeeMasterManager() {
       const field = event.colDef.field as keyof EmployeeGridRow | undefined;
       if (rowId == null || !field) return;
 
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
 
@@ -712,18 +883,14 @@ export function EmployeeMasterManager() {
           });
         }),
       );
-
-      // 상태 변경 후 행 스타일 반영을 위해 다시 그리기
-      refreshGridRows();
     },
-    [departmentNameById, refreshGridRows],
+    [commitRows, departmentNameById],
   );
 
   /* -- 액션 ---------------------------------------------------- */
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
-    setRows((prev) => [...added, ...prev]);
-    refreshGridRows();
+    commitRows((prev) => [...added, ...prev]);
   }
 
   const parseDepartmentId = useCallback(
@@ -769,10 +936,9 @@ export function EmployeeMasterManager() {
         };
       });
 
-      setRows((prev) => [...parsed, ...prev]);
-      refreshGridRows();
+      commitRows((prev) => [...parsed, ...prev]);
     },
-    [departmentNameById, issueTempId, parseDepartmentId, refreshGridRows],
+    [commitRows, departmentNameById, issueTempId, parseDepartmentId],
   );
 
   function copySelectedRows() {
@@ -796,7 +962,7 @@ export function EmployeeMasterManager() {
       ]),
     );
 
-    setRows((prev) => {
+    commitRows((prev) => {
       const next: EmployeeGridRow[] = [];
       for (const row of prev) {
         next.push(row);
@@ -807,8 +973,6 @@ export function EmployeeMasterManager() {
       }
       return next;
     });
-
-    refreshGridRows();
   }
 
   async function downloadTemplateExcel() {
@@ -902,26 +1066,20 @@ export function EmployeeMasterManager() {
         });
       }
 
-      setRows((prev) => [...parsed, ...prev]);
-      refreshGridRows();
+      commitRows((prev) => [...parsed, ...prev]);
     } catch {
       toast.error("엑셀 파일을 읽지 못했습니다. 파일 형식을 확인해 주세요.");
     }
   }
 
   /* -- 조회: 전체 화면 로딩 없이 데이터만 재조회 ------- */
-  async function handleQuery() {
-    gridApiRef.current?.stopEditing();
-    gridApiRef.current?.deselectAll();
-
+  function handleQuery() {
     const nextFilters: SearchFilters = {
       ...searchFilters,
       positions: [...searchFilters.positions],
       employmentStatuses: [...searchFilters.employmentStatuses],
     };
-    setAppliedFilters(nextFilters);
-    setPage(1);
-    tempIdRef.current = -1;
+    requestReloadAction({ type: "query", filters: nextFilters });
   }
 
   /* -- 검증 및 저장 ------------------------------------------ */
@@ -970,15 +1128,25 @@ export function EmployeeMasterManager() {
       }
 
       const json = (await res.json()) as EmployeeBatchResponse;
-      const pageData = await fetchEmployeePage(appliedFilters, page);
-      setRows(pageData.employees.map((employee) => toGridRow(employee)));
-      setTotalCount(pageData.total_count ?? pageData.employees.length);
+      commitRows((prev) =>
+        clearSavedStatuses(prev, {
+          removeDeleted: true,
+          buildOriginal: (row) => snapshotOriginal(row),
+        }),
+      );
       gridApiRef.current?.deselectAll();
       gridApiRef.current?.stopEditing();
 
       toast.success(
         `${I18N.saveDone} (입력 ${json.inserted_count}건 / 수정 ${json.updated_count}건 / 삭제 ${json.deleted_count}건)`,
       );
+
+      try {
+        setSyncedPageKey(null);
+        await mutateEmployeePage();
+      } catch {
+        toast.warning("저장은 완료되었지만 목록 재조회에 실패했습니다.");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFailed);
     } finally {
@@ -1057,7 +1225,22 @@ export function EmployeeMasterManager() {
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    void handleQuery();
+    handleQuery();
+  }
+
+  function handleDiscardDialogOpenChange(open: boolean) {
+    setDiscardDialogOpen(open);
+    if (!open) setPendingReloadAction(null);
+  }
+
+  function handleDiscardAndContinue() {
+    if (!pendingReloadAction) {
+      setDiscardDialogOpen(false);
+      return;
+    }
+    runReloadAction(pendingReloadAction, true);
+    setPendingReloadAction(null);
+    setDiscardDialogOpen(false);
   }
 
   /* -- 렌더링 ----------------------------------------------------- */
@@ -1074,7 +1257,7 @@ export function EmployeeMasterManager() {
       <ManagerSearchSection
         title={I18N.title}
         onQuery={() => {
-          void handleQuery();
+          handleQuery();
         }}
         queryLabel={I18N.query}
       >
@@ -1154,10 +1337,19 @@ export function EmployeeMasterManager() {
       <ManagerGridSection
         headerLeft={(
           <>
-            <span className="text-xs text-slate-400">
-              총 {totalCount.toLocaleString()}건 · {page} / {Math.max(1, Math.ceil(totalCount / pageSize))}페이지
-            </span>
-            <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
+            <GridPaginationControls
+              page={page}
+              totalPages={totalPages}
+              pageInput={pageInput}
+              setPageInput={setPageInput}
+              goPrev={goPrev}
+              goNext={goNext}
+              goToPage={goToPage}
+              disabled={loading || saving}
+              className="mt-0 justify-start"
+            />
+            <span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <GridChangeSummaryBadges summary={changeSummary} />
           </>
         )}
         headerRight={(
@@ -1190,6 +1382,7 @@ export function EmployeeMasterManager() {
             suppressRowClickSelection={false}
             singleClickEdit={true}
             animateRows={false}
+            rowClassRules={rowClassRules}
             getRowClass={getRowClass}
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
@@ -1201,18 +1394,18 @@ export function EmployeeMasterManager() {
             rowHeight={34}
           />
         </div>
-        <GridPaginationControls
-          page={page}
-          totalPages={totalPages}
-          pageInput={pageInput}
-          setPageInput={setPageInput}
-          goPrev={goPrev}
-          goNext={goNext}
-          goToPage={goToPage}
-          disabled={loading || saving}
-        />
       </div>
       </ManagerGridSection>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={handleDiscardDialogOpenChange}
+        title="저장되지 않은 변경 사항이 있습니다."
+        description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+        confirmLabel="무시하고 이동"
+        cancelLabel="취소"
+        confirmVariant="destructive"
+        onConfirm={handleDiscardAndContinue}
+      />
     </ManagerPageShell>
   );
 }

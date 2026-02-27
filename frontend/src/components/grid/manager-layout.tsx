@@ -3,6 +3,7 @@
 import type { ClipboardEventHandler, ReactNode, Ref } from "react";
 import { Search } from "lucide-react";
 
+import { AgGridModulesProvider } from "@/components/grid/ag-grid-modules-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -21,13 +22,15 @@ export function ManagerPageShell({
   onPasteCapture,
 }: ManagerPageShellProps) {
   return (
-    <div
-      className={cn("flex h-[calc(100vh-73px)] flex-col gap-3 px-3 py-3 md:px-6 md:py-4", className)}
-      ref={containerRef}
-      onPasteCapture={onPasteCapture}
-    >
-      {children}
-    </div>
+    <AgGridModulesProvider>
+      <div
+        className={cn("flex h-[calc(100vh-73px)] flex-col gap-3 px-3 py-3 md:px-6 md:py-4", className)}
+        ref={containerRef}
+        onPasteCapture={onPasteCapture}
+      >
+        {children}
+      </div>
+    </AgGridModulesProvider>
   );
 }
 

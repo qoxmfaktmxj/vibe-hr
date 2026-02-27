@@ -4,11 +4,12 @@
 1. `git fetch --all`
 2. `git checkout main`
 3. `git pull --ff-only origin main`
-4. Read `AGENTS.md`
-5. Read `config/grid-screens.json`
-6. Read `docs/GRID_SCREEN_STANDARD.md`
-7. Read `docs/AG_GRID_COMMON_GUIDE.md`
-8. Read `docs/MENU_ACTION_PERMISSION_PLAN.md`
+4. Read `docs/DEVELOPMENT_PRECHECK.md`
+5. Read `AGENTS.md`
+6. Read `config/grid-screens.json`
+7. Read `docs/GRID_SCREEN_STANDARD.md`
+8. Read `docs/AG_GRID_COMMON_GUIDE.md`
+9. Read `docs/MENU_ACTION_PERMISSION_PLAN.md`
 
 ## 1) Work split
 
@@ -43,4 +44,3 @@
 - [ ] Toolbar order and behaviors match the common guide
 - [ ] Save order is `DELETE -> UPDATE -> INSERT`
 - [ ] Docs updated
-

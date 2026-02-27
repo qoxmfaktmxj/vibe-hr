@@ -86,15 +86,28 @@ type TabContextMenuState = {
 const TAB_STORAGE_KEY = "vibe_hr_open_tabs";
 const MAX_OPEN_TABS = 10;
 
-function findMenuLabel(menus: MenuNode[], path: string): string | null {
-  for (const node of menus) {
-    if (node.path === path) return node.name;
+function buildMenuLabelIndex(menus: MenuNode[]): Map<string, string> {
+  const labelByPath = new Map<string, string>();
+  const stack: MenuNode[] = [...menus];
+  const visited = new Set<MenuNode>();
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || visited.has(node)) continue;
+    visited.add(node);
+
+    if (node.path) {
+      labelByPath.set(node.path, node.name);
+    }
+
     if (node.children.length > 0) {
-      const found = findMenuLabel(node.children, path);
-      if (found) return found;
+      for (const child of node.children) {
+        stack.push(child);
+      }
     }
   }
-  return null;
+
+  return labelByPath;
 }
 
 function getFallbackLabel(path: string): string {
@@ -135,9 +148,11 @@ export function AppShell({ title: _title, description: _description, children }:
     }
   }, [user?.id]);
 
+  const menuLabelByPath = useMemo(() => buildMenuLabelIndex(menus), [menus]);
+
   const resolveLabel = useCallback(
-    (path: string) => findMenuLabel(menus, path) ?? getFallbackLabel(path),
-    [menus],
+    (path: string) => menuLabelByPath.get(path) ?? getFallbackLabel(path),
+    [menuLabelByPath],
   );
 
   useEffect(() => {
@@ -200,8 +215,8 @@ export function AppShell({ title: _title, description: _description, children }:
   // - 계정 전환 후 이전 계정 탭명이 그대로 노출되는 현상 방지
   useEffect(() => {
     if (!tabsHydrated || menus.length === 0) return;
-    setStoredTabs((prev) => prev.filter((tab) => findMenuLabel(menus, tab.path) !== null));
-  }, [menus, tabsHydrated]);
+    setStoredTabs((prev) => prev.filter((tab) => menuLabelByPath.has(tab.path)));
+  }, [menuLabelByPath, menus.length, tabsHydrated]);
 
   function closeTab(path: string) {
     const next = openTabs.filter((tab) => tab.path !== path);

@@ -14,6 +14,21 @@ function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
+function walkDir(dirPath) {
+  const files = [];
+  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...walkDir(fullPath));
+      continue;
+    }
+    if (entry.isFile()) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
 function extractProfile(pageSource) {
   const match = pageSource.match(/profile:\s*["']([^"']+)["']/);
   return match?.[1] ?? null;
@@ -26,6 +41,17 @@ if (!fs.existsSync(registryPath)) {
 
 const registry = JSON.parse(readText(registryPath));
 const screens = registry?.screens ?? {};
+const registeredComponentFiles = new Set(
+  Object.values(screens).map((screen) => path.normalize(path.join(repoRoot, screen.componentFile))),
+);
+const componentsRoot = path.join(repoRoot, "frontend", "src", "components");
+const reverseScanRoots = new Set();
+for (const registeredComponent of registeredComponentFiles) {
+  const relative = path.relative(componentsRoot, registeredComponent);
+  if (relative.startsWith("..")) continue;
+  const [rootDir] = relative.split(path.sep);
+  if (rootDir) reverseScanRoots.add(rootDir);
+}
 
 for (const [key, screen] of Object.entries(screens)) {
   const pageFile = path.join(repoRoot, screen.pageFile);
@@ -52,6 +78,9 @@ for (const [key, screen] of Object.entries(screens)) {
   }
   if (!component.includes("AgGridReact")) {
     fail(`[${key}] AgGridReact missing in ${screen.componentFile}`);
+  }
+  if (component.includes("ModuleRegistry")) {
+    fail(`[${key}] ModuleRegistry is forbidden in ${screen.componentFile}; use AgGridProvider modules instead`);
   }
 
   const pageProfile = extractProfile(page);
@@ -98,9 +127,28 @@ for (const [key, screen] of Object.entries(screens)) {
   }
 }
 
+if (fs.existsSync(componentsRoot)) {
+  const componentFiles = walkDir(componentsRoot).filter((filePath) => filePath.endsWith(".tsx"));
+  for (const componentFile of componentFiles) {
+    if (!componentFile.endsWith("-manager.tsx")) continue;
+
+    const relativeToComponents = path.relative(componentsRoot, componentFile);
+    const [rootDir] = relativeToComponents.split(path.sep);
+    if (!reverseScanRoots.has(rootDir)) continue;
+
+    const source = readText(componentFile);
+    if (!source.includes("AgGridReact")) continue;
+    if (registeredComponentFiles.has(path.normalize(componentFile))) continue;
+
+    const relativeFile = path.relative(repoRoot, componentFile).replaceAll("\\", "/");
+    fail(
+      `[reverse-scan] AgGridReact component must be registered in config/grid-screens.json: ${relativeFile}`,
+    );
+  }
+}
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }
 
 console.log("[validate:grid] all registered AG Grid screens passed");
-

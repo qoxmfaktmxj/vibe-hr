@@ -149,6 +149,7 @@ export function CompanyManager() {
   const gridApiRef = useRef<GridApi<CompanyGridRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<CompanyGridRow[]>([]);
 
   const { data, isLoading, mutate } = useSWR<MngCompanyListResponse>(
     "/api/mng/companies",
@@ -161,7 +162,9 @@ export function CompanyManager() {
 
   useEffect(() => {
     if (!data) return;
-    setRows((data.companies ?? []).map(toGridRow));
+    const nextRows = (data.companies ?? []).map(toGridRow);
+    rowsRef.current = nextRows;
+    setRows(nextRows);
   }, [data]);
 
   const filteredRows = useMemo(() => {
@@ -201,13 +204,62 @@ export function CompanyManager() {
     return id;
   }, []);
 
-  const redrawRows = useCallback(() => {
-    gridApiRef.current?.redrawRows();
-  }, []);
+  const getRowKey = useCallback((row: CompanyGridRow) => String(row.id), []);
+
+  const applyGridTransaction = useCallback(
+    (prevRows: CompanyGridRow[], nextRows: CompanyGridRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: CompanyGridRow[] = [];
+      const update: CompanyGridRow[] = [];
+      const remove: CompanyGridRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
+        }
+        if (previous !== row) {
+          update.push(row);
+        }
+      }
+
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) {
+          remove.push(row);
+        }
+      }
+
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: CompanyGridRow[]) => CompanyGridRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   const patchRowById = useCallback(
     (rowId: number, patch: Partial<CompanyGridRow>) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
           const merged: CompanyGridRow = {
@@ -221,9 +273,8 @@ export function CompanyManager() {
           });
         }),
       );
-      setTimeout(redrawRows, 0);
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const addRow = useCallback(() => {
@@ -245,9 +296,8 @@ export function CompanyManager() {
       _prevStatus: undefined,
     };
 
-    setRows((prev) => [newRow, ...prev]);
-    setTimeout(redrawRows, 0);
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [newRow, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const copyRows = useCallback(() => {
     const selectedRows =
@@ -268,21 +318,19 @@ export function CompanyManager() {
       _prevStatus: undefined,
     }));
 
-    setRows((prev) => [...clones, ...prev]);
-    setTimeout(redrawRows, 0);
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [...clones, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-      setTimeout(redrawRows, 0);
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const onCellValueChanged = useCallback(
@@ -482,14 +530,13 @@ export function CompanyManager() {
           return;
         }
 
-        setRows((prev) => [...parsed, ...prev]);
-        setTimeout(redrawRows, 0);
+        commitRows((prev) => [...parsed, ...prev]);
         toast.success(`${parsed.length}건 업로드 반영 완료`);
       } catch {
         toast.error("파일 업로드에 실패했습니다.");
       }
     },
-    [issueTempId, redrawRows],
+    [commitRows, issueTempId],
   );
 
   const columnDefs = useMemo<ColDef<CompanyGridRow>[]>(

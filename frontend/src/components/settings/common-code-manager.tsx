@@ -6,6 +6,7 @@ import { type ColDef, type GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { toast } from "sonner";
 
+import { AgGridModulesProvider } from "@/components/grid/ag-grid-modules-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GridStandardToolbar } from "@/components/grid/grid-standard-toolbar";
@@ -359,7 +360,8 @@ export function CommonCodeManager() {
   if (groupError) return <div className="p-6 text-red-500">{T.initLoadError}: {String(groupError)}</div>;
 
   return (
-    <div className="space-y-4 p-6">
+    <AgGridModulesProvider>
+      <div className="space-y-4 p-6">
       <Card>
         <CardContent className="space-y-3 pt-6">
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr]">
@@ -511,6 +513,7 @@ export function CommonCodeManager() {
           setDeleteTarget(null);
         }}
       />
-    </div>
+      </div>
+    </AgGridModulesProvider>
   );
 }

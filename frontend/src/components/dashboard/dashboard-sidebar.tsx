@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  BadgeCheck,
+  BriefcaseBusiness,
   Building2,
   Calculator,
   CalendarCheck2,
   CalendarDays,
   ChevronDown,
+  IdCard,
   Clock,
   Minus,
   Plus,
@@ -13,6 +16,7 @@ import {
   FolderTree,
   LayoutDashboard,
   ListOrdered,
+  Mail,
   Menu,
   PanelLeft,
   Settings,
@@ -21,11 +25,12 @@ import {
   UsersRound,
   Wallet,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type UIEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -90,14 +95,82 @@ function toEmploymentStatusLabel(status: EmployeeItem["employment_status"]): str
   }
 }
 
+type ProfileTone = "primary" | "emerald" | "violet" | "rose" | "amber";
+
+type ProfileInfoCard = {
+  label: string;
+  value: string;
+  icon: LucideIcon;
+  tone: ProfileTone;
+  mono?: boolean;
+};
+
+function formatProfileDateTime(value: Date): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(value);
+}
+
+function getProfileToneCardClass(tone: ProfileTone): string {
+  if (tone === "emerald") {
+    return "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20";
+  }
+  if (tone === "violet") {
+    return "border-violet-200/70 bg-violet-50/50 dark:border-violet-900/40 dark:bg-violet-950/20";
+  }
+  if (tone === "rose") {
+    return "border-rose-200/70 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20";
+  }
+  if (tone === "amber") {
+    return "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20";
+  }
+  return "border-primary/30 bg-primary/5 dark:border-primary/40 dark:bg-primary/10";
+}
+
+function getProfileToneIconClass(tone: ProfileTone): string {
+  if (tone === "emerald") {
+    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+  }
+  if (tone === "violet") {
+    return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
+  }
+  if (tone === "rose") {
+    return "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
+  }
+  if (tone === "amber") {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+  }
+  return "bg-primary/15 text-primary dark:bg-primary/25";
+}
+
 function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean }) {
   const ref = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
-    if (isActive && ref.current) {
-      ref.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (!isActive || !ref.current) return;
+
+    const element = ref.current;
+    const container = element.closest("nav");
+    if (!(container instanceof HTMLElement)) return;
+
+    if (consumeCenterTargetPath(node.path)) {
+      element.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
     }
-  }, [isActive]);
+
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const isVisible = elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom;
+    if (!isVisible) {
+      element.scrollIntoView({ block: "nearest" });
+    }
+  }, [isActive, node.path]);
 
   if (!node.path) return null;
 
@@ -105,6 +178,7 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
     <Link
       ref={ref}
       href={node.path}
+      onClick={() => setCenterTargetPath(node.path)}
       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
         isActive
           ? "bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
@@ -135,6 +209,8 @@ function collectActiveCodes(nodes: MenuNode[], currentPath: string, acc: Set<str
 }
 
 const OPEN_CODES_STORAGE_KEY = "vibe_hr_sidebar_open_codes";
+const SIDEBAR_SCROLL_TOP_STORAGE_KEY = "vibe_hr_sidebar_scroll_top";
+const SIDEBAR_CENTER_TARGET_PATH_STORAGE_KEY = "vibe_hr_sidebar_center_target_path";
 
 /** sessionStorage에서 열린 그룹 코드 Set 복원 */
 function loadOpenCodes(): Set<string> {
@@ -157,6 +233,50 @@ function saveOpenCodes(codes: Set<string>): void {
     window.sessionStorage.setItem(OPEN_CODES_STORAGE_KEY, JSON.stringify([...codes]));
   } catch {
     // 저장 실패 시 무시
+  }
+}
+
+function loadSidebarScrollTop(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(SIDEBAR_SCROLL_TOP_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveSidebarScrollTop(scrollTop: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(SIDEBAR_SCROLL_TOP_STORAGE_KEY, String(Math.max(0, Math.floor(scrollTop))));
+  } catch {
+    // 저장 실패 시 무시
+  }
+}
+
+function setCenterTargetPath(path: string | null | undefined): void {
+  if (!path) return;
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(SIDEBAR_CENTER_TARGET_PATH_STORAGE_KEY, path);
+  } catch {
+    // 저장 실패 시 무시
+  }
+}
+
+function consumeCenterTargetPath(path: string | null | undefined): boolean {
+  if (!path) return false;
+  if (typeof window === "undefined") return false;
+  try {
+    const target = window.sessionStorage.getItem(SIDEBAR_CENTER_TARGET_PATH_STORAGE_KEY);
+    if (!target || target !== path) return false;
+    window.sessionStorage.removeItem(SIDEBAR_CENTER_TARGET_PATH_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -281,31 +401,46 @@ export function DashboardSidebar() {
       return next;
     });
   }, []);
+  const restoreMenuScroll = useCallback((element: HTMLElement | null) => {
+    if (!element) return;
+    const stored = loadSidebarScrollTop();
+    if (stored === null) return;
+    element.scrollTop = stored;
+  }, []);
+  const handleMenuScroll = useCallback((event: UIEvent<HTMLElement>) => {
+    saveSidebarScrollTop(event.currentTarget.scrollTop);
+  }, []);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileEmployee, setProfileEmployee] = useState<EmployeeItem | null>(null);
+  const [profileLoadedAt, setProfileLoadedAt] = useState<Date | null>(null);
 
   const displayName = user?.display_name ?? "User";
   const roleLabels = user?.roles?.join(", ") ?? "";
   const initials = getInitials(displayName) || "U";
 
-  const profileRows = useMemo(
+  const profileRows = useMemo<ProfileInfoCard[]>(
     () => [
-      { label: "이름", value: displayName },
-      { label: "이메일", value: user?.email ?? "-" },
-      { label: "권한", value: roleLabels || "-" },
-      { label: "로그인ID", value: profileEmployee?.login_id ?? "-" },
-      { label: "사번", value: profileEmployee?.employee_no ?? "-" },
-      { label: "부서", value: profileEmployee?.department_name ?? "-" },
-      { label: "직책", value: profileEmployee?.position_title ?? "-" },
-      { label: "입사일", value: profileEmployee?.hire_date ?? "-" },
+      { label: "이름", value: displayName, icon: UserRound, tone: "primary" },
+      { label: "이메일", value: user?.email ?? "-", icon: Mail, tone: "primary" },
+      { label: "권한", value: roleLabels || "-", icon: Shield, tone: "violet" },
+      { label: "로그인ID", value: profileEmployee?.login_id ?? "-", icon: IdCard, tone: "primary", mono: true },
+      { label: "사번", value: profileEmployee?.employee_no ?? "-", icon: BadgeCheck, tone: "primary", mono: true },
+      { label: "부서", value: profileEmployee?.department_name ?? "-", icon: Building2, tone: "violet" },
+      { label: "직책", value: profileEmployee?.position_title ?? "-", icon: BriefcaseBusiness, tone: "violet" },
+      { label: "입사일", value: profileEmployee?.hire_date ?? "-", icon: CalendarDays, tone: "emerald", mono: true },
       {
         label: "재직상태",
         value: profileEmployee ? toEmploymentStatusLabel(profileEmployee.employment_status) : "-",
+        icon: Clock,
+        tone: "amber",
       },
       {
         label: "로그인 활성",
         value: profileEmployee ? (profileEmployee.is_active ? "Y" : "N") : "-",
+        icon: Settings,
+        tone: "rose",
+        mono: true,
       },
     ],
     [displayName, profileEmployee, roleLabels, user?.email],
@@ -324,8 +459,10 @@ export function DashboardSidebar() {
 
       const json = (await response.json()) as { employee?: EmployeeItem };
       setProfileEmployee(json.employee ?? null);
+      setProfileLoadedAt(new Date());
     } catch (error) {
       setProfileEmployee(null);
+      setProfileLoadedAt(null);
       setProfileError(
         error instanceof Error
           ? error.message
@@ -394,7 +531,11 @@ export function DashboardSidebar() {
           </Button>
         </div>
 
-        <nav className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
+        <nav
+          ref={restoreMenuScroll}
+          onScroll={handleMenuScroll}
+          className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-3"
+        >
           {menus.map((node) =>
             node.children.length > 0 ? (
               <MenuGroupItem
@@ -472,20 +613,23 @@ export function DashboardSidebar() {
             aria-label="프로필 닫기"
             onClick={() => setProfileOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-xl rounded-xl border bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between">
+          <div className="relative z-10 w-full max-w-5xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 border border-slate-200">
+                <Avatar className="h-20 w-20 border border-border">
                   <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">{initials}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-lg font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</p>
-                  <p className="text-sm text-[color:var(--vibe-nav-text-muted)]">{user?.email ?? "-"}</p>
+                  <p className="text-2xl font-bold tracking-tight text-[color:var(--vibe-nav-text-strong)]">내 정보</p>
+                  <p className="mt-1 text-sm text-[color:var(--vibe-nav-text-muted)]">조회 전용 프로필 정보입니다.</p>
+                  <p className="mt-1 text-xs text-[color:var(--vibe-nav-text-muted)]">
+                    최근 조회: {profileLoadedAt ? formatProfileDateTime(profileLoadedAt) : "-"}
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
-                className="rounded-md border p-2 text-[color:var(--vibe-nav-text-muted)] hover:bg-slate-50 hover:text-[color:var(--vibe-nav-text-strong)]"
+                className="rounded-md border p-2 text-[color:var(--vibe-nav-text-muted)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
                 onClick={() => setProfileOpen(false)}
                 aria-label="프로필 닫기"
               >
@@ -496,13 +640,35 @@ export function DashboardSidebar() {
             {profileLoading ? <p className="mb-4 text-sm text-[color:var(--vibe-nav-text-muted)]">불러오는 중...</p> : null}
             {profileError ? <p className="mb-4 text-sm text-red-500">{profileError}</p> : null}
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {profileRows.map((row) => (
-                <div key={row.label} className="rounded-md border bg-slate-50 p-3">
-                  <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">{row.label}</p>
-                  <p className="mt-1 text-sm font-medium text-[color:var(--vibe-nav-text-strong)]">{row.value}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {profileRows.map((row) => {
+                const Icon = row.icon;
+                const displayValue = row.value || "-";
+                return (
+                  <article
+                    key={row.label}
+                    className={`rounded-2xl border p-4 transition hover:shadow-sm ${getProfileToneCardClass(row.tone)}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold tracking-wide text-[color:var(--vibe-nav-text-muted)]">{row.label}</p>
+                        <p
+                          className={`mt-2 break-words text-sm font-semibold text-[color:var(--vibe-nav-text-strong)] ${
+                            row.mono ? "font-mono" : ""
+                          }`}
+                        >
+                          {displayValue}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getProfileToneIconClass(row.tone)}`}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </div>
         </div>

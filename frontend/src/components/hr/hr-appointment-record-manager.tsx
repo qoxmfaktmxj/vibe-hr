@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ColDef,
   type GridApi,
@@ -23,17 +21,12 @@ import { Button } from "@/components/ui/button";
 import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
+import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
 import type {
   HrAppointmentOrderConfirmResponse,
   HrAppointmentRecordListResponse,
   HrAppointmentRecordItem,
 } from "@/types/hr-appointment-record";
-
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
 
 type RowStatus = GridRowStatus;
 type SearchFilters = {
@@ -106,6 +99,7 @@ export function HrAppointmentRecordManager() {
   const gridApiRef = useRef<GridApi<AppointmentRecordRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<AppointmentRecordRow[]>([]);
 
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
 
@@ -119,9 +113,58 @@ export function HrAppointmentRecordManager() {
     [],
   );
 
-  const redrawRows = useCallback(() => {
-    gridApiRef.current?.redrawRows();
-  }, []);
+  const getRowKey = useCallback((row: AppointmentRecordRow) => String(row.id), []);
+
+  const applyGridTransaction = useCallback(
+    (prevRows: AppointmentRecordRow[], nextRows: AppointmentRecordRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: AppointmentRecordRow[] = [];
+      const update: AppointmentRecordRow[] = [];
+      const remove: AppointmentRecordRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
+        }
+        if (previous !== row) {
+          update.push(row);
+        }
+      }
+
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) {
+          remove.push(row);
+        }
+      }
+
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: AppointmentRecordRow[]) => AppointmentRecordRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   const issueTempId = useCallback(() => {
     const id = tempIdRef.current;
@@ -152,6 +195,7 @@ export function HrAppointmentRecordManager() {
         _original: snapshotFields(row, TRACKED_FIELDS),
         _prevStatus: undefined,
       }));
+      rowsRef.current = nextRows;
       setRows(nextRows);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "발령처리 조회에 실패했습니다.");
@@ -201,9 +245,8 @@ export function HrAppointmentRecordManager() {
       _original: undefined,
       _prevStatus: undefined,
     };
-    setRows((prev) => [newRow, ...prev]);
-    redrawRows();
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [newRow, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const copyRows = useCallback(() => {
     const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
@@ -228,28 +271,26 @@ export function HrAppointmentRecordManager() {
         _prevStatus: undefined,
       };
     });
-    setRows((prev) => [...clones, ...prev]);
-    redrawRows();
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [...clones, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRowRevertedToOriginal(candidate, TRACKED_FIELDS),
         }),
       );
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent<AppointmentRecordRow>) => {
       const changed = event.data;
       if (!changed) return;
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== changed.id) return row;
           const merged: AppointmentRecordRow = { ...row, ...changed, _original: row._original, _prevStatus: row._prevStatus };
@@ -258,9 +299,8 @@ export function HrAppointmentRecordManager() {
           });
         }),
       );
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const saveAll = useCallback(async () => {
@@ -271,55 +311,74 @@ export function HrAppointmentRecordManager() {
 
     setSaving(true);
     try {
-      for (const row of toDelete) {
-        const response = await fetch(`/api/hr/appointments/records/${row.id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, "삭제에 실패했습니다."));
-      }
-      for (const row of toUpdate) {
-        const response = await fetch(`/api/hr/appointments/records/${row.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            appointment_no: row.appointment_no || null,
-            order_title: row.order_title || "발령",
-            order_description: row.order_description || null,
-            effective_date: row.effective_date || row.start_date,
-            appointment_kind: row.appointment_kind,
-            action_type: row.action_type || "변경",
-            start_date: row.start_date || row.effective_date,
-            end_date: row.end_date || null,
-            to_department_id: row.to_department_id || null,
-            to_position_title: row.to_position_title || null,
-            to_employment_status: row.to_employment_status || null,
-            temporary_reason: row.temporary_reason || null,
-            note: row.note || null,
-          }),
-        });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, "수정에 실패했습니다."));
-      }
-      for (const row of toInsert) {
-        const response = await fetch("/api/hr/appointments/records", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            employee_id: row.employee_id,
-            appointment_no: row.appointment_no || null,
-            order_title: row.order_title || "발령",
-            order_description: row.order_description || null,
-            effective_date: row.effective_date || row.start_date,
-            appointment_kind: row.appointment_kind,
-            action_type: row.action_type || "변경",
-            start_date: row.start_date || row.effective_date,
-            end_date: row.end_date || null,
-            to_department_id: row.to_department_id || null,
-            to_position_title: row.to_position_title || null,
-            to_employment_status: row.to_employment_status || null,
-            temporary_reason: row.temporary_reason || null,
-            note: row.note || null,
-          }),
-        });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, "입력에 실패했습니다."));
-      }
+      await runConcurrentOrThrow(
+        "삭제",
+        toDelete.map((row) => async () => {
+          const response = await fetch(`/api/hr/appointments/records/${row.id}`, { method: "DELETE" });
+          if (!response.ok) throw new Error(await parseErrorDetail(response, `삭제 실패: ${row.id}`));
+        }),
+        6,
+      );
+
+      await runConcurrentOrThrow(
+        "수정",
+        toUpdate.map((row) => async () => {
+          const response = await fetch(`/api/hr/appointments/records/${row.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              appointment_no: row.appointment_no || null,
+              order_title: row.order_title || "발령",
+              order_description: row.order_description || null,
+              effective_date: row.effective_date || row.start_date,
+              appointment_kind: row.appointment_kind,
+              action_type: row.action_type || "변경",
+              start_date: row.start_date || row.effective_date,
+              end_date: row.end_date || null,
+              to_department_id: row.to_department_id || null,
+              to_position_title: row.to_position_title || null,
+              to_employment_status: row.to_employment_status || null,
+              temporary_reason: row.temporary_reason || null,
+              note: row.note || null,
+            }),
+          });
+          if (!response.ok) throw new Error(await parseErrorDetail(response, `수정 실패: ${row.id}`));
+        }),
+        6,
+      );
+
+      await runConcurrentOrThrow(
+        "입력",
+        toInsert.map((row) => async () => {
+          const response = await fetch("/api/hr/appointments/records", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              employee_id: row.employee_id,
+              appointment_no: row.appointment_no || null,
+              order_title: row.order_title || "발령",
+              order_description: row.order_description || null,
+              effective_date: row.effective_date || row.start_date,
+              appointment_kind: row.appointment_kind,
+              action_type: row.action_type || "변경",
+              start_date: row.start_date || row.effective_date,
+              end_date: row.end_date || null,
+              to_department_id: row.to_department_id || null,
+              to_position_title: row.to_position_title || null,
+              to_employment_status: row.to_employment_status || null,
+              temporary_reason: row.temporary_reason || null,
+              note: row.note || null,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(
+              await parseErrorDetail(response, `입력 실패: ${row.employee_id}`),
+            );
+          }
+        }),
+        6,
+      );
+
       toast.success(`저장 완료 (입력 ${toInsert.length} / 수정 ${toUpdate.length} / 삭제 ${toDelete.length})`);
       await refresh(appliedFilters);
     } catch (error) {
@@ -600,8 +659,7 @@ export function HrAppointmentRecordManager() {
         toast.error("업로드할 데이터가 없습니다.");
         return;
       }
-      setRows((prev) => [...parsed, ...prev]);
-      redrawRows();
+      commitRows((prev) => [...parsed, ...prev]);
       if (skipped > 0) {
         toast.info(`업로드 ${parsed.length}건 반영, 사번 미일치 ${skipped}건 제외`);
       } else {
@@ -610,7 +668,7 @@ export function HrAppointmentRecordManager() {
     } catch {
       toast.error("업로드에 실패했습니다.");
     }
-  }, [issueTempId, redrawRows, rows]);
+  }, [commitRows, issueTempId, rows]);
 
   const toolbarActions = [
     { key: "create", label: "입력", icon: Plus, onClick: addRow, disabled: loading || saving },

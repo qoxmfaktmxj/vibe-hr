@@ -16,6 +16,9 @@ frontend/out/
 .vscode/
 .idea/
 
+# Playwright CLI artifacts
+.playwright-cli/
+
 # Environment files
 .env
 .env.*

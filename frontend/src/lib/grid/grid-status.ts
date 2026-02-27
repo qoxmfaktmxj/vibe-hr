@@ -6,6 +6,14 @@ export type GridStatusSummary = {
   deleted: number;
 };
 
+type RowClassRuleParams<T> = {
+  data?: T | null;
+};
+
+export type GridRowClassRules<T> = {
+  [className: string]: (params: RowClassRuleParams<T>) => boolean;
+};
+
 export function summarizeGridStatuses<T>(
   rows: readonly T[],
   getStatus: (row: T) => GridStatus,
@@ -32,4 +40,12 @@ export function getGridRowClass(status?: GridStatus): string {
   if (status === "updated") return "vibe-row-updated";
   if (status === "deleted") return "vibe-row-deleted";
   return "";
+}
+
+export function buildGridRowClassRules<T extends { _status?: GridStatus }>() : GridRowClassRules<T> {
+  return {
+    "vibe-row-added": (params) => params.data?._status === "added",
+    "vibe-row-updated": (params) => params.data?._status === "updated",
+    "vibe-row-deleted": (params) => params.data?._status === "deleted",
+  };
 }

@@ -100,6 +100,7 @@ export function PayItemGroupManager() {
 
     const gridApiRef = useRef<GridApi<RowData> | null>(null);
     const tempIdRef = useRef(-1);
+    const rowsRef = useRef<RowData[]>([]);
 
     const issueTempId = () => {
         const id = tempIdRef.current;
@@ -125,7 +126,9 @@ export function PayItemGroupManager() {
             const res = await fetch("/api/pay/setup/item-groups", { cache: "no-store" });
             if (!res.ok) throw new Error("그룹 목록을 불러오지 못했습니다.");
             const data = (await res.json()) as { items: PayItemGroupItem[] };
-            setRows(data.items.map(toGridRow));
+            const nextRows = data.items.map(toGridRow);
+            rowsRef.current = nextRows;
+            setRows(nextRows);
         } catch (e) {
             toast.error(e instanceof Error ? e.message : "로딩 실패");
         } finally {
@@ -135,14 +138,58 @@ export function PayItemGroupManager() {
 
     useEffect(() => { void loadData(); }, [loadData]);
 
-    const redraw = useCallback(() => {
-        if (!gridApiRef.current) return;
-        gridApiRef.current.redrawRows();
-    }, []);
+    const getRowKey = useCallback((row: RowData) => String(row.id), []);
+
+    const applyGridTransaction = useCallback(
+        (prevRows: RowData[], nextRows: RowData[]) => {
+            const api = gridApiRef.current;
+            if (!api) return;
+
+            const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+            const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+            const add: RowData[] = [];
+            const update: RowData[] = [];
+            const remove: RowData[] = [];
+
+            for (const row of nextRows) {
+                const previous = prevMap.get(getRowKey(row));
+                if (!previous) {
+                    add.push(row);
+                    continue;
+                }
+                if (previous !== row) update.push(row);
+            }
+
+            for (const row of prevRows) {
+                if (!nextMap.has(getRowKey(row))) remove.push(row);
+            }
+
+            if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+            api.applyTransaction({
+                add: add.length > 0 ? add : undefined,
+                update: update.length > 0 ? update : undefined,
+                remove: remove.length > 0 ? remove : undefined,
+                addIndex: add.length > 0 ? 0 : undefined,
+            });
+        },
+        [getRowKey],
+    );
+
+    const commitRows = useCallback(
+        (updater: (prevRows: RowData[]) => RowData[]) => {
+            const prevRows = rowsRef.current;
+            const nextRows = updater(prevRows);
+            rowsRef.current = nextRows;
+            setRows(nextRows);
+            applyGridTransaction(prevRows, nextRows);
+        },
+        [applyGridTransaction],
+    );
 
     const toggleDelete = useCallback(
         (rowId: number, checked: boolean) => {
-            setRows((prev) => {
+            commitRows((prev) => {
                 const next: RowData[] = [];
                 for (const row of prev) {
                     if (row.id !== rowId) { next.push(row); continue; }
@@ -164,9 +211,8 @@ export function PayItemGroupManager() {
                 }
                 return next;
             });
-            redraw();
         },
-        [redraw],
+        [commitRows],
     );
 
     const columnDefs = useMemo<ColDef<RowData>[]>(
@@ -280,7 +326,7 @@ export function PayItemGroupManager() {
             if (e.newValue === e.oldValue) return;
             const rowId = e.data?.id;
             if (rowId == null) return;
-            setRows((prev) =>
+            commitRows((prev) =>
                 prev.map((row) => {
                     if (row.id !== rowId) return row;
                     const next = { ...row } as RowData;
@@ -290,15 +336,13 @@ export function PayItemGroupManager() {
                     return next;
                 }),
             );
-            redraw();
         },
-        [redraw],
+        [commitRows],
     );
 
     function addRow() {
         const row = createEmptyRow(issueTempId());
-        setRows((prev) => [row, ...prev]);
-        redraw();
+        commitRows((prev) => [row, ...prev]);
     }
 
     function copySelectedRows() {
@@ -312,7 +356,7 @@ export function PayItemGroupManager() {
                 { ...r, id: issueTempId(), code: "", _status: "added" as const, _original: undefined, _prevStatus: undefined },
             ]),
         );
-        setRows((prev) => {
+        commitRows((prev) => {
             const next: RowData[] = [];
             for (const row of prev) {
                 next.push(row);
@@ -323,7 +367,6 @@ export function PayItemGroupManager() {
             }
             return next;
         });
-        redraw();
     }
 
     async function downloadExcel() {
@@ -393,7 +436,9 @@ export function PayItemGroupManager() {
             }
 
             const json = (await res.json()) as PayItemGroupBatchResponse;
-            setRows(json.items.map(toGridRow));
+            const nextRows = json.items.map(toGridRow);
+            rowsRef.current = nextRows;
+            setRows(nextRows);
             gridApiRef.current = null;
             setGridMountKey((k) => k + 1);
             toast.success(

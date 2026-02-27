@@ -11,6 +11,11 @@ type StatusMutationOptions<T extends StatusTrackedRow> = {
   removeAddedRow?: boolean;
 };
 
+type ClearSavedStatusOptions<T extends StatusTrackedRow> = {
+  removeDeleted?: boolean;
+  buildOriginal?: (row: T) => Record<string, unknown> | undefined;
+};
+
 export function reconcileUpdatedStatus<T extends StatusTrackedRow>(
   row: T,
   options: Pick<StatusMutationOptions<T>, "shouldBeClean">,
@@ -66,6 +71,31 @@ export function toggleDeletedStatus<T extends StatusTrackedRow>(
     } else {
       next.push(row);
     }
+  }
+  return next;
+}
+
+export function clearSavedStatuses<T extends StatusTrackedRow>(
+  rows: readonly T[],
+  options: ClearSavedStatusOptions<T> = {},
+): T[] {
+  const next: T[] = [];
+  for (const row of rows) {
+    if (options.removeDeleted && row._status === "deleted") {
+      continue;
+    }
+
+    const cleaned = {
+      ...row,
+      _status: "clean" as const,
+      _prevStatus: undefined,
+    } as T & { _original?: Record<string, unknown> };
+
+    if (options.buildOriginal) {
+      cleaned._original = options.buildOriginal(cleaned);
+    }
+
+    next.push(cleaned as T);
   }
   return next;
 }

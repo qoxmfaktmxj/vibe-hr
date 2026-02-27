@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ColDef,
   type GridApi,
@@ -26,12 +24,6 @@ import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-sta
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
 import type { PapAppraisalItem, PapAppraisalListResponse } from "@/types/pap-appraisal";
 import type { PapFinalResultListResponse } from "@/types/pap-final-result";
-
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
 
 type RowStatus = GridRowStatus;
 
@@ -108,6 +100,7 @@ export function PapAppraisalManager() {
   const gridApiRef = useRef<GridApi<PapAppraisalRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<PapAppraisalRow[]>([]);
 
   const { data, isLoading, mutate } = useSWR<PapAppraisalListResponse>("/api/pap/appraisals", fetcher, {
     revalidateOnFocus: false,
@@ -153,13 +146,62 @@ export function PapAppraisalManager() {
       _original: snapshotFields(row, TRACKED_FIELDS),
       _prevStatus: undefined,
     }));
+    rowsRef.current = nextRows;
     setRows(nextRows);
   }, [data]);
 
-  const redrawRows = useCallback(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.redrawRows();
-  }, []);
+  const getRowKey = useCallback((row: PapAppraisalRow) => String(row.id), []);
+
+  const applyGridTransaction = useCallback(
+    (prevRows: PapAppraisalRow[], nextRows: PapAppraisalRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: PapAppraisalRow[] = [];
+      const update: PapAppraisalRow[] = [];
+      const remove: PapAppraisalRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
+        }
+        if (previous !== row) {
+          update.push(row);
+        }
+      }
+
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) {
+          remove.push(row);
+        }
+      }
+
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: PapAppraisalRow[]) => PapAppraisalRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   const issueTempId = useCallback(() => {
     const id = tempIdRef.current;
@@ -196,7 +238,7 @@ export function PapAppraisalManager() {
 
   const patchRowById = useCallback(
     (rowId: number, patch: Partial<PapAppraisalRow>) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
           const merged: PapAppraisalRow = {
@@ -210,9 +252,8 @@ export function PapAppraisalManager() {
           });
         }),
       );
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const addRow = useCallback(() => {
@@ -237,9 +278,8 @@ export function PapAppraisalManager() {
       _original: undefined,
       _prevStatus: undefined,
     };
-    setRows((prev) => [newRow, ...prev]);
-    redrawRows();
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [newRow, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const copyRows = useCallback(() => {
     const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
@@ -258,21 +298,19 @@ export function PapAppraisalManager() {
       _original: undefined,
       _prevStatus: undefined,
     }));
-    setRows((prev) => [...clones, ...prev]);
-    redrawRows();
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [...clones, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const onCellValueChanged = useCallback(
@@ -511,14 +549,13 @@ export function PapAppraisalManager() {
           return;
         }
 
-        setRows((prev) => [...parsed, ...prev]);
-        redrawRows();
+        commitRows((prev) => [...parsed, ...prev]);
         toast.success(`${parsed.length} rows imported as new rows.`);
       } catch {
         toast.error("Upload failed.");
       }
     },
-    [finalResultCodeToId, finalResults, issueTempId, redrawRows],
+    [commitRows, finalResultCodeToId, finalResults, issueTempId],
   );
 
   const columnDefs = useMemo<ColDef<PapAppraisalRow>[]>(() => {

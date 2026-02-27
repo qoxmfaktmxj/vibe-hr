@@ -129,6 +129,7 @@ export function AttendanceCodeManager() {
 
   const gridApiRef = useRef<GridApi<AttendanceCodeRow> | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<AttendanceCodeRow[]>([]);
 
   const issueTempId = () => {
     const id = tempIdRef.current;
@@ -156,7 +157,9 @@ export function AttendanceCodeManager() {
       const res = await fetch("/api/tim/attendance-codes", { cache: "no-store" });
       if (!res.ok) throw new Error("근태코드 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as { items: TimAttendanceCodeItem[] };
-      setRows(data.items.map(toGridRow));
+      const nextRows = data.items.map(toGridRow);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "로딩 실패");
     } finally {
@@ -167,15 +170,59 @@ export function AttendanceCodeManager() {
   useEffect(() => { void loadData(); }, [loadData]);
 
   /* -- 그리드 행 다시그리기 ---------------------------------------- */
-  const redraw = useCallback(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.redrawRows();
-  }, []);
+  const getRowKey = useCallback((row: AttendanceCodeRow) => String(row.id), []);
+
+  const applyGridTransaction = useCallback(
+    (prevRows: AttendanceCodeRow[], nextRows: AttendanceCodeRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: AttendanceCodeRow[] = [];
+      const update: AttendanceCodeRow[] = [];
+      const remove: AttendanceCodeRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
+        }
+        if (previous !== row) update.push(row);
+      }
+
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) remove.push(row);
+      }
+
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: AttendanceCodeRow[]) => AttendanceCodeRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   /* -- 삭제 체크박스 토글 ----------------------------------------- */
   const toggleDelete = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) => {
+      commitRows((prev) => {
         const next: AttendanceCodeRow[] = [];
         for (const row of prev) {
           if (row.id !== rowId) { next.push(row); continue; }
@@ -188,7 +235,7 @@ export function AttendanceCodeManager() {
             }
             continue;
           }
-          if (row._status === "added") continue; // 신규행은 바로 제거
+          if (row._status === "added") continue;
           if (row._status !== "deleted") {
             next.push({ ...row, _status: "deleted", _prevStatus: row._status });
           } else {
@@ -197,9 +244,8 @@ export function AttendanceCodeManager() {
         }
         return next;
       });
-      redraw();
     },
-    [redraw],
+    [commitRows],
   );
 
   /* -- 컬럼 정의 --------------------------------------------------- */
@@ -389,7 +435,7 @@ export function AttendanceCodeManager() {
       if (e.newValue === e.oldValue) return;
       const rowId = e.data?.id;
       if (rowId == null) return;
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
           const next = { ...row } as AttendanceCodeRow;
@@ -399,16 +445,14 @@ export function AttendanceCodeManager() {
           return next;
         }),
       );
-      redraw();
     },
-    [redraw],
+    [commitRows],
   );
 
   /* -- 액션 -------------------------------------------------------- */
   function addRow() {
     const row = createEmptyRow(issueTempId());
-    setRows((prev) => [row, ...prev]);
-    redraw();
+    commitRows((prev) => [row, ...prev]);
   }
 
   function copySelectedRows() {
@@ -422,7 +466,7 @@ export function AttendanceCodeManager() {
         { ...r, id: issueTempId(), code: "", _status: "added" as const, _original: undefined, _prevStatus: undefined },
       ]),
     );
-    setRows((prev) => {
+    commitRows((prev) => {
       const next: AttendanceCodeRow[] = [];
       for (const row of prev) {
         next.push(row);
@@ -433,7 +477,6 @@ export function AttendanceCodeManager() {
       }
       return next;
     });
-    redraw();
   }
 
   async function downloadExcel() {
@@ -517,7 +560,9 @@ export function AttendanceCodeManager() {
       }
 
       const json = (await res.json()) as TimAttendanceCodeBatchResponse;
-      setRows(json.items.map(toGridRow));
+      const nextRows = json.items.map(toGridRow);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
       gridApiRef.current = null;
       setGridMountKey((k) => k + 1);
       toast.success(

@@ -11,6 +11,7 @@ from app.api.employee import router as employee_router
 from app.api.menu import router as menu_router
 from app.api.organization import router as organization_router
 from app.api.hr_basic import router as hr_basic_router
+from app.api.hr_retire import router as hr_retire_router
 from app.api.hr_appointment_code import router as hr_appointment_code_router
 from app.api.hr_appointment_record import router as hr_appointment_record_router
 from app.api.pap_appraisal import router as pap_appraisal_router
@@ -66,6 +67,7 @@ app.include_router(menu_router, prefix="/api/v1")
 app.include_router(organization_router, prefix="/api/v1")
 app.include_router(common_code_router, prefix="/api/v1")
 app.include_router(hr_basic_router, prefix="/api/v1")
+app.include_router(hr_retire_router, prefix="/api/v1")
 app.include_router(hr_appointment_code_router, prefix="/api/v1")
 app.include_router(hr_appointment_record_router, prefix="/api/v1")
 app.include_router(pap_appraisal_router, prefix="/api/v1")
