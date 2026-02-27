@@ -4,7 +4,7 @@ import { Home, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -66,6 +66,22 @@ export function AppShell({ title: _title, description: _description, children }:
   const [skipAutoAddPath, setSkipAutoAddPath] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
+
+  // 로그인 사용자가 바뀌면(계정 전환/로그아웃 후 재로그인) 탭 전체 초기화
+  const prevUserIdRef = useRef<number | null | undefined>(undefined);
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    // undefined → 최초 마운트는 스킵, null/숫자 → 실제 값이 들어온 이후 변경만 감지
+    if (prevUserIdRef.current === undefined) {
+      prevUserIdRef.current = currentId;
+      return;
+    }
+    if (prevUserIdRef.current !== currentId) {
+      prevUserIdRef.current = currentId;
+      setStoredTabs([]);
+      window.localStorage.removeItem(TAB_STORAGE_KEY);
+    }
+  }, [user?.id]);
 
   const resolveLabel = useCallback(
     (path: string) => findMenuLabel(menus, path) ?? getFallbackLabel(path),
