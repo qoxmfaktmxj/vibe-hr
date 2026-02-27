@@ -10,10 +10,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { employeeId, recordId } = await context.params;
+  const search = request.nextUrl.search || "";
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/basic/${employeeId}/records/${recordId}`, {
+  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/basic/${employeeId}/records/${recordId}${search}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",
@@ -29,7 +30,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { employeeId, recordId } = await context.params;
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/basic/${employeeId}/records/${recordId}`, {
+  const search = request.nextUrl.search || "";
+  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/basic/${employeeId}/records/${recordId}${search}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

@@ -4,7 +4,7 @@ from datetime import date
 import random
 import string
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlmodel import Session, select
 
 from app.core.security import hash_password
@@ -20,6 +20,12 @@ from app.models import (
     HrEmployee,
     HrEmployeeBasicProfile,
     HrEmployeeInfoRecord,
+    HrContactPoint,
+    HrCareer,
+    HrLicense,
+    HrMilitary,
+    HrRewardPunish,
+    HrRetireChecklistItem,
     PapFinalResult,
     PapAppraisalMaster,
     HrAnnualLeave,
@@ -154,6 +160,13 @@ WEL_BENEFIT_TYPE_SEEDS = [
     {"code": "HEALTH_CHECK", "name": "건강검진", "module_path": "/wel/health-check", "is_deduction": False, "pay_item_code": None, "sort_order": 80},
 ]
 
+HR_RETIRE_CHECKLIST_SEEDS: list[tuple[str, str, bool, int, str]] = [
+    ("asset_return", "회사 자산 반납", True, 10, "노트북/출입카드 등 지급 자산 반납"),
+    ("document_handover", "업무 인수인계 완료", True, 20, "담당 업무 및 문서 인수인계"),
+    ("account_close", "계정/권한 회수", True, 30, "내부 시스템 계정 및 권한 회수"),
+    ("expense_settlement", "비용 정산 완료", False, 40, "법인카드/개인비용 정산"),
+]
+
 MENU_TREE: list[dict] = [
     {
         "code": "dashboard",
@@ -211,7 +224,34 @@ MENU_TREE: list[dict] = [
                     {"code": "hr.admin.educations", "name": "\uD559\uB825\uAD00\uB9AC", "path": "/hr/admin/educations", "icon": "UserRound", "sort_order": 207, "roles": ["hr_manager", "admin"]},
                     {"code": "hr.admin.careers", "name": "\uACBD\uB825\uAD00\uB9AC", "path": "/hr/admin/careers", "icon": "UserRound", "sort_order": 208, "roles": ["hr_manager", "admin"]},
                     {"code": "hr.admin.certificates", "name": "\uC790\uACA9\uC99D\uAD00\uB9AC", "path": "/hr/admin/certificates", "icon": "UserRound", "sort_order": 209, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.admin.military", "name": "\uBCD1\uC5ED\uAD00\uB9AC", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 210, "roles": ["hr_manager", "admin"]}
+                    {"code": "hr.admin.military", "name": "\uBCD1\uC5ED\uAD00\uB9AC", "path": "/hr/admin/military", "icon": "UserRound", "sort_order": 210, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.admin.evaluations", "name": "\uC778\uC0AC\uD3C9\uAC00\uAD00\uB9AC", "path": "/hr/admin/evaluations", "icon": "UserRound", "sort_order": 211, "roles": ["hr_manager", "admin"]}
+                ],
+            },
+            {
+                "code": "hr.retire",
+                "name": "\uD1F4\uC9C1\uAD00\uB9AC",
+                "path": None,
+                "icon": "FileText",
+                "sort_order": 212,
+                "roles": ["hr_manager", "admin"],
+                "children": [
+                    {
+                        "code": "hr.retire.checklist",
+                        "name": "\uD1F4\uC9C1\uCCB4\uD06C\uB9AC\uC2A4\uD2B8",
+                        "path": "/hr/retire/checklist",
+                        "icon": "ListOrdered",
+                        "sort_order": 213,
+                        "roles": ["hr_manager", "admin"],
+                    },
+                    {
+                        "code": "hr.retire.approvals",
+                        "name": "\uD1F4\uC9C1\uC2B9\uC778\uAD00\uB9AC",
+                        "path": "/hr/retire/approvals",
+                        "icon": "FileText",
+                        "sort_order": 214,
+                        "roles": ["hr_manager", "admin"],
+                    },
                 ],
             },
             {
@@ -219,11 +259,11 @@ MENU_TREE: list[dict] = [
                 "name": "\uBC1C\uB839\uAD00\uB9AC",
                 "path": None,
                 "icon": "FileText",
-                "sort_order": 212,
+                "sort_order": 215,
                 "roles": ["hr_manager", "admin"],
                 "children": [
-                    {"code": "hr.appointment.codes", "name": "\uBC1C\uB839\uCF54\uB4DC\uAD00\uB9AC", "path": "/hr/appointment/codes", "icon": "ListOrdered", "sort_order": 213, "roles": ["hr_manager", "admin"]},
-                    {"code": "hr.appointment.records", "name": "\uBC1C\uB839\uCC98\uB9AC\uAD00\uB9AC", "path": "/hr/appointment/records", "icon": "UserRound", "sort_order": 214, "roles": ["hr_manager", "admin"]}
+                    {"code": "hr.appointment.codes", "name": "\uBC1C\uB839\uCF54\uB4DC\uAD00\uB9AC", "path": "/hr/appointment/codes", "icon": "ListOrdered", "sort_order": 216, "roles": ["hr_manager", "admin"]},
+                    {"code": "hr.appointment.records", "name": "\uBC1C\uB839\uCC98\uB9AC\uAD00\uB9AC", "path": "/hr/appointment/records", "icon": "UserRound", "sort_order": 217, "roles": ["hr_manager", "admin"]}
                 ],
             },
         ],
@@ -1110,45 +1150,332 @@ def ensure_common_codes(session: Session) -> None:
                     session.commit()
 
 
+HR_BASIC_SEED_TARGET_PER_CATEGORY = 200
+
+
+def _count_rows(session: Session, model: type) -> int:
+    count_result = session.exec(select(func.count(model.id))).one()
+    return int(count_result[0] if isinstance(count_result, tuple) else count_result)
+
+
+def _seed_record_date(serial: int) -> date:
+    return date(2025, (serial % 12) + 1, min(28, (serial % 28) + 1))
+
+
+def _build_legacy_hr_basic_seed_fields(category: str, serial: int) -> tuple[str, str, str | None, str | None, str]:
+    if category == "education":
+        return (
+            f"학력-{serial:03d}",
+            "학력",
+            f"테스트대학교 {serial % 20 + 1}캠퍼스",
+            f"학사-{serial % 10 + 1}",
+            "자동 시드 학력 데이터",
+        )
+    return (
+        f"평가-{serial:03d}",
+        "평가",
+        None,
+        ["S", "A", "B", "C"][serial % 4],
+        "자동 시드 평가 데이터",
+    )
+
+
+def ensure_hr_basic_domain_migration(session: Session) -> None:
+    legacy_categories = ("thrm128", "thrm123", "thrm117", "thrm113", "thrm121")
+    legacy_rows = session.exec(
+        select(HrEmployeeInfoRecord).where(HrEmployeeInfoRecord.category.in_(legacy_categories))
+    ).all()
+    if not legacy_rows:
+        return
+
+    contact_keys = {
+        (row.employee_id, row.record_date, row.contact_type, row.phone_mobile, row.email, row.addr1, row.note)
+        for row in session.exec(select(HrContactPoint)).all()
+    }
+    career_keys = {
+        (row.employee_id, row.record_date, row.career_scope, row.company_name, row.department_name, row.position_title, row.note)
+        for row in session.exec(select(HrCareer)).all()
+    }
+    license_keys = {
+        (row.employee_id, row.record_date, row.license_name, row.license_type, row.issued_org, row.license_no, row.note)
+        for row in session.exec(select(HrLicense)).all()
+    }
+    military_keys = {
+        (row.employee_id, row.record_date, row.military_type, row.branch, row.rank, row.discharge_type, row.note)
+        for row in session.exec(select(HrMilitary)).all()
+    }
+    reward_keys = {
+        (row.employee_id, row.action_date, row.reward_punish_type, row.title, row.office_name, row.reason, row.note)
+        for row in session.exec(select(HrRewardPunish)).all()
+    }
+
+    changed = False
+    for legacy in legacy_rows:
+        if legacy.category == "thrm123":
+            key = (
+                legacy.employee_id,
+                legacy.record_date,
+                legacy.title,
+                legacy.type,
+                legacy.organization,
+                legacy.value,
+                legacy.note,
+            )
+            if key in contact_keys:
+                continue
+            session.add(
+                HrContactPoint(
+                    employee_id=legacy.employee_id,
+                    contact_type=legacy.title,
+                    phone_mobile=legacy.type,
+                    email=legacy.organization,
+                    addr1=legacy.value,
+                    note=legacy.note,
+                    record_date=legacy.record_date,
+                )
+            )
+            contact_keys.add(key)
+            changed = True
+            continue
+
+        if legacy.category == "thrm117":
+            scope = (legacy.type or "EXTERNAL").upper()
+            career_scope = "INTERNAL" if scope.startswith("IN") or "사내" in scope else "EXTERNAL"
+            key = (
+                legacy.employee_id,
+                legacy.record_date,
+                career_scope,
+                legacy.title,
+                legacy.organization,
+                legacy.value,
+                legacy.note,
+            )
+            if key in career_keys:
+                continue
+            session.add(
+                HrCareer(
+                    employee_id=legacy.employee_id,
+                    career_scope=career_scope,
+                    company_name=legacy.title,
+                    department_name=legacy.organization,
+                    position_title=legacy.value,
+                    note=legacy.note,
+                    record_date=legacy.record_date,
+                )
+            )
+            career_keys.add(key)
+            changed = True
+            continue
+
+        if legacy.category == "thrm113":
+            key = (
+                legacy.employee_id,
+                legacy.record_date,
+                legacy.title,
+                legacy.type,
+                legacy.organization,
+                legacy.value,
+                legacy.note,
+            )
+            if key in license_keys:
+                continue
+            session.add(
+                HrLicense(
+                    employee_id=legacy.employee_id,
+                    license_name=legacy.title,
+                    license_type=legacy.type,
+                    issued_org=legacy.organization,
+                    license_no=legacy.value,
+                    note=legacy.note,
+                    record_date=legacy.record_date,
+                )
+            )
+            license_keys.add(key)
+            changed = True
+            continue
+
+        if legacy.category == "thrm121":
+            key = (
+                legacy.employee_id,
+                legacy.record_date,
+                legacy.title,
+                legacy.type,
+                legacy.organization,
+                legacy.value,
+                legacy.note,
+            )
+            if key in military_keys:
+                continue
+            session.add(
+                HrMilitary(
+                    employee_id=legacy.employee_id,
+                    military_type=legacy.title,
+                    branch=legacy.type,
+                    rank=legacy.organization,
+                    discharge_type=legacy.value,
+                    note=legacy.note,
+                    record_date=legacy.record_date,
+                )
+            )
+            military_keys.add(key)
+            changed = True
+            continue
+
+        reward_type = (legacy.type or "REWARD").upper()
+        normalized_reward_type = (
+            "PUNISH"
+            if reward_type.startswith(("PUN", "DIS")) or "징계" in reward_type or "벌" in reward_type
+            else "REWARD"
+        )
+        key = (
+            legacy.employee_id,
+            legacy.record_date,
+            normalized_reward_type,
+            legacy.title,
+            legacy.organization,
+            legacy.value,
+            legacy.note,
+        )
+        if key in reward_keys:
+            continue
+        session.add(
+            HrRewardPunish(
+                employee_id=legacy.employee_id,
+                reward_punish_type=normalized_reward_type,
+                title=legacy.title,
+                office_name=legacy.organization,
+                reason=legacy.value,
+                note=legacy.note,
+                action_date=legacy.record_date,
+                status="CONFIRMED",
+            )
+        )
+        reward_keys.add(key)
+        changed = True
+
+    if changed:
+        session.commit()
+
+
 def ensure_hr_basic_seed_data(session: Session) -> None:
-    employees = session.exec(select(HrEmployee).order_by(HrEmployee.id).limit(30)).all()
+    employees = session.exec(select(HrEmployee).order_by(HrEmployee.id)).all()
     if not employees:
         return
 
-    for index, employee in enumerate(employees, start=1):
+    for index, employee in enumerate(employees[:HR_BASIC_SEED_TARGET_PER_CATEGORY], start=1):
         profile = session.exec(
             select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee.id)
         ).first()
-        if profile is None:
-            profile = HrEmployeeBasicProfile(
-                employee_id=employee.id,
-                gender="남" if index % 2 else "여",
-                resident_no_masked=f"90{(index % 12) + 1:02d}15-1******",
-                blood_type=["A", "B", "O", "AB"][index % 4],
-                marital_status="기혼" if index % 3 == 0 else "미혼",
-                mbti=["ISTJ", "ENFP", "INTJ", "ESFJ"][index % 4],
-                job_family=["경영지원", "개발", "영업", "운영"][index % 4],
-                job_role=employee.position_title,
-                grade=["사원", "대리", "과장", "차장", "부장"][index % 5],
-            )
-            session.add(profile)
-
-        record_exists = session.exec(
-            select(HrEmployeeInfoRecord.id).where(HrEmployeeInfoRecord.employee_id == employee.id).limit(1)
-        ).first()
-        if record_exists is not None:
+        if profile is not None:
             continue
+        profile = HrEmployeeBasicProfile(
+            employee_id=employee.id,
+            gender="여" if index % 2 else "남",
+            resident_no_masked=f"90{(index % 12) + 1:02d}15-1******",
+            blood_type=["A", "B", "O", "AB"][index % 4],
+            marital_status="기혼" if index % 3 == 0 else "미혼",
+            mbti=["ISTJ", "ENFP", "INTJ", "ESFJ"][index % 4],
+            job_family=["경영지원", "개발", "영업", "운영"][index % 4],
+            job_role=employee.position_title,
+            grade=["사원", "대리", "과장", "차장", "부장"][index % 5],
+        )
+        session.add(profile)
 
-        seed_rows = [
-            ("reward_penalty", "우수사원", "상", "대표이사", "표창", "분기 우수사원 선정"),
-            ("contact", "연락처", "개인전화", None, "010-1234-56{:02d}".format(index), "개인 연락처"),
-            ("education", "학력", "학사", "한국대학교", "컴퓨터공학", "졸업"),
-            ("career", "경력", "이전회사", "샘플테크", "백엔드 개발", "3년"),
-            ("certificate", "자격증", "정보처리기사", "한국산업인력공단", "취득", ""),
-            ("military", "병역", "육군", "대한민국 육군", "병장", "만기전역"),
-            ("evaluation", "연말평가", "A", None, "우수", "성과 우수"),
-        ]
-        for category, title, type_value, org, value, note in seed_rows:
+    ensure_hr_basic_domain_migration(session)
+
+    contact_existing = _count_rows(session, HrContactPoint)
+    for serial in range(contact_existing + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+        employee = employees[(serial - 1) % len(employees)]
+        session.add(
+            HrContactPoint(
+                employee_id=employee.id,
+                seq=serial,
+                contact_type="주소연락처",
+                record_date=_seed_record_date(serial),
+                addr1=f"서울시 테스트로 {serial}",
+                phone_mobile=f"010-2000-{serial % 10000:04d}",
+                email=f"emp{serial:04d}@vibe-hr.local",
+                note="자동 시드 주소/연락처 데이터",
+            )
+        )
+
+    career_existing = _count_rows(session, HrCareer)
+    for serial in range(career_existing + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+        employee = employees[(serial - 1) % len(employees)]
+        is_internal = serial % 2 == 0
+        session.add(
+            HrCareer(
+                employee_id=employee.id,
+                seq=serial,
+                career_scope="INTERNAL" if is_internal else "EXTERNAL",
+                record_date=_seed_record_date(serial),
+                company_name="VIBE-HR" if is_internal else f"외부회사-{(serial % 70) + 1}",
+                department_name=f"경력부서-{(serial % 20) + 1}",
+                position_title=f"경력직무-{(serial % 15) + 1}",
+                note="자동 시드 경력 데이터",
+            )
+        )
+
+    license_existing = _count_rows(session, HrLicense)
+    for serial in range(license_existing + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+        employee = employees[(serial - 1) % len(employees)]
+        session.add(
+            HrLicense(
+                employee_id=employee.id,
+                seq=serial,
+                license_type="자격사항",
+                license_name=f"자격-{serial:03d}",
+                license_no=f"LIC-{serial:06d}",
+                issued_org="한국산업인력공단",
+                record_date=_seed_record_date(serial),
+                issued_date=_seed_record_date(serial),
+                note="자동 시드 자격사항 데이터",
+            )
+        )
+
+    military_existing = _count_rows(session, HrMilitary)
+    for serial in range(military_existing + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+        employee = employees[(serial - 1) % len(employees)]
+        session.add(
+            HrMilitary(
+                employee_id=employee.id,
+                seq=serial,
+                military_type="병역",
+                branch="대한민국 육군",
+                rank=["병장", "중사", "하사", "대위"][serial % 4],
+                record_date=_seed_record_date(serial),
+                discharge_type="만기전역",
+                note="자동 시드 병역 데이터",
+            )
+        )
+
+    reward_existing = _count_rows(session, HrRewardPunish)
+    for serial in range(reward_existing + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+        employee = employees[(serial - 1) % len(employees)]
+        is_reward = serial % 2 == 0
+        session.add(
+            HrRewardPunish(
+                employee_id=employee.id,
+                seq=serial,
+                reward_punish_type="REWARD" if is_reward else "PUNISH",
+                title=f"{'포상' if is_reward else '징계'}-{serial:03d}",
+                office_name="인사위원회",
+                reason=f"{'포상' if is_reward else '징계'} 사유 {serial:03d}",
+                action_date=_seed_record_date(serial),
+                status="CONFIRMED",
+                note=f"자동 시드 {'포상' if is_reward else '징계'} 데이터",
+            )
+        )
+
+    legacy_categories = ("education", "evaluation")
+    for category in legacy_categories:
+        count_result = session.exec(
+            select(func.count(HrEmployeeInfoRecord.id)).where(HrEmployeeInfoRecord.category == category)
+        ).one()
+        existing_count = int(count_result[0] if isinstance(count_result, tuple) else count_result)
+        for serial in range(existing_count + 1, HR_BASIC_SEED_TARGET_PER_CATEGORY + 1):
+            employee = employees[(serial - 1) % len(employees)]
+            title, type_value, org, value, note = _build_legacy_hr_basic_seed_fields(category, serial)
             session.add(
                 HrEmployeeInfoRecord(
                     employee_id=employee.id,
@@ -1158,19 +1485,125 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
                     organization=org,
                     value=value,
                     note=note,
-                    record_date=date(2025, (index % 12) + 1, min(20, (index % 27) + 1)),
+                    record_date=_seed_record_date(serial),
                 )
             )
 
     session.commit()
 
+def ensure_hr_retire_checklist_seed(session: Session) -> None:
+    for code, title, is_required, sort_order, description in HR_RETIRE_CHECKLIST_SEEDS:
+        row = session.exec(
+            select(HrRetireChecklistItem).where(HrRetireChecklistItem.code == code)
+        ).first()
+        if row is None:
+            session.add(
+                HrRetireChecklistItem(
+                    code=code,
+                    title=title,
+                    description=description,
+                    is_required=is_required,
+                    is_active=True,
+                    sort_order=sort_order,
+                )
+            )
+            continue
+
+        changed = False
+        if row.title != title:
+            row.title = title
+            changed = True
+        if row.description != description:
+            row.description = description
+            changed = True
+        if row.is_required != is_required:
+            row.is_required = is_required
+            changed = True
+        if row.sort_order != sort_order:
+            row.sort_order = sort_order
+            changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            session.add(row)
+
+    session.commit()
+
 
 def ensure_remove_legacy_appointment_records(session: Session) -> None:
-    # 발령처리 데이터를 전용 테이블로 분리하기 위한 정리 단계.
+    # 발령처리 데이터는 전용 테이블로 분리하기 위한 정리 단계.
     # 기존 hr_employee_info_records(category='appointment') 데이터는 제거한다.
     session.exec(text("DELETE FROM hr_employee_info_records WHERE category = 'appointment'"))
     session.commit()
 
+
+def ensure_hr_basic_category_mapping(session: Session) -> None:
+    # Legacy categories are normalized to EHR legacy table keys.
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm128'
+            WHERE lower(category) = 'reward_penalty'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm123'
+            WHERE lower(category) = 'address'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm123'
+            WHERE lower(category) = 'contact'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm123'
+            WHERE lower(category) = 'thrm124'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm117'
+            WHERE lower(category) = 'career'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm113'
+            WHERE lower(category) = 'certificate'
+            """
+        )
+    )
+    session.exec(
+        text(
+            """
+            UPDATE hr_employee_info_records
+            SET category = 'thrm121'
+            WHERE lower(category) = 'military'
+            """
+        )
+    )
+    session.commit()
 
 ATTENDANCE_CODE_SEEDS = [
     # (code, name, category, unit, is_requestable, min_days, max_days, deduct_annual, sort_order)
@@ -2119,7 +2552,9 @@ def seed_initial_data(session: Session) -> None:
     ensure_pap_final_results(session)
     ensure_pap_appraisal_masters(session)
     ensure_remove_legacy_appointment_records(session)
+    ensure_hr_basic_category_mapping(session)
     ensure_hr_basic_seed_data(session)
+    ensure_hr_retire_checklist_seed(session)
     ensure_attendance_codes(session)
     ensure_work_schedule_codes(session)
     ensure_schedule_foundations(session)
@@ -2135,3 +2570,4 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_approval_templates(session)
     ensure_hri_form_type_template_maps(session)
     ensure_wel_benefit_types(session)
+

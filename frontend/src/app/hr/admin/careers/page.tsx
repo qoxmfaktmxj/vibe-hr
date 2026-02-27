@@ -11,6 +11,6 @@ export default async function Page() {
   await requireMenuAccess("/hr/admin/careers");
 
   return (
-      <HrAdminRecordManager category="career" title="경력관리" />
+      <HrAdminRecordManager category="careers" title="경력관리" />
   );
 }

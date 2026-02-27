@@ -11,6 +11,6 @@ export default async function Page() {
   await requireMenuAccess("/hr/admin/certificates");
 
   return (
-      <HrAdminRecordManager category="certificate" title="자격증관리" />
+      <HrAdminRecordManager category="licenses" title="자격증관리" />
   );
 }

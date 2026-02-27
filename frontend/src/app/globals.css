@@ -535,3 +535,10 @@
   border-radius: 2px;
 }
 
+/* Remove pinned boundary line for screens that need seamless header/cell flow */
+.vibe-grid-no-pinned-divider .ag-pinned-left-header,
+.vibe-grid-no-pinned-divider .ag-pinned-left-cols-container {
+  border-right: none !important;
+  box-shadow: none !important;
+}
+

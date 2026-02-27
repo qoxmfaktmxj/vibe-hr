@@ -59,11 +59,22 @@ def hr_basic_record_create(employee_id: int, payload: HrBasicRecordCreateRequest
 
 
 @router.put("/{employee_id}/records/{record_id}", response_model=HrBasicRecordItem, dependencies=[Depends(require_roles("hr_manager", "admin"))])
-def hr_basic_record_update(employee_id: int, record_id: int, payload: HrBasicRecordUpdateRequest, session: Session = Depends(get_session)) -> HrBasicRecordItem:
-    return update_hr_basic_record(session, employee_id, record_id, payload)
+def hr_basic_record_update(
+    employee_id: int,
+    record_id: int,
+    payload: HrBasicRecordUpdateRequest,
+    category: str = Query(...),
+    session: Session = Depends(get_session),
+) -> HrBasicRecordItem:
+    return update_hr_basic_record(session, employee_id, record_id, payload, category=category)
 
 
 @router.delete("/{employee_id}/records/{record_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_roles("hr_manager", "admin"))])
-def hr_basic_record_delete(employee_id: int, record_id: int, session: Session = Depends(get_session)) -> Response:
-    delete_hr_basic_record(session, employee_id, record_id)
+def hr_basic_record_delete(
+    employee_id: int,
+    record_id: int,
+    category: str = Query(...),
+    session: Session = Depends(get_session),
+) -> Response:
+    delete_hr_basic_record(session, employee_id, record_id, category=category)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

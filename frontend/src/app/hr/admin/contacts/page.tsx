@@ -11,6 +11,6 @@ export default async function Page() {
   await requireMenuAccess("/hr/admin/contacts");
 
   return (
-      <HrAdminRecordManager category="contact" title="주소연락처관리" />
+      <HrAdminRecordManager category="contact_points" title="주소연락처관리" />
   );
 }

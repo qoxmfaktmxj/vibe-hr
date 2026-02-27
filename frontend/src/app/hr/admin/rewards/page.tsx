@@ -11,6 +11,6 @@ export default async function Page() {
   await requireMenuAccess("/hr/admin/rewards");
 
   return (
-      <HrAdminRecordManager category="reward_penalty" title="상벌관리" />
+      <HrAdminRecordManager category="reward_punish" title="상벌관리" />
   );
 }

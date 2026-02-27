@@ -15,27 +15,30 @@ import { toast } from "sonner";
 import useSWR from "swr";
 
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
+import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { fetcher } from "@/lib/fetcher";
 import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
+import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
 import type { EmployeeItem } from "@/types/employee";
 import type { HrInfoRow } from "@/types/hr-employee-profile";
 
-// AG Grid modules are provided globally via <AgGridProvider>.
+// AG Grid modules are provided by ManagerPageShell via AgGridModulesProvider.
 
 type Props = {
   category:
     | "appointment"
-    | "reward_penalty"
-    | "contact"
+    | "reward_punish"
+    | "contact_points"
     | "education"
-    | "career"
-    | "certificate"
+    | "careers"
+    | "licenses"
     | "military"
     | "evaluation";
   title: string;
@@ -69,6 +72,7 @@ const EMPTY_FILTERS: SearchFilters = {
 };
 
 const TRACKED_FIELDS: (keyof HrInfoRow)[] = ["record_date", "type", "title", "organization", "value", "note"];
+const PAGE_SIZE = 50;
 
 const STATUS_LABELS: Record<RowStatus, string> = {
   clean: "",
@@ -98,20 +102,54 @@ function matchesEmployeeFilters(employee: EmployeeItem, filters: SearchFilters):
 }
 
 async function parseErrorDetail(response: Response, fallback: string): Promise<string> {
-  const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-  return json?.detail ?? fallback;
+  const json = (await response.json().catch(() => null)) as unknown;
+  return stringifyErrorDetail(json) ?? fallback;
+}
+
+function stringifyErrorDetail(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.length > 0 ? text : null;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => stringifyErrorDetail(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" / ") : null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.msg === "string") {
+    const loc = Array.isArray(record.loc)
+      ? record.loc.map((part) => String(part)).join(".")
+      : "";
+    return loc ? `${loc}: ${record.msg}` : record.msg;
+  }
+
+  return (
+    stringifyErrorDetail(record.detail) ??
+    stringifyErrorDetail(record.message) ??
+    stringifyErrorDetail(record.error)
+  );
 }
 
 export function HrAdminRecordManager({ category, title }: Props) {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<AdminGridRow[]>([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const gridApiRef = useRef<GridApi<AdminGridRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<AdminGridRow[]>([]);
 
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
@@ -158,10 +196,39 @@ export function HrAdminRecordManager({ category, title }: Props) {
     return id;
   }, []);
 
-  const redrawRows = useCallback(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.redrawRows();
-  }, []);
+  const commitRows = useCallback(
+    (updater: (prevRows: AdminGridRow[]) => AdminGridRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+    },
+    [],
+  );
+
+  const {
+    totalPages,
+    pageInput,
+    setPageInput,
+    goPrev,
+    goNext,
+    goToPage,
+  } = useGridPagination({
+    page,
+    totalCount: rows.length,
+    pageSize: PAGE_SIZE,
+    onPageChange: setPage,
+  });
+
+  const pagedRows = useMemo(() => {
+    const startIndex = (page - 1) * PAGE_SIZE;
+    return rows.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [page, rows]);
+
+  useEffect(() => {
+    if (page <= totalPages) return;
+    setPage(totalPages);
+  }, [page, totalPages]);
 
   const refresh = useCallback(
     async (filters: SearchFilters) => {
@@ -184,7 +251,9 @@ export function HrAdminRecordManager({ category, title }: Props) {
           _original: snapshotOriginal(row),
           _prevStatus: undefined,
         }));
+        rowsRef.current = nextRows;
         setRows(nextRows);
+        setPage(1);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "데이터 조회에 실패했습니다.");
       } finally {
@@ -201,6 +270,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
   const handleQuery = useCallback(() => {
     const nextFilters = { ...searchFilters };
     setAppliedFilters(nextFilters);
+    setPage(1);
   }, [searchFilters]);
 
   const addRow = useCallback(() => {
@@ -231,9 +301,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
       _prevStatus: undefined,
     };
 
-    setRows((prev) => [newRow, ...prev]);
-    redrawRows();
-  }, [category, issueTempId, redrawRows]);
+    commitRows((prev) => [newRow, ...prev]);
+  }, [category, commitRows, issueTempId]);
 
   const copyRows = useCallback(() => {
     const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
@@ -251,21 +320,19 @@ export function HrAdminRecordManager({ category, title }: Props) {
       _prevStatus: undefined,
     }));
 
-    setRows((prev) => [...clones, ...prev]);
-    redrawRows();
-  }, [issueTempId, redrawRows]);
+    commitRows((prev) => [...clones, ...prev]);
+  }, [commitRows, issueTempId]);
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const onCellValueChanged = useCallback(
@@ -273,7 +340,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
       const changed = event.data;
       if (!changed) return;
 
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.employee_id !== changed.employee_id || row.id !== changed.id) {
             return row;
@@ -289,10 +356,8 @@ export function HrAdminRecordManager({ category, title }: Props) {
           });
         }),
       );
-
-      redrawRows();
     },
-    [redrawRows],
+    [commitRows],
   );
 
   const saveAll = useCallback(async () => {
@@ -307,49 +372,66 @@ export function HrAdminRecordManager({ category, title }: Props) {
 
     setSaving(true);
     try {
-      for (const row of toDelete) {
-        const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, { method: "DELETE" });
-        if (!response.ok) {
-          throw new Error(await parseErrorDetail(response, `${row.employee_no} 삭제 실패`));
-        }
-      }
+      await runConcurrentOrThrow(
+        "삭제",
+        toDelete.map((row) => async () => {
+          const rowCategory = row.category || category;
+          const response = await fetch(
+            `/api/hr/basic/${row.employee_id}/records/${row.id}?category=${encodeURIComponent(rowCategory)}`,
+            { method: "DELETE" },
+          );
+          if (!response.ok) {
+            throw new Error(await parseErrorDetail(response, `${row.employee_no} 삭제 실패`));
+          }
+        }),
+        6,
+      );
 
-      for (const row of toUpdate) {
-        const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            record_date: row.record_date || null,
-            type: row.type || null,
-            title: row.title || null,
-            organization: row.organization || null,
-            value: row.value || null,
-            note: row.note || null,
-          }),
-        });
-        if (!response.ok) {
-          throw new Error(await parseErrorDetail(response, `${row.employee_no} 수정 실패`));
-        }
-      }
+      await runConcurrentOrThrow(
+        "수정",
+        toUpdate.map((row) => async () => {
+          const rowCategory = row.category || category;
+          const response = await fetch(`/api/hr/basic/${row.employee_id}/records/${row.id}?category=${encodeURIComponent(rowCategory)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              record_date: row.record_date || null,
+              type: row.type || null,
+              title: row.title || null,
+              organization: row.organization || null,
+              value: row.value || null,
+              note: row.note || null,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(await parseErrorDetail(response, `${row.employee_no} 수정 실패`));
+          }
+        }),
+        6,
+      );
 
-      for (const row of toInsert) {
-        const response = await fetch(`/api/hr/basic/${row.employee_id}/records`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            category,
-            record_date: row.record_date || null,
-            type: row.type || null,
-            title: row.title || null,
-            organization: row.organization || null,
-            value: row.value || null,
-            note: row.note || null,
-          }),
-        });
-        if (!response.ok) {
-          throw new Error(await parseErrorDetail(response, `${row.employee_no} 입력 실패`));
-        }
-      }
+      await runConcurrentOrThrow(
+        "입력",
+        toInsert.map((row) => async () => {
+          const response = await fetch(`/api/hr/basic/${row.employee_id}/records`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category: row.category || category,
+              record_date: row.record_date || null,
+              type: row.type || null,
+              title: row.title || null,
+              organization: row.organization || null,
+              value: row.value || null,
+              note: row.note || null,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(await parseErrorDetail(response, `${row.employee_no} 입력 실패`));
+          }
+        }),
+        6,
+      );
 
       toast.success(`저장 완료 (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`);
       await refresh(appliedFilters);
@@ -463,8 +545,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
           return;
         }
 
-        setRows((prev) => [...parsed, ...prev]);
-        redrawRows();
+        commitRows((prev) => [...parsed, ...prev]);
 
         if (skipped > 0) {
           toast.info(`업로드 ${parsed.length}건, 사번 불일치 ${skipped}건 제외`);
@@ -473,7 +554,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
         toast.error("업로드에 실패했습니다.");
       }
     },
-    [category, employeeByNo, issueTempId, redrawRows],
+    [category, commitRows, employeeByNo, issueTempId],
   );
 
   const columnDefs = useMemo<ColDef<AdminGridRow>[]>(() => {
@@ -690,13 +771,24 @@ export function HrAdminRecordManager({ category, title }: Props) {
         headerLeft={(
           <>
             <span className="text-xs text-slate-400">
-              조회 대상 {filteredEmployees.length.toLocaleString()}명 / 레코드 {rows.length.toLocaleString()}건
+              조회 대상 {filteredEmployees.length.toLocaleString()}명 / 레코드 {rows.length.toLocaleString()}건 · {page} / {totalPages}페이지
             </span>
             <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
           </>
         )}
         headerRight={(
           <>
+            <GridPaginationControls
+              page={page}
+              totalPages={totalPages}
+              pageInput={pageInput}
+              setPageInput={setPageInput}
+              goPrev={goPrev}
+              goNext={goNext}
+              goToPage={goToPage}
+              disabled={loading || saving}
+              className="mt-0 justify-start"
+            />
             <GridToolbarActions actions={toolbarActions} />
             <input
               ref={uploadInputRef}
@@ -714,10 +806,10 @@ export function HrAdminRecordManager({ category, title }: Props) {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
-          <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid vibe-grid-no-pinned-divider h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
             <AgGridReact<AdminGridRow>
               theme="legacy"
-              rowData={rows}
+              rowData={pagedRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
               rowSelection="multiple"

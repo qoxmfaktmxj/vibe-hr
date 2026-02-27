@@ -8,6 +8,7 @@ import {
   type GridApi,
   type GridReadyEvent,
   type ICellRendererParams,
+  type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { Plus, Copy, FileDown, Upload, Download, Save } from "lucide-react";
@@ -24,11 +25,16 @@ import {
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
-import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
-import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import {
+  getGridRowClass,
+  getGridStatusCellClass,
+  summarizeGridStatuses,
+} from "@/lib/grid/grid-status";
+import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
 import type { OrganizationDepartmentItem, OrganizationDepartmentListResponse } from "@/types/organization";
 
-// AG Grid modules are provided globally via <AgGridProvider>.
+// AG Grid modules are provided by ManagerPageShell via AgGridModulesProvider.
 
 type RowStatus = GridRowStatus;
 
@@ -128,6 +134,26 @@ function toGridRow(item: OrganizationDepartmentItem): OrgRow {
   };
 }
 
+function stringifyErrorDetail(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text.length > 0 ? text : null;
+  }
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => stringifyErrorDetail(item))
+      .filter((item): item is string => Boolean(item));
+    return parts.length > 0 ? parts.join(" / ") : null;
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.msg === "string") {
+    const loc = Array.isArray(record.loc) ? record.loc.map((part) => String(part)).join(".") : "";
+    return loc ? `${loc}: ${record.msg}` : record.msg;
+  }
+  return stringifyErrorDetail(record.detail) ?? stringifyErrorDetail(record.message) ?? stringifyErrorDetail(record.error);
+}
+
 export function OrganizationManager() {
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [searchCode, setSearchCode] = useState("");
@@ -141,6 +167,7 @@ export function OrganizationManager() {
   const gridApiRef = useRef<GridApi<OrgRow> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tempIdRef = useRef(-1);
+  const rowsRef = useRef<OrgRow[]>([]);
 
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
 
@@ -149,10 +176,54 @@ export function OrganizationManager() {
     [rows],
   );
 
-  const refreshGridRows = useCallback(() => {
-    if (!gridApiRef.current) return;
-    gridApiRef.current.redrawRows();
-  }, []);
+  const getRowKey = useCallback((row: OrgRow) => String(row.id), []);
+
+  const applyGridTransaction = useCallback(
+    (prevRows: OrgRow[], nextRows: OrgRow[]) => {
+      const api = gridApiRef.current;
+      if (!api) return;
+
+      const prevMap = new Map(prevRows.map((row) => [getRowKey(row), row]));
+      const nextMap = new Map(nextRows.map((row) => [getRowKey(row), row]));
+      const add: OrgRow[] = [];
+      const update: OrgRow[] = [];
+      const remove: OrgRow[] = [];
+
+      for (const row of nextRows) {
+        const previous = prevMap.get(getRowKey(row));
+        if (!previous) {
+          add.push(row);
+          continue;
+        }
+        if (previous !== row) update.push(row);
+      }
+
+      for (const row of prevRows) {
+        if (!nextMap.has(getRowKey(row))) remove.push(row);
+      }
+
+      if (add.length === 0 && update.length === 0 && remove.length === 0) return;
+
+      api.applyTransaction({
+        add: add.length > 0 ? add : undefined,
+        update: update.length > 0 ? update : undefined,
+        remove: remove.length > 0 ? remove : undefined,
+        addIndex: add.length > 0 ? 0 : undefined,
+      });
+    },
+    [getRowKey],
+  );
+
+  const commitRows = useCallback(
+    (updater: (prevRows: OrgRow[]) => OrgRow[]) => {
+      const prevRows = rowsRef.current;
+      const nextRows = updater(prevRows);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      applyGridTransaction(prevRows, nextRows);
+    },
+    [applyGridTransaction],
+  );
 
   const fetchDepartments = useCallback(async () => {
     const params = new URLSearchParams();
@@ -164,8 +235,8 @@ export function OrganizationManager() {
       params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
     const response = await fetch(endpoint, { cache: "no-store" });
     if (!response.ok) {
-      const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-      throw new Error(json?.detail ?? I18N.loadError);
+      const json = (await response.json().catch(() => null)) as unknown;
+      throw new Error(stringifyErrorDetail(json) ?? I18N.loadError);
     }
     const data = (await response.json()) as OrganizationDepartmentListResponse;
     return data.departments;
@@ -176,6 +247,7 @@ export function OrganizationManager() {
     try {
       const departments = await fetchDepartments();
       const nextRows = departments.map(toGridRow);
+      rowsRef.current = nextRows;
       setRows(nextRows);
       setSelectedId(nextRows[0]?.id ?? null);
     } catch (error) {
@@ -218,16 +290,14 @@ export function OrganizationManager() {
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      setRows((prev) =>
+      commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-
-      refreshGridRows();
     },
-    [refreshGridRows],
+    [commitRows],
   );
 
   const columnDefs = useMemo<ColDef<OrgRow>[]>(
@@ -311,7 +381,7 @@ export function OrganizationManager() {
     [toggleDeleteById],
   );
 
-  const getRowClass = useCallback((params: { data?: OrgRow }) => {
+  const getRowClass = useCallback((params: RowClassParams<OrgRow>) => {
     return getGridRowClass(params.data?._status);
   }, []);
 
@@ -331,9 +401,8 @@ export function OrganizationManager() {
       _status: "added",
     };
 
-    setRows((prev) => [newRow, ...prev]);
+    commitRows((prev) => [newRow, ...prev]);
     setSelectedId(newId);
-    refreshGridRows();
   }
 
   function copyRow() {
@@ -352,13 +421,12 @@ export function OrganizationManager() {
       _original: undefined,
     };
 
-    setRows((prev) => {
+    commitRows((prev) => {
       const index = prev.findIndex((row) => row.id === selectedRow.id);
       if (index < 0) return [copied, ...prev];
       return [...prev.slice(0, index + 1), copied, ...prev.slice(index + 1)];
     });
     setSelectedId(newId);
-    refreshGridRows();
   }
 
   function downloadTemplate() {
@@ -400,12 +468,11 @@ export function OrganizationManager() {
         };
       });
 
-      setRows((prev) => [...pastedRows, ...prev]);
+      commitRows((prev) => [...pastedRows, ...prev]);
       setSelectedId(pastedRows[0]?.id ?? null);
-      refreshGridRows();
       toast.success(`붙여넣기 완료 (${pastedRows.length}건)`);
     },
-    [refreshGridRows],
+    [commitRows],
   );
 
   function downloadXlsx() {
@@ -435,38 +502,57 @@ export function OrganizationManager() {
 
     setSaving(true);
     try {
-      for (const row of toDelete) {
-        const response = await fetch(`/api/org/departments/${row.id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error(`삭제 실패: ${row.code}`);
-      }
+      await runConcurrentOrThrow(
+        "삭제",
+        toDelete.map((row) => async () => {
+          const response = await fetch(`/api/org/departments/${row.id}`, { method: "DELETE" });
+          if (!response.ok) throw new Error(`삭제 실패: ${row.code}`);
+        }),
+        6,
+      );
 
-      for (const row of toUpdate) {
-        const response = await fetch(`/api/org/departments/${row.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: row.code,
-            name: row.name,
-            parent_id: row.parent_id,
-            is_active: row.is_active,
-          }),
-        });
-        if (!response.ok) throw new Error(`수정 실패: ${row.code}`);
-      }
+      await runConcurrentOrThrow(
+        "수정",
+        toUpdate.map((row) => async () => {
+          const response = await fetch(`/api/org/departments/${row.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: row.code,
+              name: row.name,
+              parent_id: row.parent_id,
+              is_active: row.is_active,
+            }),
+          });
+          if (!response.ok) throw new Error(`수정 실패: ${row.code}`);
+        }),
+        6,
+      );
 
-      for (const row of toInsert) {
-        const response = await fetch("/api/org/departments", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: row.code,
-            name: row.name,
-            parent_id: row.parent_id,
-            is_active: row.is_active,
-          }),
-        });
-        if (!response.ok) throw new Error(`입력 실패: ${row.code || "(신규)"}`);
-      }
+      await runConcurrentOrThrow(
+        "입력",
+        toInsert.map((row) => async () => {
+          const response = await fetch("/api/org/departments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: row.code,
+              name: row.name,
+              parent_id: row.parent_id,
+              is_active: row.is_active,
+            }),
+          });
+          if (!response.ok) throw new Error(`입력 실패: ${row.code || "(신규)"}`);
+        }),
+        6,
+      );
+
+      commitRows((prev) =>
+        clearSavedStatuses(prev, {
+          removeDeleted: true,
+          buildOriginal: (row) => snapshotOriginal(row),
+        }),
+      );
 
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
@@ -543,7 +629,7 @@ export function OrganizationManager() {
       const field = event.colDef.field as keyof OrgRow | undefined;
       if (rowId == null || !field) return;
 
-      setRows((prev) =>
+      commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
           const next = { ...row, [field]: event.newValue } as OrgRow;
@@ -552,9 +638,8 @@ export function OrganizationManager() {
           });
         }),
       );
-      refreshGridRows();
     },
-    [refreshGridRows],
+    [commitRows],
   );
 
   if (initialLoading) {

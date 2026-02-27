@@ -194,6 +194,155 @@ class HrEmployeeInfoRecord(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class HrContactPoint(SQLModel, table=True):
+    __tablename__ = "hr_contact_points"
+    __table_args__ = (
+        Index("ix_hr_contact_points_employee_record_date", "employee_id", "record_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    seq: int = Field(default=1)
+    contact_type: Optional[str] = Field(default=None, max_length=50)
+    record_date: Optional[date] = None
+    zip_code: Optional[str] = Field(default=None, max_length=20)
+    addr1: Optional[str] = Field(default=None, max_length=300)
+    addr2: Optional[str] = Field(default=None, max_length=300)
+    phone_mobile: Optional[str] = Field(default=None, max_length=40)
+    phone_home: Optional[str] = Field(default=None, max_length=40)
+    phone_work: Optional[str] = Field(default=None, max_length=40)
+    email: Optional[str] = Field(default=None, max_length=320)
+    emergency_name: Optional[str] = Field(default=None, max_length=100)
+    emergency_relation: Optional[str] = Field(default=None, max_length=50)
+    emergency_phone: Optional[str] = Field(default=None, max_length=40)
+    is_primary: bool = Field(default=False)
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrCareer(SQLModel, table=True):
+    __tablename__ = "hr_careers"
+    __table_args__ = (
+        CheckConstraint("career_scope IN ('INTERNAL', 'EXTERNAL')", name="ck_hr_careers_scope"),
+        Index("ix_hr_careers_employee_record_date", "employee_id", "record_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    seq: int = Field(default=1)
+    career_scope: str = Field(default="EXTERNAL", max_length=20)
+    record_date: Optional[date] = None
+    company_name: Optional[str] = Field(default=None, max_length=120)
+    department_name: Optional[str] = Field(default=None, max_length=120)
+    position_title: Optional[str] = Field(default=None, max_length=120)
+    job_title: Optional[str] = Field(default=None, max_length=120)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    is_current: bool = Field(default=False)
+    career_years: Optional[int] = None
+    career_months: Optional[int] = None
+    description: Optional[str] = Field(default=None, max_length=1000)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrLicense(SQLModel, table=True):
+    __tablename__ = "hr_licenses"
+    __table_args__ = (
+        Index("ix_hr_licenses_employee_record_date", "employee_id", "record_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    seq: int = Field(default=1)
+    license_type: Optional[str] = Field(default=None, max_length=60)
+    license_code: Optional[str] = Field(default=None, max_length=60)
+    license_name: Optional[str] = Field(default=None, max_length=120)
+    license_grade: Optional[str] = Field(default=None, max_length=60)
+    license_no: Optional[str] = Field(default=None, max_length=120)
+    issued_org: Optional[str] = Field(default=None, max_length=120)
+    record_date: Optional[date] = None
+    issued_date: Optional[date] = None
+    renewal_date: Optional[date] = None
+    expire_date: Optional[date] = None
+    allowance_yn: bool = Field(default=False)
+    allowance_rate: Optional[float] = None
+    allowance_amount: Optional[float] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrMilitary(SQLModel, table=True):
+    __tablename__ = "hr_military"
+    __table_args__ = (
+        Index("ix_hr_military_employee_record_date", "employee_id", "record_date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    seq: int = Field(default=1)
+    military_type: Optional[str] = Field(default=None, max_length=60)
+    branch: Optional[str] = Field(default=None, max_length=60)
+    rank: Optional[str] = Field(default=None, max_length=60)
+    record_date: Optional[date] = None
+    service_start_date: Optional[date] = None
+    service_end_date: Optional[date] = None
+    discharge_type: Optional[str] = Field(default=None, max_length=60)
+    exemption_reason: Optional[str] = Field(default=None, max_length=500)
+    special_case_yn: bool = Field(default=False)
+    special_case_type: Optional[str] = Field(default=None, max_length=60)
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrRewardPunish(SQLModel, table=True):
+    __tablename__ = "hr_reward_punish"
+    __table_args__ = (
+        CheckConstraint(
+            "reward_punish_type IN ('REWARD', 'PUNISH')",
+            name="ck_hr_reward_punish_type",
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'REQUESTED', 'APPROVED', 'REJECTED', 'CONFIRMED')",
+            name="ck_hr_reward_punish_status",
+        ),
+        Index("ix_hr_reward_punish_employee_action_date", "employee_id", "action_date"),
+        Index("ix_hr_reward_punish_request_status", "hri_request_id", "status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    seq: int = Field(default=1)
+    reward_punish_type: str = Field(max_length=20)
+    code: Optional[str] = Field(default=None, max_length=60)
+    title: Optional[str] = Field(default=None, max_length=120)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+    action_date: Optional[date] = None
+    office_name: Optional[str] = Field(default=None, max_length=120)
+    amount: Optional[float] = None
+    status: str = Field(default="DRAFT", max_length=20)
+    hri_request_id: Optional[int] = Field(default=None, foreign_key="hri_request_masters.id")
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrAppointmentOrder(SQLModel, table=True):
     """발령처리 마스터 (THRM191 대응)."""
 
@@ -287,6 +436,84 @@ class HrPersonnelHistory(SQLModel, table=True):
     after_value: Optional[str] = Field(default=None, max_length=200)
     description: Optional[str] = Field(default=None, max_length=500)
     created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class HrRetireChecklistItem(SQLModel, table=True):
+    __tablename__ = "hr_retire_checklist_items"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_hr_retire_checklist_items_code"),
+        Index("ix_hr_retire_checklist_items_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=50, index=True)
+    title: str = Field(max_length=120)
+    description: Optional[str] = Field(default=None, max_length=500)
+    is_required: bool = Field(default=True)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrRetireCase(SQLModel, table=True):
+    __tablename__ = "hr_retire_cases"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'confirmed', 'cancelled')",
+            name="ck_hr_retire_cases_status",
+        ),
+        Index("ix_hr_retire_cases_status_date", "status", "retire_date"),
+        Index("ix_hr_retire_cases_employee_created", "employee_id", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    retire_date: date = Field(index=True)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    status: str = Field(default="draft", max_length=20)
+    previous_employment_status: Optional[str] = Field(default=None, max_length=20)
+    requested_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    confirmed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    confirmed_at: Optional[datetime] = None
+    cancelled_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    cancelled_at: Optional[datetime] = None
+    cancel_reason: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrRetireCaseItem(SQLModel, table=True):
+    __tablename__ = "hr_retire_case_items"
+    __table_args__ = (
+        UniqueConstraint("case_id", "checklist_item_id", name="uq_hr_retire_case_items_case_checklist"),
+        Index("ix_hr_retire_case_items_case_checked", "case_id", "is_checked"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    case_id: int = Field(foreign_key="hr_retire_cases.id", index=True)
+    checklist_item_id: int = Field(foreign_key="hr_retire_checklist_items.id", index=True)
+    is_required: bool = Field(default=True)
+    is_checked: bool = Field(default=False)
+    checked_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    checked_at: Optional[datetime] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class HrRetireAuditLog(SQLModel, table=True):
+    __tablename__ = "hr_retire_audit_logs"
+    __table_args__ = (
+        Index("ix_hr_retire_audit_logs_case_created", "case_id", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    case_id: int = Field(foreign_key="hr_retire_cases.id", index=True)
+    action_type: str = Field(max_length=30, index=True)
+    actor_user_id: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    detail: Optional[str] = Field(default=None, max_length=1000)
     created_at: datetime = Field(default_factory=utc_now)
 
 
