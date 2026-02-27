@@ -52,6 +52,23 @@
       ],
       "ownerModule": "ORG"
     },
+    "mng.companies": {
+      "path": "/mng/companies",
+      "pageFile": "frontend/src/app/mng/companies/page.tsx",
+      "componentFile": "frontend/src/components/mng/company-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
     "hr.appointment.codes": {
       "path": "/hr/appointment/codes",
       "pageFile": "frontend/src/app/hr/appointment/codes/page.tsx",

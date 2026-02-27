@@ -60,7 +60,7 @@ type DashboardAttendancePanelProps = {
 export function DashboardAttendancePanel({ compact = false }: DashboardAttendancePanelProps) {
   const { user } = useAuth();
   // SSR hydration mismatch 방지: 초기값은 함수로 지연 계산
-  const [clock, setClock] = useState<string>(() => getKoreaDateTime());
+  const [clock, setClock] = useState<string>("");
   const scheduleKey = user?.id ? `/api/tim/attendance-daily/today-schedule?user_id=${user.id}` : "/api/tim/attendance-daily/today-schedule";
   const { data, isLoading } = useSWR<TimTodayScheduleResponse>(scheduleKey, fetcher, {
     revalidateOnFocus: false,
@@ -119,7 +119,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
   return (
     <div className={`rounded-xl border bg-card p-4 ${compact ? "h-full" : ""}`}>
       <div className="space-y-1">
-        <p className="font-mono text-lg font-semibold tracking-wide">{clock ?? "\u00a0"}</p>
+        <p className="font-mono text-lg font-semibold tracking-wide">{clock || "\u00a0"}</p>
         <div className="text-xs text-muted-foreground">
           <p>구분: {dayTypeLabel ?? "-"}</p>
           <p>

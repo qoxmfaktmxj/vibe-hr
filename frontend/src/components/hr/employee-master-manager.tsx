@@ -35,11 +35,9 @@ import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-b
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
-import { Input } from "@/components/ui/input";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { buildEmployeeBatchPayload } from "@/lib/hr/employee-batch";
 import {
-  hasRowPatchChanges,
   isRowRevertedToOriginal,
   snapshotFields,
   type GridRowStatus,
@@ -49,7 +47,6 @@ import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-sta
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
-import { useMediaQuery } from "@/lib/use-media-query";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
   EmployeeBatchResponse,
@@ -329,7 +326,6 @@ export function EmployeeMasterManager() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const tempIdRef = useRef(-1);
-  const isDesktop = useMediaQuery("(min-width: 768px)", true);
 
   /* -- 파생값 ---------------------------------------------------- */
   const departmentNameById = useMemo(() => {
@@ -470,7 +466,7 @@ export function EmployeeMasterManager() {
         }),
       );
 
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     },
     [refreshGridRows],
   );
@@ -718,36 +714,16 @@ export function EmployeeMasterManager() {
       );
 
       // 상태 변경 후 행 스타일 반영을 위해 다시 그리기
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     },
     [departmentNameById, refreshGridRows],
-  );
-
-  const patchRow = useCallback(
-    (rowId: number, patch: Partial<EmployeeGridRow>) => {
-      setRows((prev) =>
-        prev.map((row) => {
-          if (row.id !== rowId) return row;
-          if (!hasRowPatchChanges(row, patch)) return row;
-
-          const next: EmployeeGridRow = { ...row, ...patch };
-          if ("_status" in patch) return next;
-
-          return reconcileUpdatedStatus(next, {
-            shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
-          });
-        }),
-      );
-      setTimeout(refreshGridRows, 0);
-    },
-    [refreshGridRows],
   );
 
   /* -- 액션 ---------------------------------------------------- */
   function addRows(count: number) {
     const added = Array.from({ length: count }, () => createEmptyRow());
     setRows((prev) => [...added, ...prev]);
-    setTimeout(refreshGridRows, 0);
+    refreshGridRows();
   }
 
   const parseDepartmentId = useCallback(
@@ -794,7 +770,7 @@ export function EmployeeMasterManager() {
       });
 
       setRows((prev) => [...parsed, ...prev]);
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     },
     [departmentNameById, issueTempId, parseDepartmentId, refreshGridRows],
   );
@@ -832,7 +808,7 @@ export function EmployeeMasterManager() {
       return next;
     });
 
-    setTimeout(refreshGridRows, 0);
+    refreshGridRows();
   }
 
   async function downloadTemplateExcel() {
@@ -927,7 +903,7 @@ export function EmployeeMasterManager() {
       }
 
       setRows((prev) => [...parsed, ...prev]);
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     } catch {
       toast.error("엑셀 파일을 읽지 못했습니다. 파일 형식을 확인해 주세요.");
     }
@@ -1013,7 +989,6 @@ export function EmployeeMasterManager() {
   const filteredRows = rows;
 
 
-  const mobileRows = filteredRows;
   const statusOptions = employmentOptions
     .map((option) => ({
       value: option.code,
@@ -1204,132 +1179,44 @@ export function EmployeeMasterManager() {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
 
-      {isDesktop ? (
-        <div className="min-h-0 flex flex-1 flex-col px-3 pb-4 pt-2 md:px-6 md:pt-0">
-          <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
-            <AgGridReact<EmployeeGridRow>
-              theme="legacy"
-              rowData={filteredRows}
-              columnDefs={columnDefs}
-              defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
-              singleClickEdit={true}
-              animateRows={false}
-              getRowClass={getRowClass}
-              getRowId={(params) => String(params.data.id)}
-              onGridReady={onGridReady}
-              onCellValueChanged={onCellValueChanged}
-              loading={loading}
-              localeText={AG_GRID_LOCALE_KO}
-              overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
-              headerHeight={36}
-              rowHeight={34}
-            />
-          </div>
-          <GridPaginationControls
-            page={page}
-            totalPages={totalPages}
-            pageInput={pageInput}
-            setPageInput={setPageInput}
-            goPrev={goPrev}
-            goNext={goNext}
-            goToPage={goToPage}
-            disabled={loading || saving}
+      <div className="min-h-0 flex flex-1 flex-col px-6 pb-4">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+          <AgGridReact<EmployeeGridRow>
+            theme="legacy"
+            rowData={filteredRows}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            rowSelection="multiple"
+            suppressRowClickSelection={false}
+            singleClickEdit={true}
+            animateRows={false}
+            getRowClass={getRowClass}
+            getRowId={(params) => String(params.data.id)}
+            onGridReady={onGridReady}
+            onCellValueChanged={onCellValueChanged}
+            loading={loading}
+            localeText={AG_GRID_LOCALE_KO}
+            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+            headerHeight={36}
+            rowHeight={34}
           />
         </div>
-      ) : (
-        <div className="flex-1 overflow-auto px-3 pb-4 pt-2">
-          <div className="space-y-2">
-            {mobileRows.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
-                {I18N.noRows}
-              </div>
-            ) : (
-              mobileRows.map((row) => {
-                const deptName = row.department_name || departmentNameById.get(row.department_id) || "";
-                const isDeleted = row._status === "deleted";
-                return (
-                  <div key={row.id} className={`rounded-lg border bg-white p-3 ${isDeleted ? "border-red-300 bg-red-50/40" : "border-slate-200"}`}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="text-xs text-slate-500">
-                        {row.employee_no || "신규"} · {deptName || "부서 미지정"}
-                      </div>
-                      <label className="flex items-center gap-1 text-xs text-red-600">
-                        <input
-                          type="checkbox"
-                          checked={isDeleted}
-                          onChange={(e) => toggleDeleteById(row.id, e.target.checked)}
-                        />
-                        삭제
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        value={row.display_name}
-                        disabled={isDeleted}
-                        onChange={(e) => patchRow(row.id, { display_name: e.target.value })}
-                        placeholder="이름"
-                        className="h-9"
-                      />
-                      <select
-                        value={String(row.department_id)}
-                        disabled={isDeleted}
-                        onChange={(e) => {
-                          const dId = Number(e.target.value);
-                          patchRow(row.id, {
-                            department_id: dId,
-                            department_name: departmentNameById.get(dId) ?? "",
-                          });
-                        }}
-                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-                      >
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={row.position_title}
-                        disabled={isDeleted}
-                        onChange={(e) => patchRow(row.id, { position_title: e.target.value })}
-                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
-                      >
-                        {(positionNames.length > 0 ? positionNames : [row.position_title || "사원"]).map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className={`col-span-2 ${isDeleted ? "pointer-events-none opacity-60" : ""}`}>
-                        <CustomDatePicker
-                          className="w-full"
-                          value={row.hire_date}
-                          onChange={(value) => patchRow(row.id, { hire_date: value })}
-                          holidays={HOLIDAY_DATE_KEYS}
-                        />
-                      </div>
-                      <Input
-                        value={row.email}
-                        disabled={isDeleted}
-                        onChange={(e) => patchRow(row.id, { email: e.target.value })}
-                        placeholder="이메일"
-                        className="col-span-2 h-9"
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
+        <GridPaginationControls
+          page={page}
+          totalPages={totalPages}
+          pageInput={pageInput}
+          setPageInput={setPageInput}
+          goPrev={goPrev}
+          goNext={goNext}
+          goToPage={goToPage}
+          disabled={loading || saving}
+        />
+      </div>
       </ManagerGridSection>
     </ManagerPageShell>
   );
 }
+
 
 
 

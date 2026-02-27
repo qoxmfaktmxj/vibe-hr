@@ -106,7 +106,9 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
       ref={ref}
       href={node.path}
       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-        isActive ? "bg-primary/10 text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
+        isActive
+          ? "bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
+          : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
       }`}
       aria-current={isActive ? "page" : undefined}
     >
@@ -180,7 +182,9 @@ function MenuGroupItem({
         type="button"
         onClick={() => onToggle(node.code)}
         className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-          active ? "text-primary" : "text-gray-500 hover:bg-white hover:text-gray-800"
+          active
+            ? "text-[color:var(--vibe-nav-text-strong)]"
+            : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
         }`}
         style={{ paddingLeft: `${16 + depth * 12}px` }}
       >
@@ -352,8 +356,8 @@ export function DashboardSidebar() {
             />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight text-gray-900">Vibe-HR</p>
-            <p className="text-xs text-[var(--vibe-accent-muted)]">인사 관리 시스템</p>
+            <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">Vibe-HR</p>
+            <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
           </div>
         </div>
 
@@ -421,8 +425,8 @@ export function DashboardSidebar() {
             <AvatarFallback className="bg-primary/10 font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-gray-900">{displayName}</span>
-            <span className="text-xs text-[var(--vibe-accent-muted)]">내 정보 보기</span>
+            <span className="text-sm font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</span>
+            <span className="text-xs text-[color:var(--vibe-nav-text-muted)]">내 정보 보기</span>
           </div>
         </button>
       </div>
@@ -475,13 +479,13 @@ export function DashboardSidebar() {
                   <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">{initials}</AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">{displayName}</p>
-                  <p className="text-sm text-slate-500">{user?.email ?? "-"}</p>
+                  <p className="text-lg font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</p>
+                  <p className="text-sm text-[color:var(--vibe-nav-text-muted)]">{user?.email ?? "-"}</p>
                 </div>
               </div>
               <button
                 type="button"
-                className="rounded-md border p-2 text-slate-500 hover:bg-slate-50"
+                className="rounded-md border p-2 text-[color:var(--vibe-nav-text-muted)] hover:bg-slate-50 hover:text-[color:var(--vibe-nav-text-strong)]"
                 onClick={() => setProfileOpen(false)}
                 aria-label="프로필 닫기"
               >
@@ -489,14 +493,14 @@ export function DashboardSidebar() {
               </button>
             </div>
 
-            {profileLoading ? <p className="mb-4 text-sm text-slate-500">불러오는 중...</p> : null}
+            {profileLoading ? <p className="mb-4 text-sm text-[color:var(--vibe-nav-text-muted)]">불러오는 중...</p> : null}
             {profileError ? <p className="mb-4 text-sm text-red-500">{profileError}</p> : null}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {profileRows.map((row) => (
                 <div key={row.label} className="rounded-md border bg-slate-50 p-3">
-                  <p className="text-xs text-slate-500">{row.label}</p>
-                  <p className="mt-1 text-sm font-medium text-slate-800">{row.value}</p>
+                  <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">{row.label}</p>
+                  <p className="mt-1 text-sm font-medium text-[color:var(--vibe-nav-text-strong)]">{row.value}</p>
                 </div>
               ))}
             </div>

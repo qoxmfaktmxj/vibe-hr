@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -202,7 +202,7 @@ export function HrAppointmentRecordManager() {
       _prevStatus: undefined,
     };
     setRows((prev) => [newRow, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [issueTempId, redrawRows]);
 
   const copyRows = useCallback(() => {
@@ -229,7 +229,7 @@ export function HrAppointmentRecordManager() {
       };
     });
     setRows((prev) => [...clones, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [issueTempId, redrawRows]);
 
   const toggleDeleteById = useCallback(
@@ -240,7 +240,7 @@ export function HrAppointmentRecordManager() {
           shouldBeClean: (candidate) => isRowRevertedToOriginal(candidate, TRACKED_FIELDS),
         }),
       );
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -258,7 +258,7 @@ export function HrAppointmentRecordManager() {
           });
         }),
       );
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -601,7 +601,7 @@ export function HrAppointmentRecordManager() {
         return;
       }
       setRows((prev) => [...parsed, ...prev]);
-      setTimeout(redrawRows, 0);
+      redrawRows();
       if (skipped > 0) {
         toast.info(`업로드 ${parsed.length}건 반영, 사번 미일치 ${skipped}건 제외`);
       } else {
@@ -695,3 +695,4 @@ export function HrAppointmentRecordManager() {
     </ManagerPageShell>
   );
 }
+

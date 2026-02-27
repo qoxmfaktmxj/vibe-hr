@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
@@ -225,7 +225,7 @@ export function OrganizationManager() {
         }),
       );
 
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     },
     [refreshGridRows],
   );
@@ -333,7 +333,7 @@ export function OrganizationManager() {
 
     setRows((prev) => [newRow, ...prev]);
     setSelectedId(newId);
-    setTimeout(refreshGridRows, 0);
+    refreshGridRows();
   }
 
   function copyRow() {
@@ -358,7 +358,7 @@ export function OrganizationManager() {
       return [...prev.slice(0, index + 1), copied, ...prev.slice(index + 1)];
     });
     setSelectedId(newId);
-    setTimeout(refreshGridRows, 0);
+    refreshGridRows();
   }
 
   function downloadTemplate() {
@@ -402,7 +402,7 @@ export function OrganizationManager() {
 
       setRows((prev) => [...pastedRows, ...prev]);
       setSelectedId(pastedRows[0]?.id ?? null);
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
       toast.success(`붙여넣기 완료 (${pastedRows.length}건)`);
     },
     [refreshGridRows],
@@ -552,7 +552,7 @@ export function OrganizationManager() {
           });
         }),
       );
-      setTimeout(refreshGridRows, 0);
+      refreshGridRows();
     },
     [refreshGridRows],
   );
@@ -633,3 +633,4 @@ export function OrganizationManager() {
     </ManagerPageShell>
   );
 }
+

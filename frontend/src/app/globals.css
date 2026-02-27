@@ -95,6 +95,9 @@
   --vibe-background-light: #f6f6f8;
   --vibe-background-dark: #101522;
   --vibe-text-base: #111318;
+  --vibe-nav-text: #334155;
+  --vibe-nav-text-strong: #0f172a;
+  --vibe-nav-text-muted: #64748b;
 }
 
 :root[data-palette="vivid"] {
@@ -140,6 +143,9 @@
   --vibe-accent-red: #d35269;
   --vibe-background-light: #f4f4ed;
   --vibe-text-base: #2a1542;
+  --vibe-nav-text: #5e239d;
+  --vibe-nav-text-strong: #2a1542;
+  --vibe-nav-text-muted: #5e239d;
 }
 
 /* earth palette removed */
@@ -225,6 +231,9 @@
   --vibe-background-light: #0b1220;
   --vibe-background-dark: #030712;
   --vibe-text-base: #e2e8f0;
+  --vibe-nav-text: #cbd5e1;
+  --vibe-nav-text-strong: #f8fafc;
+  --vibe-nav-text-muted: #94a3b8;
 }
 
 @layer base {
@@ -354,6 +363,9 @@
   --vibe-sidebar-bg: #140f24;
   --vibe-background-light: #12101d;
   --vibe-text-base: #f5f3ff;
+  --vibe-nav-text: #ddd6fe;
+  --vibe-nav-text-strong: #f5f3ff;
+  --vibe-nav-text-muted: #c4b5fd;
 }
 
 .dark {

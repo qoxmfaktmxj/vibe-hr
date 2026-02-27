@@ -40,7 +40,6 @@ import { fetcher } from "@/lib/fetcher";
 import type {
   HriFormTypeItem,
   HriFormTypeListResponse,
-  HriRequestDetailFull,
   HriRequestDetailFullResponse,
   HriRequestDetailResponse,
   HriRequestItem,
@@ -1088,7 +1087,7 @@ export function HriApplicationHub() {
       },
     ],
     [],
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const defaultColDef = useMemo<ColDef<HriRequestItem>>(
     () => ({ resizable: true, editable: false }),
@@ -1146,8 +1145,7 @@ export function HriApplicationHub() {
           </>
         }
       >
-        {/* 데스크탑 AG Grid */}
-        <div className="hidden min-h-0 flex-1 px-3 pb-4 md:block md:px-6">
+        <div className="min-h-0 flex-1 px-6 pb-4">
           <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
             <AgGridReact<HriRequestItem>
               theme="legacy"
@@ -1166,35 +1164,6 @@ export function HriApplicationHub() {
               headerHeight={36}
               rowHeight={36}
             />
-          </div>
-        </div>
-
-        {/* 모바일 카드 */}
-        <div className="flex-1 overflow-auto px-3 pb-4 pt-2 md:hidden">
-          <div className="space-y-2">
-            {filteredRows.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
-                신청 내역이 없습니다.
-              </div>
-            ) : (
-              filteredRows.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left"
-                  onClick={() => setDetailId(item.id)}
-                >
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="font-mono text-xs text-slate-400">{item.request_no}</span>
-                    <StatusBadge code={item.status_code} />
-                  </div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {item.form_name ?? "-"} · {item.created_at.slice(0, 10)}
-                  </p>
-                </button>
-              ))
-            )}
           </div>
         </div>
       </ManagerGridSection>

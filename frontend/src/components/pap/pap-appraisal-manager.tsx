@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -210,7 +210,7 @@ export function PapAppraisalManager() {
           });
         }),
       );
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -238,7 +238,7 @@ export function PapAppraisalManager() {
       _prevStatus: undefined,
     };
     setRows((prev) => [newRow, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [issueTempId, redrawRows]);
 
   const copyRows = useCallback(() => {
@@ -259,7 +259,7 @@ export function PapAppraisalManager() {
       _prevStatus: undefined,
     }));
     setRows((prev) => [...clones, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [issueTempId, redrawRows]);
 
   const toggleDeleteById = useCallback(
@@ -270,7 +270,7 @@ export function PapAppraisalManager() {
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -512,7 +512,7 @@ export function PapAppraisalManager() {
         }
 
         setRows((prev) => [...parsed, ...prev]);
-        setTimeout(redrawRows, 0);
+        redrawRows();
         toast.success(`${parsed.length} rows imported as new rows.`);
       } catch {
         toast.error("Upload failed.");
@@ -817,3 +817,4 @@ export function PapAppraisalManager() {
     </ManagerPageShell>
   );
 }
+

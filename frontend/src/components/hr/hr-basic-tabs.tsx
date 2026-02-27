@@ -1,6 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  Brain,
+  BriefcaseBusiness,
+  CalendarCheck2,
+  CalendarX2,
+  Fingerprint,
+  Heart,
+  IdCard,
+  Star,
+  TimerOff,
+  UserRound,
+  Users,
+  Droplets,
+  Shapes,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +30,84 @@ type Props = {
   onReload: () => Promise<void>;
 };
 
-type TabKey = "basic" | "appointment" | "reward" | "contact" | "education" | "career" | "certificate" | "military" | "evaluation";
+type TabKey =
+  | "basic"
+  | "appointment"
+  | "reward"
+  | "contact"
+  | "education"
+  | "career"
+  | "certificate"
+  | "military"
+  | "evaluation";
+
+type BasicProfileDraft = {
+  full_name: string;
+  gender: string;
+  resident_no_masked: string;
+  hire_date: string;
+  retire_date: string;
+  blood_type: string;
+  marital_status: string;
+  mbti: string;
+  probation_end_date: string;
+  job_family: string;
+  job_role: string;
+  grade: string;
+};
+
+type BasicProfileKey = keyof BasicProfileDraft;
+type Tone = "primary" | "emerald" | "violet" | "rose" | "amber";
+
+type ProfileCardMeta = {
+  key?: BasicProfileKey;
+  fixedValue?: string;
+  label: string;
+  icon: LucideIcon;
+  tone: Tone;
+  inputType?: "text" | "date";
+  mono?: boolean;
+};
+
+const APPOINTMENT_PAGE_SIZE = 5;
+
+function asInputValue(value?: string | null): string {
+  return value ?? "";
+}
+
+function asNullable(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function buildProfileDraft(detail: HrBasicDetailResponse | null): BasicProfileDraft {
+  return {
+    full_name: asInputValue(detail?.profile.full_name),
+    gender: asInputValue(detail?.profile.gender),
+    resident_no_masked: asInputValue(detail?.profile.resident_no_masked),
+    hire_date: asInputValue(detail?.profile.hire_date),
+    retire_date: asInputValue(detail?.profile.retire_date),
+    blood_type: asInputValue(detail?.profile.blood_type),
+    marital_status: asInputValue(detail?.profile.marital_status),
+    mbti: asInputValue(detail?.profile.mbti),
+    probation_end_date: asInputValue(detail?.profile.probation_end_date),
+    job_family: asInputValue(detail?.profile.job_family),
+    job_role: asInputValue(detail?.profile.job_role),
+    grade: asInputValue(detail?.profile.grade),
+  };
+}
+
+function formatDateTime(value: Date): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(value);
+}
 
 function toCategory(tab: Exclude<TabKey, "basic">): string {
   return {
@@ -41,16 +134,77 @@ function rowsByTab(detail: HrBasicDetailResponse | null, tab: Exclude<TabKey, "b
   return detail.evaluations;
 }
 
+function buildPageNumbers(current: number, total: number): number[] {
+  const windowSize = 5;
+  const half = Math.floor(windowSize / 2);
+  let start = Math.max(1, current - half);
+  const end = Math.min(total, start + windowSize - 1);
+  if (end - start + 1 < windowSize) {
+    start = Math.max(1, end - windowSize + 1);
+  }
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function getToneCardClass(tone: Tone): string {
+  if (tone === "emerald") {
+    return "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20";
+  }
+  if (tone === "violet") {
+    return "border-violet-200/70 bg-violet-50/50 dark:border-violet-900/40 dark:bg-violet-950/20";
+  }
+  if (tone === "rose") {
+    return "border-rose-200/70 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20";
+  }
+  if (tone === "amber") {
+    return "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20";
+  }
+  return "border-primary/30 bg-primary/5 dark:border-primary/40 dark:bg-primary/10";
+}
+
+function getToneIconClass(tone: Tone): string {
+  if (tone === "emerald") {
+    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+  }
+  if (tone === "violet") {
+    return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
+  }
+  if (tone === "rose") {
+    return "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
+  }
+  if (tone === "amber") {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+  }
+  return "bg-primary/15 text-primary dark:bg-primary/25";
+}
+
 export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [newTitle, setNewTitle] = useState("");
   const [draftRows, setDraftRows] = useState<Record<number, HrInfoRow>>({});
+  const [appointmentPage, setAppointmentPage] = useState(1);
+
+  const [profileDraft, setProfileDraft] = useState<BasicProfileDraft>(() => buildProfileDraft(detail));
+  const [profileEditMode, setProfileEditMode] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date>(new Date());
+
+  useEffect(() => {
+    if (!profileEditMode) {
+      setProfileDraft(buildProfileDraft(detail));
+    }
+  }, [detail, profileEditMode]);
+
+  useEffect(() => {
+    if (detail) {
+      setLastUpdatedAt(new Date());
+    }
+  }, [detail]);
 
   const tabs: Array<[TabKey, string]> = [
-    ["basic", "기본"],
+    ["basic", "인사기본"],
     ["appointment", "발령"],
     ["reward", "상벌"],
-    ["contact", "주소/연락처"],
+    ["contact", "주소연락처"],
     ["education", "학력"],
     ["career", "경력"],
     ["certificate", "자격증"],
@@ -58,26 +212,89 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
     ["evaluation", "평가"],
   ];
 
-  const basicRows = useMemo(
+  const profileCards = useMemo<ProfileCardMeta[]>(
     () => [
-      ["이름", detail?.profile.full_name ?? "-"],
-      ["사번", detail?.profile.employee_no ?? "-"],
-      ["성별", detail?.profile.gender ?? "-"],
-      ["주민번호", detail?.profile.resident_no_masked ?? "-"],
-      ["입사일", detail?.profile.hire_date ?? "-"],
-      ["퇴사일", detail?.profile.retire_date ?? "-"],
-      ["혈액형", detail?.profile.blood_type ?? "-"],
-      ["혼인여부", detail?.profile.marital_status ?? "-"],
-      ["MBTI", detail?.profile.mbti ?? "-"],
-      ["수습해제일", detail?.profile.probation_end_date ?? "-"],
-      ["직군", detail?.profile.job_family ?? "-"],
-      ["직무", detail?.profile.job_role ?? "-"],
-      ["직급", detail?.profile.grade ?? "-"],
+      { key: "full_name", label: "성명", icon: UserRound, tone: "primary" },
+      { fixedValue: detail?.profile.employee_no ?? "", label: "사번", icon: IdCard, tone: "primary", mono: true },
+      { key: "gender", label: "성별", icon: Users, tone: "primary" },
+      { key: "resident_no_masked", label: "주민번호", icon: Fingerprint, tone: "primary", mono: true },
+      { key: "hire_date", label: "입사일", icon: CalendarCheck2, tone: "emerald", inputType: "date", mono: true },
+      { key: "retire_date", label: "퇴사일", icon: CalendarX2, tone: "emerald", inputType: "date", mono: true },
+      { key: "blood_type", label: "혈액형", icon: Droplets, tone: "rose" },
+      { key: "marital_status", label: "혼인상태", icon: Heart, tone: "rose" },
+      { key: "mbti", label: "MBTI", icon: Brain, tone: "amber", mono: true },
+      { key: "probation_end_date", label: "수습종료일", icon: TimerOff, tone: "emerald", inputType: "date", mono: true },
+      { key: "job_family", label: "직군", icon: Shapes, tone: "violet" },
+      { key: "job_role", label: "직무", icon: BriefcaseBusiness, tone: "violet" },
+      { key: "grade", label: "직급", icon: Star, tone: "violet" },
     ],
-    [detail],
+    [detail?.profile.employee_no],
   );
 
   const tabRows = activeTab === "basic" ? [] : rowsByTab(detail, activeTab);
+
+  const appointmentRows = useMemo(() => rowsByTab(detail, "appointment"), [detail]);
+  const appointmentTotalPages = Math.max(1, Math.ceil(appointmentRows.length / APPOINTMENT_PAGE_SIZE));
+  const currentAppointmentPage = Math.min(appointmentPage, appointmentTotalPages);
+  const appointmentPageNumbers = useMemo(
+    () => buildPageNumbers(currentAppointmentPage, appointmentTotalPages),
+    [currentAppointmentPage, appointmentTotalPages],
+  );
+  const appointmentPagedRows = useMemo(() => {
+    const start = (currentAppointmentPage - 1) * APPOINTMENT_PAGE_SIZE;
+    return appointmentRows.slice(start, start + APPOINTMENT_PAGE_SIZE);
+  }, [currentAppointmentPage, appointmentRows]);
+
+  function updateProfileDraft(field: BasicProfileKey, value: string) {
+    setProfileDraft((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function cancelBasicEdit() {
+    setProfileDraft(buildProfileDraft(detail));
+    setProfileEditMode(false);
+  }
+
+  async function saveBasicProfile() {
+    if (!employeeId) return;
+    if (activeTab !== "basic") {
+      toast.error("인사기본 탭에서만 기본정보를 저장할 수 있습니다.");
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const response = await fetch(`/api/hr/basic/${employeeId}/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: asNullable(profileDraft.full_name),
+          hire_date: asNullable(profileDraft.hire_date),
+          gender: asNullable(profileDraft.gender),
+          resident_no_masked: asNullable(profileDraft.resident_no_masked),
+          retire_date: asNullable(profileDraft.retire_date),
+          blood_type: asNullable(profileDraft.blood_type),
+          marital_status: asNullable(profileDraft.marital_status),
+          mbti: asNullable(profileDraft.mbti),
+          probation_end_date: asNullable(profileDraft.probation_end_date),
+          job_family: asNullable(profileDraft.job_family),
+          job_role: asNullable(profileDraft.job_role),
+          grade: asNullable(profileDraft.grade),
+        }),
+      });
+
+      if (!response.ok) {
+        const json = (await response.json().catch(() => null)) as { detail?: string } | null;
+        toast.error(json?.detail ?? "기본정보 저장에 실패했습니다.");
+        return;
+      }
+
+      toast.success("기본정보가 저장되었습니다.");
+      setProfileEditMode(false);
+      await onReload();
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function addRecord() {
     if (!employeeId || activeTab === "basic") return;
@@ -91,9 +308,12 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
         note: "",
       }),
     });
-    if (!response.ok) return toast.error("추가 실패");
+    if (!response.ok) {
+      toast.error("행 추가에 실패했습니다.");
+      return;
+    }
     setNewTitle("");
-    toast.success("추가 완료");
+    toast.success("행이 추가되었습니다.");
     await onReload();
   }
 
@@ -114,16 +334,22 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
         note: row.note || null,
       }),
     });
-    if (!response.ok) return toast.error("저장 실패");
-    toast.success("저장 완료");
+    if (!response.ok) {
+      toast.error("저장에 실패했습니다.");
+      return;
+    }
+    toast.success("저장되었습니다.");
     await onReload();
   }
 
   async function removeRecord(row: HrInfoRow) {
     if (!employeeId) return;
     const response = await fetch(`/api/hr/basic/${employeeId}/records/${row.id}`, { method: "DELETE" });
-    if (!response.ok) return toast.error("삭제 실패");
-    toast.success("삭제 완료");
+    if (!response.ok) {
+      toast.error("삭제에 실패했습니다.");
+      return;
+    }
+    toast.success("삭제되었습니다.");
     await onReload();
   }
 
@@ -138,101 +364,327 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   }
 
   return (
-    <div className="mx-4 mt-4 rounded-xl bg-card p-4 shadow-sm lg:mx-8 lg:p-6">
-      <div className="mb-4 flex flex-wrap gap-2">
-        {tabs.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setActiveTab(value);
-              setDraftRows({});
-            }}
-            className={`rounded-md border px-3 py-1.5 text-sm ${
-              activeTab === value ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <div className="mx-4 mt-4 space-y-4 lg:mx-8">
+      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm lg:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-[color:var(--vibe-nav-text-strong)]">인사기본 정보</h2>
+            <p className="mt-1 text-sm text-[color:var(--vibe-nav-text-muted)]">
+              직원의 상세한 개인 및 직무 정보를 확인하세요.
+            </p>
+            {profileEditMode ? (
+              <p className="mt-2 text-xs font-medium text-primary">수정 모드입니다. 변경 후 저장 버튼을 눌러주세요.</p>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (activeTab !== "basic") {
+                  setActiveTab("basic");
+                }
+                setProfileEditMode(true);
+              }}
+              disabled={!employeeId || profileEditMode}
+            >
+              수정
+            </Button>
+
+            {profileEditMode ? (
+              <Button type="button" variant="outline" onClick={cancelBasicEdit} disabled={profileSaving}>
+                취소
+              </Button>
+            ) : null}
+
+            <Button
+              type="button"
+              onClick={() => void saveBasicProfile()}
+              disabled={!employeeId || activeTab !== "basic" || !profileEditMode || profileSaving}
+            >
+              {profileSaving ? "저장중..." : "저장"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => toast.info("출력 방식은 협의 후 반영하겠습니다.")}
+            >
+              출력
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {tabs.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setActiveTab(value);
+                setDraftRows({});
+                if (value === "appointment") setAppointmentPage(1);
+              }}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                activeTab === value
+                  ? "border-primary/40 bg-primary/10 text-[color:var(--vibe-nav-text-strong)]"
+                  : "border-border bg-card text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {activeTab === "basic" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>인사기본</CardTitle>
+        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm lg:p-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {profileCards.map((card) => {
+              const raw = card.key ? profileDraft[card.key] : card.fixedValue ?? "";
+              const displayValue = raw.trim().length > 0 ? raw : "-";
+              const editable = Boolean(card.key) && profileEditMode;
+              const Icon = card.icon;
+
+              return (
+                <article
+                  key={card.label}
+                  className={`rounded-2xl border p-4 transition hover:shadow-sm ${getToneCardClass(card.tone)} ${displayValue === "-" ? "opacity-85" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold tracking-wide text-[color:var(--vibe-nav-text-muted)]">{card.label}</p>
+
+                      {editable && card.key ? (
+                        <Input
+                          type={card.inputType ?? "text"}
+                          value={profileDraft[card.key]}
+                          onChange={(event) => updateProfileDraft(card.key as BasicProfileKey, event.target.value)}
+                          className={`mt-2 h-9 ${card.mono ? "font-mono" : ""}`}
+                        />
+                      ) : (
+                        <p
+                          className={`mt-2 break-words text-lg font-bold text-[color:var(--vibe-nav-text-strong)] ${
+                            card.mono ? "font-mono text-[15px]" : ""
+                          } ${displayValue === "-" ? "text-[color:var(--vibe-nav-text-muted)]" : ""}`}
+                        >
+                          {displayValue}
+                        </p>
+                      )}
+                    </div>
+
+                    <span
+                      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${getToneIconClass(card.tone)}`}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 text-right text-xs text-[color:var(--vibe-nav-text-muted)]">
+            마지막 갱신: {formatDateTime(lastUpdatedAt)}
+          </div>
+        </section>
+      ) : activeTab === "appointment" ? (
+        <Card className="rounded-3xl border-border shadow-sm">
+          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">발령 이력</CardTitle>
+              <p className="mt-1 text-sm text-[color:var(--vibe-nav-text-muted)]">소량 데이터 테이블 모드 (비 AG Grid)</p>
+            </div>
+            <div className="text-sm font-medium text-[color:var(--vibe-nav-text-muted)]">
+              [{currentAppointmentPage} / {appointmentTotalPages}]
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-              {basicRows.map(([label, value]) => (
-                <div key={label} className="rounded-lg border bg-slate-50 px-3 py-2">
-                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
-                  <p className="text-sm font-semibold text-foreground">{value}</p>
-                </div>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder="신규 행 제목"
+                className="max-w-xs"
+              />
+              <Button onClick={addRecord}>추가</Button>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+              <table className="w-full min-w-[980px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-muted/50 text-xs uppercase tracking-wide text-[color:var(--vibe-nav-text)]">
+                    <th className="border-b border-border px-3 py-2 text-center">순번</th>
+                    <th className="border-b border-border px-3 py-2 text-left">일자</th>
+                    <th className="border-b border-border px-3 py-2 text-left">구분</th>
+                    <th className="border-b border-border px-3 py-2 text-left">제목</th>
+                    <th className="border-b border-border px-3 py-2 text-left">소속</th>
+                    <th className="border-b border-border px-3 py-2 text-left">값</th>
+                    <th className="border-b border-border px-3 py-2 text-left">비고</th>
+                    <th className="border-b border-border px-3 py-2 text-left">작업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointmentPagedRows.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-8 text-center text-[color:var(--vibe-nav-text-muted)]" colSpan={8}>
+                        발령 데이터가 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    appointmentPagedRows.map((row, index) => {
+                      const draft = draftRows[row.id] ?? row;
+                      const rowNumber = (currentAppointmentPage - 1) * APPOINTMENT_PAGE_SIZE + index + 1;
+                      return (
+                        <tr key={row.id} className="border-b border-border/60 hover:bg-accent/40">
+                          <td className="px-3 py-2 text-center text-[color:var(--vibe-nav-text-muted)]">{rowNumber}</td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="date"
+                              value={draft.record_date ?? ""}
+                              onChange={(event) => updateDraft(row.id, "record_date", event.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={draft.type ?? ""} onChange={(event) => updateDraft(row.id, "type", event.target.value)} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={draft.title ?? ""} onChange={(event) => updateDraft(row.id, "title", event.target.value)} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={draft.organization ?? ""}
+                              onChange={(event) => updateDraft(row.id, "organization", event.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={draft.value ?? ""} onChange={(event) => updateDraft(row.id, "value", event.target.value)} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={draft.note ?? ""} onChange={(event) => updateDraft(row.id, "note", event.target.value)} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1">
+                              <Button size="sm" onClick={() => void saveRow(row.id)}>
+                                저장
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => void removeRecord(row)}>
+                                삭제
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentAppointmentPage <= 1}
+                onClick={() => setAppointmentPage(Math.max(1, currentAppointmentPage - 1))}
+              >
+                이전
+              </Button>
+              {appointmentPageNumbers.map((pageNo) => (
+                <Button
+                  key={pageNo}
+                  type="button"
+                  size="sm"
+                  variant={currentAppointmentPage === pageNo ? "default" : "outline"}
+                  onClick={() => setAppointmentPage(pageNo)}
+                >
+                  {pageNo}
+                </Button>
               ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentAppointmentPage >= appointmentTotalPages}
+                onClick={() => setAppointmentPage(Math.min(appointmentTotalPages, currentAppointmentPage + 1))}
+              >
+                다음
+              </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="rounded-3xl border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-slate-800">탭 데이터 관리</CardTitle>
+            <CardTitle className="text-[color:var(--vibe-nav-text-strong)]">이력 관리</CardTitle>
             <div className="mt-2 flex gap-2">
-              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="신규 항목 제목" className="max-w-xs" />
+              <Input
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder="신규 행 제목"
+                className="max-w-xs"
+              />
               <Button onClick={addRecord}>추가</Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr className="text-slate-700">
+                <thead className="bg-muted/50">
+                  <tr className="text-[color:var(--vibe-nav-text-strong)]">
                     <th className="px-2 py-2 text-left font-semibold">일자</th>
                     <th className="px-2 py-2 text-left font-semibold">구분</th>
                     <th className="px-2 py-2 text-left font-semibold">제목</th>
-                    <th className="px-2 py-2 text-left font-semibold">기관/부서</th>
+                    <th className="px-2 py-2 text-left font-semibold">소속</th>
                     <th className="px-2 py-2 text-left font-semibold">값</th>
                     <th className="px-2 py-2 text-left font-semibold">비고</th>
-                    <th className="px-2 py-2 text-left font-semibold">동작</th>
+                    <th className="px-2 py-2 text-left font-semibold">작업</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tabRows.length === 0 ? (
                     <tr>
-                      <td className="px-2 py-6 text-center text-slate-400" colSpan={7}>
-                        데이터 없음
+                      <td className="px-2 py-6 text-center text-[color:var(--vibe-nav-text-muted)]" colSpan={7}>
+                        데이터가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     tabRows.map((row) => {
                       const draft = draftRows[row.id] ?? row;
                       return (
-                        <tr key={row.id} className="border-t">
+                        <tr key={row.id} className="border-t border-border/60">
                           <td className="px-2 py-1">
                             <Input
                               type="date"
                               value={draft.record_date ?? ""}
-                              onChange={(e) => updateDraft(row.id, "record_date", e.target.value)}
+                              onChange={(event) => updateDraft(row.id, "record_date", event.target.value)}
                             />
                           </td>
                           <td className="px-2 py-1">
-                            <Input value={draft.type ?? ""} onChange={(e) => updateDraft(row.id, "type", e.target.value)} />
+                            <Input value={draft.type ?? ""} onChange={(event) => updateDraft(row.id, "type", event.target.value)} />
                           </td>
                           <td className="px-2 py-1">
-                            <Input value={draft.title ?? ""} onChange={(e) => updateDraft(row.id, "title", e.target.value)} />
+                            <Input value={draft.title ?? ""} onChange={(event) => updateDraft(row.id, "title", event.target.value)} />
                           </td>
                           <td className="px-2 py-1">
-                            <Input value={draft.organization ?? ""} onChange={(e) => updateDraft(row.id, "organization", e.target.value)} />
+                            <Input
+                              value={draft.organization ?? ""}
+                              onChange={(event) => updateDraft(row.id, "organization", event.target.value)}
+                            />
                           </td>
                           <td className="px-2 py-1">
-                            <Input value={draft.value ?? ""} onChange={(e) => updateDraft(row.id, "value", e.target.value)} />
+                            <Input value={draft.value ?? ""} onChange={(event) => updateDraft(row.id, "value", event.target.value)} />
                           </td>
                           <td className="px-2 py-1">
-                            <Input value={draft.note ?? ""} onChange={(e) => updateDraft(row.id, "note", e.target.value)} />
+                            <Input value={draft.note ?? ""} onChange={(event) => updateDraft(row.id, "note", event.target.value)} />
                           </td>
                           <td className="px-2 py-1">
                             <div className="flex gap-1">
-                              <Button size="sm" onClick={() => void saveRow(row.id)}>저장</Button>
+                              <Button size="sm" onClick={() => void saveRow(row.id)}>
+                                저장
+                              </Button>
                               <Button size="sm" variant="outline" onClick={() => void removeRecord(row)}>
                                 삭제
                               </Button>

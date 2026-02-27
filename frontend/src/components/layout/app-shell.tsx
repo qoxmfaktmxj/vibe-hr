@@ -297,8 +297,10 @@ export function AppShell({ title: _title, description: _description, children }:
           <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6">
             <button
               type="button"
-              className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                pathname === "/dashboard" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent"
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors ${
+                pathname === "/dashboard"
+                  ? "bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
+                  : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
               }`}
               onClick={() => router.push("/dashboard")}
             >
@@ -311,10 +313,10 @@ export function AppShell({ title: _title, description: _description, children }:
                 <button
                   key={tab.path}
                   type="button"
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs ${
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition-colors ${
                     active
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:bg-accent"
+                      ? "border-primary/40 bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
+                      : "border-border bg-card text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
                   }`}
                   onClick={() => router.push(tab.path)}
                   onContextMenu={(event) => {
@@ -362,21 +364,21 @@ export function AppShell({ title: _title, description: _description, children }:
         >
           <button
             type="button"
-            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={() => closeLeftTabs(contextMenu.targetPath)}
           >
             좌측 탭 모두 닫기
           </button>
           <button
             type="button"
-            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={() => closeRightTabs(contextMenu.targetPath)}
           >
             우측 탭 모두 닫기
           </button>
           <button
             type="button"
-            className="block w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent"
+            className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={closeAllTabs}
           >
             전체 탭 닫기 (홈 이동)

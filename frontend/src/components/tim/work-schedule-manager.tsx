@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Copy, Save, Download, Search } from "lucide-react";
@@ -190,7 +190,7 @@ export function WorkScheduleManager() {
         }
         return next;
       });
-      setTimeout(redraw, 0);
+      redraw();
     },
     [redraw],
   );
@@ -370,7 +370,7 @@ export function WorkScheduleManager() {
           return next;
         }),
       );
-      setTimeout(redraw, 0);
+      redraw();
     },
     [redraw],
   );
@@ -379,7 +379,7 @@ export function WorkScheduleManager() {
   function addRow() {
     const row = createEmptyRow(issueTempId());
     setRows((prev) => [row, ...prev]);
-    setTimeout(redraw, 0);
+    redraw();
   }
 
   function copySelectedRows() {
@@ -404,7 +404,7 @@ export function WorkScheduleManager() {
       }
       return next;
     });
-    setTimeout(redraw, 0);
+    redraw();
   }
 
   async function downloadExcel() {
@@ -597,3 +597,4 @@ export function WorkScheduleManager() {
     </div>
   );
 }
+

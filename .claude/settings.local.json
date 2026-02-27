@@ -31,7 +31,30 @@
       "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"\nimport ast\nfor f in [\n    ''backend/app/models/entities.py'',\n    ''backend/app/models/__init__.py'',\n    ''backend/app/services/hri_request_service.py'',\n]:\n    try:\n        ast.parse\\(open\\(f, encoding=''utf-8''\\).read\\(\\)\\)\n        print\\(f''OK: {f}''\\)\n    except SyntaxError as e:\n        print\\(f''FAIL: {f} - {e}''\\)\n\")",
       "Bash(dir:*)",
       "Bash(\"C:\\\\Users\\\\kms\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" -c \"\nimport ast\nfor f in [\n    ''backend/app/schemas/hri_request.py'',\n    ''backend/app/services/hri_request_service.py'',\n    ''backend/app/api/hri_request.py'',\n]:\n    try:\n        ast.parse\\(open\\(f, encoding=''utf-8''\\).read\\(\\)\\)\n        print\\(f''OK: {f}''\\)\n    except SyntaxError as e:\n        print\\(f''FAIL: {f} - {e}''\\)\n\")",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(.venvScriptspython.exe -c \"from app.services.tim_schedule_service import generate_employee_daily_schedules; print\\(''OK''\\)\")",
+      "Bash(.venvScriptspython.exe -m py_compile app/services/tim_schedule_service.py)",
+      "Bash(cmd /c \"cd C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\backend && .venv\\\\Scripts\\\\python.exe -m py_compile app/services/tim_schedule_service.py\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\backend && .venv\\\\Scripts\\\\python.exe -m py_compile app/services/tim_schedule_service.py && echo SUCCESS\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\backend && .venv\\\\Scripts\\\\python.exe -m py_compile app\\\\services\\\\tim_schedule_service.py && echo SUCCESS\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\kms\\\\Desktop\\\\dev\\\\vibe-hr\\\\backend && .venv\\\\Scripts\\\\python.exe app\\\\services\\\\tim_schedule_service.py\")",
+      "Bash(C:UserskmsDesktopdevvibe-hrbackend.venvScriptspython.exe -m py_compile:*)",
+      "Bash(python3:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash({ .venv/Scripts/python.exe -m py_compile app/services/tim_schedule_service.py)",
+      "Bash(})",
+      "Bash(git -C \"C:/Users/kms/Desktop/dev/vibe-hr\" diff --stat HEAD)",
+      "Bash(git -C \"C:/Users/kms/Desktop/dev/vibe-hr\" add backend/app/api/tim_attendance_daily.py backend/app/services/tim_attendance_daily_service.py backend/app/services/tim_schedule_service.py)",
+      "Bash(git -C:*)",
+      "WebFetch(domain:skills.sh)",
+      "Bash(npx skills:*)",
+      "Skill(browser-use)",
+      "Skill(browser-use:*)",
+      "Bash(browser-use.cmd doctor:*)",
+      "Bash(cmd /c \"browser-use doctor\")",
+      "Bash(cmd /c \"browser-use --version\")",
+      "Bash(npx tsc:*)",
+      "Bash(curl:*)"
     ]
   }
 }

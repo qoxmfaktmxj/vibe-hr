@@ -1,4 +1,5 @@
 import { DashboardAttendancePanel } from "@/components/dashboard/dashboard-attendance-panel";
+import { AttendanceTrendChart, LeaveTrendChart } from "@/components/dashboard/dashboard-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardSummary } from "@/lib/api";
 
@@ -30,8 +31,15 @@ export default async function DashboardPage() {
     summary.pending_leave_requests,
   ];
 
-  const maxAttendance = Math.max(...attendanceTrend, 1);
-  const maxLeave = Math.max(...leaveTrend, 1);
+  const attendanceChartData = attendanceTrend.map((count, idx) => ({
+    day: `D-${attendanceTrend.length - idx - 1}`,
+    count,
+  }));
+
+  const leaveChartData = leaveTrend.map((count, idx) => ({
+    day: `D-${leaveTrend.length - idx - 1}`,
+    count,
+  }));
 
   return (
       <div className="space-y-6 p-6 lg:p-8">
@@ -90,20 +98,7 @@ export default async function DashboardPage() {
               <CardTitle className="text-base">최근 7일 출근 추이 (샘플)</CardTitle>
             </CardHeader>
             <CardContent>
-              <svg viewBox="0 0 700 220" className="h-56 w-full" aria-label="attendance trend chart">
-                {attendanceTrend.map((value, idx) => {
-                  const x = 40 + idx * 100;
-                  const y = 180 - (value / maxAttendance) * 120;
-                  return <circle key={`point-${idx}`} cx={x} cy={y} r={4} fill="currentColor" className="text-primary" />;
-                })}
-                {attendanceTrend.slice(1).map((value, idx) => {
-                  const x1 = 40 + idx * 100;
-                  const y1 = 180 - (attendanceTrend[idx] / maxAttendance) * 120;
-                  const x2 = 40 + (idx + 1) * 100;
-                  const y2 = 180 - (value / maxAttendance) * 120;
-                  return <line key={`line-${idx}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="hsl(var(--primary))" strokeWidth={3} />;
-                })}
-              </svg>
+              <AttendanceTrendChart data={attendanceChartData} />
             </CardContent>
           </Card>
 
@@ -112,20 +107,7 @@ export default async function DashboardPage() {
               <CardTitle className="text-base">대기 휴가 건수 추이 (샘플)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {leaveTrend.map((value, idx) => (
-                  <div key={`leave-${idx}`} className="flex items-center gap-2 text-sm">
-                    <span className="w-14 text-xs text-muted-foreground">D-{leaveTrend.length - idx - 1}</span>
-                    <div className="h-4 flex-1 rounded bg-muted">
-                      <div
-                        className="h-4 rounded bg-primary"
-                        style={{ width: `${Math.max(8, (value / maxLeave) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="w-8 text-right text-xs">{value}</span>
-                  </div>
-                ))}
-              </div>
+              <LeaveTrendChart data={leaveChartData} />
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-md border bg-muted/20 p-3">전체 인원: <b>{summary.total_employees.toLocaleString()}</b></div>

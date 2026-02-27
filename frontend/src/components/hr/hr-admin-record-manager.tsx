@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -232,7 +232,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     };
 
     setRows((prev) => [newRow, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [category, issueTempId, redrawRows]);
 
   const copyRows = useCallback(() => {
@@ -252,7 +252,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     }));
 
     setRows((prev) => [...clones, ...prev]);
-    setTimeout(redrawRows, 0);
+    redrawRows();
   }, [issueTempId, redrawRows]);
 
   const toggleDeleteById = useCallback(
@@ -263,7 +263,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
           shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
         }),
       );
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -290,7 +290,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
         }),
       );
 
-      setTimeout(redrawRows, 0);
+      redrawRows();
     },
     [redrawRows],
   );
@@ -464,7 +464,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
         }
 
         setRows((prev) => [...parsed, ...prev]);
-        setTimeout(redrawRows, 0);
+        redrawRows();
 
         if (skipped > 0) {
           toast.info(`업로드 ${parsed.length}건, 사번 불일치 ${skipped}건 제외`);
@@ -739,3 +739,4 @@ export function HrAdminRecordManager({ category, title }: Props) {
     </ManagerPageShell>
   );
 }
+

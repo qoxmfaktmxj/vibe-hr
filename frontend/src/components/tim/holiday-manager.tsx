@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   forwardRef,
@@ -240,7 +240,7 @@ export function HolidayManager() {
         }
         return next;
       });
-      setTimeout(redraw, 0);
+      redraw();
     },
     [redraw],
   );
@@ -373,7 +373,7 @@ export function HolidayManager() {
           return next;
         }),
       );
-      setTimeout(redraw, 0);
+      redraw();
     },
     [redraw],
   );
@@ -382,7 +382,7 @@ export function HolidayManager() {
   function addRow() {
     const row = createEmptyRow(issueTempId(), year);
     setRows((prev) => [row, ...prev]);
-    setTimeout(redraw, 0);
+    redraw();
   }
 
   async function downloadExcel() {
@@ -637,3 +637,4 @@ export function HolidayManager() {
     </div>
   );
 }
+
