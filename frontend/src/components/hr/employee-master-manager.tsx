@@ -56,6 +56,7 @@ import type {
   DepartmentItem,
   EmployeeItem,
 } from "@/types/employee";
+import type { TimHolidayListResponse } from "@/types/tim";
 
 /* AG Grid modules are provided by ManagerPageShell via AgGridModulesProvider. */
 
@@ -269,6 +270,17 @@ function toDisplayEmploymentStatus(
   return labelByCode.get(status) ?? status;
 }
 
+async function fetchHolidayDateKeys(url: string): Promise<string[]> {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) return [];
+    const json = (await response.json()) as TimHolidayListResponse;
+    return (json.items ?? []).map((h) => h.holiday_date);
+  } catch {
+    return [];
+  }
+}
+
 async function fetchDepartments(url: string): Promise<DepartmentItem[]> {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(await parseErrorDetail(response, I18N.loadDepartmentError));
@@ -343,7 +355,7 @@ function cloneFilters(filters: SearchFilters): SearchFilters {
   };
 }
 
-type HireDateEditorProps = ICellEditorParams<EmployeeGridRow, string>;
+type HireDateEditorProps = ICellEditorParams<EmployeeGridRow, string> & { holidays?: string[] };
 
 const HireDateCellEditor = forwardRef<
   { getValue: () => string; isPopup: () => boolean },
@@ -373,7 +385,7 @@ const HireDateCellEditor = forwardRef<
       <CustomDatePicker
         value={value}
         onChange={handleChange}
-        holidays={HOLIDAY_DATE_KEYS}
+        holidays={props.holidays ?? []}
         inline
         closeOnSelect={false}
       />
@@ -440,6 +452,15 @@ export function EmployeeMasterManager() {
       revalidateIfStale: true,
       dedupingInterval: 60_000,
     },
+  );
+  const { data: fetchedHolidayDateKeys = [] } = useSWR<string[]>(
+    `/api/tim/holidays?year=${new Date().getFullYear()}`,
+    fetchHolidayDateKeys,
+    { revalidateOnFocus: false, dedupingInterval: 600_000 },
+  );
+  const holidayDateKeys = useMemo(
+    () => (fetchedHolidayDateKeys.length > 0 ? fetchedHolidayDateKeys : HOLIDAY_DATE_KEYS),
+    [fetchedHolidayDateKeys],
   );
   const employmentOptions = useMemo(() => {
     const normalized = employmentCodeOptions.filter(
@@ -782,6 +803,7 @@ export function EmployeeMasterManager() {
         width: 120,
         editable: (params) => params.data?._status !== "deleted",
         cellEditor: HireDateCellEditor,
+        cellEditorParams: { holidays: holidayDateKeys },
         cellEditorPopup: true,
         cellEditorPopupPosition: "under",
       },
@@ -821,7 +843,7 @@ export function EmployeeMasterManager() {
         editable: (params) => params.data?._status !== "deleted",
       },
     ];
-  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, positionNames, toggleDeleteById]);
+  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, holidayDateKeys, positionNames, toggleDeleteById]);
 
   const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(
     () => ({ sortable: true, filter: true, resizable: true, editable: false }),
@@ -1299,7 +1321,7 @@ export function EmployeeMasterManager() {
             <CustomDatePicker
               value={searchFilters.hireDateTo}
               onChange={(value) => setSearchFilters((prev) => ({ ...prev, hireDateTo: value }))}
-              holidays={HOLIDAY_DATE_KEYS}
+              holidays={holidayDateKeys}
               placeholder={SEARCH_PLACEHOLDERS.hireDateTo}
               className="w-full"
             />

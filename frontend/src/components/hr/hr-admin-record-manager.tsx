@@ -20,7 +20,7 @@ import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { fetcher } from "@/lib/fetcher";
-import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
@@ -632,6 +632,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
     ];
   }, [toggleDeleteById]);
 
+  const rowClassRules = useMemo(() => buildGridRowClassRules<AdminGridRow>(), []);
   const getRowClass = useCallback((params: RowClassParams<AdminGridRow>) => {
     return getGridRowClass(params.data?._status);
   }, []);
@@ -797,6 +798,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
               suppressRowClickSelection={false}
               singleClickEdit
               animateRows={false}
+              rowClassRules={rowClassRules}
               getRowClass={getRowClass}
               getRowId={(params) => `${params.data.employee_id}-${params.data.id}`}
               onGridReady={onGridReady}
