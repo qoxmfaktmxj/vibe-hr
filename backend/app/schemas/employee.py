@@ -76,4 +76,3 @@ class EmployeeBatchResponse(BaseModel):
     inserted_count: int
     updated_count: int
     deleted_count: int
-    employees: list[EmployeeItem]

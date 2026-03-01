@@ -5,7 +5,7 @@ import secrets
 import string
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete as sa_delete
+from sqlalchemy import delete as sa_delete, func
 from sqlmodel import Session, select
 
 from app.core.security import hash_password
@@ -109,16 +109,17 @@ def list_employees(
     if active is not None:
         stmt = stmt.where(AuthUser.is_active == active)  # noqa: E712
 
-    rows_all = session.exec(stmt.order_by(HrEmployee.id)).all()
-    total_count = len(rows_all)
+    # DB 레벨 COUNT — 전체 row 로드 없이 카운트
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_count: int = session.exec(count_stmt).one()
 
+    # DB 레벨 OFFSET/LIMIT
+    paged_stmt = stmt.order_by(HrEmployee.id)
     if page is not None and limit is not None and limit > 0:
-        start = max(0, (page - 1) * limit)
-        end = start + limit
-        rows = rows_all[start:end]
-    else:
-        rows = rows_all
+        offset = max(0, (page - 1) * limit)
+        paged_stmt = paged_stmt.offset(offset).limit(limit)
 
+    rows = session.exec(paged_stmt).all()
     return ([_build_employee_item(employee, user, department) for employee, user, department in rows], total_count)
 
 
@@ -328,10 +329,8 @@ def batch_save_employees(session: Session, payload: EmployeeBatchRequest) -> Emp
             detail=f"Batch save failed: {str(exc)}",
         ) from exc
 
-    employees, _ = list_employees(session)
     return EmployeeBatchResponse(
         inserted_count=inserted_count,
         updated_count=updated_count,
         deleted_count=deleted_count,
-        employees=employees,
     )

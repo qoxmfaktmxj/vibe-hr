@@ -2,18 +2,11 @@
 
 import { useMemo } from "react";
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type ColDef,
   type RowClickedEvent,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
-let mngGridModulesRegistered = false;
-if (!mngGridModulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  mngGridModulesRegistered = true;
-}
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
   page: "페이지",

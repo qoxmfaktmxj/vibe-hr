@@ -5,8 +5,6 @@ import { Plus, Copy, Save, Download, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ICellRendererParams,
   type ColDef,
@@ -30,14 +28,6 @@ import type {
   TimAttendanceCodeBatchResponse,
 } from "@/types/tim";
 
-/* ------------------------------------------------------------------ */
-/* AG Grid 모듈 등록 (최초 1회)                                         */
-/* ------------------------------------------------------------------ */
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
 
 /* ------------------------------------------------------------------ */
 /* 타입                                                                */

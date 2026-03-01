@@ -62,5 +62,4 @@ export type EmployeeBatchResponse = {
   inserted_count: number;
   updated_count: number;
   deleted_count: number;
-  employees: EmployeeItem[];
 };

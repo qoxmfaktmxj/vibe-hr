@@ -13,8 +13,6 @@ import { Plus, Save, Download, Search, CopyPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type CellValueChangedEvent,
   type ICellEditorParams,
   type ICellRendererParams,
@@ -40,14 +38,6 @@ import type {
   TimHolidayCopyYearResponse,
 } from "@/types/tim";
 
-/* ------------------------------------------------------------------ */
-/* AG Grid 모듈 등록 (최초 1회)                                         */
-/* ------------------------------------------------------------------ */
-let modulesRegistered = false;
-if (!modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  modulesRegistered = true;
-}
 
 /* ------------------------------------------------------------------ */
 /* 타입                                                                */

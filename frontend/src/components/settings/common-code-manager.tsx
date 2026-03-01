@@ -444,7 +444,7 @@ export function CommonCodeManager() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>세부코드 관리 {selectedGroup ? `(${selectedGroup.name})` : ""}</CardTitle>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => codeGridApiRef.current?.exportDataAsCsv({ fileName: "detail-codes.csv" })} disabled={!selectedGroupId}>엑셀 다운로드</Button>
+            <Button size="sm" variant="outline" onClick={() => codeGridApiRef.current?.exportDataAsCsv({ fileName: "detail-codes.csv" })} disabled={!selectedGroupId}>CSV 다운로드</Button>
             <Button size="sm" variant="outline" onClick={copyCode} disabled={!selectedCode}>복사</Button>
             <Button size="sm" variant="outline" onClick={() => { setCodeCreateMode(true); setSelectedCodeId(null); }} disabled={!selectedGroupId}>입력</Button>
             <Button size="sm" variant="save" onClick={saveCode} disabled={saving || !selectedGroupId}>저장</Button>

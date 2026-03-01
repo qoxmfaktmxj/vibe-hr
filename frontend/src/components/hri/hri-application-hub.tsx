@@ -13,8 +13,6 @@ import {
 import { toast } from "sonner";
 
 import {
-  AllCommunityModule,
-  ModuleRegistry,
   type ColDef,
   type GridApi,
   type GridReadyEvent,
@@ -50,11 +48,6 @@ import type {
 /* ------------------------------------------------------------------ */
 /* AG Grid 모듈 등록                                                    */
 /* ------------------------------------------------------------------ */
-let _modulesRegistered = false;
-if (!_modulesRegistered) {
-  ModuleRegistry.registerModules([AllCommunityModule]);
-  _modulesRegistered = true;
-}
 
 /* ------------------------------------------------------------------ */
 /* 상수 & 헬퍼                                                          */

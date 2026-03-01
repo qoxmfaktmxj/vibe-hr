@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import useSWR, { mutate } from "swr";
 
@@ -9,20 +9,29 @@ import { Button } from "@/components/ui/button";
 import { fetcher } from "@/lib/fetcher";
 import type { TimTodayScheduleResponse } from "@/types/tim";
 
-function getKoreaDateTime() {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
+// 모듈 레벨 싱글턴 — 매 tick마다 생성 비용 제거
+const _koreaDateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
 
+const _koreaTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+function getKoreaDateTime() {
+  const parts = _koreaDateTimeFormatter.formatToParts(new Date());
   const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${pick("year")}-${pick("month")}-${pick("day")} (${pick("weekday")}) ${pick("hour")}:${pick("minute")}:${pick("second")}`;
 }
@@ -34,14 +43,19 @@ function parseUtcDate(value: string): Date {
 
 function fmtTimeOnly(value: string | null) {
   if (!value) return "-";
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(parseUtcDate(value));
+  return _koreaTimeFormatter.format(parseUtcDate(value));
 }
+
+// 시계만 격리 — 매초 setClock이 대시보드 전체를 흔들지 않도록 memo로 분리
+const ClockDisplay = memo(function ClockDisplay() {
+  const [clock, setClock] = useState<string>("");
+  useEffect(() => {
+    setClock(getKoreaDateTime());
+    const timer = window.setInterval(() => setClock(getKoreaDateTime()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <p className="font-mono text-lg font-semibold tracking-wide">{clock || "\u00a0"}</p>;
+});
 
 function toAttendanceStatusLabel(status: string | null | undefined) {
   if (!status) return "-";
@@ -59,19 +73,10 @@ type DashboardAttendancePanelProps = {
 
 export function DashboardAttendancePanel({ compact = false }: DashboardAttendancePanelProps) {
   const { user } = useAuth();
-  // SSR hydration mismatch 방지: 초기값은 함수로 지연 계산
-  const [clock, setClock] = useState<string>("");
   const scheduleKey = user?.id ? `/api/tim/attendance-daily/today-schedule?user_id=${user.id}` : "/api/tim/attendance-daily/today-schedule";
   const { data, isLoading } = useSWR<TimTodayScheduleResponse>(scheduleKey, fetcher, {
     revalidateOnFocus: false,
   });
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setClock(getKoreaDateTime());
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const workedLabel = useMemo(() => {
     const minutes = data?.attendance?.worked_minutes;
@@ -119,7 +124,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
   return (
     <div className={`rounded-xl border bg-card p-4 ${compact ? "h-full" : ""}`}>
       <div className="space-y-1">
-        <p className="font-mono text-lg font-semibold tracking-wide">{clock || "\u00a0"}</p>
+        <ClockDisplay />
         <div className="text-xs text-muted-foreground">
           <p>구분: {dayTypeLabel ?? "-"}</p>
           <p>

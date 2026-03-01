@@ -5,8 +5,6 @@ import { Plus, Copy, Save, Download, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-    AllCommunityModule,
-    ModuleRegistry,
     type CellValueChangedEvent,
     type ICellRendererParams,
     type ColDef,
@@ -30,11 +28,6 @@ import type {
     PayAllowanceDeductionBatchResponse,
 } from "@/types/pay";
 
-let modulesRegistered = false;
-if (!modulesRegistered) {
-    ModuleRegistry.registerModules([AllCommunityModule]);
-    modulesRegistered = true;
-}
 
 type RowStatus = GridRowStatus;
 
