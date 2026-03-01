@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import {
   type CellValueChangedEvent,
   type ColDef,
@@ -154,11 +153,18 @@ function stringifyErrorDetail(value: unknown): string | null {
   return stringifyErrorDetail(record.detail) ?? stringifyErrorDetail(record.message) ?? stringifyErrorDetail(record.error);
 }
 
+type SearchFilters = {
+  code: string;
+  name: string;
+  referenceDate: string;
+};
+
+const EMPTY_FILTERS: SearchFilters = { code: "", name: "", referenceDate: "" };
+
 export function OrganizationManager() {
   const [rows, setRows] = useState<OrgRow[]>([]);
-  const [searchCode, setSearchCode] = useState("");
-  const [searchName, setSearchName] = useState("");
-  const [referenceDate, setReferenceDate] = useState("");
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -225,11 +231,11 @@ export function OrganizationManager() {
     [applyGridTransaction],
   );
 
-  const fetchDepartments = useCallback(async () => {
+  const fetchDepartments = useCallback(async (filters: SearchFilters) => {
     const params = new URLSearchParams();
-    if (searchCode.trim()) params.set("code", searchCode.trim());
-    if (searchName.trim()) params.set("name", searchName.trim());
-    if (referenceDate.trim()) params.set("reference_date", referenceDate.trim());
+    if (filters.code.trim()) params.set("code", filters.code.trim());
+    if (filters.name.trim()) params.set("name", filters.name.trim());
+    if (filters.referenceDate.trim()) params.set("reference_date", filters.referenceDate.trim());
 
     const endpoint =
       params.size > 0 ? `/api/org/departments?${params.toString()}` : "/api/org/departments";
@@ -240,12 +246,12 @@ export function OrganizationManager() {
     }
     const data = (await response.json()) as OrganizationDepartmentListResponse;
     return data.departments;
-  }, [referenceDate, searchCode, searchName]);
+  }, []);
 
-  const runQuery = useCallback(async () => {
+  const runQuery = useCallback(async (filters: SearchFilters) => {
     setLoading(true);
     try {
-      const departments = await fetchDepartments();
+      const departments = await fetchDepartments(filters);
       const nextRows = departments.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
@@ -259,8 +265,10 @@ export function OrganizationManager() {
   }, [fetchDepartments]);
 
   useEffect(() => {
-    void runQuery();
-  }, [runQuery]);
+    void runQuery(appliedFilters);
+    // appliedFilters only changes when the user explicitly clicks 조회 or presses Enter
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedFilters]);
 
   useEffect(() => {
     const api = gridApiRef.current;
@@ -475,7 +483,7 @@ export function OrganizationManager() {
     [commitRows],
   );
 
-  function downloadXlsx() {
+  async function downloadXlsx() {
     const exportRows = rows.map((row, index) => ({
       No: index + 1,
       삭제: row._status === "deleted" ? "Y" : "N",
@@ -487,6 +495,7 @@ export function OrganizationManager() {
       수정일: row.updated_at ? new Date(row.updated_at).toLocaleString() : "",
     }));
 
+    const XLSX = await import("xlsx");
     const sheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "조직코드");
@@ -557,7 +566,7 @@ export function OrganizationManager() {
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
       );
-      await runQuery();
+      await runQuery(appliedFilters);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFail);
     } finally {
@@ -565,10 +574,14 @@ export function OrganizationManager() {
     }
   }
 
+  function applyAndQuery() {
+    setAppliedFilters(searchFilters);
+  }
+
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    void runQuery();
+    applyAndQuery();
   }
 
   const toolbarActions = [
@@ -604,7 +617,7 @@ export function OrganizationManager() {
       key: "download",
       label: I18N.download,
       icon: Download,
-      onClick: downloadXlsx,
+      onClick: () => void downloadXlsx(),
       disabled: saving,
     },
   ];
@@ -654,30 +667,28 @@ export function OrganizationManager() {
     <ManagerPageShell containerRef={containerRef} onPasteCapture={handlePasteCapture}>
       <ManagerSearchSection
         title={I18N.title}
-        onQuery={() => {
-          void runQuery();
-        }}
+        onQuery={applyAndQuery}
         queryLabel={I18N.query}
         queryDisabled={saving}
       >
         <SearchFieldGrid className="xl:grid-cols-3">
           <SearchTextField
-            value={searchCode}
-            onChange={setSearchCode}
+            value={searchFilters.code}
+            onChange={(value) => setSearchFilters((prev) => ({ ...prev, code: value }))}
             onKeyDown={handleSearchFieldEnter}
             placeholder={SEARCH_PLACEHOLDERS.organizationCode}
           />
           <SearchTextField
-            value={searchName}
-            onChange={setSearchName}
+            value={searchFilters.name}
+            onChange={(value) => setSearchFilters((prev) => ({ ...prev, name: value }))}
             onKeyDown={handleSearchFieldEnter}
             placeholder={SEARCH_PLACEHOLDERS.organizationName}
           />
           <Input
             type="date"
             className="h-9 text-sm"
-            value={referenceDate}
-            onChange={(event) => setReferenceDate(event.target.value)}
+            value={searchFilters.referenceDate}
+            onChange={(event) => setSearchFilters((prev) => ({ ...prev, referenceDate: event.target.value }))}
             onKeyDown={handleSearchFieldEnter}
             aria-label={SEARCH_PLACEHOLDERS.referenceDate}
           />

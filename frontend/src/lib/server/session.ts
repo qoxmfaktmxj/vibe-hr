@@ -21,7 +21,7 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
-      cache: "no-store",
+      next: { revalidate: 60 },
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
@@ -40,7 +40,7 @@ export const getMenuTree = cache(async (): Promise<MenuNode[]> => {
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/v1/menus/tree`, {
-      cache: "no-store",
+      next: { revalidate: 300 },
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
