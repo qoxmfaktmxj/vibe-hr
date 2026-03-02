@@ -14,12 +14,13 @@ from app.models import AuthRole, AuthUser, AuthUserRole
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-def build_access_token(user_id: int) -> str:
+def build_access_token(user_id: int, expires_min: int | None = None) -> str:
     now = datetime.now(timezone.utc)
+    ttl_min = expires_min if expires_min is not None and expires_min > 0 else settings.auth_token_expires_min
     payload = {
         "sub": str(user_id),
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.auth_token_expires_min)).timestamp()),
+        "exp": int((now + timedelta(minutes=ttl_min)).timestamp()),
         "iss": settings.auth_token_issuer,
     }
     return jwt.encode(
@@ -29,7 +30,7 @@ def build_access_token(user_id: int) -> str:
     )
 
 
-def parse_access_token(token: str) -> int | None:
+def parse_access_token_payload(token: str) -> dict | None:
     try:
         payload = jwt.decode(
             token,
@@ -39,6 +40,13 @@ def parse_access_token(token: str) -> int | None:
             options={"require": ["sub", "iat", "exp", "iss"]},
         )
     except InvalidTokenError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def parse_access_token(token: str) -> int | None:
+    payload = parse_access_token_payload(token)
+    if payload is None:
         return None
 
     user_id_str = payload.get("sub")

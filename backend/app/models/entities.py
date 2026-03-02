@@ -158,6 +158,33 @@ class AppCode(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class AppSystemSetting(SQLModel, table=True):
+    __tablename__ = "app_system_settings"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True, max_length=120)
+    category: str = Field(default="general", index=True, max_length=50)
+    value_type: str = Field(default="string", max_length=20)
+    value_text: str = Field(default="")
+    description: Optional[str] = Field(default=None, max_length=255)
+    is_active: bool = Field(default=True)
+    updated_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AppSystemSettingHistory(SQLModel, table=True):
+    __tablename__ = "app_system_setting_history"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    setting_id: Optional[int] = Field(default=None, foreign_key="app_system_settings.id")
+    key: str = Field(index=True, max_length=120)
+    old_value_text: Optional[str] = None
+    new_value_text: str
+    changed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    reason: Optional[str] = Field(default=None, max_length=255)
+    changed_at: datetime = Field(default_factory=utc_now)
+
+
 class HrEmployeeBasicProfile(SQLModel, table=True):
     __tablename__ = "hr_employee_basic_profiles"
     __table_args__ = (UniqueConstraint("employee_id", name="uq_hr_employee_basic_profiles_employee_id"),)

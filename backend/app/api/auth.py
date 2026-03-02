@@ -49,6 +49,14 @@ def me(
     return build_login_user(session, current_user)
 
 
+@router.post("/refresh", response_model=LoginResponse)
+def refresh(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> LoginResponse:
+    return build_login_response(session, current_user)
+
+
 @router.get(
     "/impersonation/users",
     response_model=ImpersonationCandidateListResponse,

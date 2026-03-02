@@ -48,9 +48,8 @@ function fmtTimeOnly(value: string | null) {
 
 // 시계만 격리 — 매초 setClock이 대시보드 전체를 흔들지 않도록 memo로 분리
 const ClockDisplay = memo(function ClockDisplay() {
-  const [clock, setClock] = useState<string>("");
+  const [clock, setClock] = useState<string>(() => getKoreaDateTime());
   useEffect(() => {
-    setClock(getKoreaDateTime());
     const timer = window.setInterval(() => setClock(getKoreaDateTime()), 1000);
     return () => window.clearInterval(timer);
   }, []);

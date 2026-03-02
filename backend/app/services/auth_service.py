@@ -1,10 +1,13 @@
+from datetime import datetime, timezone
+
 from sqlmodel import Session, or_, select
 
-from app.core.auth import build_access_token
+from app.core.auth import build_access_token, parse_access_token_payload
 from app.core.security import hash_password, verify_password
 from app.core.time_utils import business_today, now_utc
 from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
 from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
+from app.services.system_setting_service import get_auth_session_policy
 
 
 def authenticate_user(session: Session, login_id: str, password: str) -> AuthUser | None:
@@ -34,14 +37,28 @@ def build_login_user(session: Session, user: AuthUser) -> LoginUser:
 
 
 def build_login_response(session: Session, user: AuthUser) -> LoginResponse:
+    policy = get_auth_session_policy(session)
+
     user.last_login_at = now_utc()
     user.updated_at = now_utc()
     session.add(user)
     session.commit()
 
+    access_token = build_access_token(user.id, expires_min=policy.access_ttl_min)
+    payload = parse_access_token_payload(access_token) or {}
+    exp = int(payload.get("exp", int(datetime.now(timezone.utc).timestamp())))
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+
     return LoginResponse(
-        access_token=build_access_token(user.id),
+        access_token=access_token,
         user=build_login_user(session, user),
+        expires_at=exp,
+        expires_in_sec=max(0, exp - now_ts),
+        access_ttl_min=policy.access_ttl_min,
+        refresh_threshold_min=policy.refresh_threshold_min,
+        remember_enabled=policy.remember_enabled,
+        remember_ttl_min=policy.remember_ttl_min,
+        show_countdown=policy.show_countdown,
     )
 
 

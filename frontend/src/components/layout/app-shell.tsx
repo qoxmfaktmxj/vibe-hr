@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { useMenu } from "@/components/auth/menu-provider";
+import { SessionCountdown } from "@/components/layout/session-countdown";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import type { MenuNode } from "@/types/menu";
 
@@ -300,6 +301,7 @@ export function AppShell({ title: _title, description: _description, children }:
             </div>
 
             <div className="flex items-center justify-end gap-2">
+              <SessionCountdown />
               <ThemeSettingsPopoverNoSsr />
               {/* user 로드 전 자리 유지 (DOM 구조 고정) */}
               <span className={isAdmin ? undefined : "invisible pointer-events-none"}>

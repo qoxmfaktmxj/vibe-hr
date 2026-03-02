@@ -19,6 +19,13 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: LoginUser
+    expires_at: int
+    expires_in_sec: int
+    access_ttl_min: int
+    refresh_threshold_min: int
+    remember_enabled: bool
+    remember_ttl_min: int
+    show_countdown: bool
 
 
 class ImpersonationCandidate(BaseModel):

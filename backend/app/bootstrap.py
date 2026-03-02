@@ -13,6 +13,7 @@ from app.models import (
     AppCodeGroup,
     AppMenu,
     AppMenuRole,
+    AppSystemSetting,
     AuthRole,
     AuthUser,
     AuthUserRole,
@@ -561,7 +562,8 @@ MENU_TREE: list[dict] = [
                 "children": [
                     {"code": "settings.menus", "name": "메뉴관리", "path": "/settings/menus", "icon": "PanelLeft", "sort_order": 902, "roles": ["admin"]},
                     {"code": "settings.common-codes", "name": "공통코드관리", "path": "/settings/common-codes", "icon": "ListOrdered", "sort_order": 903, "roles": ["admin"]},
-                    {"code": "settings.icons", "name": "아이콘관리", "path": "/settings/icons", "icon": "ListPlus", "sort_order": 904, "roles": ["admin"]}
+                    {"code": "settings.icons", "name": "아이콘관리", "path": "/settings/icons", "icon": "ListPlus", "sort_order": 904, "roles": ["admin"]},
+                    {"code": "settings.system", "name": "시스템기준관리", "path": "/settings/system", "icon": "Settings", "sort_order": 905, "roles": ["admin"]}
                 ],
             },
             {
@@ -1132,6 +1134,32 @@ def ensure_menus(session: Session) -> None:
             changed = True
     if changed:
         session.commit()
+
+
+def ensure_system_settings(session: Session) -> None:
+    defaults: list[tuple[str, str, str, str, str]] = [
+        ("auth.session.access_ttl_min", "auth", "int", "120", "Access JWT 만료시간(분)"),
+        ("auth.session.refresh_threshold_min", "auth", "int", "60", "갱신 임계치(분)"),
+        ("auth.session.remember_enabled", "auth", "bool", "true", "Remember me 허용 여부"),
+        ("auth.session.remember_ttl_min", "auth", "int", str(60 * 24 * 30), "Remember me 쿠키 만료(분)"),
+        ("auth.session.show_countdown", "auth", "bool", "true", "상단 세션 카운트다운 표시 여부"),
+    ]
+
+    existing = set(session.exec(select(AppSystemSetting.key)).all())
+    for key, category, value_type, value_text, description in defaults:
+        if key in existing:
+            continue
+        session.add(
+            AppSystemSetting(
+                key=key,
+                category=category,
+                value_type=value_type,
+                value_text=value_text,
+                description=description,
+                is_active=True,
+            )
+        )
+    session.commit()
 
 
 def ensure_common_codes(session: Session) -> None:
@@ -3077,6 +3105,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
+    ensure_system_settings(session)
     ensure_common_codes(session)
     ensure_pap_final_results(session)
     ensure_pap_appraisal_masters(session)

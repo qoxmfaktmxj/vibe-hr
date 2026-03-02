@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { AuthUser } from "@/types/auth";
 
-type LoginResponse = {
+type RefreshResponse = {
   access_token: string;
   user: AuthUser;
   access_ttl_min: number;
@@ -21,45 +21,33 @@ const REFRESH_THRESHOLD_COOKIE = "vibe_hr_refresh_threshold_min";
 const SHOW_COUNTDOWN_COOKIE = "vibe_hr_show_countdown";
 
 export async function POST(request: NextRequest) {
-  const payload = await request.json().catch(() => null);
-  const loginId = typeof payload?.login_id === "string" ? payload.login_id.trim() : "";
-  const password = typeof payload?.password === "string" ? payload.password : "";
-  const remember = payload?.remember === true;
-
-  if (!loginId || !password) {
-    return NextResponse.json(
-      { detail: "아이디와 비밀번호를 입력해 주세요." },
-      { status: 400 },
-    );
+  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  if (!accessToken) {
+    return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
     cache: "no-store",
-    body: JSON.stringify({ login_id: loginId, password }),
   });
 
   if (!upstreamResponse.ok) {
-    return NextResponse.json(
-      { detail: "아이디 또는 비밀번호가 올바르지 않습니다." },
-      { status: upstreamResponse.status === 401 ? 401 : 500 },
-    );
+    return NextResponse.json({ detail: "Session refresh failed." }, { status: upstreamResponse.status });
   }
 
-  const data = (await upstreamResponse.json()) as LoginResponse;
-
-  const response = NextResponse.json({ user: data.user }, { status: 200 });
+  const data = (await upstreamResponse.json()) as RefreshResponse;
   const accessTtlMin = Number.isFinite(data.access_ttl_min) ? Math.max(5, data.access_ttl_min) : 120;
   const rememberTtlMin = Number.isFinite(data.remember_ttl_min) ? Math.max(60, data.remember_ttl_min) : 60 * 24 * 30;
   const refreshThresholdMin = Number.isFinite(data.refresh_threshold_min)
     ? Math.max(1, data.refresh_threshold_min)
     : Math.floor(accessTtlMin / 2);
-  const rememberEnabled = data.remember_enabled === true;
-  const maxAge = (remember && rememberEnabled ? rememberTtlMin : accessTtlMin) * 60;
+  const maxAge = (data.remember_enabled ? rememberTtlMin : accessTtlMin) * 60;
 
+  const response = NextResponse.json({ ok: true }, { status: 200 });
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
     value: data.access_token,

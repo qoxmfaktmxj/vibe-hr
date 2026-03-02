@@ -33,6 +33,7 @@ from app.api.mng_outsource import router as mng_outsource_router
 from app.api.mng_infra import router as mng_infra_router
 from app.api.welfare import router as welfare_router
 from app.api.tra import router as tra_router
+from app.api.system_setting import router as system_setting_router
 from app.bootstrap import seed_initial_data
 from app.core.config import settings
 from app.core.database import engine, init_db
@@ -90,6 +91,7 @@ app.include_router(mng_outsource_router, prefix="/api/v1")
 app.include_router(mng_infra_router, prefix="/api/v1")
 app.include_router(welfare_router, prefix="/api/v1")
 app.include_router(tra_router, prefix="/api/v1")
+app.include_router(system_setting_router, prefix="/api/v1")
 
 
 @app.get("/health")
