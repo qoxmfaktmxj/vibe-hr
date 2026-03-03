@@ -19,6 +19,7 @@ const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ACCESS_TTL_COOKIE = "vibe_hr_access_ttl_min";
 const REFRESH_THRESHOLD_COOKIE = "vibe_hr_refresh_threshold_min";
 const SHOW_COUNTDOWN_COOKIE = "vibe_hr_show_countdown";
+const REMEMBER_ENABLED_COOKIE = "vibe_hr_remember_enabled";
 
 export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
   response.cookies.set({ name: ACCESS_TTL_COOKIE, value: String(accessTtlMin), path: "/", maxAge });
   response.cookies.set({ name: REFRESH_THRESHOLD_COOKIE, value: String(refreshThresholdMin), path: "/", maxAge });
   response.cookies.set({ name: SHOW_COUNTDOWN_COOKIE, value: data.show_countdown ? "1" : "0", path: "/", maxAge });
+  // 갱신 시 remember 설정 유지를 위해 저장
+  response.cookies.set({ name: REMEMBER_ENABLED_COOKIE, value: (remember && rememberEnabled) ? "1" : "0", path: "/", maxAge });
 
   return response;
 }

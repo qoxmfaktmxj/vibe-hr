@@ -213,15 +213,11 @@ export function HrAppointmentRecordManager() {
   }, [searchFilters]);
 
   const addRow = useCallback(() => {
-    const selected = gridApiRef.current?.getSelectedRows().find((row) => row._status !== "deleted");
-    if (!selected) {
-      toast.error("기준 행(직원)을 먼저 선택해 주세요.");
-      return;
-    }
     const tempId = issueTempId();
     const today = new Date().toISOString().slice(0, 10);
+    // 선택된 행이 있으면 직원 정보를 기본값으로 활용, 없으면 빈 행으로 입력
+    const selected = gridApiRef.current?.getSelectedRows().find((row) => row._status !== "deleted");
     const newRow: AppointmentRecordRow = {
-      ...selected,
       id: tempId,
       order_id: tempId,
       appointment_no: "",
@@ -230,11 +226,24 @@ export function HrAppointmentRecordManager() {
       order_status: "draft",
       confirmed_at: null,
       confirmed_by: null,
+      employee_id: selected?.employee_id ?? 0,
+      employee_no: selected?.employee_no ?? "",
+      display_name: selected?.display_name ?? "",
+      department_name: selected?.department_name ?? "",
+      employment_status: selected?.employment_status ?? "active",
+      appointment_code_id: null,
+      appointment_code_name: null,
       appointment_kind: "permanent",
       action_type: "",
       effective_date: today,
       start_date: today,
       end_date: null,
+      from_department_id: selected?.from_department_id ?? null,
+      to_department_id: null,
+      from_position_title: selected?.from_position_title ?? null,
+      to_position_title: null,
+      from_employment_status: selected?.from_employment_status ?? null,
+      to_employment_status: null,
       apply_status: "pending",
       applied_at: null,
       temporary_reason: "",

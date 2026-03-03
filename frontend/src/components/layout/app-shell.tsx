@@ -128,7 +128,7 @@ export function AppShell({ title: _title, description: _description, children }:
   const [tabsHydrated, setTabsHydrated] = useState(false);
 
   const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
-  const [skipAutoAddPath, setSkipAutoAddPath] = useState<string | null>(null);
+  const [suppressNextAutoAdd, setSuppressNextAutoAdd] = useState(false);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
   const idleReady = useIdleMount();
@@ -186,26 +186,47 @@ export function AppShell({ title: _title, description: _description, children }:
     }
   }, []);
 
-  const openTabs = useMemo(() => {
-    const normalized = storedTabs.map((tab) => ({
-      ...tab,
-      label: resolveLabel(tab.path),
-    }));
+  useEffect(() => {
+    if (!tabsHydrated) return;
 
-    if (
-      !pathname ||
-      pathname === "/login" ||
-      pathname === "/unauthorized" ||
-      pathname === "/dashboard" ||
-      pathname === skipAutoAddPath
-    ) {
-      return normalized.slice(-MAX_OPEN_TABS);
-    }
+    setStoredTabs((prev) => {
+      const normalized = prev
+        .filter((tab) => tab.path !== "/dashboard")
+        .map((tab) => ({ ...tab, label: resolveLabel(tab.path) }));
 
-    const exists = normalized.some((tab) => tab.path === pathname);
-    const next = exists ? normalized : [...normalized, { path: pathname, label: resolveLabel(pathname) }];
-    return next.slice(-MAX_OPEN_TABS);
-  }, [pathname, resolveLabel, skipAutoAddPath, storedTabs]);
+      if (suppressNextAutoAdd) {
+        setSuppressNextAutoAdd(false);
+        return normalized.slice(-MAX_OPEN_TABS);
+      }
+
+      if (
+        !pathname ||
+        pathname === "/login" ||
+        pathname === "/unauthorized" ||
+        pathname === "/dashboard"
+      ) {
+        return normalized.slice(-MAX_OPEN_TABS);
+      }
+
+      const exists = normalized.some((tab) => tab.path === pathname);
+      if (exists) {
+        return normalized.slice(-MAX_OPEN_TABS);
+      }
+
+      return [...normalized, { path: pathname, label: resolveLabel(pathname) }].slice(-MAX_OPEN_TABS);
+    });
+  }, [pathname, resolveLabel, suppressNextAutoAdd, tabsHydrated]);
+
+  const openTabs = useMemo(
+    () =>
+      storedTabs
+        .map((tab) => ({
+          ...tab,
+          label: resolveLabel(tab.path),
+        }))
+        .slice(-MAX_OPEN_TABS),
+    [resolveLabel, storedTabs],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined" || !tabsHydrated) return;
@@ -230,13 +251,10 @@ export function AppShell({ title: _title, description: _description, children }:
   }
 
   function closeAllTabs() {
-    setSkipAutoAddPath(pathname);
+    setSuppressNextAutoAdd(true);
     setStoredTabs([]);
     router.push("/dashboard");
     setContextMenu(null);
-    window.setTimeout(() => {
-      setSkipAutoAddPath(null);
-    }, 0);
   }
 
   function closeLeftTabs(targetPath: string) {

@@ -1,5 +1,6 @@
 "use client";
 
+import * as LucideIcons from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,18 @@ import { Label } from "@/components/ui/label";
 import { normalizeMenuIconName, MENU_ICON_OPTIONS } from "@/lib/menu-icon-options";
 import { renderMenuIcon } from "@/lib/menu-icon-render";
 import type { MenuAdminItem, RoleItem } from "@/types/menu-admin";
+
+// 전체 Lucide 아이콘 목록 (고급 검색용)
+const LUCIDE_NON_ICON_EXPORTS = new Set(["Icon", "DynamicIcon", "DynamicIconComponent"]);
+const ALL_LUCIDE_ICON_NAMES: string[] = Object.keys(LucideIcons)
+  .filter((name) => {
+    if (LUCIDE_NON_ICON_EXPORTS.has(name)) return false;
+    if (!/^[A-Z][A-Za-z0-9]+$/.test(name)) return false;
+    const v = (LucideIcons as Record<string, unknown>)[name];
+    const t = typeof v;
+    return v != null && (t === "function" || t === "object");
+  })
+  .sort((a, b) => a.localeCompare(b));
 
 type FlatMenu = {
   id: number;
@@ -54,6 +67,110 @@ function findMenu(nodes: MenuAdminItem[], id: number): MenuAdminItem | null {
   return null;
 }
 
+function IconPickerGrid({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (icon: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [advanced, setAdvanced] = useState(false);
+
+  const source = advanced ? ALL_LUCIDE_ICON_NAMES : (MENU_ICON_OPTIONS as readonly string[]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return source;
+    return source.filter((name) => name.toLowerCase().includes(q));
+  }, [query, source]);
+
+  return (
+    <div className="space-y-2">
+      {/* 현재 선택된 아이콘 미리보기 + 선택 토글 버튼 */}
+      <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-500">
+          {renderMenuIcon(value || null, "h-5 w-5")}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm text-gray-700">
+          {value || "(기본 아이콘)"}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="shrink-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+        >
+          {open ? "닫기" : "선택"}
+        </button>
+      </div>
+
+      {/* 아이콘 그리드 피커 */}
+      {open && (
+        <div className="rounded-md border border-gray-200 bg-white">
+          {/* 검색 + 고급 토글 */}
+          <div className="flex items-center gap-2 border-b border-gray-100 p-2">
+            <Input
+              className="h-7 flex-1 text-xs"
+              placeholder={advanced ? "전체 아이콘 검색..." : "기본 아이콘 검색..."}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => { setAdvanced((v) => !v); setQuery(""); }}
+              className={`shrink-0 rounded border px-2 py-1 text-[10px] font-medium transition-colors ${
+                advanced
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              {advanced ? "고급 켜짐" : "고급 검색"}
+            </button>
+            <span className="shrink-0 text-[10px] text-gray-400">{filtered.length}개</span>
+          </div>
+
+          {/* 아이콘 그리드 */}
+          <div className="max-h-56 overflow-y-auto p-2">
+            <div className="grid grid-cols-5 gap-1">
+              {/* 없음 옵션 (검색어 없을 때만 표시) */}
+              {!query && (
+                <button
+                  type="button"
+                  onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
+                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-gray-100 ${!value ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
+                  title="없음"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center text-[11px] text-gray-400">—</span>
+                  <span className="w-full truncate text-center text-[10px] text-gray-400">없음</span>
+                </button>
+              )}
+              {filtered.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => { onChange(name); setOpen(false); setQuery(""); }}
+                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-gray-100 ${
+                    value === name ? "bg-primary/10 text-primary ring-1 ring-primary/40" : "text-gray-600"
+                  }`}
+                  title={name}
+                >
+                  {renderMenuIcon(name, "h-5 w-5")}
+                  <span className="w-full truncate text-center text-[10px]">{name}</span>
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <p className="col-span-5 py-4 text-center text-xs text-gray-400">
+                  검색 결과가 없습니다.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MenuTree({
   nodes,
   selectedId,
@@ -72,12 +189,16 @@ function MenuTree({
             <button
               type="button"
               onClick={() => onSelect(node.id)}
-              className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
+              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
                 selected ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
               }`}
             >
+              <span className={`shrink-0 ${selected ? "text-primary" : "text-gray-400"}`}>
+                {node.icon
+                  ? renderMenuIcon(node.icon, "h-4 w-4")
+                  : <span className="inline-block h-4 w-4" aria-hidden="true" />}
+              </span>
               <span className="font-medium">{node.name}</span>
-              <span className="ml-2 text-xs text-gray-500">({node.code})</span>
             </button>
             {node.children.length > 0 ? (
               <div className="ml-4 border-l border-gray-200 pl-2">
@@ -363,27 +484,10 @@ export function MenuAdminManager() {
                 </div>
                 <div className="space-y-2">
                   <Label>아이콘</Label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50">
-                      {renderMenuIcon(form.icon, "h-4 w-4")}
-                    </div>
-                    <Input
-                      list="menu-icon-options"
-                      value={form.icon}
-                      onChange={(e) => setForm((p) => ({ ...p, icon: e.target.value }))}
-                      placeholder="예: ListOrdered"
-                    />
-                  </div>
-                  <select
-                    className="h-9 w-full rounded-md border border-gray-200 px-2 text-sm"
+                  <IconPickerGrid
                     value={form.icon}
-                    onChange={(e) => setForm((p) => ({ ...p, icon: e.target.value }))}
-                  >
-                    <option value="">(기본 아이콘)</option>
-                    {MENU_ICON_OPTIONS.map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
-                  </select>
+                    onChange={(icon) => setForm((p) => ({ ...p, icon }))}
+                  />
                 </div>
               </div>
 
@@ -432,12 +536,6 @@ export function MenuAdminManager() {
         </CardContent>
       </Card>
 
-      <datalist id="menu-icon-options">
-        {MENU_ICON_OPTIONS.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-
       {showCreate ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-lg">
@@ -474,27 +572,10 @@ export function MenuAdminManager() {
               </div>
               <div className="space-y-2">
                 <Label>아이콘</Label>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50">
-                    {renderMenuIcon(form.icon, "h-4 w-4")}
-                  </div>
-                  <Input
-                    list="menu-icon-options"
-                    value={form.icon}
-                    onChange={(e) => setForm((p) => ({ ...p, icon: e.target.value }))}
-                    placeholder="예: ListOrdered"
-                  />
-                </div>
-                <select
-                  className="h-9 w-full rounded-md border border-gray-200 px-2 text-sm"
+                <IconPickerGrid
                   value={form.icon}
-                  onChange={(e) => setForm((p) => ({ ...p, icon: e.target.value }))}
-                >
-                  <option value="">(기본 아이콘)</option>
-                  {MENU_ICON_OPTIONS.map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
+                  onChange={(icon) => setForm((p) => ({ ...p, icon }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>정렬 순서</Label>

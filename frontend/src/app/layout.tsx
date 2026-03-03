@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { Providers } from "@/components/providers";
@@ -27,6 +27,9 @@ export const metadata: Metadata = {
     "msapplication-config": "/browserconfig.xml",
     "msapplication-TileColor": "#1C295E",
   },
+};
+
+export const viewport: Viewport = {
   themeColor: "#1C295E",
 };
 

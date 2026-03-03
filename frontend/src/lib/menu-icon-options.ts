@@ -62,5 +62,9 @@ export function normalizeMenuIconName(value?: string | null): string | null {
   const raw = (value ?? "").trim();
   if (!raw) return null;
   const aliased = MENU_ICON_ALIASES[raw] ?? raw;
-  return MENU_ICON_SET.has(aliased as (typeof MENU_ICON_OPTIONS)[number]) ? aliased : null;
+  // 사전 승인된 아이콘 목록에 있으면 반환
+  if (MENU_ICON_SET.has(aliased as (typeof MENU_ICON_OPTIONS)[number])) return aliased;
+  // PascalCase 형식의 Lucide 아이콘 이름이면 허용 (동적 렌더링 지원)
+  if (/^[A-Z][A-Za-z0-9]+$/.test(aliased)) return aliased;
+  return null;
 }

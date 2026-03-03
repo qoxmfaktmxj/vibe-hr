@@ -8,6 +8,7 @@ const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ACCESS_TTL_COOKIE = "vibe_hr_access_ttl_min";
 const REFRESH_THRESHOLD_COOKIE = "vibe_hr_refresh_threshold_min";
 const SHOW_COUNTDOWN_COOKIE = "vibe_hr_show_countdown";
+const REMEMBER_ENABLED_COOKIE = "vibe_hr_remember_enabled";
 const PUBLIC_PATHS = new Set(["/login", "/unauthorized"]);
 
 function isStaticAsset(pathname: string): boolean {
@@ -119,7 +120,9 @@ function applyRefreshedCookies(
   const thresholdMin = Number.isFinite(refreshed.refreshThresholdMin)
     ? Math.max(1, refreshed.refreshThresholdMin ?? Math.floor(accessTtlMin / 2))
     : Math.floor(accessTtlMin / 2);
-  const maxAge = ((refreshed.rememberEnabled ?? true) ? rememberTtlMin : accessTtlMin) * 60;
+  // rememberEnabled: 갱신 응답에 없으면 기존 쿠키 값 유지 (원래 로그인 설정 그대로)
+  const rememberEnabled = refreshed.rememberEnabled ?? (response.cookies.get(REMEMBER_ENABLED_COOKIE)?.value === "1");
+  const maxAge = (rememberEnabled ? rememberTtlMin : accessTtlMin) * 60;
 
   response.cookies.set({
     name: AUTH_COOKIE_NAME,

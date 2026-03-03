@@ -544,6 +544,47 @@ class HrRetireAuditLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class HrRecruitFinalist(SQLModel, table=True):
+    __tablename__ = "hr_recruit_finalists"
+    __table_args__ = (
+        UniqueConstraint("candidate_no", name="uq_hr_recruit_finalists_no"),
+        UniqueConstraint("external_key", name="uq_hr_recruit_finalists_external_key"),
+        CheckConstraint(
+            "source_type IN ('if', 'manual')",
+            name="ck_hr_recruit_finalists_source_type",
+        ),
+        CheckConstraint(
+            "hire_type IN ('new', 'experienced')",
+            name="ck_hr_recruit_finalists_hire_type",
+        ),
+        CheckConstraint(
+            "status_code IN ('draft', 'ready', 'appointed')",
+            name="ck_hr_recruit_finalists_status_code",
+        ),
+        Index("ix_hr_recruit_finalists_status_created", "status_code", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    candidate_no: str = Field(max_length=30, index=True)
+    source_type: str = Field(default="manual", max_length=20)
+    external_key: Optional[str] = Field(default=None, max_length=100, index=True)
+    full_name: str = Field(max_length=100)
+    resident_no_masked: Optional[str] = Field(default=None, max_length=30)
+    birth_date: Optional[date] = None
+    phone_mobile: Optional[str] = Field(default=None, max_length=40)
+    email: Optional[str] = Field(default=None, max_length=320)
+    hire_type: str = Field(default="new", max_length=20)
+    career_years: Optional[int] = None
+    login_id: Optional[str] = Field(default=None, max_length=50)
+    employee_no: Optional[str] = Field(default=None, max_length=30, index=True)
+    expected_join_date: Optional[date] = None
+    status_code: str = Field(default="draft", max_length=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class PapFinalResult(SQLModel, table=True):
     __tablename__ = "PAP_FINAL_RESULTS"
     __table_args__ = (
