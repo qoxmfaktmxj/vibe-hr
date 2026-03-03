@@ -18,6 +18,23 @@
       ],
       "ownerModule": "HR"
     },
+    "hr.recruit.finalists": {
+      "path": "/hr/recruit/finalists",
+      "pageFile": "frontend/src/app/hr/recruit/finalists/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-recruit-finalist-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
     "settings.common-codes": {
       "path": "/settings/common-codes",
       "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
