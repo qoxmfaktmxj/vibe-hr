@@ -20,7 +20,7 @@ export function SessionCountdown() {
   // 서버에서 최초 응답을 받기 전에는 tick이 0 → 만료 처리하지 않도록 방어
   const initializedRef = useRef(false);
   // 클릭 핸들러에서 fetchSession을 호출할 수 있도록 ref로 노출
-  const fetchSessionRef = useRef<() => Promise<void>>();
+  const fetchSessionRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     let mounted = true;
