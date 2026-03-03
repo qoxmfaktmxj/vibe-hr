@@ -129,6 +129,15 @@ def create_finalist(session: Session, payload: HrRecruitFinalistCreateRequest) -
     return _build_item(item)
 
 
+_STATUS_ORDER: dict[str, int] = {"draft": 0, "ready": 1, "appointed": 2}
+
+_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"draft", "ready"},
+    "ready": {"ready", "appointed", "draft"},
+    "appointed": {"appointed"},
+}
+
+
 def update_finalist(
     session: Session,
     finalist_id: int,
@@ -137,6 +146,15 @@ def update_finalist(
     item = session.get(HrRecruitFinalist, finalist_id)
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="채용합격자 정보를 찾을 수 없습니다.")
+
+    if payload.status_code is not None and payload.status_code != item.status_code:
+        current = item.status_code or "draft"
+        allowed = _STATUS_TRANSITIONS.get(current, set())
+        if payload.status_code not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"상태 전이 불가: '{current}' → '{payload.status_code}'",
+            )
 
     if payload.source_type is not None:
         item.source_type = payload.source_type
@@ -189,12 +207,7 @@ def delete_finalists(session: Session, ids: list[int]) -> int:
 
 def sync_if_rows(session: Session, inbound_rows: list[HrRecruitIfInboundRow]) -> tuple[int, int]:
     if not inbound_rows:
-        today = datetime.now(timezone.utc).strftime("%Y%m%d")
-        inbound_rows = [
-            HrRecruitIfInboundRow(external_key=f"IF-{today}-001", full_name="김채용", hire_type="new"),
-            HrRecruitIfInboundRow(external_key=f"IF-{today}-002", full_name="이경력", hire_type="experienced"),
-            HrRecruitIfInboundRow(external_key=f"IF-{today}-003", full_name="박지원", hire_type="new"),
-        ]
+        return 0, 0
 
     inserted_count = 0
     updated_count = 0
@@ -245,21 +258,24 @@ def generate_employee_numbers(session: Session, ids: list[int]) -> tuple[int, in
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="대상 채용합격자 데이터가 없습니다.")
 
-    updated_count = 0
-    skipped_count = 0
-    for row in rows:
-        if row.employee_no:
-            skipped_count += 1
-            continue
-        row.employee_no = _next_employee_no(session)
-        if not row.login_id:
-            row.login_id = row.employee_no.lower().replace("-", "")
-        if row.status_code == "draft":
-            row.status_code = "ready"
-        row.updated_at = _utc_now()
-        session.add(row)
-        updated_count += 1
+    # 번호가 필요한 행만 먼저 분리
+    needs_no = [r for r in rows if not r.employee_no]
+    skipped_count = len(rows) - len(needs_no)
+
+    if needs_no:
+        # 루프 전에 기준 시퀀스를 한 번만 계산 → 배치 내 중복 방지
+        base_no = _next_employee_no(session)
+        base_seq = int(base_no.replace("EMP-", ""))
+
+        for offset, row in enumerate(needs_no):
+            row.employee_no = f"EMP-{base_seq + offset:06d}"
+            if not row.login_id:
+                row.login_id = row.employee_no.lower().replace("-", "")
+            if row.status_code == "draft":
+                row.status_code = "ready"
+            row.updated_at = _utc_now()
+            session.add(row)
 
     session.commit()
-    return updated_count, skipped_count
+    return len(needs_no), skipped_count
 
