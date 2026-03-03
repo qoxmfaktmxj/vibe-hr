@@ -11,8 +11,8 @@ describe("normalizeMenuIconName", () => {
     expect(normalizeMenuIconName("Users")).toBe("UsersRound");
   });
 
-  it("returns null for unknown icon", () => {
-    expect(normalizeMenuIconName("UnknownIcon")).toBeNull();
+  it("allows unknown PascalCase icon names for advanced mode", () => {
+    expect(normalizeMenuIconName("UnknownIcon")).toBe("UnknownIcon");
   });
 
   it("returns null for empty values", () => {
