@@ -444,7 +444,7 @@ export function DashboardSidebar() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
             <Image
               src="/vibehr_logo-256x256.png"
-              alt="Vibe-HR"
+              alt="VIBE-HR"
               width={20}
               height={20}
               className="h-5 w-5"
@@ -452,7 +452,7 @@ export function DashboardSidebar() {
             />
           </div>
           <div>
-            <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">Vibe-HR</p>
+            <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">VIBE-HR</p>
             <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
           </div>
         </div>

@@ -12,8 +12,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Vibe-HR",
-  description: "Vibe-HR MVP with Next.js + FastAPI + SQLModel",
+  title: "VIBE-HR",
+  description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
