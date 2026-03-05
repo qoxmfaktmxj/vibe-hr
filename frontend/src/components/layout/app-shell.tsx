@@ -295,7 +295,7 @@ export function AppShell({ title: _title, description: _description, children }:
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-border bg-card text-card-foreground">
-          <div className="grid grid-cols-3 items-center px-4 py-2 lg:px-6">
+          <div className="grid grid-cols-3 items-center border-b border-primary/20 bg-primary px-4 py-2 text-primary-foreground lg:px-6">
             <div className="flex items-center gap-2">
               <span className="h-8 w-8" aria-hidden="true" />
             </div>
@@ -303,18 +303,18 @@ export function AppShell({ title: _title, description: _description, children }:
             <div className="flex justify-center">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                className="inline-flex items-center gap-2 rounded-full border border-white/35 bg-white/15 px-4 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-white/25"
                 aria-label="대시보드로 이동"
                 title="대시보드로 이동"
               >
                 <Image
                   src="/vibehr_logo-256x256.png"
-                  alt="Vibe-HR"
+                  alt="VIBE-HR"
                   width={16}
                   height={16}
                   className="h-4 w-4"
                 />
-                <span>Vibe-HR</span>
+                <span>VIBE-HR</span>
               </Link>
             </div>
 

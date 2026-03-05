@@ -29,13 +29,13 @@ function AuthCardIntro() {
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#EEF2FF]">
         <Image
           src="/vibehr_logo-256x256.png"
-          alt="Vibe-HR"
+          alt="VIBE-HR"
           width={48}
           height={48}
           priority
         />
       </div>
-      <h1 className="text-3xl font-black tracking-tight text-[#111318]">Vibe-HR</h1>
+      <h1 className="text-3xl font-black tracking-tight text-[#111318]">VIBE-HR</h1>
     </CardHeader>
   );
 }
