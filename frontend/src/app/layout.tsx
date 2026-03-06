@@ -23,14 +23,25 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   manifest: "/site.webmanifest",
+  openGraph: {
+    title: "VIBE-HR",
+    description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
+    images: [{ url: "/vibe-hr-thumbnail.webp", width: 1200, height: 630, type: "image/webp" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VIBE-HR",
+    description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
+    images: ["/vibe-hr-thumbnail.webp"],
+  },
   other: {
     "msapplication-config": "/browserconfig.xml",
-    "msapplication-TileColor": "#1C295E",
+    "msapplication-TileColor": "#3C6DEE",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1C295E",
+  themeColor: "#3C6DEE",
 };
 
 export default async function RootLayout({

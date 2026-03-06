@@ -195,7 +195,13 @@ export function AppShell({ title: _title, description: _description, children }:
         .map((tab) => ({ ...tab, label: resolveLabel(tab.path) }));
 
       if (suppressNextAutoAdd) {
-        setSuppressNextAutoAdd(false);
+        if (
+          pathname === "/dashboard" ||
+          pathname === "/login" ||
+          pathname === "/unauthorized"
+        ) {
+          setSuppressNextAutoAdd(false);
+        }
         return normalized.slice(-MAX_OPEN_TABS);
       }
 
@@ -308,7 +314,7 @@ export function AppShell({ title: _title, description: _description, children }:
                 title="대시보드로 이동"
               >
                 <Image
-                  src="/vibehr_logo-256x256.png"
+                  src="/vibehr_mark.svg"
                   alt="VIBE-HR"
                   width={16}
                   height={16}

@@ -443,7 +443,7 @@ export function DashboardSidebar() {
         <div className="flex items-center gap-3 p-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
             <Image
-              src="/vibehr_logo-256x256.png"
+              src="/vibehr_mark.svg"
               alt="VIBE-HR"
               width={20}
               height={20}

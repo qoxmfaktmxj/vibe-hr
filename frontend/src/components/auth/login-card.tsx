@@ -28,7 +28,7 @@ function AuthCardIntro() {
     <CardHeader className="space-y-3 px-8 pb-4 pt-8 text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#EEF2FF]">
         <Image
-          src="/vibehr_logo-256x256.png"
+          src="/vibehr_mark.svg"
           alt="VIBE-HR"
           width={48}
           height={48}
