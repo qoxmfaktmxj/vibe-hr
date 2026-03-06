@@ -1,7 +1,5 @@
 <svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="900" height="240" fill="white"/>
   <g transform="translate(24 24)">
-    <rect width="192" height="192" fill="white"/>
     <circle cx="54" cy="44" r="25" fill="#3C6DEE"/>
     <circle cx="138" cy="44" r="25" fill="#BAC1B8"/>
     <path d="M18 84H174C174 129.922 140.578 165 98 165C55.4218 165 22 129.922 22 84H18Z" fill="#E9EFF5"/>
