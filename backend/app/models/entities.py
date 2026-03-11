@@ -856,6 +856,135 @@ class PayItemGroupDetail(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
 
 
+class PayEmployeeProfile(SQLModel, table=True):
+    """직원 급여 프로필 (정기급여 대상 기준 정보)"""
+
+    __tablename__ = "pay_employee_profiles"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "effective_from", name="uq_pay_employee_profiles_employee_period"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    payroll_code_id: int = Field(foreign_key="pay_payroll_codes.id", index=True)
+    item_group_id: Optional[int] = Field(default=None, foreign_key="pay_item_groups.id")
+    base_salary: float = Field(default=0)
+    pay_type_code: str = Field(default="regular", max_length=20)
+    payment_day_type: str = Field(default="fixed_day", max_length=20)
+    payment_day_value: Optional[int] = Field(default=None)
+    holiday_adjustment: str = Field(default="previous_business_day", max_length=30)
+    effective_from: date = Field(index=True)
+    effective_to: Optional[date] = Field(default=None, index=True)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayVariableInput(SQLModel, table=True):
+    """월 변동 수당/공제 입력"""
+
+    __tablename__ = "pay_variable_inputs"
+    __table_args__ = (
+        UniqueConstraint("year_month", "employee_id", "item_code", name="uq_pay_variable_inputs_month_employee_item"),
+        Index("ix_pay_variable_inputs_year_month", "year_month", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year_month: str = Field(index=True, max_length=7)  # YYYY-MM
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    item_code: str = Field(max_length=20)
+    direction: str = Field(default="earning", max_length=20)  # earning | deduction
+    amount: float = Field(default=0)
+    memo: Optional[str] = Field(default=None, max_length=200)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollRun(SQLModel, table=True):
+    """월 급여 실행 헤더"""
+
+    __tablename__ = "pay_payroll_runs"
+    __table_args__ = (
+        UniqueConstraint("year_month", "payroll_code_id", name="uq_pay_payroll_runs_month_code"),
+        Index("ix_pay_payroll_runs_month_status", "year_month", "status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year_month: str = Field(index=True, max_length=7)  # YYYY-MM
+    payroll_code_id: int = Field(foreign_key="pay_payroll_codes.id", index=True)
+    run_name: Optional[str] = Field(default=None, max_length=120)
+    status: str = Field(default="draft", max_length=20)  # draft | calculated | closed | paid
+    total_employees: int = Field(default=0)
+    total_gross: float = Field(default=0)
+    total_deductions: float = Field(default=0)
+    total_net: float = Field(default=0)
+    calculated_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollRunEmployee(SQLModel, table=True):
+    """월 급여 실행 대상자별 결과 요약"""
+
+    __tablename__ = "pay_payroll_run_employees"
+    __table_args__ = (
+        UniqueConstraint("run_id", "employee_id", name="uq_pay_payroll_run_employees_run_employee"),
+        Index("ix_pay_payroll_run_employees_run", "run_id", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    profile_id: Optional[int] = Field(default=None, foreign_key="pay_employee_profiles.id")
+    gross_pay: float = Field(default=0)
+    taxable_income: float = Field(default=0)
+    non_taxable_income: float = Field(default=0)
+    total_deductions: float = Field(default=0)
+    net_pay: float = Field(default=0)
+    status: str = Field(default="ok", max_length=20)  # ok | warning | error
+    warning_message: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollRunItem(SQLModel, table=True):
+    """월 급여 실행 대상자별 항목 상세"""
+
+    __tablename__ = "pay_payroll_run_items"
+    __table_args__ = (
+        Index("ix_pay_payroll_run_items_run_employee", "run_employee_id", "direction"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_employee_id: int = Field(foreign_key="pay_payroll_run_employees.id", index=True)
+    item_code: str = Field(max_length=30)
+    item_name: str = Field(max_length=120)
+    direction: str = Field(max_length=20)  # earning | deduction
+    amount: float = Field(default=0)
+    tax_type: str = Field(default="taxable", max_length=30)
+    calculation_type: str = Field(default="fixed", max_length=30)
+    source_type: str = Field(default="system", max_length=30)  # profile | variable | formula | system
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollRunEvent(SQLModel, table=True):
+    """월 급여 실행 이벤트 로그"""
+
+    __tablename__ = "pay_payroll_run_events"
+    __table_args__ = (
+        Index("ix_pay_payroll_run_events_run", "run_id", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    event_type: str = Field(max_length=30)  # created | calculated | closed | paid
+    message: str = Field(max_length=500)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
 class HriFormType(SQLModel, table=True):
     """Common request form type master."""
 
