@@ -40,6 +40,10 @@ from app.models import (
     PayAllowanceDeduction,
     PayItemGroup,
     PayItemGroupDetail,
+    PayEmployeeProfile,
+    PayVariableInput,
+    PayPayrollRun,
+    PayPayrollRunEvent,
     HriFormType,
     HriFormTypePolicy,
     HriApprovalLineTemplate,
@@ -2313,6 +2317,141 @@ def ensure_pay_item_groups(session: Session) -> None:
     session.commit()
 
 
+def ensure_pay_phase2_samples(session: Session) -> None:
+    payroll_code = session.exec(select(PayPayrollCode).where(PayPayrollCode.code == "P100")).first()
+    item_group = session.exec(select(PayItemGroup).where(PayItemGroup.code == "GR-OFFICE")).first()
+    if payroll_code is None:
+        return
+
+    month_start = date.today().replace(day=1)
+    year_month = month_start.strftime("%Y-%m")
+
+    sample_employees = session.exec(
+        select(HrEmployee).where(HrEmployee.employee_no.in_(["HR-0001", "HR-0002"]))
+    ).all()
+
+    if not sample_employees:
+        return
+
+    sample_rows = [
+        {"employee_no": "HR-0001", "base_salary": 4200000.0, "allowance": 200000.0, "deduction": 90000.0},
+        {"employee_no": "HR-0002", "base_salary": 3900000.0, "allowance": 150000.0, "deduction": 70000.0},
+    ]
+
+    employee_map = {employee.employee_no: employee for employee in sample_employees}
+
+    for sample in sample_rows:
+        employee = employee_map.get(sample["employee_no"])
+        if employee is None:
+            continue
+
+        existing_profile = session.exec(
+            select(PayEmployeeProfile).where(
+                PayEmployeeProfile.employee_id == employee.id,
+                PayEmployeeProfile.effective_from == month_start,
+            )
+        ).first()
+
+        if existing_profile is None:
+            session.add(
+                PayEmployeeProfile(
+                    employee_id=employee.id,
+                    payroll_code_id=payroll_code.id,
+                    item_group_id=item_group.id if item_group else None,
+                    base_salary=sample["base_salary"],
+                    pay_type_code="regular",
+                    payment_day_type="fixed_day",
+                    payment_day_value=25,
+                    holiday_adjustment="previous_business_day",
+                    effective_from=month_start,
+                    effective_to=None,
+                    is_active=True,
+                )
+            )
+        else:
+            changed = False
+            if existing_profile.payroll_code_id != payroll_code.id:
+                existing_profile.payroll_code_id = payroll_code.id
+                changed = True
+            if existing_profile.item_group_id != (item_group.id if item_group else None):
+                existing_profile.item_group_id = item_group.id if item_group else None
+                changed = True
+            if existing_profile.base_salary != sample["base_salary"]:
+                existing_profile.base_salary = sample["base_salary"]
+                changed = True
+            if existing_profile.pay_type_code != "regular":
+                existing_profile.pay_type_code = "regular"
+                changed = True
+            if existing_profile.payment_day_type != "fixed_day":
+                existing_profile.payment_day_type = "fixed_day"
+                changed = True
+            if existing_profile.payment_day_value != 25:
+                existing_profile.payment_day_value = 25
+                changed = True
+            if existing_profile.holiday_adjustment != "previous_business_day":
+                existing_profile.holiday_adjustment = "previous_business_day"
+                changed = True
+            if existing_profile.effective_to is not None:
+                existing_profile.effective_to = None
+                changed = True
+            if not existing_profile.is_active:
+                existing_profile.is_active = True
+                changed = True
+            if changed:
+                session.add(existing_profile)
+
+        variable_samples = [
+            {
+                "item_code": "MLA",
+                "direction": "earning",
+                "amount": sample["allowance"],
+                "memo": "seed sample allowance",
+            },
+            {
+                "item_code": "HIN",
+                "direction": "deduction",
+                "amount": sample["deduction"],
+                "memo": "seed sample deduction",
+            },
+        ]
+
+        for var_item in variable_samples:
+            existing_variable = session.exec(
+                select(PayVariableInput).where(
+                    PayVariableInput.year_month == year_month,
+                    PayVariableInput.employee_id == employee.id,
+                    PayVariableInput.item_code == var_item["item_code"],
+                )
+            ).first()
+
+            if existing_variable is None:
+                session.add(
+                    PayVariableInput(
+                        year_month=year_month,
+                        employee_id=employee.id,
+                        item_code=var_item["item_code"],
+                        direction=var_item["direction"],
+                        amount=var_item["amount"],
+                        memo=var_item["memo"],
+                    )
+                )
+            else:
+                changed = False
+                if existing_variable.direction != var_item["direction"]:
+                    existing_variable.direction = var_item["direction"]
+                    changed = True
+                if existing_variable.amount != var_item["amount"]:
+                    existing_variable.amount = var_item["amount"]
+                    changed = True
+                if existing_variable.memo != var_item["memo"]:
+                    existing_variable.memo = var_item["memo"]
+                    changed = True
+                if changed:
+                    session.add(existing_variable)
+
+    session.commit()
+
+
 def ensure_hri_form_types(session: Session) -> None:
     for form_code, form_name_ko, module_code, requires_receive, default_priority in HRI_FORM_TYPE_SEEDS:
         existing = session.exec(select(HriFormType).where(HriFormType.form_code == form_code)).first()
@@ -3154,6 +3293,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_pay_tax_rates(session)
     ensure_pay_allowance_deductions(session)
     ensure_pay_item_groups(session)
+    ensure_pay_phase2_samples(session)
     ensure_hri_form_types(session)
     ensure_hri_form_type_policies(session)
     ensure_hri_approval_actor_rules(session)
