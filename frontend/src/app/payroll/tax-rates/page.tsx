@@ -5,7 +5,7 @@ import { PayrollTaxRateManager } from "@/components/payroll/payroll-tax-rate-man
 
 export const GRID_SCREEN = {
     engine: "ag-grid",
-    profile: "standard-v1",
+    profile: "standard-v2",
     registryKey: "payroll.tax-rates",
 } as const;
 

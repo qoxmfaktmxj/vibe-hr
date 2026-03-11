@@ -5,7 +5,7 @@ import { PayItemGroupManager } from "@/components/payroll/pay-item-group-manager
 
 export const GRID_SCREEN = {
   engine: "ag-grid",
-  profile: "standard-v1",
+  profile: "standard-v2",
   registryKey: "payroll.item-groups",
 } as const;
 

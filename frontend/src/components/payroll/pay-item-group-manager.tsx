@@ -10,18 +10,23 @@ import {
     type ColDef,
     type GridApi,
     type GridReadyEvent,
-    type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
-import { Button } from "@/components/ui/button";
+import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
+import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
     isRowRevertedToOriginal,
-    resolveRestoredStatus,
     snapshotFields,
     type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import type {
     PayItemGroupItem,
     PayItemGroupBatchRequest,
@@ -89,11 +94,15 @@ export function PayItemGroupManager() {
     const [saving, setSaving] = useState(false);
     const [searchName, setSearchName] = useState("");
     const [appliedName, setAppliedName] = useState("");
+    const [page, setPage] = useState(1);
     const [gridMountKey, setGridMountKey] = useState(0);
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+    const [pendingQuery, setPendingQuery] = useState(false);
 
     const gridApiRef = useRef<GridApi<RowData> | null>(null);
     const tempIdRef = useRef(-1);
     const rowsRef = useRef<RowData[]>([]);
+    const pageSize = 100;
 
     const issueTempId = () => {
         const id = tempIdRef.current;
@@ -101,17 +110,9 @@ export function PayItemGroupManager() {
         return id;
     };
 
-    const changeSummary = useMemo(() => {
-        const s = { added: 0, updated: 0, deleted: 0 };
-        for (const r of rows) {
-            if (r._status === "added") s.added++;
-            else if (r._status === "updated") s.updated++;
-            else if (r._status === "deleted") s.deleted++;
-        }
-        return s;
-    }, [rows]);
-
-    const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
+    const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
+    const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
+    const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -182,28 +183,12 @@ export function PayItemGroupManager() {
 
     const toggleDelete = useCallback(
         (rowId: number, checked: boolean) => {
-            commitRows((prev) => {
-                const next: RowData[] = [];
-                for (const row of prev) {
-                    if (row.id !== rowId) { next.push(row); continue; }
-                    if (!checked) {
-                        if (row._status === "deleted") {
-                            const restored = resolveRestoredStatus(row, (r) => isReverted(r));
-                            next.push({ ...row, _status: restored, _prevStatus: undefined });
-                        } else {
-                            next.push(row);
-                        }
-                        continue;
-                    }
-                    if (row._status === "added") continue;
-                    if (row._status !== "deleted") {
-                        next.push({ ...row, _status: "deleted", _prevStatus: row._status });
-                    } else {
-                        next.push(row);
-                    }
-                }
-                return next;
-            });
+            commitRows((prev) =>
+                toggleDeletedStatus(prev, rowId, checked, {
+                    shouldBeClean: (candidate) => isReverted(candidate),
+                    removeAddedRow: true,
+                }),
+            );
         },
         [commitRows],
     );
@@ -253,13 +238,7 @@ export function PayItemGroupManager() {
                 editable: false,
                 sortable: false,
                 filter: false,
-                cellClass: (p) => {
-                    const s = p.value as RowStatus;
-                    if (s === "added") return "vibe-status-added";
-                    if (s === "updated") return "vibe-status-updated";
-                    if (s === "deleted") return "vibe-status-deleted";
-                    return "";
-                },
+                cellClass: (p) => getGridStatusCellClass(p.value as RowStatus),
                 valueFormatter: (p) => STATUS_LABELS[(p.value as RowStatus) ?? "clean"],
             },
             {
@@ -302,14 +281,6 @@ export function PayItemGroupManager() {
         [],
     );
 
-    const getRowClass = useCallback((params: RowClassParams<RowData>) => {
-        if (!params.data) return "";
-        if (params.data._status === "added") return "vibe-row-added";
-        if (params.data._status === "updated") return "vibe-row-updated";
-        if (params.data._status === "deleted") return "vibe-row-deleted";
-        return "";
-    }, []);
-
     const onGridReady = useCallback((e: GridReadyEvent<RowData>) => {
         gridApiRef.current = e.api;
     }, []);
@@ -322,11 +293,9 @@ export function PayItemGroupManager() {
             commitRows((prev) =>
                 prev.map((row) => {
                     if (row.id !== rowId) return row;
-                    const next = { ...row } as RowData;
-                    if (next._status !== "added" && next._status !== "deleted") {
-                        next._status = isReverted(next) ? "clean" : "updated";
-                    }
-                    return next;
+                    return reconcileUpdatedStatus({ ...row } as RowData, {
+                        shouldBeClean: (candidate) => isReverted(candidate),
+                    });
                 }),
             );
         },
@@ -387,6 +356,17 @@ export function PayItemGroupManager() {
         tempIdRef.current = -1;
         gridApiRef.current = null;
         setGridMountKey((k) => k + 1);
+        setPage(1);
+    }
+
+    function handleQueryRequest() {
+        gridApiRef.current?.stopEditing();
+        if (hasChanges) {
+            setPendingQuery(true);
+            setDiscardDialogOpen(true);
+            return;
+        }
+        void handleQuery();
     }
 
     async function saveAllChanges() {
@@ -451,6 +431,20 @@ export function PayItemGroupManager() {
             return true;
         });
     }, [rows, appliedName]);
+    const totalCount = filteredRows.length;
+    const pagedRows = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return filteredRows.slice(start, start + pageSize);
+    }, [filteredRows, page, pageSize]);
+    const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
+
+    function handleTemplateDownload() {
+        toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+    }
+
+    function handleUpload() {
+        toast.success("업로드는 다음 단계에서 연결합니다.");
+    }
 
     if (loading) {
         return (
@@ -461,69 +455,64 @@ export function PayItemGroupManager() {
     }
 
     return (
-        <div className="flex h-[calc(100vh-73px)] flex-col">
-            <div className="border-b border-gray-200 bg-white px-6 py-3">
+        <ManagerPageShell>
+            <ManagerSearchSection title="항목그룹관리" onQuery={handleQueryRequest}>
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">
                         <div className="text-xs text-slate-500">코드/그룹명</div>
                         <Input
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") void handleQuery(); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleQueryRequest(); }}
                             placeholder="예: GR-HQ"
                             className="h-9 w-48 text-sm"
                         />
                     </div>
-                    <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-9">
-                        <Search className="mr-1 h-3.5 w-3.5" />
-                        조회
-                    </Button>
                 </div>
-            </div>
+            </ManagerSearchSection>
 
-            <div className="flex items-center justify-between border-b border-gray-100 bg-white px-6 py-2">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-semibold text-gray-800">그룹 목록</h2>
-                    <span className="text-xs text-slate-400">
-                        {filteredRows.length} / {rows.length}건
-                    </span>
-                    {hasChanges && (
-                        <div className="flex gap-1.5">
-                            {changeSummary.added > 0 && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">+{changeSummary.added}</span>}
-                            {changeSummary.updated > 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">~{changeSummary.updated}</span>}
-                            {changeSummary.deleted > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">-{changeSummary.deleted}</span>}
-                        </div>
-                    )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <Button size="sm" variant="outline" onClick={addRow}>
-                        <Plus className="mr-1 h-3.5 w-3.5" /> 입력
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={copySelectedRows}>
-                        <Copy className="mr-1 h-3.5 w-3.5" /> 복사
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void downloadExcel()}>
-                        <Download className="mr-1 h-3.5 w-3.5" /> 다운로드
-                    </Button>
-                    <div className="mx-1 h-6 w-px bg-gray-200" />
-                    <Button size="sm" variant="save" onClick={() => void saveAllChanges()} disabled={saving}>
-                        <Save className="mr-1 h-3.5 w-3.5" /> {saving ? "저장중..." : "저장"}
-                    </Button>
-                </div>
-            </div>
-
-            <div className="flex-1 px-6 pb-4 pt-2">
+            <ManagerGridSection
+                headerLeft={
+                    <>
+                        <GridPaginationControls
+                            page={page}
+                            totalPages={pagination.totalPages}
+                            pageInput={pagination.pageInput}
+                            setPageInput={pagination.setPageInput}
+                            goPrev={pagination.goPrev}
+                            goNext={pagination.goNext}
+                            goToPage={pagination.goToPage}
+                        />
+                        <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+                        <GridChangeSummaryBadges summary={changeSummary} />
+                    </>
+                }
+                headerRight={
+                    <GridToolbarActions
+                        actions={[
+                            { key: "create", label: "입력", icon: Plus, onClick: addRow },
+                            { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
+                            { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
+                            { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
+                            { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+                        ]}
+                        saveAction={{ key: "save", label: saving ? "저장중..." : "저장", icon: Save, onClick: () => void saveAllChanges(), disabled: saving }}
+                    />
+                }
+                contentClassName="min-h-0 flex-1 px-6 pb-4"
+            >
                 <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
                     <AgGridReact<RowData>
                         theme="legacy"
                         key={gridMountKey}
-                        rowData={filteredRows}
+                        rowData={pagedRows}
                         columnDefs={columnDefs}
                         defaultColDef={defaultColDef}
                         rowSelection="multiple"
                         suppressRowClickSelection={true}
                         animateRows={false}
-                        getRowClass={getRowClass}
+                        rowClassRules={rowClassRules}
+                        getRowClass={(params) => getGridRowClass(params.data?._status)}
                         getRowId={(p) => String(p.data.id)}
                         onGridReady={onGridReady}
                         onCellValueChanged={onCellValueChanged}
@@ -533,8 +522,24 @@ export function PayItemGroupManager() {
                         rowHeight={34}
                     />
                 </div>
-            </div>
-        </div>
+            </ManagerGridSection>
+
+            <ConfirmDialog
+                open={discardDialogOpen}
+                onOpenChange={setDiscardDialogOpen}
+                title="저장되지 않은 변경 사항이 있습니다."
+                description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+                confirmLabel="무시하고 이동"
+                cancelLabel="취소"
+                onConfirm={() => {
+                    setDiscardDialogOpen(false);
+                    if (pendingQuery) {
+                        setPendingQuery(false);
+                        void handleQuery();
+                    }
+                }}
+            />
+        </ManagerPageShell>
     );
 }
 

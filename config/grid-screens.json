@@ -431,7 +431,7 @@
       "pageFile": "frontend/src/app/payroll/codes/page.tsx",
       "componentFile": "frontend/src/components/payroll/payroll-code-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -448,7 +448,7 @@
       "pageFile": "frontend/src/app/payroll/item-groups/page.tsx",
       "componentFile": "frontend/src/components/payroll/pay-item-group-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -465,7 +465,7 @@
       "pageFile": "frontend/src/app/payroll/allowance-deduction-items/page.tsx",
       "componentFile": "frontend/src/components/payroll/pay-allowance-deduction-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -482,7 +482,7 @@
       "pageFile": "frontend/src/app/payroll/tax-rates/page.tsx",
       "componentFile": "frontend/src/components/payroll/payroll-tax-rate-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
