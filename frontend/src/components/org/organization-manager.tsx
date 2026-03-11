@@ -161,10 +161,14 @@ type SearchFilters = {
 
 const EMPTY_FILTERS: SearchFilters = { code: "", name: "", referenceDate: "" };
 
+function createEmptyFilters(): SearchFilters {
+  return { ...EMPTY_FILTERS };
+}
+
 export function OrganizationManager() {
   const [rows, setRows] = useState<OrgRow[]>([]);
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => createEmptyFilters());
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(() => createEmptyFilters());
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -575,7 +579,7 @@ export function OrganizationManager() {
   }
 
   function applyAndQuery() {
-    setAppliedFilters(searchFilters);
+    setAppliedFilters({ ...searchFilters });
   }
 
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement>) {
