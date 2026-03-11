@@ -481,7 +481,21 @@ MENU_TREE: list[dict] = [
                     {"code": "payroll.allowance-deduction-items", "name": "수당공제항목관리", "path": "/payroll/allowance-deduction-items", "icon": "Calculator", "sort_order": 502, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.item-groups", "name": "항목그룹관리", "path": "/payroll/item-groups", "icon": "Calculator", "sort_order": 503, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.codes", "name": "급여코드관리", "path": "/payroll/codes", "icon": "Calculator", "sort_order": 504, "roles": ["payroll_mgr", "admin"]},
-                    {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]}
+                    {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.payment-schedules", "name": "월급여일자관리", "path": "/payroll/payment-schedules", "icon": "CalendarDays", "sort_order": 506, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.employee-profiles", "name": "직원급여프로필관리", "path": "/payroll/employee-profiles", "icon": "Users", "sort_order": 507, "roles": ["payroll_mgr", "admin"]}
+                ],
+            },
+            {
+                "code": "payroll.process",
+                "name": "급여실행관리",
+                "path": None,
+                "icon": "Wallet",
+                "sort_order": 510,
+                "roles": ["payroll_mgr", "admin"],
+                "children": [
+                    {"code": "payroll.variable-inputs", "name": "월변동입력관리", "path": "/payroll/variable-inputs", "icon": "NotebookPen", "sort_order": 511, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.runs", "name": "월급여Run관리", "path": "/payroll/runs", "icon": "PlayCircle", "sort_order": 512, "roles": ["payroll_mgr", "admin"]}
                 ],
             },
         ],

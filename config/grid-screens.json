@@ -494,6 +494,74 @@
       ],
       "ownerModule": "PAYROLL"
     },
+    "payroll.payment-schedules": {
+      "path": "/payroll/payment-schedules",
+      "pageFile": "frontend/src/app/payroll/payment-schedules/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-payment-schedule-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.employee-profiles": {
+      "path": "/payroll/employee-profiles",
+      "pageFile": "frontend/src/app/payroll/employee-profiles/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-employee-profile-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.variable-inputs": {
+      "path": "/payroll/variable-inputs",
+      "pageFile": "frontend/src/app/payroll/variable-inputs/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-variable-input-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.runs": {
+      "path": "/payroll/runs",
+      "pageFile": "frontend/src/app/payroll/runs/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-run-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
     "hri.requests.mine": {
       "path": "/hri/requests/mine",
       "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
