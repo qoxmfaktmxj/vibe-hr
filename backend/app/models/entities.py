@@ -890,7 +890,7 @@ class PayVariableInput(SQLModel, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    year_month: str = Field(index=True, max_length=7)  # YYYY-MM
+    year_month: str = Field(max_length=7)  # YYYY-MM
     employee_id: int = Field(foreign_key="hr_employees.id", index=True)
     item_code: str = Field(max_length=20)
     direction: str = Field(default="earning", max_length=20)  # earning | deduction
