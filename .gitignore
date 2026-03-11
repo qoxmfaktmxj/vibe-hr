@@ -16,6 +16,12 @@ frontend/out/
 .vscode/
 .idea/
 
+# OMX local/project runtime artifacts
+.codex/
+.agents/
+.omx/
+.backup/
+
 # Playwright CLI artifacts
 .playwright-cli/
 
