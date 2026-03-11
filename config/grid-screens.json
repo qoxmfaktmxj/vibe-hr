@@ -380,7 +380,7 @@
       "pageFile": "frontend/src/app/tim/codes/page.tsx",
       "componentFile": "frontend/src/components/tim/attendance-code-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -397,7 +397,7 @@
       "pageFile": "frontend/src/app/tim/holidays/page.tsx",
       "componentFile": "frontend/src/components/tim/holiday-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -414,7 +414,7 @@
       "pageFile": "frontend/src/app/tim/work-codes/page.tsx",
       "componentFile": "frontend/src/components/tim/work-schedule-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",

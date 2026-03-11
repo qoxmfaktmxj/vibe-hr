@@ -19,18 +19,24 @@ import {
   type ColDef,
   type GridApi,
   type GridReadyEvent,
-  type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
+import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
+import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   isRowRevertedToOriginal,
-  resolveRestoredStatus,
   snapshotFields,
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import type {
   TimHolidayItem,
   TimHolidayBatchRequest,
@@ -154,7 +160,10 @@ export function HolidayManager() {
   const [saving, setSaving] = useState(false);
   const [year, setYear] = useState(currentYear);
   const [yearInput, setYearInput] = useState(String(currentYear));
+  const [page, setPage] = useState(1);
   const [gridMountKey, setGridMountKey] = useState(0);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"query" | "copyYear" | null>(null);
 
   // 전년도 복사 모달 상태
   const [copyFrom, setCopyFrom] = useState(String(currentYear));
@@ -164,6 +173,7 @@ export function HolidayManager() {
   const gridApiRef = useRef<GridApi<HolidayRow> | null>(null);
   const tempIdRef = useRef(-1);
   const rowsRef = useRef<HolidayRow[]>([]);
+  const pageSize = 100;
 
   const issueTempId = () => {
     const id = tempIdRef.current;
@@ -172,17 +182,9 @@ export function HolidayManager() {
   };
 
   /* -- 변경 요약 ---------------------------------------------------- */
-  const changeSummary = useMemo(() => {
-    const s = { added: 0, updated: 0, deleted: 0 };
-    for (const r of rows) {
-      if (r._status === "added") s.added++;
-      else if (r._status === "updated") s.updated++;
-      else if (r._status === "deleted") s.deleted++;
-    }
-    return s;
-  }, [rows]);
-
-  const hasChanges = changeSummary.added + changeSummary.updated + changeSummary.deleted > 0;
+  const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
+  const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
+  const rowClassRules = useMemo(() => buildGridRowClassRules<HolidayRow>(), []);
 
   /* -- 로딩 -------------------------------------------------------- */
   const loadData = useCallback(async (targetYear: number) => {
@@ -255,28 +257,12 @@ export function HolidayManager() {
   /* -- 삭제 토글 --------------------------------------------------- */
   const toggleDelete = useCallback(
     (rowId: number, checked: boolean) => {
-      commitRows((prev) => {
-        const next: HolidayRow[] = [];
-        for (const row of prev) {
-          if (row.id !== rowId) { next.push(row); continue; }
-          if (!checked) {
-            if (row._status === "deleted") {
-              const restored = resolveRestoredStatus(row, (r) => isReverted(r));
-              next.push({ ...row, _status: restored, _prevStatus: undefined });
-            } else {
-              next.push(row);
-            }
-            continue;
-          }
-          if (row._status === "added") continue;
-          if (row._status !== "deleted") {
-            next.push({ ...row, _status: "deleted", _prevStatus: row._status });
-          } else {
-            next.push(row);
-          }
-        }
-        return next;
-      });
+      commitRows((prev) =>
+        toggleDeletedStatus(prev, rowId, checked, {
+          shouldBeClean: (candidate) => isReverted(candidate),
+          removeAddedRow: true,
+        }),
+      );
     },
     [commitRows],
   );
@@ -327,13 +313,7 @@ export function HolidayManager() {
         editable: false,
         sortable: false,
         filter: false,
-        cellClass: (p) => {
-          const s = p.value as RowStatus;
-          if (s === "added") return "vibe-status-added";
-          if (s === "updated") return "vibe-status-updated";
-          if (s === "deleted") return "vibe-status-deleted";
-          return "";
-        },
+        cellClass: (p) => getGridStatusCellClass(p.value as RowStatus),
         valueFormatter: (p) => STATUS_LABELS[(p.value as RowStatus) ?? "clean"],
       },
       {
@@ -382,14 +362,6 @@ export function HolidayManager() {
     [],
   );
 
-  const getRowClass = useCallback((params: RowClassParams<HolidayRow>) => {
-    if (!params.data) return "";
-    if (params.data._status === "added") return "vibe-row-added";
-    if (params.data._status === "updated") return "vibe-row-updated";
-    if (params.data._status === "deleted") return "vibe-row-deleted";
-    return "";
-  }, []);
-
   const onGridReady = useCallback((e: GridReadyEvent<HolidayRow>) => {
     gridApiRef.current = e.api;
   }, []);
@@ -402,11 +374,9 @@ export function HolidayManager() {
       commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
-          const next = { ...row } as HolidayRow;
-          if (next._status !== "added" && next._status !== "deleted") {
-            next._status = isReverted(next) ? "clean" : "updated";
-          }
-          return next;
+          return reconcileUpdatedStatus({ ...row } as HolidayRow, {
+            shouldBeClean: (candidate) => isReverted(candidate),
+          });
         }),
       );
     },
@@ -417,6 +387,30 @@ export function HolidayManager() {
   function addRow() {
     const row = createEmptyRow(issueTempId(), year);
     commitRows((prev) => [row, ...prev]);
+  }
+
+  function copySelectedRows() {
+    if (!gridApiRef.current) return;
+    const selected = gridApiRef.current.getSelectedRows().filter((r) => r._status !== "deleted");
+    if (selected.length === 0) return;
+    const selectedIdSet = new Set(selected.map((r) => r.id));
+    const clones = new Map(
+      selected.map((r) => [
+        r.id,
+        { ...r, id: issueTempId(), _status: "added" as const, _original: undefined, _prevStatus: undefined },
+      ]),
+    );
+    commitRows((prev) => {
+      const next: HolidayRow[] = [];
+      for (const row of prev) {
+        next.push(row);
+        if (selectedIdSet.has(row.id)) {
+          const clone = clones.get(row.id);
+          if (clone) next.push(clone);
+        }
+      }
+      return next;
+    });
   }
 
   async function downloadExcel() {
@@ -449,6 +443,17 @@ export function HolidayManager() {
     tempIdRef.current = -1;
     gridApiRef.current = null;
     setGridMountKey((k) => k + 1);
+    setPage(1);
+  }
+
+  function handleQueryRequest() {
+    gridApiRef.current?.stopEditing();
+    if (hasChanges) {
+      setPendingAction("query");
+      setDiscardDialogOpen(true);
+      return;
+    }
+    void handleQuery();
   }
 
   async function copyYear() {
@@ -480,11 +485,22 @@ export function HolidayManager() {
       setYearInput(String(to));
       setYear(to);
       setGridMountKey((k) => k + 1);
+      setPage(1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "복사에 실패했습니다.");
     } finally {
       setCopyLoading(false);
     }
+  }
+
+  function handleCopyYearRequest() {
+    gridApiRef.current?.stopEditing();
+    if (hasChanges) {
+      setPendingAction("copyYear");
+      setDiscardDialogOpen(true);
+      return;
+    }
+    void copyYear();
   }
 
   async function saveAllChanges() {
@@ -540,6 +556,21 @@ export function HolidayManager() {
     }
   }
 
+  const totalCount = rows.length;
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+  const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
+
+  function handleTemplateDownload() {
+    toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+  }
+
+  function handleUpload() {
+    toast.success("업로드는 다음 단계에서 연결합니다.");
+  }
+
   /* -- 렌더링 ------------------------------------------------------ */
   if (loading) {
     return (
@@ -550,116 +581,79 @@ export function HolidayManager() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-73px)] flex-col">
-      {/* 검색 영역 */}
-      <div className="border-b border-gray-200 bg-white px-6 py-3">
+    <ManagerPageShell>
+      <ManagerSearchSection title="공휴일관리" onQuery={handleQueryRequest}>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <div className="text-xs text-slate-500">조회 연도</div>
-            <input
+            <Input
               type="number"
               value={yearInput}
               min={2000}
               max={2100}
               onChange={(e) => setYearInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") void handleQuery(); }}
-              className="h-9 w-24 rounded-md border border-gray-200 px-3 text-sm"
+              onKeyDown={(e) => { if (e.key === "Enter") handleQueryRequest(); }}
+              className="h-9 w-24 text-sm"
             />
           </div>
-          <Button size="sm" variant="query" onClick={() => void handleQuery()} className="h-9">
-            <Search className="mr-1 h-3.5 w-3.5" />
-            조회
-          </Button>
-
-          {/* 구분선 */}
           <div className="mx-2 h-8 w-px bg-gray-200" />
-
-          {/* 전년도 복사 */}
           <div className="flex items-end gap-2">
             <div className="space-y-1">
               <div className="text-xs text-slate-500">복사 원본 연도</div>
-              <input
-                type="number"
-                value={copyFrom}
-                min={2000}
-                max={2100}
-                onChange={(e) => setCopyFrom(e.target.value)}
-                className="h-9 w-24 rounded-md border border-gray-200 px-3 text-sm"
-              />
+              <Input type="number" value={copyFrom} min={2000} max={2100} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-24 text-sm" />
             </div>
             <span className="mb-2 text-slate-400">→</span>
             <div className="space-y-1">
               <div className="text-xs text-slate-500">대상 연도</div>
-              <input
-                type="number"
-                value={copyTo}
-                min={2000}
-                max={2100}
-                onChange={(e) => setCopyTo(e.target.value)}
-                className="h-9 w-24 rounded-md border border-gray-200 px-3 text-sm"
-              />
+              <Input type="number" value={copyTo} min={2000} max={2100} onChange={(e) => setCopyTo(e.target.value)} className="h-9 w-24 text-sm" />
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void copyYear()}
+            <button
+              type="button"
+              onClick={handleCopyYearRequest}
               disabled={copyLoading}
-              className="h-9"
+              className="inline-flex h-9 items-center rounded-md border border-gray-200 px-3 text-sm"
             >
               <CopyPlus className="mr-1 h-3.5 w-3.5" />
               {copyLoading ? "복사중..." : "연도 복사"}
-            </Button>
+            </button>
           </div>
         </div>
-      </div>
+      </ManagerSearchSection>
 
-      {/* 툴바 */}
-      <div className="flex items-center justify-between border-b border-gray-100 bg-white px-6 py-2">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-gray-800">{year}년 공휴일</h2>
-          <span className="text-xs text-slate-400">{rows.length}건</span>
-          {hasChanges && (
-            <div className="flex gap-1.5">
-              {changeSummary.added > 0 && (
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">+{changeSummary.added}</span>
-              )}
-              {changeSummary.updated > 0 && (
-                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">~{changeSummary.updated}</span>
-              )}
-              {changeSummary.deleted > 0 && (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">-{changeSummary.deleted}</span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={addRow}>
-            <Plus className="mr-1 h-3.5 w-3.5" />입력
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void downloadExcel()}>
-            <Download className="mr-1 h-3.5 w-3.5" />다운로드
-          </Button>
-          <div className="mx-1 h-6 w-px bg-gray-200" />
-          <Button size="sm" variant="save" onClick={() => void saveAllChanges()} disabled={saving}>
-            <Save className="mr-1 h-3.5 w-3.5" />
-            {saving ? "저장중..." : "저장"}
-          </Button>
-        </div>
-      </div>
-
-      {/* AG Grid */}
-      <div className="flex-1 px-6 pb-4 pt-2">
+      <ManagerGridSection
+        headerLeft={
+          <>
+            <GridPaginationControls page={page} totalPages={pagination.totalPages} pageInput={pagination.pageInput} setPageInput={pagination.setPageInput} goPrev={pagination.goPrev} goNext={pagination.goNext} goToPage={pagination.goToPage} />
+            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <GridChangeSummaryBadges summary={changeSummary} />
+          </>
+        }
+        headerRight={
+          <GridToolbarActions
+            actions={[
+              { key: "create", label: "입력", icon: Plus, onClick: addRow },
+              { key: "copy", label: "복사", icon: CopyPlus, onClick: copySelectedRows },
+              { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
+              { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
+              { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+            ]}
+            saveAction={{ key: "save", label: saving ? "저장중..." : "저장", icon: Save, onClick: () => void saveAllChanges(), disabled: saving }}
+          />
+        }
+        contentClassName="min-h-0 flex-1 px-6 pb-4"
+      >
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
           <AgGridReact<HolidayRow>
             theme="legacy"
             key={gridMountKey}
-            rowData={rows}
+            rowData={pagedRows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             rowSelection="multiple"
             suppressRowClickSelection={true}
             animateRows={false}
-            getRowClass={getRowClass}
+            rowClassRules={rowClassRules}
+            getRowClass={(params) => getGridRowClass(params.data?._status)}
             getRowId={(p) => String(p.data.id)}
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
@@ -669,8 +663,27 @@ export function HolidayManager() {
             rowHeight={34}
           />
         </div>
-      </div>
-    </div>
+      </ManagerGridSection>
+
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={setDiscardDialogOpen}
+        title="저장되지 않은 변경 사항이 있습니다."
+        description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+        confirmLabel="무시하고 이동"
+        cancelLabel="취소"
+        onConfirm={() => {
+          const action = pendingAction;
+          setDiscardDialogOpen(false);
+          setPendingAction(null);
+          if (action === "query") {
+            void handleQuery();
+          } else if (action === "copyYear") {
+            void copyYear();
+          }
+        }}
+      />
+    </ManagerPageShell>
   );
 }
 
