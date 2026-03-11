@@ -19,7 +19,7 @@ import { GridPaginationControls } from "@/components/grid/grid-pagination-contro
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
-import { Input } from "@/components/ui/input";
+import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import {
   isRowRevertedToOriginal,
   snapshotFields,
@@ -776,13 +776,13 @@ export function OrganizationManager() {
             onKeyDown={handleSearchFieldEnter}
             placeholder={SEARCH_PLACEHOLDERS.organizationName}
           />
-          <Input
-            type="date"
-            className="h-9 text-sm"
+          <CustomDatePicker
             value={searchFilters.referenceDate}
-            onChange={(event) => setSearchFilters((prev) => ({ ...prev, referenceDate: event.target.value }))}
+            onChange={(value) => setSearchFilters((prev) => ({ ...prev, referenceDate: value }))}
+            placeholder={SEARCH_PLACEHOLDERS.referenceDate}
+            className="w-full"
             onKeyDown={handleSearchFieldEnter}
-            aria-label={SEARCH_PLACEHOLDERS.referenceDate}
+            ariaLabel={SEARCH_PLACEHOLDERS.referenceDate}
           />
         </SearchFieldGrid>
       </ManagerSearchSection>
