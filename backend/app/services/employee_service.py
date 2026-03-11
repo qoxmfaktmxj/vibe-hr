@@ -309,21 +309,24 @@ def batch_save_employees(session: Session, payload: EmployeeBatchRequest) -> Emp
     deleted_count = 0
 
     try:
-        with session.begin():
-            if delete_ids:
-                for chunk in _chunked(delete_ids, BATCH_DELETE_CHUNK_SIZE):
-                    deleted_count += _delete_employees_no_commit(session, chunk)
+        if delete_ids:
+            for chunk in _chunked(delete_ids, BATCH_DELETE_CHUNK_SIZE):
+                deleted_count += _delete_employees_no_commit(session, chunk)
 
-            for row in update_items:
-                _update_employee_no_commit(session, row.id, row)
-                updated_count += 1
+        for row in update_items:
+            _update_employee_no_commit(session, row.id, row)
+            updated_count += 1
 
-            for row in insert_items:
-                _create_employee_no_commit(session, row)
-                inserted_count += 1
+        for row in insert_items:
+            _create_employee_no_commit(session, row)
+            inserted_count += 1
+
+        session.commit()
     except HTTPException:
+        session.rollback()
         raise
     except Exception as exc:
+        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Batch save failed: {str(exc)}",

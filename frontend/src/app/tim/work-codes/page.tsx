@@ -1,8 +1,15 @@
+import { AgGridModulesProvider } from "@/components/grid/ag-grid-modules-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { EmployeeScheduleExceptionManager } from "@/components/tim/employee-schedule-exception-manager";
 import { ScheduleGeneratorManager } from "@/components/tim/schedule-generator-manager";
 import { WorkScheduleManager } from "@/components/tim/work-schedule-manager";
 import { requireMenuAccess } from "@/lib/guard";
+
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v1",
+  registryKey: "tim.work-schedules",
+} as const;
 
 export default async function TimWorkCodesPage() {
   await requireMenuAccess("/tim/work-codes");
@@ -14,7 +21,9 @@ export default async function TimWorkCodesPage() {
           <ScheduleGeneratorManager />
           <EmployeeScheduleExceptionManager />
         </div>
-        <WorkScheduleManager />
+        <AgGridModulesProvider>
+          <WorkScheduleManager />
+        </AgGridModulesProvider>
       </div>
     </AppShell>
   );

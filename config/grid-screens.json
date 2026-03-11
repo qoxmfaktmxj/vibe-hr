@@ -374,6 +374,142 @@
         "download"
       ],
       "ownerModule": "TRA"
+    },
+    "tim.attendance-codes": {
+      "path": "/tim/codes",
+      "pageFile": "frontend/src/app/tim/codes/page.tsx",
+      "componentFile": "frontend/src/components/tim/attendance-code-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.holidays": {
+      "path": "/tim/holidays",
+      "pageFile": "frontend/src/app/tim/holidays/page.tsx",
+      "componentFile": "frontend/src/components/tim/holiday-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.work-schedules": {
+      "path": "/tim/work-codes",
+      "pageFile": "frontend/src/app/tim/work-codes/page.tsx",
+      "componentFile": "frontend/src/components/tim/work-schedule-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "payroll.codes": {
+      "path": "/payroll/codes",
+      "pageFile": "frontend/src/app/payroll/codes/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-code-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.item-groups": {
+      "path": "/payroll/item-groups",
+      "pageFile": "frontend/src/app/payroll/item-groups/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-item-group-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.allowance-deduction-items": {
+      "path": "/payroll/allowance-deduction-items",
+      "pageFile": "frontend/src/app/payroll/allowance-deduction-items/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-allowance-deduction-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.tax-rates": {
+      "path": "/payroll/tax-rates",
+      "pageFile": "frontend/src/app/payroll/tax-rates/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-tax-rate-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "hri.requests.mine": {
+      "path": "/hri/requests/mine",
+      "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
+      "componentFile": "frontend/src/components/hri/hri-application-hub.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HRI"
     }
   }
 }

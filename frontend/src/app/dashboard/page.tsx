@@ -3,6 +3,8 @@ import { AttendanceTrendChart, LeaveTrendChart } from "@/components/dashboard/da
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardSummary } from "@/lib/api";
 
+export const dynamic = "force-dynamic";
+
 type WeatherSnapshot = {
   tempC: number | null;
   windKmh: number | null;
@@ -34,7 +36,7 @@ async function getNoKeyWeather(): Promise<WeatherSnapshot> {
   try {
     const response = await fetch(
       "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,wind_speed_10m,weather_code&timezone=Asia%2FSeoul",
-      { next: { revalidate: 600 } },
+      { cache: "no-store" },
     );
     if (!response.ok) throw new Error(`weather ${response.status}`);
     const json = (await response.json()) as {
@@ -54,9 +56,9 @@ async function getNoKeyWeather(): Promise<WeatherSnapshot> {
 async function getNoKeyFx(): Promise<FxSnapshot> {
   try {
     const [usd, eur, jpy] = await Promise.all([
-      fetch("https://api.frankfurter.app/latest?from=USD&to=KRW", { next: { revalidate: 600 } }),
-      fetch("https://api.frankfurter.app/latest?from=EUR&to=KRW", { next: { revalidate: 600 } }),
-      fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW", { next: { revalidate: 600 } }),
+      fetch("https://api.frankfurter.app/latest?from=USD&to=KRW", { cache: "no-store" }),
+      fetch("https://api.frankfurter.app/latest?from=EUR&to=KRW", { cache: "no-store" }),
+      fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW", { cache: "no-store" }),
     ]);
     if (!usd.ok || !eur.ok || !jpy.ok) throw new Error("fx fetch failed");
 
@@ -192,7 +194,7 @@ export default async function DashboardPage() {
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">오늘 날씨 (서울 · 무키 API)</CardTitle>
+              <CardTitle className="text-base">오늘 날씨 (서울 · Open-Meteo 무키 API)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
@@ -206,7 +208,7 @@ export default async function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">주요 환율 (무키 API)</CardTitle>
+              <CardTitle className="text-base">주요 환율 (Frankfurter 무키 API)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">

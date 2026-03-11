@@ -62,9 +62,11 @@ def _ensure_no_cycle(session: Session, department_id: int, parent_id: int | None
 def list_departments(
     session: Session,
     *,
+    page: int | None = None,
+    limit: int | None = None,
     code: str | None = None,
     name: str | None = None,
-) -> list[OrganizationDepartmentItem]:
+) -> tuple[list[OrganizationDepartmentItem], int]:
     statement = select(OrgDepartment).order_by(OrgDepartment.code)
     if code:
         statement = statement.where(OrgDepartment.code.ilike(f"%{code.strip()}%"))
@@ -72,10 +74,15 @@ def list_departments(
         statement = statement.where(OrgDepartment.name.ilike(f"%{name.strip()}%"))
 
     departments = session.exec(statement).all()
+    total_count = len(departments)
+    if page is not None and limit is not None and limit > 0:
+        offset = max(0, (page - 1) * limit)
+        departments = departments[offset : offset + limit]
+
     parent_name_rows = session.exec(select(OrgDepartment.id, OrgDepartment.name)).all()
     parent_name_map = {department_id: department_name for department_id, department_name in parent_name_rows}
 
-    return [_build_department_item(department, parent_name_map) for department in departments]
+    return ([_build_department_item(department, parent_name_map) for department in departments], total_count)
 
 
 def create_department(

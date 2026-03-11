@@ -13,6 +13,8 @@ export type OrganizationDepartmentListResponse = {
   departments: OrganizationDepartmentItem[];
   total_count: number;
   reference_date: string | null;
+  page?: number | null;
+  limit?: number | null;
 };
 
 export type OrganizationDepartmentDetailResponse = {

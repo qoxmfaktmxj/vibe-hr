@@ -1,13 +1,22 @@
+import { AgGridModulesProvider } from "@/components/grid/ag-grid-modules-provider";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 import { AttendanceCodeManager } from "@/components/tim/attendance-code-manager";
+
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v1",
+  registryKey: "tim.attendance-codes",
+} as const;
 
 export default async function TimCodesPage() {
   await requireMenuAccess("/tim/codes");
 
   return (
     <AppShell title="근태코드관리" description="근태/휴가 코드 및 사용 조건 관리">
-      <AttendanceCodeManager />
+      <AgGridModulesProvider>
+        <AttendanceCodeManager />
+      </AgGridModulesProvider>
     </AppShell>
   );
 }

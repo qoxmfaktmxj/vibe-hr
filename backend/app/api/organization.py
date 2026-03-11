@@ -29,16 +29,35 @@ router = APIRouter(prefix="/org", tags=["organization"])
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
 def organization_departments(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    all: bool = Query(default=False),
     code: str | None = Query(default=None),
     name: str | None = Query(default=None),
     reference_date: date | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> OrganizationDepartmentListResponse:
-    departments = list_departments(session, code=code, name=name)
+    if all:
+        departments, total_count = list_departments(session, code=code, name=name)
+        return OrganizationDepartmentListResponse(
+            departments=departments,
+            total_count=total_count,
+            reference_date=reference_date,
+        )
+
+    departments, total_count = list_departments(
+        session,
+        page=page,
+        limit=limit,
+        code=code,
+        name=name,
+    )
     return OrganizationDepartmentListResponse(
         departments=departments,
-        total_count=len(departments),
+        total_count=total_count,
         reference_date=reference_date,
+        page=page,
+        limit=limit,
     )
 
 

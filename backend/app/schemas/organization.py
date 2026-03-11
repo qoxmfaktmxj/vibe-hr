@@ -20,6 +20,8 @@ class OrganizationDepartmentListResponse(BaseModel):
     departments: list[OrganizationDepartmentItem]
     total_count: int
     reference_date: date | None = None
+    page: int | None = None
+    limit: int | None = None
 
 
 class OrganizationDepartmentDetailResponse(BaseModel):

@@ -13,7 +13,9 @@ import { AgGridReact } from "ag-grid-react";
 import { Plus, Copy, FileDown, Upload, Download, Save } from "lucide-react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
+import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
@@ -26,10 +28,12 @@ import {
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import {
+  buildGridRowClassRules,
   getGridRowClass,
   getGridStatusCellClass,
   summarizeGridStatuses,
 } from "@/lib/grid/grid-status";
+import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
 import type { OrganizationDepartmentItem, OrganizationDepartmentListResponse } from "@/types/organization";
 
@@ -159,6 +163,10 @@ type SearchFilters = {
   referenceDate: string;
 };
 
+type PendingReloadAction =
+  | { type: "page"; page: number }
+  | { type: "query"; filters: SearchFilters };
+
 const EMPTY_FILTERS: SearchFilters = { code: "", name: "", referenceDate: "" };
 
 function createEmptyFilters(): SearchFilters {
@@ -169,10 +177,15 @@ export function OrganizationManager() {
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => createEmptyFilters());
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(() => createEmptyFilters());
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(100);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [pendingReloadAction, setPendingReloadAction] = useState<PendingReloadAction | null>(null);
 
   const gridApiRef = useRef<GridApi<OrgRow> | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +198,7 @@ export function OrganizationManager() {
     () => summarizeGridStatuses(rows, (row) => row._status),
     [rows],
   );
+  const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
 
   const getRowKey = useCallback((row: OrgRow) => String(row.id), []);
 
@@ -235,8 +249,56 @@ export function OrganizationManager() {
     [applyGridTransaction],
   );
 
-  const fetchDepartments = useCallback(async (filters: SearchFilters) => {
+  const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
+    gridApiRef.current?.stopEditing();
+    gridApiRef.current?.deselectAll();
+
+    if (discardDirtyRows) {
+      rowsRef.current = [];
+      setRows([]);
+    }
+
+    if (action.type === "page") {
+      setPage(action.page);
+      return;
+    }
+
+    setAppliedFilters(action.filters);
+    setPage(1);
+    tempIdRef.current = -1;
+  }, []);
+
+  const requestReloadAction = useCallback(
+    (action: PendingReloadAction) => {
+      if (action.type === "page" && action.page === page) return;
+      if (hasDirtyRows) {
+        setPendingReloadAction(action);
+        setDiscardDialogOpen(true);
+        return;
+      }
+      runReloadAction(action, false);
+    },
+    [hasDirtyRows, page, runReloadAction],
+  );
+
+  const {
+    totalPages,
+    pageInput,
+    setPageInput,
+    goPrev,
+    goNext,
+    goToPage,
+  } = useGridPagination({
+    page,
+    totalCount,
+    pageSize,
+    onPageChange: (nextPage) => requestReloadAction({ type: "page", page: nextPage }),
+  });
+
+  const fetchDepartments = useCallback(async (filters: SearchFilters, pageNo: number) => {
     const params = new URLSearchParams();
+    params.set("page", String(pageNo));
+    params.set("limit", String(pageSize));
     if (filters.code.trim()) params.set("code", filters.code.trim());
     if (filters.name.trim()) params.set("name", filters.name.trim());
     if (filters.referenceDate.trim()) params.set("reference_date", filters.referenceDate.trim());
@@ -248,17 +310,17 @@ export function OrganizationManager() {
       const json = (await response.json().catch(() => null)) as unknown;
       throw new Error(stringifyErrorDetail(json) ?? I18N.loadError);
     }
-    const data = (await response.json()) as OrganizationDepartmentListResponse;
-    return data.departments;
-  }, []);
+    return (await response.json()) as OrganizationDepartmentListResponse;
+  }, [pageSize]);
 
-  const runQuery = useCallback(async (filters: SearchFilters) => {
+  const runQuery = useCallback(async (filters: SearchFilters, pageNo: number) => {
     setLoading(true);
     try {
-      const departments = await fetchDepartments(filters);
-      const nextRows = departments.map(toGridRow);
+      const response = await fetchDepartments(filters, pageNo);
+      const nextRows = response.departments.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
+      setTotalCount(response.total_count ?? response.departments.length);
       setSelectedId(nextRows[0]?.id ?? null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.loadError);
@@ -269,10 +331,10 @@ export function OrganizationManager() {
   }, [fetchDepartments]);
 
   useEffect(() => {
-    void runQuery(appliedFilters);
+    void runQuery(appliedFilters, page);
     // appliedFilters only changes when the user explicitly clicks 조회 or presses Enter
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appliedFilters]);
+  }, [appliedFilters, page]);
 
   useEffect(() => {
     const api = gridApiRef.current;
@@ -396,6 +458,7 @@ export function OrganizationManager() {
   const getRowClass = useCallback((params: RowClassParams<OrgRow>) => {
     return getGridRowClass(params.data?._status);
   }, []);
+  const rowClassRules = useMemo(() => buildGridRowClassRules<OrgRow>(), []);
 
   function addRow() {
     const newId = tempIdRef.current;
@@ -570,7 +633,7 @@ export function OrganizationManager() {
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
       );
-      await runQuery(appliedFilters);
+      await runQuery(appliedFilters, page);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFail);
     } finally {
@@ -579,13 +642,28 @@ export function OrganizationManager() {
   }
 
   function applyAndQuery() {
-    setAppliedFilters({ ...searchFilters });
+    requestReloadAction({ type: "query", filters: { ...searchFilters } });
   }
 
   function handleSearchFieldEnter(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
     applyAndQuery();
+  }
+
+  function handleDiscardDialogOpenChange(open: boolean) {
+    setDiscardDialogOpen(open);
+    if (!open) setPendingReloadAction(null);
+  }
+
+  function handleDiscardAndContinue() {
+    if (!pendingReloadAction) {
+      setDiscardDialogOpen(false);
+      return;
+    }
+    runReloadAction(pendingReloadAction, true);
+    setPendingReloadAction(null);
+    setDiscardDialogOpen(false);
   }
 
   const toolbarActions = [
@@ -649,7 +727,17 @@ export function OrganizationManager() {
       commitRows((prev) =>
         prev.map((row) => {
           if (row.id !== rowId) return row;
-          const next = { ...row, [field]: event.newValue } as OrgRow;
+          const next = { ...row } as OrgRow;
+          if (field === "code" || field === "name") {
+            next[field] = String(event.newValue ?? "") as never;
+          } else if (field === "is_active") {
+            next.is_active =
+              typeof event.newValue === "boolean"
+                ? event.newValue
+                : String(event.newValue ?? "N").toUpperCase() === "Y";
+          } else {
+            next[field] = event.newValue as never;
+          }
           return reconcileUpdatedStatus(next, {
             shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
           });
@@ -700,7 +788,23 @@ export function OrganizationManager() {
       </ManagerSearchSection>
 
       <ManagerGridSection
-        headerLeft={<GridChangeSummaryBadges summary={changeSummary} className="ml-1" />}
+        headerLeft={(
+          <>
+            <GridPaginationControls
+              page={page}
+              totalPages={totalPages}
+              pageInput={pageInput}
+              setPageInput={setPageInput}
+              goPrev={goPrev}
+              goNext={goNext}
+              goToPage={goToPage}
+              disabled={loading || saving}
+              className="mt-0 justify-start"
+            />
+            <span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <GridChangeSummaryBadges summary={changeSummary} />
+          </>
+        )}
         headerRight={<GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} />}
         contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-0"
       >
@@ -715,6 +819,7 @@ export function OrganizationManager() {
             suppressRowClickSelection={false}
             singleClickEdit
             animateRows={false}
+            rowClassRules={rowClassRules}
             getRowClass={getRowClass}
             loading={loading}
             localeText={AG_GRID_LOCALE_KO}
@@ -730,6 +835,16 @@ export function OrganizationManager() {
           />
         </div>
       </ManagerGridSection>
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={handleDiscardDialogOpenChange}
+        title="저장되지 않은 변경 사항이 있습니다."
+        description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+        confirmLabel="무시하고 이동"
+        cancelLabel="취소"
+        confirmVariant="destructive"
+        onConfirm={handleDiscardAndContinue}
+      />
     </ManagerPageShell>
   );
 }
