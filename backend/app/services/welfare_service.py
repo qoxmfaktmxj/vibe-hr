@@ -4,8 +4,12 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
-from app.models import WelBenefitType
-from app.schemas.welfare import WelBenefitTypeBatchRequest, WelBenefitTypeItem
+from app.models import WelBenefitRequest, WelBenefitType
+from app.schemas.welfare import (
+    WelBenefitRequestItem,
+    WelBenefitTypeBatchRequest,
+    WelBenefitTypeItem,
+)
 
 
 def _utc_now() -> datetime:
@@ -17,6 +21,13 @@ def list_wel_benefit_types(session: Session) -> list[WelBenefitTypeItem]:
         select(WelBenefitType).order_by(WelBenefitType.sort_order, WelBenefitType.id)
     ).all()
     return [WelBenefitTypeItem.model_validate(row, from_attributes=True) for row in rows]
+
+
+def list_wel_benefit_requests(session: Session) -> list[WelBenefitRequestItem]:
+    rows = session.exec(
+        select(WelBenefitRequest).order_by(WelBenefitRequest.requested_at.desc(), WelBenefitRequest.id.desc())
+    ).all()
+    return [WelBenefitRequestItem.model_validate(row, from_attributes=True) for row in rows]
 
 
 def batch_save_wel_benefit_types(session: Session, payload: WelBenefitTypeBatchRequest) -> dict[str, int]:

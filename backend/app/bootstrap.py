@@ -64,6 +64,7 @@ from app.models import (
     MngOutsourceAttendance,
     MngInfraMaster,
     MngInfraConfig,
+    WelBenefitRequest,
     WelBenefitType,
     TraOrganization,
     TraCourse,
@@ -188,6 +189,84 @@ WEL_BENEFIT_TYPE_SEEDS = [
     {"code": "RESORT", "name": "리조트", "module_path": "/wel/resort", "is_deduction": False, "pay_item_code": None, "sort_order": 60},
     {"code": "CLUB", "name": "동호회", "module_path": "/wel/club", "is_deduction": True, "pay_item_code": "CLUB_DEDUCT", "sort_order": 70},
     {"code": "HEALTH_CHECK", "name": "건강검진", "module_path": "/wel/health-check", "is_deduction": False, "pay_item_code": None, "sort_order": 80},
+]
+
+WEL_BENEFIT_REQUEST_SEEDS = [
+    {
+        "request_no": "WEL-202603-001",
+        "benefit_type_code": "SCHOLARSHIP",
+        "benefit_type_name": "\uD559\uC790\uAE08",
+        "employee_no": "HR-0001",
+        "employee_name": "\uAD00\uB9AC\uC790",
+        "department_name": "\uC778\uC0AC\uCD1D\uAD04",
+        "status_code": "payroll_reflected",
+        "requested_amount": 1500000,
+        "approved_amount": 1500000,
+        "payroll_run_label": "2026-03 \uC815\uAE30\uAE09\uC5EC",
+        "description": "\uC790\uB140 1\uD559\uAE30 \uB4F1\uB85D\uAE08 \uC9C0\uC6D0",
+        "requested_at": datetime(2026, 3, 4, 9, 0),
+        "approved_at": datetime(2026, 3, 5, 11, 30),
+    },
+    {
+        "request_no": "WEL-202603-002",
+        "benefit_type_code": "CONDOLENCE",
+        "benefit_type_name": "\uACBD\uC870\uAE08",
+        "employee_no": "HR-0142",
+        "employee_name": "\uC774\uC11C\uC900",
+        "department_name": "\uACBD\uC601\uC9C0\uC6D0\uD300",
+        "status_code": "submitted",
+        "requested_amount": 500000,
+        "approved_amount": None,
+        "payroll_run_label": None,
+        "description": "\uAC00\uC871 \uACBD\uC870 \uC99D\uBE59 \uC811\uC218 \uD6C4 \uC778\uC0AC \uAC80\uD1A0 \uB300\uAE30",
+        "requested_at": datetime(2026, 3, 8, 14, 10),
+        "approved_at": None,
+    },
+    {
+        "request_no": "WEL-202603-003",
+        "benefit_type_code": "LOAN",
+        "benefit_type_name": "\uC0AC\uB0B4\uB300\uCD9C",
+        "employee_no": "HR-0098",
+        "employee_name": "\uBC15\uC9C0\uD6C8",
+        "department_name": "\uAC1C\uBC1C\uC6B41\uD300",
+        "status_code": "approved",
+        "requested_amount": 3000000,
+        "approved_amount": 3000000,
+        "payroll_run_label": "2026-04 \uACF5\uC81C \uC608\uC815",
+        "description": "\uC0AC\uB0B4\uB300\uCD9C \uC2B9\uC778 \uD6C4 4\uC6D4 \uAE09\uC5EC \uBD84\uBD80\uD130 \uC0C1\uD658 \uC2DC\uC791",
+        "requested_at": datetime(2026, 3, 9, 10, 20),
+        "approved_at": datetime(2026, 3, 10, 16, 0),
+    },
+    {
+        "request_no": "WEL-202603-004",
+        "benefit_type_code": "MEDICAL",
+        "benefit_type_name": "\uC758\uB8CC\uBE44",
+        "employee_no": "HR-0215",
+        "employee_name": "\uCD5C\uC720\uC9C4",
+        "department_name": "\uC0DD\uC0B0\uAD00\uB9AC\uD300",
+        "status_code": "rejected",
+        "requested_amount": 320000,
+        "approved_amount": None,
+        "payroll_run_label": None,
+        "description": "\uC99D\uBE59 \uBCF4\uC644 \uD544\uC694\uB85C \uBC18\uB824",
+        "requested_at": datetime(2026, 3, 6, 15, 40),
+        "approved_at": datetime(2026, 3, 7, 13, 15),
+    },
+    {
+        "request_no": "WEL-202603-005",
+        "benefit_type_code": "RESORT",
+        "benefit_type_name": "\uB9AC\uC870\uD2B8",
+        "employee_no": "HR-0312",
+        "employee_name": "\uC724\uD558\uB9BC",
+        "department_name": "\uC601\uC5C5\uC9C0\uC6D0\uD300",
+        "status_code": "draft",
+        "requested_amount": 200000,
+        "approved_amount": None,
+        "payroll_run_label": None,
+        "description": "\uD558\uACC4 \uB9AC\uC870\uD2B8 \uC774\uC6A9 \uC2E0\uCCAD\uC11C \uC791\uC131 \uC911",
+        "requested_at": datetime(2026, 3, 11, 18, 5),
+        "approved_at": None,
+    },
 ]
 
 TRA_ORGANIZATION_SEEDS = [
@@ -2797,6 +2876,128 @@ def ensure_wel_benefit_types(session: Session) -> None:
     session.commit()
 
 
+def ensure_wel_benefit_requests(session: Session) -> None:
+    existing = {
+        row.request_no: row
+        for row in session.exec(select(WelBenefitRequest)).all()
+    }
+
+    for seed in WEL_BENEFIT_REQUEST_SEEDS:
+        row = existing.get(seed["request_no"])
+        if row is None:
+            session.add(WelBenefitRequest(**seed))
+            continue
+
+        changed = False
+        for key, value in seed.items():
+            if getattr(row, key) != value:
+                setattr(row, key, value)
+                changed = True
+
+        if changed:
+            row.updated_at = datetime.utcnow()
+            session.add(row)
+
+    session.commit()
+
+
+def ensure_welfare_menu_overrides(session: Session) -> None:
+    role_codes = ["hr_manager", "payroll_mgr", "admin"]
+    role_map = {
+        row.code: row
+        for row in session.exec(select(AuthRole).where(AuthRole.code.in_(role_codes))).all()
+    }
+
+    menu_specs = [
+        {
+            "code": "wel",
+            "parent_code": None,
+            "name": "\uBCF5\uB9AC\uD6C4\uC0DD",
+            "path": None,
+            "icon": "HeartHandshake",
+            "sort_order": 650,
+        },
+        {
+            "code": "wel.requests",
+            "parent_code": "wel",
+            "name": "\uBCF5\uB9AC\uD6C4\uC0DD \uC2E0\uCCAD\uD604\uD669",
+            "path": "/wel/requests",
+            "icon": "ListOrdered",
+            "sort_order": 651,
+        },
+        {
+            "code": "wel.benefit-types",
+            "parent_code": "wel",
+            "name": "\uBCF5\uB9AC\uD6C4\uC0DD \uC720\uD615\uAD00\uB9AC",
+            "path": "/wel/benefit-types",
+            "icon": "Gift",
+            "sort_order": 652,
+        },
+    ]
+
+    menus = {
+        row.code: row
+        for row in session.exec(select(AppMenu).where(AppMenu.code.in_([item["code"] for item in menu_specs]))).all()
+    }
+
+    for spec in menu_specs:
+        parent_id = None
+        if spec["parent_code"] is not None:
+            parent = menus.get(spec["parent_code"])
+            if parent is None:
+                continue
+            parent_id = parent.id
+
+        row = menus.get(spec["code"])
+        if row is None:
+            row = AppMenu(
+                code=spec["code"],
+                name=spec["name"],
+                parent_id=parent_id,
+                path=spec["path"],
+                icon=spec["icon"],
+                sort_order=spec["sort_order"],
+                is_active=True,
+            )
+            session.add(row)
+            session.commit()
+            session.refresh(row)
+            menus[row.code] = row
+        else:
+            changed = False
+            for key in ("name", "path", "icon", "sort_order"):
+                value = spec[key]
+                if getattr(row, key) != value:
+                    setattr(row, key, value)
+                    changed = True
+            if row.parent_id != parent_id:
+                row.parent_id = parent_id
+                changed = True
+            if not row.is_active:
+                row.is_active = True
+                changed = True
+            if changed:
+                session.add(row)
+                session.commit()
+                session.refresh(row)
+            menus[row.code] = row
+
+        target_role_ids = {
+            role_map[role_code].id
+            for role_code in role_codes
+            if role_code in role_map
+        }
+        existing_roles = {
+            row.role_id: row
+            for row in session.exec(select(AppMenuRole).where(AppMenuRole.menu_id == row.id)).all()
+        }
+        for role_id in target_role_ids - set(existing_roles):
+            session.add(AppMenuRole(menu_id=row.id, role_id=role_id))
+        for role_id in set(existing_roles) - target_role_ids:
+            session.delete(existing_roles[role_id])
+        session.commit()
+
+
 def ensure_tra_seed_data(session: Session) -> None:
     now_utc = datetime.utcnow()
 
@@ -3376,6 +3577,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
+    ensure_welfare_menu_overrides(session)
     ensure_menu_actions(session)
     ensure_system_settings(session)
     ensure_common_codes(session)
@@ -3401,5 +3603,6 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_approval_templates(session)
     ensure_hri_form_type_template_maps(session)
     ensure_wel_benefit_types(session)
+    ensure_wel_benefit_requests(session)
     ensure_tra_seed_data(session)
 

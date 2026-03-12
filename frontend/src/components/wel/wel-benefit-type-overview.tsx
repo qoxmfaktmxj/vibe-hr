@@ -5,6 +5,17 @@ type WelBenefitTypeOverviewProps = {
   items: WelBenefitTypeItem[];
 };
 
+const BENEFIT_TYPE_LABELS: Record<string, string> = {
+  SCHOLARSHIP: "학자금",
+  CONDOLENCE: "경조금",
+  MEDICAL: "의료비",
+  LOAN: "사내대출",
+  PENSION: "개인연금",
+  RESORT: "리조트",
+  CLUB: "동호회",
+  HEALTH_CHECK: "건강검진",
+};
+
 function SummaryCard({
   title,
   value,
@@ -77,7 +88,7 @@ export function WelBenefitTypeOverview({ items }: WelBenefitTypeOverviewProps) {
         <SummaryCard
           title="활성 유형"
           value={`${activeCount}`}
-          description="실제 메뉴와 샘플 seed에서 노출 가능한 활성 건수"
+          description="실제 메뉴와 샘플 seed에서 바로 노출 가능한 활성 건수"
         />
       </section>
 
@@ -85,7 +96,8 @@ export function WelBenefitTypeOverview({ items }: WelBenefitTypeOverviewProps) {
         <CardHeader className="border-b border-slate-200 bg-slate-50/80">
           <CardTitle className="text-lg font-bold text-slate-900">복리후생 유형 샘플 데이터</CardTitle>
           <p className="text-sm text-slate-500">
-            메뉴가 추가되면 seed도 함께 들어가야 한다는 현재 정책에 맞춰, 이 화면은 기본 seed 데이터를 바로 보여준다.
+            메뉴가 추가되면 seed도 함께 들어가야 한다는 현재 정책에 맞춰, 이 화면은 기본 seed
+            데이터를 바로 보여준다.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -103,9 +115,13 @@ export function WelBenefitTypeOverview({ items }: WelBenefitTypeOverviewProps) {
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className="border-t border-slate-200 text-sm text-slate-700">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-600">{item.code}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-600">
+                      {item.code}
+                    </td>
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{item.name}</div>
+                      <div className="font-semibold text-slate-900">
+                        {BENEFIT_TYPE_LABELS[item.code] ?? item.name}
+                      </div>
                       <div className="text-xs text-slate-500">정렬순서 {item.sort_order}</div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.module_path}</td>

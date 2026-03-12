@@ -10,6 +10,7 @@ from app.models.entities import (
     AuthRole,
     AuthUser,
     AuthUserRole,
+    OrgCorporation,
     HrAttendanceDaily,
     HrEmployee,
     HrEmployeeBasicProfile,
@@ -77,6 +78,7 @@ from app.models.entities import (
     MngInfraMaster,
     MngInfraConfig,
     WelBenefitType,
+    WelBenefitRequest,
 )
 from app.models.tra import (
     TraApplication,
@@ -102,6 +104,7 @@ __all__ = [
     "AuthRole",
     "AuthUser",
     "AuthUserRole",
+    "OrgCorporation",
     "OrgDepartment",
     "HrEmployee",
     "HrEmployeeBasicProfile",
@@ -169,6 +172,7 @@ __all__ = [
     "MngInfraMaster",
     "MngInfraConfig",
     "WelBenefitType",
+    "WelBenefitRequest",
     "TraOrganization",
     "TraCourse",
     "TraEvent",

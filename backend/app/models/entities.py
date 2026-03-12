@@ -54,6 +54,27 @@ class OrgDepartment(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class OrgCorporation(SQLModel, table=True):
+    __tablename__ = "org_corporations"
+    __table_args__ = (
+        UniqueConstraint("enter_cd", name="uq_org_corporations_enter_cd"),
+        UniqueConstraint("company_code", name="uq_org_corporations_company_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    enter_cd: str = Field(index=True, max_length=20)
+    company_code: str = Field(index=True, max_length=20)
+    corporation_name: str = Field(max_length=120)
+    corporation_number: Optional[str] = Field(default=None, max_length=30)
+    business_number: Optional[str] = Field(default=None, max_length=30)
+    company_seal_url: Optional[str] = Field(default=None, max_length=500)
+    certificate_seal_url: Optional[str] = Field(default=None, max_length=500)
+    company_logo_url: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrEmployee(SQLModel, table=True):
     __tablename__ = "hr_employees"
     __table_args__ = (
@@ -1712,5 +1733,29 @@ class WelBenefitType(SQLModel, table=True):
     pay_item_code: Optional[str] = Field(default=None, max_length=60)
     is_active: bool = Field(default=True)
     sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class WelBenefitRequest(SQLModel, table=True):
+    __tablename__ = "wel_benefit_requests"
+    __table_args__ = (
+        UniqueConstraint("request_no", name="uq_wel_benefit_requests_request_no"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    request_no: str = Field(index=True, max_length=40)
+    benefit_type_code: str = Field(index=True, max_length=40)
+    benefit_type_name: str = Field(max_length=100)
+    employee_no: str = Field(index=True, max_length=40)
+    employee_name: str = Field(max_length=100)
+    department_name: str = Field(max_length=120)
+    status_code: str = Field(index=True, max_length=30)
+    requested_amount: int = Field(default=0)
+    approved_amount: Optional[int] = Field(default=None)
+    payroll_run_label: Optional[str] = Field(default=None, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=500)
+    requested_at: datetime = Field(default_factory=utc_now)
+    approved_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

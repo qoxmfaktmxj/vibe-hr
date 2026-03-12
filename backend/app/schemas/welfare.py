@@ -24,6 +24,30 @@ class WelBenefitTypeListResponse(BaseModel):
     total_count: int
 
 
+class WelBenefitRequestItem(BaseModel):
+    id: int
+    request_no: str
+    benefit_type_code: str
+    benefit_type_name: str
+    employee_no: str
+    employee_name: str
+    department_name: str
+    status_code: str
+    requested_amount: int
+    approved_amount: Optional[int]
+    payroll_run_label: Optional[str]
+    description: Optional[str]
+    requested_at: datetime
+    approved_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+
+class WelBenefitRequestListResponse(BaseModel):
+    items: list[WelBenefitRequestItem]
+    total_count: int
+
+
 class WelBenefitTypeRowInput(BaseModel):
     id: Optional[int] = None
     code: str
