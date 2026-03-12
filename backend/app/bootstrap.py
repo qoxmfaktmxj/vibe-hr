@@ -32,6 +32,7 @@ from app.models import (
     PapAppraisalMaster,
     HrAnnualLeave,
     HrLeaveRequest,
+    OrgCorporation,
     OrgDepartment,
     TimAttendanceCode,
     TimHoliday,
@@ -162,6 +163,20 @@ DEPARTMENT_SEEDS = [
     ("HQ-FIN", "\uC7AC\uBB34\uBCF8\uBD80"),
     ("HQ-OPS", "\uC6B4\uC601\uBCF8\uBD80"),
     *[(f"ORG-{index:04d}", f"\uC870\uC9C1{index:02d}") for index in range(1, 46)],
+]
+
+CORPORATION_SEEDS = [
+    {
+        "enter_cd": "VIBE",
+        "company_code": "VIBE",
+        "corporation_name": "VIBE-HR",
+        "corporation_number": "110111-1234567",
+        "business_number": "123-45-67890",
+        "company_seal_url": None,
+        "certificate_seal_url": None,
+        "company_logo_url": "/vibehr_mark.svg",
+        "is_active": True,
+    },
 ]
 
 WEL_BENEFIT_TYPE_SEEDS = [
@@ -531,6 +546,17 @@ MENU_TREE: list[dict] = [
         ],
     },
     {
+        "code": "wel",
+        "name": "복리후생",
+        "path": None,
+        "icon": "HeartHandshake",
+        "sort_order": 650,
+        "roles": ["hr_manager", "payroll_mgr", "admin"],
+        "children": [
+            {"code": "wel.benefit-types", "name": "복리후생 유형관리", "path": "/wel/benefit-types", "icon": "Gift", "sort_order": 651, "roles": ["hr_manager", "payroll_mgr", "admin"]},
+        ],
+    },
+    {
         "code": "mng",
         "name": "관리",
         "path": None,
@@ -810,6 +836,31 @@ def ensure_departments(session: Session) -> list[OrgDepartment]:
                 session.refresh(department)
         departments.append(department)
     return departments
+
+
+def ensure_corporations(session: Session) -> list[OrgCorporation]:
+    corporations: list[OrgCorporation] = []
+    for seed in CORPORATION_SEEDS:
+        corporation = session.exec(
+            select(OrgCorporation).where(OrgCorporation.enter_cd == seed["enter_cd"])
+        ).first()
+        if corporation is None:
+            corporation = OrgCorporation(**seed)
+            session.add(corporation)
+            session.commit()
+            session.refresh(corporation)
+        else:
+            changed = False
+            for key, value in seed.items():
+                if getattr(corporation, key) != value:
+                    setattr(corporation, key, value)
+                    changed = True
+            if changed:
+                session.add(corporation)
+                session.commit()
+                session.refresh(corporation)
+        corporations.append(corporation)
+    return corporations
 
 
 def ensure_department(session: Session) -> OrgDepartment:
@@ -3283,6 +3334,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_schema(session)
     ensure_hr_appointment_schema(session)
     ensure_roles(session)
+    ensure_corporations(session)
     departments = ensure_departments(session)
     department = next((item for item in departments if item.code == "HQ-HR"), departments[0])
 

@@ -1,18 +1,28 @@
 import "server-only";
 
 import { cache } from "react";
+import { cookies } from "next/headers";
 
 import type { AuthUser } from "@/types/auth";
 import type { MenuNode, MenuTreeResponse } from "@/types/menu";
 import { fetchBackendJson, getServerAccessToken } from "@/lib/server/backend-client";
 
 export const getAccessToken = getServerAccessToken;
+const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
 
 export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
   try {
-    return await fetchBackendJson<AuthUser>("/api/v1/auth/me", {
-      next: { revalidate: 60 },
-    });
+    const [user, cookieStore] = await Promise.all([
+      fetchBackendJson<AuthUser>("/api/v1/auth/me", {
+        next: { revalidate: 60 },
+      }),
+      cookies(),
+    ]);
+    if (!user) return null;
+    return {
+      ...user,
+      enter_cd: cookieStore.get(ENTER_CD_COOKIE)?.value ?? null,
+    };
   } catch {
     return null;
   }
@@ -21,7 +31,7 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
 export const getMenuTree = cache(async (): Promise<MenuNode[]> => {
   try {
     const data = await fetchBackendJson<MenuTreeResponse>("/api/v1/menus/tree", {
-      next: { revalidate: 300 },
+      cache: "no-store",
     });
     return data?.menus ?? [];
   } catch {
