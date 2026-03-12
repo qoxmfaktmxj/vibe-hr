@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlmodel import Session
 
 from app.core.auth import require_roles
@@ -36,8 +36,27 @@ router = APIRouter(prefix="/codes", tags=["common-codes"])
     response_model=CodeGroupListResponse,
     dependencies=[Depends(require_roles("admin"))],
 )
-def code_groups(session: Session = Depends(get_session)) -> CodeGroupListResponse:
-    return CodeGroupListResponse(groups=list_code_groups(session))
+def code_groups(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    all: bool = Query(default=False),
+    code: str | None = Query(default=None),
+    name: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> CodeGroupListResponse:
+    groups, total_count = list_code_groups(
+        session,
+        page=None if all else page,
+        limit=None if all else limit,
+        code=code,
+        name=name,
+    )
+    return CodeGroupListResponse(
+        groups=groups,
+        total_count=total_count,
+        page=None if all else page,
+        limit=None if all else limit,
+    )
 
 
 @router.post(
@@ -81,8 +100,29 @@ def code_group_delete(group_id: int, session: Session = Depends(get_session)) ->
     response_model=CodeListResponse,
     dependencies=[Depends(require_roles("admin"))],
 )
-def code_list(group_id: int, session: Session = Depends(get_session)) -> CodeListResponse:
-    return CodeListResponse(codes=list_codes(session, group_id))
+def code_list(
+    group_id: int,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    all: bool = Query(default=False),
+    code: str | None = Query(default=None),
+    name: str | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> CodeListResponse:
+    codes, total_count = list_codes(
+        session,
+        group_id,
+        page=None if all else page,
+        limit=None if all else limit,
+        code=code,
+        name=name,
+    )
+    return CodeListResponse(
+        codes=codes,
+        total_count=total_count,
+        page=None if all else page,
+        limit=None if all else limit,
+    )
 
 
 @router.post(

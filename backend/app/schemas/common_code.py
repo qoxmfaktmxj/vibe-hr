@@ -32,6 +32,9 @@ class CodeItem(BaseModel):
 
 class CodeGroupListResponse(BaseModel):
     groups: list[CodeGroupItem]
+    total_count: int
+    page: int | None = None
+    limit: int | None = None
 
 
 class CodeGroupDetailResponse(BaseModel):
@@ -40,6 +43,9 @@ class CodeGroupDetailResponse(BaseModel):
 
 class CodeListResponse(BaseModel):
     codes: list[CodeItem]
+    total_count: int
+    page: int | None = None
+    limit: int | None = None
 
 
 class CodeDetailResponse(BaseModel):

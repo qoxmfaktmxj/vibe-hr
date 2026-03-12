@@ -11,7 +11,8 @@ export async function GET(request: NextRequest, context: Context) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { groupId } = await context.params;
-  const res = await fetch(`${API_BASE_URL}/api/v1/codes/groups/${groupId}/items`, {
+  const search = request.nextUrl.searchParams.toString();
+  const res = await fetch(`${API_BASE_URL}/api/v1/codes/groups/${groupId}/items${search ? `?${search}` : ""}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

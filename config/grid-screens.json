@@ -40,7 +40,7 @@
       "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
       "componentFile": "frontend/src/components/settings/common-code-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",

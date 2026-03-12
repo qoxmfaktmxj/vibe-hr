@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.models import AppCode, AppCodeGroup
@@ -64,9 +65,29 @@ def _get_code_or_404(session: Session, group_id: int, code_id: int) -> AppCode:
     return code
 
 
-def list_code_groups(session: Session) -> list[CodeGroupItem]:
-    rows = session.exec(select(AppCodeGroup).order_by(AppCodeGroup.sort_order, AppCodeGroup.id)).all()
-    return [_group_item(row) for row in rows]
+def list_code_groups(
+    session: Session,
+    *,
+    page: int | None = None,
+    limit: int | None = None,
+    code: str | None = None,
+    name: str | None = None,
+) -> tuple[list[CodeGroupItem], int]:
+    statement = select(AppCodeGroup)
+
+    if code:
+        statement = statement.where(AppCodeGroup.code.ilike(f"%{code.strip()}%"))
+    if name:
+        statement = statement.where(AppCodeGroup.name.ilike(f"%{name.strip()}%"))
+
+    total_count = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    statement = statement.order_by(AppCodeGroup.sort_order, AppCodeGroup.id)
+
+    if page is not None and limit is not None:
+        statement = statement.offset((page - 1) * limit).limit(limit)
+
+    rows = session.exec(statement).all()
+    return ([_group_item(row) for row in rows], total_count)
 
 
 def create_code_group(session: Session, payload: CodeGroupCreateRequest) -> CodeGroupItem:
@@ -126,12 +147,31 @@ def delete_code_group(session: Session, group_id: int) -> None:
     session.commit()
 
 
-def list_codes(session: Session, group_id: int) -> list[CodeItem]:
+def list_codes(
+    session: Session,
+    group_id: int,
+    *,
+    page: int | None = None,
+    limit: int | None = None,
+    code: str | None = None,
+    name: str | None = None,
+) -> tuple[list[CodeItem], int]:
     _get_group_or_404(session, group_id)
-    rows = session.exec(
-        select(AppCode).where(AppCode.group_id == group_id).order_by(AppCode.sort_order, AppCode.id)
-    ).all()
-    return [_code_item(row) for row in rows]
+    statement = select(AppCode).where(AppCode.group_id == group_id)
+
+    if code:
+        statement = statement.where(AppCode.code.ilike(f"%{code.strip()}%"))
+    if name:
+        statement = statement.where(AppCode.name.ilike(f"%{name.strip()}%"))
+
+    total_count = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    statement = statement.order_by(AppCode.sort_order, AppCode.id)
+
+    if page is not None and limit is not None:
+        statement = statement.offset((page - 1) * limit).limit(limit)
+
+    rows = session.exec(statement).all()
+    return ([_code_item(row) for row in rows], total_count)
 
 
 def create_code(session: Session, group_id: int, payload: CodeCreateRequest) -> CodeItem:

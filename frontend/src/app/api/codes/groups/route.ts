@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
   const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
-  const res = await fetch(`${API_BASE_URL}/api/v1/codes/groups`, {
+  const search = request.nextUrl.searchParams.toString();
+  const res = await fetch(`${API_BASE_URL}/api/v1/codes/groups${search ? `?${search}` : ""}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

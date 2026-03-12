@@ -23,9 +23,19 @@ export type CodeItem = {
   updated_at: string;
 };
 
-export type CodeGroupListResponse = { groups: CodeGroupItem[] };
+export type CodeGroupListResponse = {
+  groups: CodeGroupItem[];
+  total_count: number;
+  page?: number | null;
+  limit?: number | null;
+};
 export type CodeGroupDetailResponse = { group: CodeGroupItem };
-export type CodeListResponse = { codes: CodeItem[] };
+export type CodeListResponse = {
+  codes: CodeItem[];
+  total_count: number;
+  page?: number | null;
+  limit?: number | null;
+};
 export type CodeDetailResponse = { code: CodeItem };
 export type ActiveCodeOption = { code: string; name: string };
 export type ActiveCodeListResponse = { group_code: string; options: ActiveCodeOption[] };
