@@ -1,60 +1,154 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CellValueChangedEvent, ColDef, GridApi, GridReadyEvent, ICellRendererParams, RowClassParams } from "ag-grid-community";
+import type {
+  CellValueChangedEvent,
+  ColDef,
+  GridApi,
+  GridReadyEvent,
+  ICellRendererParams,
+  RowClassParams,
+} from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import { Copy, Download, FileDown, Plus, RefreshCw, Save, Upload, UserRoundPlus } from "lucide-react";
+import {
+  Copy,
+  Download,
+  FileDown,
+  Plus,
+  RefreshCw,
+  Save,
+  Upload,
+  UserRoundPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
-import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import {
+  ManagerGridSection,
+  ManagerPageShell,
+  ManagerSearchSection,
+} from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetcher } from "@/lib/fetcher";
-import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
-import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import {
+  buildGridRowClassRules,
+  getGridRowClass,
+  getGridStatusCellClass,
+  summarizeGridStatuses,
+} from "@/lib/grid/grid-status";
+import {
+  clearSavedStatuses,
+  reconcileUpdatedStatus,
+  toggleDeletedStatus,
+} from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
-import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
-import type { HrRecruitFinalistItem, HrRecruitFinalistListResponse } from "@/types/hr-recruit";
+import {
+  isRowRevertedToOriginal,
+  snapshotFields,
+  type GridRowStatus,
+} from "@/lib/hr/grid-change-tracker";
+import type {
+  HrRecruitFinalistItem,
+  HrRecruitFinalistListResponse,
+} from "@/types/hr-recruit";
 
 type ProgressStatus = "draft" | "ready" | "appointed";
 type SearchFilters = { keyword: string; status: "" | ProgressStatus };
-type PendingReloadAction = { type: "page"; page: number } | { type: "query"; filters: SearchFilters };
-type RecruitGridRow = HrRecruitFinalistItem & { _status: GridRowStatus; _original?: Record<string, unknown>; _prevStatus?: GridRowStatus };
+type PendingReloadAction =
+  | { type: "page"; page: number }
+  | { type: "query"; filters: SearchFilters };
+type RecruitGridRow = HrRecruitFinalistItem & {
+  _status: GridRowStatus;
+  _original?: Record<string, unknown>;
+  _prevStatus?: GridRowStatus;
+};
 
 const EMPTY_FILTERS: SearchFilters = { keyword: "", status: "" };
-const TRACKED_FIELDS: (keyof HrRecruitFinalistItem)[] = ["source_type", "external_key", "full_name", "resident_no_masked", "birth_date", "phone_mobile", "email", "hire_type", "career_years", "login_id", "employee_no", "expected_join_date", "status_code", "note", "is_active"];
-const STATUS_LABELS: Record<GridRowStatus, string> = { clean: "", added: "신규", updated: "수정", deleted: "삭제" };
+const TRACKED_FIELDS: (keyof HrRecruitFinalistItem)[] = [
+  "source_type",
+  "external_key",
+  "full_name",
+  "resident_no_masked",
+  "birth_date",
+  "phone_mobile",
+  "email",
+  "hire_type",
+  "career_years",
+  "login_id",
+  "employee_no",
+  "expected_join_date",
+  "status_code",
+  "note",
+  "is_active",
+];
+const STATUS_LABELS: Record<GridRowStatus, string> = {
+  clean: "",
+  added: "신규",
+  updated: "수정",
+  deleted: "삭제",
+};
 const SOURCE_LABELS = { if: "IF", manual: "수기" } as const;
 const HIRE_TYPE_LABELS = { new: "신입", experienced: "경력" } as const;
-const PROCESS_STATUS_LABELS = { draft: "초안", ready: "발령준비", appointed: "발령완료" } as const;
-const AG_GRID_LOCALE_KO: Record<string, string> = { page: "페이지", more: "더보기", to: "~", of: "/", next: "다음", last: "마지막", first: "처음", previous: "이전", loadingOoo: "불러오는 중...", noRowsToShow: "표시할 데이터가 없습니다.", searchOoo: "검색..." };
+const PROCESS_STATUS_LABELS = {
+  draft: "초안",
+  ready: "발령준비",
+  appointed: "발령완료",
+} as const;
+const AG_GRID_LOCALE_KO: Record<string, string> = {
+  page: "페이지",
+  more: "더보기",
+  to: "~",
+  of: "/",
+  next: "다음",
+  last: "마지막",
+  first: "처음",
+  previous: "이전",
+  loadingOoo: "불러오는 중...",
+  noRowsToShow: "표시할 데이터가 없습니다.",
+  searchOoo: "검색...",
+};
 
 const normalizeText = (value: unknown) => {
   const text = String(value ?? "").trim();
   return text ? text : null;
 };
+
 const normalizeDate = (value: unknown) => {
   const text = String(value ?? "").trim();
   return text ? text.slice(0, 10) : null;
 };
+
 const normalizeCareerYears = (value: unknown) => {
   if (value == null || value === "") return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
 const snapshotOriginal = (row: HrRecruitFinalistItem) => snapshotFields(row, TRACKED_FIELDS);
-const isRevertedToOriginal = (row: RecruitGridRow) => isRowRevertedToOriginal(row, TRACKED_FIELDS);
-const toGridRow = (row: HrRecruitFinalistItem): RecruitGridRow => ({ ...row, _status: "clean", _original: snapshotOriginal(row), _prevStatus: undefined });
+const isRevertedToOriginal = (row: RecruitGridRow) =>
+  isRowRevertedToOriginal(row, TRACKED_FIELDS);
+const toGridRow = (row: HrRecruitFinalistItem): RecruitGridRow => ({
+  ...row,
+  _status: "clean",
+  _original: snapshotOriginal(row),
+  _prevStatus: undefined,
+});
 
 async function parseErrorDetail(response: Response, fallback: string) {
-  const json = (await response.json().catch(() => null)) as { detail?: string | { msg?: string }[] } | null;
+  const json = (await response.json().catch(() => null)) as
+    | { detail?: string | { msg?: string }[] }
+    | null;
+
   if (typeof json?.detail === "string") return json.detail;
-  if (Array.isArray(json?.detail) && typeof json.detail[0]?.msg === "string") return json.detail[0].msg!;
+  if (Array.isArray(json?.detail) && typeof json.detail[0]?.msg === "string") {
+    return json.detail[0].msg;
+  }
+
   return fallback;
 }
 
@@ -73,7 +167,11 @@ export function HrRecruitFinalistManager() {
   const rowsRef = useRef<RecruitGridRow[]>([]);
   const tempIdRef = useRef(-1);
 
-  const { data, isLoading, mutate } = useSWR<HrRecruitFinalistListResponse>("/api/hr/recruit/finalists", fetcher, { revalidateOnFocus: false, dedupingInterval: 30_000 });
+  const { data, isLoading, mutate } = useSWR<HrRecruitFinalistListResponse>(
+    "/api/hr/recruit/finalists",
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30_000 },
+  );
 
   useEffect(() => {
     if (!data) return;
@@ -87,11 +185,20 @@ export function HrRecruitFinalistManager() {
     return rows.filter((row) => {
       if (appliedFilters.status && row.status_code !== appliedFilters.status) return false;
       if (!keyword) return true;
-      return row.full_name.toLowerCase().includes(keyword) || row.candidate_no.toLowerCase().includes(keyword) || (row.employee_no ?? "").toLowerCase().includes(keyword) || (row.login_id ?? "").toLowerCase().includes(keyword);
+      return (
+        row.full_name.toLowerCase().includes(keyword) ||
+        row.candidate_no.toLowerCase().includes(keyword) ||
+        (row.employee_no ?? "").toLowerCase().includes(keyword) ||
+        (row.login_id ?? "").toLowerCase().includes(keyword)
+      );
     });
   }, [appliedFilters, rows]);
+
   const totalCount = filteredRows.length;
-  const pagedRows = useMemo(() => filteredRows.slice((page - 1) * pageSize, page * pageSize), [filteredRows, page, pageSize]);
+  const pagedRows = useMemo(
+    () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
+    [filteredRows, page, pageSize],
+  );
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
   const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
 
@@ -108,6 +215,7 @@ export function HrRecruitFinalistManager() {
       setPage(1);
     }
   }, []);
+
   const requestReloadAction = useCallback((action: PendingReloadAction) => {
     if (action.type === "page" && action.page === page) return;
     if (hasDirtyRows) {
@@ -124,6 +232,7 @@ export function HrRecruitFinalistManager() {
     pageSize,
     onPageChange: (nextPage) => requestReloadAction({ type: "page", page: nextPage }),
   });
+
   const defaultColDef = useMemo<ColDef<RecruitGridRow>>(
     () => ({
       sortable: true,
@@ -151,29 +260,77 @@ export function HrRecruitFinalistManager() {
   const patchRowById = useCallback((rowId: number, patch: Partial<RecruitGridRow>) => {
     commitRows((prev) => prev.map((row) => {
       if (row.id !== rowId) return row;
-      const merged: RecruitGridRow = { ...row, ...patch, _original: row._original, _prevStatus: row._prevStatus };
-      return reconcileUpdatedStatus(merged, { shouldBeClean: (candidate) => isRevertedToOriginal(candidate) });
+      const merged: RecruitGridRow = {
+        ...row,
+        ...patch,
+        _original: row._original,
+        _prevStatus: row._prevStatus,
+      };
+      return reconcileUpdatedStatus(merged, {
+        shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
+      });
     }));
   }, [commitRows]);
 
   const addRow = useCallback(() => {
     const now = new Date().toISOString();
-    commitRows((prev) => [{ id: issueTempId(), candidate_no: "", source_type: "manual", external_key: null, full_name: "", resident_no_masked: null, birth_date: null, phone_mobile: null, email: null, hire_type: "new", career_years: null, login_id: null, employee_no: null, expected_join_date: new Date().toISOString().slice(0, 10), status_code: "draft", note: null, is_active: true, created_at: now, updated_at: now, _status: "added", _original: undefined, _prevStatus: undefined }, ...prev]);
+    commitRows((prev) => [{
+      id: issueTempId(),
+      candidate_no: "",
+      source_type: "manual",
+      external_key: null,
+      full_name: "",
+      resident_no_masked: null,
+      birth_date: null,
+      phone_mobile: null,
+      email: null,
+      hire_type: "new",
+      career_years: null,
+      login_id: null,
+      employee_no: null,
+      expected_join_date: new Date().toISOString().slice(0, 10),
+      status_code: "draft",
+      note: null,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+      _status: "added",
+      _original: undefined,
+      _prevStatus: undefined,
+    }, ...prev]);
   }, [commitRows, issueTempId]);
 
   const copyRows = useCallback(() => {
-    const selectedRows = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
+    const selectedRows =
+      gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
     if (selectedRows.length === 0) {
       toast.error("복사할 행을 먼저 선택하세요.");
       return;
     }
     const now = new Date().toISOString();
-    const clones = selectedRows.map<RecruitGridRow>((row) => ({ ...row, id: issueTempId(), candidate_no: "", external_key: null, employee_no: null, login_id: null, status_code: "draft", source_type: "manual", created_at: now, updated_at: now, _status: "added", _original: undefined, _prevStatus: undefined }));
+    const clones = selectedRows.map<RecruitGridRow>((row) => ({
+      ...row,
+      id: issueTempId(),
+      candidate_no: "",
+      external_key: null,
+      employee_no: null,
+      login_id: null,
+      status_code: "draft",
+      source_type: "manual",
+      created_at: now,
+      updated_at: now,
+      _status: "added",
+      _original: undefined,
+      _prevStatus: undefined,
+    }));
     commitRows((prev) => [...clones, ...prev]);
   }, [commitRows, issueTempId]);
 
   const toggleDeleteById = useCallback((rowId: number, checked: boolean) => {
-    commitRows((prev) => toggleDeletedStatus(prev, rowId, checked, { removeAddedRow: true, shouldBeClean: (candidate) => isRevertedToOriginal(candidate) }));
+    commitRows((prev) => toggleDeletedStatus(prev, rowId, checked, {
+      removeAddedRow: true,
+      shouldBeClean: (candidate) => isRevertedToOriginal(candidate),
+    }));
   }, [commitRows]);
 
   const onCellValueChanged = useCallback((event: CellValueChangedEvent<RecruitGridRow>) => {
@@ -193,7 +350,10 @@ export function HrRecruitFinalistManager() {
   const downloadTemplate = useCallback(async () => {
     try {
       const { utils, writeFileXLSX } = await import("xlsx");
-      const sheet = utils.aoa_to_sheet([["이름", "주민등록번호(마스킹)", "생년월일", "휴대전화", "이메일", "채용유형(new/experienced)", "경력연차", "입사예정일", "비고"], ["홍길동", "900101-1******", "1990-01-01", "010-1234-5678", "hong@example.com", "new", "0", "2026-04-01", "메모 예시"]]);
+      const sheet = utils.aoa_to_sheet([
+        ["이름", "주민등록번호(마스킹)", "생년월일", "휴대전화", "이메일", "채용유형(new/experienced)", "경력연차", "입사예정일", "비고"],
+        ["홍길동", "900101-1******", "1990-01-01", "010-1234-5678", "hong@example.com", "new", "0", "2026-04-01", "메모 예시"],
+      ]);
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, "업로드양식");
       writeFileXLSX(book, "hr-recruit-finalists-template.xlsx");
@@ -205,7 +365,23 @@ export function HrRecruitFinalistManager() {
   const downloadCurrentSheet = useCallback(async () => {
     try {
       const { utils, writeFileXLSX } = await import("xlsx");
-      const rowsForExport = rows.map((row) => [STATUS_LABELS[row._status], row.candidate_no, SOURCE_LABELS[row.source_type], row.full_name, row.resident_no_masked ?? "", row.birth_date ?? "", row.phone_mobile ?? "", row.email ?? "", HIRE_TYPE_LABELS[row.hire_type], row.career_years ?? "", row.login_id ?? "", row.employee_no ?? "", row.expected_join_date ?? "", PROCESS_STATUS_LABELS[row.status_code], row.note ?? ""]);
+      const rowsForExport = rows.map((row) => [
+        STATUS_LABELS[row._status],
+        row.candidate_no,
+        SOURCE_LABELS[row.source_type],
+        row.full_name,
+        row.resident_no_masked ?? "",
+        row.birth_date ?? "",
+        row.phone_mobile ?? "",
+        row.email ?? "",
+        HIRE_TYPE_LABELS[row.hire_type],
+        row.career_years ?? "",
+        row.login_id ?? "",
+        row.employee_no ?? "",
+        row.expected_join_date ?? "",
+        PROCESS_STATUS_LABELS[row.status_code],
+        row.note ?? "",
+      ]);
       const sheet = utils.aoa_to_sheet([["상태", "후보번호", "등록구분", "이름", "주민번호", "생년월일", "휴대전화", "이메일", "채용유형", "경력연차", "로그인ID", "사번", "입사예정일", "진행상태", "비고"], ...rowsForExport]);
       const book = utils.book_new();
       utils.book_append_sheet(book, sheet, "채용합격자");
@@ -223,7 +399,33 @@ export function HrRecruitFinalistManager() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rowsAoa = utils.sheet_to_json<(string | number | boolean)[]>(sheet, { header: 1, raw: false });
       if (!rowsAoa || rowsAoa.length <= 1) return;
-      const parsed = rowsAoa.slice(1).map((cells) => cells.map((value) => String(value ?? "").trim())).filter((cells) => cells.some((value) => value.length > 0)).map<RecruitGridRow>((c) => ({ id: issueTempId(), candidate_no: "", source_type: "manual", external_key: null, full_name: c[0] ?? "", resident_no_masked: normalizeText(c[1]), birth_date: normalizeDate(c[2]), phone_mobile: normalizeText(c[3]), email: normalizeText(c[4]), hire_type: c[5] === "experienced" ? "experienced" : "new", career_years: normalizeCareerYears(c[6]), login_id: null, employee_no: null, expected_join_date: normalizeDate(c[7]), status_code: "draft", note: normalizeText(c[8]), is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), _status: "added", _original: undefined, _prevStatus: undefined }));
+      const parsed = rowsAoa.slice(1)
+        .map((cells) => cells.map((value) => String(value ?? "").trim()))
+        .filter((cells) => cells.some((value) => value.length > 0))
+        .map<RecruitGridRow>((c) => ({
+          id: issueTempId(),
+          candidate_no: "",
+          source_type: "manual",
+          external_key: null,
+          full_name: c[0] ?? "",
+          resident_no_masked: normalizeText(c[1]),
+          birth_date: normalizeDate(c[2]),
+          phone_mobile: normalizeText(c[3]),
+          email: normalizeText(c[4]),
+          hire_type: c[5] === "experienced" ? "experienced" : "new",
+          career_years: normalizeCareerYears(c[6]),
+          login_id: null,
+          employee_no: null,
+          expected_join_date: normalizeDate(c[7]),
+          status_code: "draft",
+          note: normalizeText(c[8]),
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          _status: "added",
+          _original: undefined,
+          _prevStatus: undefined,
+        }));
       if (parsed.length === 0) {
         toast.error("업로드할 데이터가 없습니다.");
         return;
@@ -245,7 +447,9 @@ export function HrRecruitFinalistManager() {
     }
     setSaving(true);
     try {
-      for (const row of [...toInsert, ...toUpdate]) if (!row.full_name.trim()) throw new Error("이름은 필수입니다.");
+      for (const row of [...toInsert, ...toUpdate]) {
+        if (!row.full_name.trim()) throw new Error("이름은 필수입니다.");
+      }
       if (toDelete.length > 0) {
         const response = await fetch("/api/hr/recruit/finalists", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: toDelete.map((row) => row.id) }) });
         if (!response.ok) throw new Error(await parseErrorDetail(response, "삭제에 실패했습니다."));
@@ -293,23 +497,23 @@ export function HrRecruitFinalistManager() {
   }, [mutate]);
 
   const columnDefs = useMemo<ColDef<RecruitGridRow>[]>(() => [
-    { headerName: "??", width: 62, pinned: "left", sortable: false, filter: false, suppressHeaderMenuButton: true, editable: false, cellRenderer: (params: ICellRendererParams<RecruitGridRow>) => { const row = params.data; if (!row) return null; return <div className="flex h-full items-center justify-center"><input type="checkbox" checked={row._status === "deleted"} className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]" onChange={(event) => toggleDeleteById(row.id, event.target.checked)} onClick={(event) => event.stopPropagation()} /></div>; } },
-    { field: "_status", headerName: "??", width: 84, pinned: "left", editable: false, sortable: false, filter: false, valueFormatter: (params) => STATUS_LABELS[(params.value as GridRowStatus) ?? "clean"], cellClass: (params) => getGridStatusCellClass(params.value as GridRowStatus) },
-    { field: "candidate_no", headerName: "?????", minWidth: 130, editable: false },
-    { field: "source_type", headerName: "????", minWidth: 100, editable: (params) => params.data?._status === "added", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["manual", "if"] }, valueFormatter: (params) => SOURCE_LABELS[(params.value as keyof typeof SOURCE_LABELS) ?? "manual"] },
-    { field: "full_name", headerName: "??", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
-    { field: "resident_no_masked", headerName: "????", minWidth: 130, editable: (params) => params.data?._status !== "deleted" },
-    { field: "birth_date", headerName: "????", minWidth: 115, editable: (params) => params.data?._status !== "deleted" },
-    { field: "phone_mobile", headerName: "????", minWidth: 130, editable: (params) => params.data?._status !== "deleted" },
-    { field: "email", headerName: "???", minWidth: 190, editable: (params) => params.data?._status !== "deleted" },
-    { field: "hire_type", headerName: "????", minWidth: 110, editable: (params) => params.data?._status !== "deleted", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["new", "experienced"] }, valueFormatter: (params) => HIRE_TYPE_LABELS[(params.value as keyof typeof HIRE_TYPE_LABELS) ?? "new"] },
-    { field: "career_years", headerName: "????", minWidth: 100, editable: (params) => params.data?._status !== "deleted" },
-    { field: "login_id", headerName: "???ID", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
-    { field: "employee_no", headerName: "??", minWidth: 120, editable: false },
-    { field: "expected_join_date", headerName: "?????", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
-    { field: "status_code", headerName: "????", minWidth: 110, editable: (params) => params.data?._status !== "deleted", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["draft", "ready", "appointed"] }, valueFormatter: (params) => PROCESS_STATUS_LABELS[(params.value as keyof typeof PROCESS_STATUS_LABELS) ?? "draft"] },
+    { headerName: "삭제", width: 62, pinned: "left", sortable: false, filter: false, suppressHeaderMenuButton: true, editable: false, cellRenderer: (params: ICellRendererParams<RecruitGridRow>) => { const row = params.data; if (!row) return null; return <div className="flex h-full items-center justify-center"><input type="checkbox" checked={row._status === "deleted"} className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]" onChange={(event) => toggleDeleteById(row.id, event.target.checked)} onClick={(event) => event.stopPropagation()} /></div>; } },
+    { field: "_status", headerName: "상태", width: 84, pinned: "left", editable: false, sortable: false, filter: false, valueFormatter: (params) => STATUS_LABELS[(params.value as GridRowStatus) ?? "clean"], cellClass: (params) => getGridStatusCellClass(params.value as GridRowStatus) },
+    { field: "candidate_no", headerName: "후보번호", minWidth: 130, editable: false },
+    { field: "source_type", headerName: "등록구분", minWidth: 100, editable: (params) => params.data?._status === "added", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["manual", "if"] }, valueFormatter: (params) => SOURCE_LABELS[(params.value as keyof typeof SOURCE_LABELS) ?? "manual"] },
+    { field: "full_name", headerName: "이름", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
+    { field: "resident_no_masked", headerName: "주민번호", minWidth: 130, editable: (params) => params.data?._status !== "deleted" },
+    { field: "birth_date", headerName: "생년월일", minWidth: 115, editable: (params) => params.data?._status !== "deleted" },
+    { field: "phone_mobile", headerName: "휴대전화", minWidth: 130, editable: (params) => params.data?._status !== "deleted" },
+    { field: "email", headerName: "이메일", minWidth: 190, editable: (params) => params.data?._status !== "deleted" },
+    { field: "hire_type", headerName: "채용유형", minWidth: 110, editable: (params) => params.data?._status !== "deleted", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["new", "experienced"] }, valueFormatter: (params) => HIRE_TYPE_LABELS[(params.value as keyof typeof HIRE_TYPE_LABELS) ?? "new"] },
+    { field: "career_years", headerName: "경력연차", minWidth: 100, editable: (params) => params.data?._status !== "deleted" },
+    { field: "login_id", headerName: "로그인ID", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
+    { field: "employee_no", headerName: "사번", minWidth: 120, editable: false },
+    { field: "expected_join_date", headerName: "입사예정일", minWidth: 120, editable: (params) => params.data?._status !== "deleted" },
+    { field: "status_code", headerName: "진행상태", minWidth: 110, editable: (params) => params.data?._status !== "deleted", cellEditor: "agSelectCellEditor", cellEditorParams: { values: ["draft", "ready", "appointed"] }, valueFormatter: (params) => PROCESS_STATUS_LABELS[(params.value as keyof typeof PROCESS_STATUS_LABELS) ?? "draft"] },
     { field: "note", headerName: "비고", minWidth: 180, flex: 1.2, editable: (params) => params.data?._status !== "deleted" },
-    { field: "updated_at", headerName: "????", minWidth: 170, editable: false, valueFormatter: (params) => (params.value ? new Date(params.value as string).toLocaleString() : "") },
+    { field: "updated_at", headerName: "수정일시", minWidth: 170, editable: false, valueFormatter: (params) => (params.value ? new Date(params.value as string).toLocaleString() : "") },
   ], [toggleDeleteById]);
 
   const rowClassRules = useMemo(() => buildGridRowClassRules<RecruitGridRow>(), []);
@@ -317,14 +521,14 @@ export function HrRecruitFinalistManager() {
   const selectionColumnDef = useMemo<ColDef<RecruitGridRow>>(() => ({ width: 44, pinned: "left", sortable: false, filter: false, editable: false, resizable: false, suppressHeaderMenuButton: true }), []);
 
   const toolbarActions = [
-    { key: "create", label: "??", icon: Plus, onClick: addRow, disabled: isLoading || saving || generatingNo },
+    { key: "create", label: "입력", icon: Plus, onClick: addRow, disabled: isLoading || saving || generatingNo },
     { key: "copy", label: "복사", icon: Copy, onClick: copyRows, disabled: isLoading || saving || generatingNo },
-    { key: "template", label: "?? ????", icon: FileDown, onClick: () => void downloadTemplate(), disabled: isLoading || saving || generatingNo },
-    { key: "upload", label: "???", icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: isLoading || saving || generatingNo },
-    { key: "download", label: "????", icon: Download, onClick: () => void downloadCurrentSheet(), disabled: isLoading || saving || generatingNo },
+    { key: "template", label: "양식 다운로드", icon: FileDown, onClick: () => void downloadTemplate(), disabled: isLoading || saving || generatingNo },
+    { key: "upload", label: "업로드", icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: isLoading || saving || generatingNo },
+    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadCurrentSheet(), disabled: isLoading || saving || generatingNo },
   ];
 
-  const toolbarSaveAction = { key: "save", label: saving ? "?? ?..." : "??", icon: Save, onClick: () => void saveAll(), disabled: isLoading || saving || generatingNo, variant: "save" as const };
+  const toolbarSaveAction = { key: "save", label: saving ? "저장 중..." : "저장", icon: Save, onClick: () => void saveAll(), disabled: isLoading || saving || generatingNo, variant: "save" as const };
 
   const handleQuery = () => requestReloadAction({ type: "query", filters: { ...searchFilters } });
   const handleSearchEnter = (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => { if (event.key === "Enter") { event.preventDefault(); handleQuery(); } };
@@ -333,31 +537,31 @@ export function HrRecruitFinalistManager() {
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title="???????" onQuery={handleQuery} queryLabel="??" queryDisabled={isLoading || saving || generatingNo}>
+      <ManagerSearchSection title="채용합격자관리" onQuery={handleQuery} queryLabel="조회" queryDisabled={isLoading || saving || generatingNo}>
         <SearchFieldGrid className="xl:grid-cols-3">
-          <SearchTextField value={searchFilters.keyword} onChange={(value) => setSearchFilters((prev) => ({ ...prev, keyword: value }))} onKeyDown={handleSearchEnter} placeholder="?? / ????? / ?? / ???ID" />
-          <select value={searchFilters.status} onChange={(event) => setSearchFilters((prev) => ({ ...prev, status: event.target.value as SearchFilters["status"] }))} onKeyDown={handleSearchEnter} aria-label="????" className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground">
-            <option value="">???? ??</option>
-            <option value="draft">??</option>
-            <option value="ready">????</option>
-            <option value="appointed">????</option>
+          <SearchTextField value={searchFilters.keyword} onChange={(value) => setSearchFilters((prev) => ({ ...prev, keyword: value }))} onKeyDown={handleSearchEnter} placeholder="이름 / 후보번호 / 사번 / 로그인ID" />
+          <select value={searchFilters.status} onChange={(event) => setSearchFilters((prev) => ({ ...prev, status: event.target.value as SearchFilters["status"] }))} onKeyDown={handleSearchEnter} aria-label="진행상태" className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground">
+            <option value="">전체 상태</option>
+            <option value="draft">초안</option>
+            <option value="ready">발령준비</option>
+            <option value="appointed">발령완료</option>
           </select>
         </SearchFieldGrid>
       </ManagerSearchSection>
 
       <ManagerGridSection
-        headerLeft={<><GridPaginationControls page={page} totalPages={totalPages} pageInput={pageInput} setPageInput={setPageInput} goPrev={goPrev} goNext={goNext} goToPage={goToPage} disabled={isLoading || saving || generatingNo} className="mt-0 justify-start" /><span className="text-xs text-slate-500">? {totalCount.toLocaleString()}?</span><GridChangeSummaryBadges summary={changeSummary} /></>}
-        headerRight={<><GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} /><Button size="sm" variant="action" onClick={() => void syncFromIf()} disabled><RefreshCw className="h-3.5 w-3.5" />IF ?? ???</Button><Button size="sm" variant="action" onClick={() => void generateEmployeeNoForSelected()} disabled={isLoading || saving || generatingNo}><UserRoundPlus className="h-3.5 w-3.5" />{generatingNo ? "?????..." : "????"}</Button><input ref={uploadInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleUploadFile(file); event.currentTarget.value = ""; }} /></>}
+        headerLeft={<><GridPaginationControls page={page} totalPages={totalPages} pageInput={pageInput} setPageInput={setPageInput} goPrev={goPrev} goNext={goNext} goToPage={goToPage} disabled={isLoading || saving || generatingNo} className="mt-0 justify-start" /><span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span><GridChangeSummaryBadges summary={changeSummary} /></>}
+        headerRight={<><GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} /><Button size="sm" variant="action" onClick={() => void syncFromIf()} disabled><RefreshCw className="h-3.5 w-3.5" />IF 동기화</Button><Button size="sm" variant="action" onClick={() => void generateEmployeeNoForSelected()} disabled={isLoading || saving || generatingNo}><UserRoundPlus className="h-3.5 w-3.5" />{generatingNo ? "채번중..." : "사번 채번"}</Button><input ref={uploadInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleUploadFile(file); event.currentTarget.value = ""; }} /></>}
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
           <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
-            <AgGridReact<RecruitGridRow> theme="legacy" rowData={pagedRows} columnDefs={columnDefs} defaultColDef={defaultColDef} rowSelection={{ mode: "multiRow", enableClickSelection: true }} selectionColumnDef={selectionColumnDef} singleClickEdit animateRows={false} localeText={AG_GRID_LOCALE_KO} rowClassRules={rowClassRules} getRowClass={getRowClass} getRowId={(params) => String(params.data.id)} onGridReady={(event: GridReadyEvent<RecruitGridRow>) => { gridApiRef.current = event.api; }} onCellValueChanged={onCellValueChanged} loading={isLoading} headerHeight={36} rowHeight={34} overlayNoRowsTemplate='<span class="text-sm text-slate-400">???? ????.</span>' />
+            <AgGridReact<RecruitGridRow> theme="legacy" rowData={pagedRows} columnDefs={columnDefs} defaultColDef={defaultColDef} rowSelection={{ mode: "multiRow", enableClickSelection: true }} selectionColumnDef={selectionColumnDef} singleClickEdit animateRows={false} localeText={AG_GRID_LOCALE_KO} rowClassRules={rowClassRules} getRowClass={getRowClass} getRowId={(params) => String(params.data.id)} onGridReady={(event: GridReadyEvent<RecruitGridRow>) => { gridApiRef.current = event.api; }} onCellValueChanged={onCellValueChanged} loading={isLoading} headerHeight={36} rowHeight={34} overlayNoRowsTemplate='<span class="text-sm text-slate-400">표시할 데이터가 없습니다.</span>' />
           </div>
         </div>
       </ManagerGridSection>
 
-      <ConfirmDialog open={discardDialogOpen} onOpenChange={handleDiscardDialogOpenChange} title="???? ?? ?? ??? ????." description="?? ?? ??? ???? ?? ???? ?? ??? ?????. ?? ?????????" confirmLabel="???? ??" cancelLabel="??" confirmVariant="destructive" onConfirm={handleDiscardAndContinue} />
+      <ConfirmDialog open={discardDialogOpen} onOpenChange={handleDiscardDialogOpenChange} title="저장되지 않은 변경사항이 있습니다." description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?" confirmLabel="무시하고 이동" cancelLabel="취소" confirmVariant="destructive" onConfirm={handleDiscardAndContinue} />
     </ManagerPageShell>
   );
 }
