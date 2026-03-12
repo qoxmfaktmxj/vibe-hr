@@ -28,11 +28,11 @@ type RecruitGridRow = HrRecruitFinalistItem & { _status: GridRowStatus; _origina
 
 const EMPTY_FILTERS: SearchFilters = { keyword: "", status: "" };
 const TRACKED_FIELDS: (keyof HrRecruitFinalistItem)[] = ["source_type", "external_key", "full_name", "resident_no_masked", "birth_date", "phone_mobile", "email", "hire_type", "career_years", "login_id", "employee_no", "expected_join_date", "status_code", "note", "is_active"];
-const STATUS_LABELS: Record<GridRowStatus, string> = { clean: "", added: "??", updated: "??", deleted: "??" };
-const SOURCE_LABELS = { if: "IF", manual: "??" } as const;
-const HIRE_TYPE_LABELS = { new: "??", experienced: "??" } as const;
-const PROCESS_STATUS_LABELS = { draft: "??", ready: "????", appointed: "????" } as const;
-const AG_GRID_LOCALE_KO: Record<string, string> = { page: "???", more: "???", to: "~", of: "/", next: "??", last: "???", first: "??", previous: "??", loadingOoo: "?? ?...", noRowsToShow: "???? ????.", searchOoo: "??..." };
+const STATUS_LABELS: Record<GridRowStatus, string> = { clean: "", added: "신규", updated: "수정", deleted: "삭제" };
+const SOURCE_LABELS = { if: "IF", manual: "수기" } as const;
+const HIRE_TYPE_LABELS = { new: "신입", experienced: "경력" } as const;
+const PROCESS_STATUS_LABELS = { draft: "초안", ready: "발령준비", appointed: "발령완료" } as const;
+const AG_GRID_LOCALE_KO: Record<string, string> = { page: "페이지", more: "더보기", to: "~", of: "/", next: "다음", last: "마지막", first: "처음", previous: "이전", loadingOoo: "불러오는 중...", noRowsToShow: "표시할 데이터가 없습니다.", searchOoo: "검색..." };
 
 const normalizeText = (value: unknown) => {
   const text = String(value ?? "").trim();
@@ -164,7 +164,7 @@ export function HrRecruitFinalistManager() {
   const copyRows = useCallback(() => {
     const selectedRows = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
     if (selectedRows.length === 0) {
-      toast.error("??? ?? ??? ???.");
+      toast.error("복사할 행을 먼저 선택하세요.");
       return;
     }
     const now = new Date().toISOString();
@@ -193,12 +193,12 @@ export function HrRecruitFinalistManager() {
   const downloadTemplate = useCallback(async () => {
     try {
       const { utils, writeFileXLSX } = await import("xlsx");
-      const sheet = utils.aoa_to_sheet([["??", "??????(???)", "????", "????", "???", "????(new/experienced)", "????", "?????", "??"], ["???", "900101-1******", "1990-01-01", "010-1234-5678", "hong@example.com", "new", "0", "2026-04-01", "?? ??"]]);
+      const sheet = utils.aoa_to_sheet([["이름", "주민등록번호(마스킹)", "생년월일", "휴대전화", "이메일", "채용유형(new/experienced)", "경력연차", "입사예정일", "비고"], ["홍길동", "900101-1******", "1990-01-01", "010-1234-5678", "hong@example.com", "new", "0", "2026-04-01", "메모 예시"]]);
       const book = utils.book_new();
-      utils.book_append_sheet(book, sheet, "?????");
+      utils.book_append_sheet(book, sheet, "업로드양식");
       writeFileXLSX(book, "hr-recruit-finalists-template.xlsx");
     } catch {
-      toast.error("?? ????? ??????.");
+      toast.error("양식 다운로드에 실패했습니다.");
     }
   }, []);
 
@@ -206,12 +206,12 @@ export function HrRecruitFinalistManager() {
     try {
       const { utils, writeFileXLSX } = await import("xlsx");
       const rowsForExport = rows.map((row) => [STATUS_LABELS[row._status], row.candidate_no, SOURCE_LABELS[row.source_type], row.full_name, row.resident_no_masked ?? "", row.birth_date ?? "", row.phone_mobile ?? "", row.email ?? "", HIRE_TYPE_LABELS[row.hire_type], row.career_years ?? "", row.login_id ?? "", row.employee_no ?? "", row.expected_join_date ?? "", PROCESS_STATUS_LABELS[row.status_code], row.note ?? ""]);
-      const sheet = utils.aoa_to_sheet([["??", "?????", "????", "??", "????", "????", "????", "???", "????", "????", "???ID", "??", "?????", "????", "??"], ...rowsForExport]);
+      const sheet = utils.aoa_to_sheet([["상태", "후보번호", "등록구분", "이름", "주민번호", "생년월일", "휴대전화", "이메일", "채용유형", "경력연차", "로그인ID", "사번", "입사예정일", "진행상태", "비고"], ...rowsForExport]);
       const book = utils.book_new();
-      utils.book_append_sheet(book, sheet, "???????");
+      utils.book_append_sheet(book, sheet, "채용합격자");
       writeFileXLSX(book, `hr-recruit-finalists-${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch {
-      toast.error("????? ??????.");
+      toast.error("다운로드에 실패했습니다.");
     }
   }, [rows]);
 
@@ -225,13 +225,13 @@ export function HrRecruitFinalistManager() {
       if (!rowsAoa || rowsAoa.length <= 1) return;
       const parsed = rowsAoa.slice(1).map((cells) => cells.map((value) => String(value ?? "").trim())).filter((cells) => cells.some((value) => value.length > 0)).map<RecruitGridRow>((c) => ({ id: issueTempId(), candidate_no: "", source_type: "manual", external_key: null, full_name: c[0] ?? "", resident_no_masked: normalizeText(c[1]), birth_date: normalizeDate(c[2]), phone_mobile: normalizeText(c[3]), email: normalizeText(c[4]), hire_type: c[5] === "experienced" ? "experienced" : "new", career_years: normalizeCareerYears(c[6]), login_id: null, employee_no: null, expected_join_date: normalizeDate(c[7]), status_code: "draft", note: normalizeText(c[8]), is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), _status: "added", _original: undefined, _prevStatus: undefined }));
       if (parsed.length === 0) {
-        toast.error("???? ?? ???? ????.");
+        toast.error("업로드할 데이터가 없습니다.");
         return;
       }
       commitRows((prev) => [...parsed, ...prev]);
-      toast.success(`${parsed.length}? ??? ?? ??`);
+      toast.success(`${parsed.length}건을 추가했습니다.`);
     } catch {
-      toast.error("?? ???? ??????.");
+      toast.error("엑셀 파일을 읽지 못했습니다.");
     }
   }, [commitRows, issueTempId]);
 
@@ -240,53 +240,53 @@ export function HrRecruitFinalistManager() {
     const toInsert = rows.filter((row) => row._status === "added");
     const toUpdate = rows.filter((row) => row._status === "updated" && row.id > 0);
     if (toDelete.length + toInsert.length + toUpdate.length === 0) {
-      toast.info("??? ???? ????.");
+      toast.info("저장할 변경사항이 없습니다.");
       return;
     }
     setSaving(true);
     try {
-      for (const row of [...toInsert, ...toUpdate]) if (!row.full_name.trim()) throw new Error("??? ?????.");
+      for (const row of [...toInsert, ...toUpdate]) if (!row.full_name.trim()) throw new Error("이름은 필수입니다.");
       if (toDelete.length > 0) {
         const response = await fetch("/api/hr/recruit/finalists", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: toDelete.map((row) => row.id) }) });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, "??? ??????."));
+        if (!response.ok) throw new Error(await parseErrorDetail(response, "삭제에 실패했습니다."));
       }
       for (const row of toUpdate) {
         const response = await fetch(`/api/hr/recruit/finalists/${row.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_type: row.source_type, external_key: row.external_key ?? null, full_name: row.full_name.trim(), resident_no_masked: row.resident_no_masked ?? null, birth_date: row.birth_date ?? null, phone_mobile: row.phone_mobile ?? null, email: row.email ?? null, hire_type: row.hire_type, career_years: row.career_years ?? null, login_id: row.login_id ?? null, employee_no: row.employee_no ?? null, expected_join_date: row.expected_join_date ?? null, status_code: row.status_code, note: row.note ?? null, is_active: row.is_active }) });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, `${row.full_name} ??? ??????.`));
+        if (!response.ok) throw new Error(await parseErrorDetail(response, `${row.full_name} 수정에 실패했습니다.`));
       }
       for (const row of toInsert) {
         const response = await fetch("/api/hr/recruit/finalists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_type: "manual", external_key: null, full_name: row.full_name.trim(), resident_no_masked: row.resident_no_masked ?? null, birth_date: row.birth_date ?? null, phone_mobile: row.phone_mobile ?? null, email: row.email ?? null, hire_type: row.hire_type, career_years: row.career_years ?? null, login_id: row.login_id ?? null, employee_no: row.employee_no ?? null, expected_join_date: row.expected_join_date ?? null, status_code: row.status_code, note: row.note ?? null, is_active: row.is_active }) });
-        if (!response.ok) throw new Error(await parseErrorDetail(response, `${row.full_name} ??? ??????.`));
+        if (!response.ok) throw new Error(await parseErrorDetail(response, `${row.full_name} 등록에 실패했습니다.`));
       }
       commitRows((prev) => clearSavedStatuses(prev, { removeDeleted: true, buildOriginal: (row) => snapshotOriginal(row) }));
       await mutate();
-      toast.success(`??? ???????. (?? ${toInsert.length}? / ?? ${toUpdate.length}? / ?? ${toDelete.length}?)`);
+      toast.success(`변경사항을 저장했습니다. (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "??? ??????.");
+      toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
   }, [commitRows, mutate, rows]);
 
   const syncFromIf = useCallback(async () => {
-    toast.info("IF ??? ?? ?? ?????.");
+    toast.info("IF 동기화는 아직 연결되지 않았습니다.");
   }, []);
 
   const generateEmployeeNoForSelected = useCallback(async () => {
     const selected = gridApiRef.current?.getSelectedRows() ?? [];
     const targetIds = selected.filter((row) => row._status !== "deleted" && row.id > 0).map((row) => row.id);
     if (targetIds.length === 0) {
-      toast.error("?? ?? ??? ??? ???.");
+      toast.error("사번을 채번할 행을 선택하세요.");
       return;
     }
     setGeneratingNo(true);
     try {
       const response = await fetch("/api/hr/recruit/finalists/generate-employee-no", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: targetIds }) });
-      if (!response.ok) throw new Error(await parseErrorDetail(response, "?? ??? ??????."));
+      if (!response.ok) throw new Error(await parseErrorDetail(response, "사번 채번에 실패했습니다."));
       await mutate();
-      toast.success("?? ??? ???????.");
+      toast.success("사번 채번을 완료했습니다.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "?? ??? ??????.");
+      toast.error(error instanceof Error ? error.message : "사번 채번에 실패했습니다.");
     } finally {
       setGeneratingNo(false);
     }
@@ -361,5 +361,3 @@ export function HrRecruitFinalistManager() {
     </ManagerPageShell>
   );
 }
-
-
