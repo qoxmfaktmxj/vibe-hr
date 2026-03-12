@@ -548,7 +548,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
         pinned: "left",
         sortable: false,
         filter: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         editable: false,
         cellRenderer: (params: ICellRendererParams<AdminGridRow>) => {
           const row = params.data;
@@ -794,8 +794,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
               rowData={pagedRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
               rowClassRules={rowClassRules}

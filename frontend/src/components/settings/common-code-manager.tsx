@@ -57,6 +57,9 @@ const EMPTY_CODE = {
   extra_value2: "",
 };
 
+const EMPTY_GROUPS: CodeGroupItem[] = [];
+const EMPTY_CODES: CodeItem[] = [];
+
 type DeleteTarget =
   | { kind: "group"; groupId: number }
   | { kind: "code"; groupId: number; codeId: number }
@@ -97,7 +100,7 @@ export function CommonCodeManager() {
     revalidateOnFocus: false,
   });
 
-  const groups = groupData?.groups ?? [];
+  const groups = useMemo(() => groupData?.groups ?? EMPTY_GROUPS, [groupData]);
 
   const {
     data: codeData,
@@ -110,7 +113,7 @@ export function CommonCodeManager() {
     { revalidateOnFocus: false },
   );
 
-  const codes = codeData?.codes ?? [];
+  const codes = useMemo(() => codeData?.codes ?? EMPTY_CODES, [codeData]);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,

@@ -385,7 +385,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
         pinned: "left",
         sortable: false,
         filter: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         editable: false,
         cellRenderer: (params: ICellRendererParams<TraResourceRow>) => {
           const row = params.data;
@@ -539,8 +539,7 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
               rowData={filteredRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
               getRowClass={getRowClass}

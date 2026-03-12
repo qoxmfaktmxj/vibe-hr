@@ -449,7 +449,7 @@ export function HrAppointmentCodeManager() {
         pinned: "left",
         sortable: false,
         filter: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         editable: false,
         cellRenderer: (params: ICellRendererParams<AppointmentCodeRow>) => {
           const row = params.data;
@@ -662,8 +662,7 @@ export function HrAppointmentCodeManager() {
               rowData={filteredRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
               getRowClass={getRowClass}

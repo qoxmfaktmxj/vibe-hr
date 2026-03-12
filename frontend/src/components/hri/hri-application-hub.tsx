@@ -1145,8 +1145,7 @@ export function HriApplicationHub() {
               rowData={filteredRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="single"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "singleRow", enableClickSelection: true }}
               animateRows={false}
               getRowId={(p) => String(p.data.id)}
               onGridReady={onGridReady}

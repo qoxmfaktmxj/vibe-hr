@@ -419,7 +419,7 @@ export function HrAppointmentRecordManager() {
       pinned: "left",
       sortable: false,
       filter: false,
-      suppressMenu: true,
+      suppressHeaderMenuButton: true,
       editable: false,
       cellRenderer: (params: ICellRendererParams<AppointmentRecordRow>) => {
         const row = params.data;
@@ -454,7 +454,7 @@ export function HrAppointmentRecordManager() {
       editable: false,
       sortable: false,
       filter: false,
-      suppressMenu: true,
+      suppressHeaderMenuButton: true,
       cellRenderer: (params: ICellRendererParams<AppointmentRecordRow>) => {
         const row = params.data;
         if (!row) return null;
@@ -743,8 +743,7 @@ export function HrAppointmentRecordManager() {
               rowData={rows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
               getRowClass={getRowClass}
