@@ -12,4 +12,11 @@ export type PapFinalResultItem = {
 
 export type PapFinalResultListResponse = {
   items: PapFinalResultItem[];
+  total_count: number;
+  page: number;
+  limit: number;
+};
+
+export type PapFinalResultDetailResponse = {
+  item: PapFinalResultItem;
 };

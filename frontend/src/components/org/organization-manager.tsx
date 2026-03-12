@@ -34,6 +34,7 @@ import {
   summarizeGridStatuses,
 } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
 import type { OrganizationDepartmentItem, OrganizationDepartmentListResponse } from "@/types/organization";
 
@@ -82,6 +83,14 @@ const STATUS_LABELS: Record<RowStatus, string> = {
   added: "입력",
   updated: "수정",
   deleted: "삭제",
+};
+
+const ACTION_CODE_BY_KEY: Record<string, string> = {
+  add: "create",
+  copy: "copy",
+  template: "template_download",
+  upload: "upload",
+  download: "download",
 };
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
@@ -174,6 +183,7 @@ function createEmptyFilters(): SearchFilters {
 }
 
 export function OrganizationManager() {
+  const { can, loading: menuActionLoading } = useMenuActions("/org/departments");
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(() => createEmptyFilters());
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(() => createEmptyFilters());
@@ -385,7 +395,7 @@ export function OrganizationManager() {
         filter: false,
         editable: false,
         resizable: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         cellRenderer: (params: ICellRendererParams<OrgRow>) => {
           const row = params.data;
           if (!row) return null;
@@ -702,16 +712,18 @@ export function OrganizationManager() {
       onClick: () => void downloadXlsx(),
       disabled: saving,
     },
-  ];
+  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
 
-  const toolbarSaveAction = {
-    key: "save",
-    label: saving ? `${I18N.save}...` : I18N.save,
-    icon: Save,
-    onClick: () => void saveAll(),
-    disabled: saving,
-    variant: "save" as const,
-  };
+  const toolbarSaveAction = can("save")
+    ? {
+        key: "save",
+        label: saving ? `${I18N.save}...` : I18N.save,
+        icon: Save,
+        onClick: () => void saveAll(),
+        disabled: saving || menuActionLoading,
+        variant: "save" as const,
+      }
+    : undefined;
 
   const onGridReady = useCallback((event: GridReadyEvent<OrgRow>) => {
     gridApiRef.current = event.api;
@@ -761,7 +773,7 @@ export function OrganizationManager() {
         title={I18N.title}
         onQuery={applyAndQuery}
         queryLabel={I18N.query}
-        queryDisabled={saving}
+        queryDisabled={saving || menuActionLoading || !can("query")}
       >
         <SearchFieldGrid className="xl:grid-cols-3">
           <SearchTextField
@@ -815,8 +827,7 @@ export function OrganizationManager() {
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
             getRowId={(params) => String(params.data.id)}
-            rowSelection="single"
-            suppressRowClickSelection={false}
+            rowSelection={{ mode: "singleRow", enableClickSelection: true }}
             singleClickEdit
             animateRows={false}
             rowClassRules={rowClassRules}

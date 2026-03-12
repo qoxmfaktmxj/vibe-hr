@@ -2,8 +2,7 @@
 
 import { Toaster } from "sonner";
 
-import { AuthProvider } from "@/components/auth/auth-provider";
-import { MenuProvider } from "@/components/auth/menu-provider";
+import { SessionProviders } from "@/components/session-providers";
 import type { AuthUser } from "@/types/auth";
 import type { MenuNode } from "@/types/menu";
 
@@ -17,8 +16,7 @@ export function Providers({
   initialMenus: MenuNode[];
 }) {
   return (
-    <AuthProvider initialUser={initialUser}>
-      <MenuProvider initialMenus={initialMenus}>
+    <SessionProviders initialUser={initialUser} initialMenus={initialMenus}>
         {children}
         <Toaster
           position="top-right"
@@ -36,7 +34,6 @@ export function Providers({
             },
           }}
         />
-      </MenuProvider>
-    </AuthProvider>
+    </SessionProviders>
   );
 }

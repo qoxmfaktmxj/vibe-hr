@@ -12,6 +12,7 @@ from app.models import (
     AppCode,
     AppCodeGroup,
     AppMenu,
+    AppMenuAction,
     AppMenuRole,
     AppSystemSetting,
     AuthRole,
@@ -344,6 +345,14 @@ MENU_TREE: list[dict] = [
                 "sort_order": 251,
                 "roles": ["hr_manager", "admin"],
             },
+            {
+                "code": "pap.final-results",
+                "name": "\uCD5C\uC885\uB4F1\uAE09\uAD00\uB9AC",
+                "path": "/pap/final-results",
+                "icon": "Award",
+                "sort_order": 252,
+                "roles": ["hr_manager", "admin"],
+            },
         ],
     },
     {
@@ -618,6 +627,16 @@ MENU_TREE: list[dict] = [
         ],
     },
 ]
+
+STANDARD_MENU_ACTION_CODES: tuple[str, ...] = (
+    "query",
+    "create",
+    "copy",
+    "template_download",
+    "upload",
+    "save",
+    "download",
+)
 
 
 COMMON_CODE_GROUP_SEEDS = [
@@ -1168,6 +1187,35 @@ def ensure_menus(session: Session) -> None:
             menu.is_active = False
             session.add(menu)
             changed = True
+    if changed:
+        session.commit()
+
+
+def ensure_menu_actions(session: Session) -> None:
+    menu_rows = session.exec(select(AppMenu).where(AppMenu.path.is_not(None), AppMenu.is_active == True)).all()
+    existing_rows = session.exec(select(AppMenuAction)).all()
+    existing_keys = {(row.menu_id, row.action_code) for row in existing_rows}
+    now_utc = datetime.utcnow()
+    changed = False
+
+    for menu in menu_rows:
+        if menu.id is None:
+            continue
+        for action_code in STANDARD_MENU_ACTION_CODES:
+            key = (menu.id, action_code)
+            if key in existing_keys:
+                continue
+            session.add(
+                AppMenuAction(
+                    menu_id=menu.id,
+                    action_code=action_code,
+                    enabled_default=True,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            changed = True
+
     if changed:
         session.commit()
 
@@ -3276,6 +3324,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
+    ensure_menu_actions(session)
     ensure_system_settings(session)
     ensure_common_codes(session)
     ensure_pap_final_results(session)

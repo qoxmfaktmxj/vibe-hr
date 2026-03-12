@@ -83,10 +83,19 @@ def list_appraisals(
     session: Session,
     appraisal_year: int | None = None,
     active_only: bool | None = None,
-) -> list[PapAppraisalItem]:
+    code: str | None = None,
+    name: str | None = None,
+    page: int = 1,
+    limit: int = 100,
+    all_rows: bool = False,
+) -> tuple[list[PapAppraisalItem], int]:
     statement = select(PapAppraisalMaster)
     if appraisal_year is not None:
         statement = statement.where(PapAppraisalMaster.appraisal_year == appraisal_year)
+    if code:
+        statement = statement.where(PapAppraisalMaster.appraisal_code.contains(code.strip().upper()))
+    if name:
+        statement = statement.where(PapAppraisalMaster.appraisal_name.contains(name.strip()))
     if active_only is not None:
         statement = statement.where(PapAppraisalMaster.is_active == active_only)
     rows = session.exec(
@@ -97,7 +106,12 @@ def list_appraisals(
         ),
     ).all()
     if not rows:
-        return []
+        return ([], 0)
+
+    total_count = len(rows)
+    if not all_rows:
+        start = max(page - 1, 0) * limit
+        rows = rows[start:start + limit]
 
     final_result_ids = {row.final_result_id for row in rows if row.final_result_id is not None}
     final_results = {}
@@ -107,7 +121,7 @@ def list_appraisals(
             for result in session.exec(select(PapFinalResult).where(PapFinalResult.id.in_(final_result_ids))).all()
             if result.id is not None
         }
-    return [_to_item(row, final_results.get(row.final_result_id)) for row in rows]
+    return ([_to_item(row, final_results.get(row.final_result_id)) for row in rows], total_count)
 
 
 def create_appraisal(session: Session, payload: PapAppraisalCreateRequest) -> PapAppraisalItem:

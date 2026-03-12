@@ -1,10 +1,12 @@
 """MNG 고객사 관리 API 라우터."""
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session
 
-from app.core.auth import require_roles
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.models import AuthUser
+from app.services.menu_service import get_allowed_menu_actions_for_user
 from app.schemas.mng import (
     MngBulkDeleteRequest,
     MngBulkDeleteResponse,
@@ -31,6 +33,20 @@ from app.services.mng_company_service import (
 router = APIRouter(prefix="/mng", tags=["mng-company"])
 
 
+def _require_menu_action(
+    session: Session,
+    current_user: AuthUser,
+    action_code: str,
+) -> None:
+    allowed = get_allowed_menu_actions_for_user(
+        session,
+        user_id=current_user.id,
+        menu_code="mng.companies",
+    )
+    if not allowed.get(action_code, False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Action not allowed.")
+
+
 # ── 고객사 CRUD ──
 
 @router.get(
@@ -41,7 +57,9 @@ router = APIRouter(prefix="/mng", tags=["mng-company"])
 def mng_company_list(
     search: str | None = Query(default=None),
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> MngCompanyListResponse:
+    _require_menu_action(session, current_user, "query")
     items = list_companies(session, search=search)
     return MngCompanyListResponse(companies=items, total_count=len(items))
 
@@ -80,7 +98,9 @@ def mng_company_detail(
 def mng_company_create(
     payload: MngCompanyCreateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> MngCompanyDetailResponse:
+    _require_menu_action(session, current_user, "save")
     item = create_company(session, payload)
     return MngCompanyDetailResponse(company=item)
 
@@ -94,7 +114,9 @@ def mng_company_update(
     company_id: int,
     payload: MngCompanyUpdateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> MngCompanyDetailResponse:
+    _require_menu_action(session, current_user, "save")
     item = update_company(session, company_id, payload)
     return MngCompanyDetailResponse(company=item)
 
@@ -107,7 +129,9 @@ def mng_company_update(
 def mng_company_delete(
     payload: MngBulkDeleteRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> MngBulkDeleteResponse:
+    _require_menu_action(session, current_user, "save")
     cnt = delete_companies(session, payload.ids)
     return MngBulkDeleteResponse(deleted_count=cnt)
 

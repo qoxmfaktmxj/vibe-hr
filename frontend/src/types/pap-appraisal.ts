@@ -18,6 +18,9 @@ export type PapAppraisalItem = {
 
 export type PapAppraisalListResponse = {
   items: PapAppraisalItem[];
+  total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type PapAppraisalDetailResponse = {

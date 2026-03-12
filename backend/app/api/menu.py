@@ -8,6 +8,8 @@ from app.schemas.menu import (
     MenuAdminDetailResponse,
     MenuAdminItem,
     MenuAdminTreeResponse,
+    MenuActionPermissionItem,
+    MenuActionPermissionResponse,
     MenuCreateRequest,
     MenuRoleMappingResponse,
     MenuRoleUpdateRequest,
@@ -20,6 +22,9 @@ from app.schemas.menu import (
     RoleMenuPermissionMatrixResponse,
     RoleMenuPermissionMatrixUpdateRequest,
     RoleMenuMappingResponse,
+    RoleMenuActionPermissionItem,
+    RoleMenuActionPermissionMatrixResponse,
+    RoleMenuActionPermissionMatrixUpdateRequest,
     RoleMenuUpdateRequest,
     RoleUpdateRequest,
 )
@@ -29,12 +34,15 @@ from app.services.menu_service import (
     delete_menu,
     delete_role,
     get_admin_menu_tree,
+    get_allowed_menu_actions_for_user,
     get_menu_roles,
+    get_role_menu_action_permission_matrix,
     get_role_menu_permission_matrix,
     get_menu_tree_for_user,
     get_role_menus,
     list_roles,
     replace_menu_roles,
+    replace_role_menu_action_permission_matrix,
     replace_role_menu_permission_matrix,
     replace_role_menus,
     update_menu,
@@ -52,6 +60,30 @@ def menu_tree(
     """현재 로그인 사용자의 역할 기반으로 접근 가능한 메뉴 트리를 반환한다."""
     tree = get_menu_tree_for_user(session, current_user.id)
     return MenuTreeResponse(menus=tree)
+
+
+@router.get("/actions/current", response_model=MenuActionPermissionResponse)
+def current_menu_actions(
+    menu_code: str | None = None,
+    path: str | None = None,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> MenuActionPermissionResponse:
+    allowed = get_allowed_menu_actions_for_user(
+        session,
+        user_id=current_user.id,
+        menu_code=menu_code,
+        path=path,
+    )
+    return MenuActionPermissionResponse(
+        menu_code=menu_code or "",
+        path=path,
+        allowed_actions=[action_code for action_code, is_allowed in allowed.items() if is_allowed],
+        actions=[
+            MenuActionPermissionItem(action_code=action_code, allowed=is_allowed)
+            for action_code, is_allowed in allowed.items()
+        ],
+    )
 
 
 @router.get(
@@ -189,6 +221,57 @@ def admin_update_role_permission_matrix(
         for role_id, menu_ids in matrix.items()
     ]
     return RoleMenuPermissionMatrixResponse(mappings=mappings)
+
+
+@router.get(
+    "/admin/roles/action-permissions",
+    response_model=RoleMenuActionPermissionMatrixResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_role_action_permission_matrix(
+    session: Session = Depends(get_session),
+) -> RoleMenuActionPermissionMatrixResponse:
+    rows = get_role_menu_action_permission_matrix(session)
+    return RoleMenuActionPermissionMatrixResponse(
+        mappings=[
+            RoleMenuActionPermissionItem(
+                role_id=row.role_id,
+                menu_id=row.menu_id,
+                action_code=row.action_code,
+                allowed=row.allowed,
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.put(
+    "/admin/roles/action-permissions",
+    response_model=RoleMenuActionPermissionMatrixResponse,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def admin_update_role_action_permission_matrix(
+    payload: RoleMenuActionPermissionMatrixUpdateRequest,
+    session: Session = Depends(get_session),
+) -> RoleMenuActionPermissionMatrixResponse:
+    rows = replace_role_menu_action_permission_matrix(
+        session,
+        mappings=[
+            (item.role_id, item.menu_id, item.action_code, item.allowed)
+            for item in payload.mappings
+        ],
+    )
+    return RoleMenuActionPermissionMatrixResponse(
+        mappings=[
+            RoleMenuActionPermissionItem(
+                role_id=row.role_id,
+                menu_id=row.menu_id,
+                action_code=row.action_code,
+                allowed=row.allowed,
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.post(

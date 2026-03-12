@@ -83,7 +83,17 @@ function pct(value: number, total: number) {
 }
 
 export default async function DashboardPage() {
-  const [summary, weather, fx] = await Promise.all([getDashboardSummary(), getNoKeyWeather(), getNoKeyFx()]);
+  const [summaryResult, weather, fx] = await Promise.all([getDashboardSummary(), getNoKeyWeather(), getNoKeyFx()]);
+  const summary = summaryResult.ok
+    ? summaryResult.summary
+    : {
+        total_employees: 0,
+        total_departments: 0,
+        attendance_present_today: 0,
+        attendance_late_today: 0,
+        attendance_absent_today: 0,
+        pending_leave_requests: 0,
+      };
   const totalAttendance =
     summary.attendance_present_today + summary.attendance_late_today + summary.attendance_absent_today;
 
@@ -127,6 +137,11 @@ export default async function DashboardPage() {
               <CardTitle className="text-base">오늘 출근 현황</CardTitle>
             </CardHeader>
             <CardContent>
+              {!summaryResult.ok ? (
+                <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Dashboard summary is currently unavailable. The cards are intentionally showing an empty state.
+                </div>
+              ) : null}
               <div className="mb-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
                 <div className="rounded-md border bg-muted/20 p-3">
                   정상출근: <b>{summary.attendance_present_today}</b> ({pct(summary.attendance_present_today, totalAttendance)}%)

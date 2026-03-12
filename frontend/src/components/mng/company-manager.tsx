@@ -32,6 +32,7 @@ import {
   reconcileUpdatedStatus,
   toggleDeletedStatus,
 } from "@/lib/grid/grid-status-mutations";
+import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import {
   isRowRevertedToOriginal,
   snapshotFields,
@@ -117,6 +118,14 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
   noMatches: "일치 항목 없음",
 };
 
+const ACTION_CODE_BY_KEY: Record<string, string> = {
+  create: "create",
+  copy: "copy",
+  template: "template_download",
+  upload: "upload",
+  download: "download",
+};
+
 function snapshotOriginal(row: MngCompanyItem): Record<string, unknown> {
   return snapshotFields(row, TRACKED_FIELDS);
 }
@@ -141,6 +150,7 @@ async function parseErrorDetail(response: Response, fallback: string): Promise<s
 }
 
 export function CompanyManager() {
+  const { can, loading: menuActionLoading } = useMenuActions("/mng/companies");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<CompanyGridRow[]>([]);
@@ -547,7 +557,7 @@ export function CompanyManager() {
         pinned: "left",
         sortable: false,
         filter: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         editable: false,
         cellRenderer: (params: ICellRendererParams<CompanyGridRow>) => {
           const row = params.data;
@@ -724,13 +734,26 @@ export function CompanyManager() {
     handleQuery();
   }
 
+  const filteredToolbarActions = toolbarActions.filter(
+    (action) => action.key !== "save" && can(ACTION_CODE_BY_KEY[action.key] ?? action.key),
+  );
+  const rawSaveAction = toolbarActions.find((action) => action.key === "save");
+  const toolbarSaveAction =
+    can("save") && rawSaveAction
+      ? {
+          ...rawSaveAction,
+          disabled: Boolean(rawSaveAction.disabled) || menuActionLoading,
+          variant: "save" as const,
+        }
+      : undefined;
+
   return (
     <ManagerPageShell>
       <ManagerSearchSection
         title="고객사관리"
         onQuery={handleQuery}
         queryLabel="조회"
-        queryDisabled={isLoading || saving}
+        queryDisabled={isLoading || saving || menuActionLoading || !can("query")}
       >
         <SearchFieldGrid className="xl:grid-cols-4">
           <SearchTextField
@@ -776,7 +799,7 @@ export function CompanyManager() {
         )}
         headerRight={(
           <>
-            <GridToolbarActions actions={toolbarActions} />
+            <GridToolbarActions actions={filteredToolbarActions} saveAction={toolbarSaveAction} />
             <input
               ref={uploadInputRef}
               type="file"
@@ -799,8 +822,7 @@ export function CompanyManager() {
               rowData={filteredRows}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
-              rowSelection="multiple"
-              suppressRowClickSelection={false}
+              rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
               localeText={AG_GRID_LOCALE_KO}

@@ -25,6 +25,9 @@ class PapAppraisalItem(BaseModel):
 
 class PapAppraisalListResponse(BaseModel):
     items: list[PapAppraisalItem]
+    total_count: int
+    page: int
+    limit: int
 
 
 class PapAppraisalDetailResponse(BaseModel):

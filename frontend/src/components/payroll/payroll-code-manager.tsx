@@ -32,6 +32,7 @@ import {
 } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type {
     PayPayrollCodeItem,
     PayPayrollCodeBatchRequest,
@@ -66,6 +67,14 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
     selectAll: "전체 선택", noMatches: "일치 항목 없음",
 };
 
+const ACTION_CODE_BY_KEY: Record<string, string> = {
+    create: "create",
+    copy: "copy",
+    template: "template_download",
+    upload: "upload",
+    download: "download",
+};
+
 function snapshotOriginal(row: PayPayrollCodeItem): Record<string, unknown> {
     return snapshotFields(row, TRACKED_FIELDS);
 }
@@ -96,6 +105,7 @@ function createEmptyRow(tempId: number): RowData {
 }
 
 export function PayrollCodeManager() {
+    const { can, loading: menuActionLoading } = useMenuActions("/payroll/codes");
     const [rows, setRows] = useState<RowData[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -203,23 +213,12 @@ export function PayrollCodeManager() {
     const columnDefs = useMemo<ColDef<RowData>[]>(
         () => [
             {
-                headerName: "선택",
-                checkboxSelection: true,
-                headerCheckboxSelection: true,
-                width: 52,
-                pinned: "left",
-                sortable: false,
-                filter: false,
-                suppressMenu: true,
-                resizable: false,
-            },
-            {
                 headerName: "삭제",
                 width: 52,
                 pinned: "left",
                 sortable: false,
                 filter: false,
-                suppressMenu: true,
+                suppressHeaderMenuButton: true,
                 resizable: false,
                 editable: false,
                 cellRenderer: (params: ICellRendererParams<RowData>) => {
@@ -312,6 +311,17 @@ export function PayrollCodeManager() {
 
     const defaultColDef = useMemo<ColDef<RowData>>(
         () => ({ sortable: true, filter: true, resizable: true, editable: false }),
+        [],
+    );
+    const selectionColumnDef = useMemo<ColDef<RowData>>(
+        () => ({
+            width: 52,
+            pinned: "left",
+            sortable: false,
+            filter: false,
+            resizable: false,
+            suppressHeaderMenuButton: true,
+        }),
         [],
     );
 
@@ -490,6 +500,24 @@ export function PayrollCodeManager() {
         toast.success("업로드는 다음 단계에서 연결합니다.");
     }
 
+    const toolbarActions = [
+        { key: "create", label: "입력", icon: Plus, onClick: addRow },
+        { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
+        { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
+        { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
+        { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+    ];
+    const filteredToolbarActions = toolbarActions.filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+    const toolbarSaveAction = can("save")
+        ? {
+            key: "save",
+            label: saving ? "저장중..." : "저장",
+            icon: Save,
+            onClick: () => void saveAllChanges(),
+            disabled: saving || menuActionLoading,
+        }
+        : undefined;
+
     if (loading) {
         return (
             <div className="flex items-center justify-center p-12">
@@ -500,7 +528,11 @@ export function PayrollCodeManager() {
 
     return (
         <ManagerPageShell>
-            <ManagerSearchSection title="급여코드관리" onQuery={handleQueryRequest}>
+            <ManagerSearchSection
+                title="급여코드관리"
+                onQuery={handleQueryRequest}
+                queryDisabled={saving || menuActionLoading || !can("query")}
+            >
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">
                         <div className="text-xs text-slate-500">급여코드/명칭</div>
@@ -533,14 +565,8 @@ export function PayrollCodeManager() {
                 }
                 headerRight={
                     <GridToolbarActions
-                        actions={[
-                            { key: "create", label: "입력", icon: Plus, onClick: addRow },
-                            { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-                            { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-                            { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
-                            { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-                        ]}
-                        saveAction={{ key: "save", label: saving ? "저장중..." : "저장", icon: Save, onClick: () => void saveAllChanges(), disabled: saving }}
+                        actions={filteredToolbarActions}
+                        saveAction={toolbarSaveAction}
                     />
                 }
                 contentClassName="min-h-0 flex-1 px-6 pb-4"
@@ -552,8 +578,8 @@ export function PayrollCodeManager() {
                         rowData={pagedRows}
                         columnDefs={columnDefs}
                         defaultColDef={defaultColDef}
-                        rowSelection="multiple"
-                        suppressRowClickSelection={true}
+                        rowSelection={{ mode: "multiRow" }}
+                        selectionColumnDef={selectionColumnDef}
                         animateRows={false}
                         rowClassRules={rowClassRules}
                         getRowClass={(params) => getGridRowClass(params.data?._status)}

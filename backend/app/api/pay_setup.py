@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
-from app.core.auth import require_roles
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.models import AuthUser
 from app.schemas.pay_setup_schema import (
     PayAllowanceDeductionBatchRequest,
     PayAllowanceDeductionBatchResponse,
@@ -17,6 +18,7 @@ from app.schemas.pay_setup_schema import (
     PayTaxRateBatchResponse,
     PayTaxRateListResponse,
 )
+from app.services.menu_service import get_allowed_menu_actions_for_user
 from app.services.pay_setup_service import (
     batch_save_pay_allowance_deductions,
     batch_save_pay_item_groups,
@@ -31,6 +33,24 @@ from app.services.pay_setup_service import (
 router = APIRouter(prefix="/pay/setup", tags=["pay-setup"])
 
 
+def _require_menu_action(
+    session: Session,
+    current_user: AuthUser,
+    menu_code: str,
+    action_code: str,
+) -> None:
+    allowed = get_allowed_menu_actions_for_user(
+        session,
+        user_id=current_user.id,
+        menu_code=menu_code,
+    )
+    if not allowed.get(action_code, False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action.",
+        )
+
+
 # -------------------------------------------------------------------------
 # PayPayrollCode Endpoints
 # -------------------------------------------------------------------------
@@ -41,7 +61,9 @@ router = APIRouter(prefix="/pay/setup", tags=["pay-setup"])
 )
 def get_payroll_codes(
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayPayrollCodeListResponse:
+    _require_menu_action(session, current_user, "payroll.codes", "query")
     items = list_pay_payroll_codes(session)
     return PayPayrollCodeListResponse(items=items, total_count=len(items))
 
@@ -54,7 +76,9 @@ def get_payroll_codes(
 def save_payroll_codes_batch(
     payload: PayPayrollCodeBatchRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayPayrollCodeBatchResponse:
+    _require_menu_action(session, current_user, "payroll.codes", "save")
     return batch_save_pay_payroll_codes(session, payload)
 
 
@@ -68,7 +92,9 @@ def save_payroll_codes_batch(
 )
 def get_tax_rates(
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayTaxRateListResponse:
+    _require_menu_action(session, current_user, "payroll.tax-rates", "query")
     items = list_pay_tax_rates(session)
     return PayTaxRateListResponse(items=items, total_count=len(items))
 
@@ -81,7 +107,9 @@ def get_tax_rates(
 def save_tax_rates_batch(
     payload: PayTaxRateBatchRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayTaxRateBatchResponse:
+    _require_menu_action(session, current_user, "payroll.tax-rates", "save")
     return batch_save_pay_tax_rates(session, payload)
 
 
@@ -95,7 +123,9 @@ def save_tax_rates_batch(
 )
 def get_allowance_deductions(
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayAllowanceDeductionListResponse:
+    _require_menu_action(session, current_user, "payroll.allowance-deduction-items", "query")
     items = list_pay_allowance_deductions(session)
     return PayAllowanceDeductionListResponse(items=items, total_count=len(items))
 
@@ -108,7 +138,9 @@ def get_allowance_deductions(
 def save_allowance_deductions_batch(
     payload: PayAllowanceDeductionBatchRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayAllowanceDeductionBatchResponse:
+    _require_menu_action(session, current_user, "payroll.allowance-deduction-items", "save")
     return batch_save_pay_allowance_deductions(session, payload)
 
 
@@ -122,7 +154,9 @@ def save_allowance_deductions_batch(
 )
 def get_item_groups(
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayItemGroupListResponse:
+    _require_menu_action(session, current_user, "payroll.item-groups", "query")
     items = list_pay_item_groups(session)
     return PayItemGroupListResponse(items=items, total_count=len(items))
 
@@ -135,5 +169,7 @@ def get_item_groups(
 def save_item_groups_batch(
     payload: PayItemGroupBatchRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> PayItemGroupBatchResponse:
+    _require_menu_action(session, current_user, "payroll.item-groups", "save")
     return batch_save_pay_item_groups(session, payload)

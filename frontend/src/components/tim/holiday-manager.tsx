@@ -37,6 +37,7 @@ import {
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type {
   TimHolidayItem,
   TimHolidayBatchRequest,
@@ -81,6 +82,14 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
   contains: "포함", notContains: "미포함", startsWith: "시작", endsWith: "끝",
   andCondition: "그리고", orCondition: "또는",
   selectAll: "전체 선택", noMatches: "일치 항목 없음",
+};
+
+const ACTION_CODE_BY_KEY: Record<string, string> = {
+  create: "create",
+  copy: "copy",
+  template: "template_download",
+  upload: "upload",
+  download: "download",
 };
 
 /* ------------------------------------------------------------------ */
@@ -154,6 +163,7 @@ function createEmptyRow(tempId: number, year: number): HolidayRow {
 /* 컴포넌트                                                            */
 /* ------------------------------------------------------------------ */
 export function HolidayManager() {
+  const { can, loading: menuActionLoading } = useMenuActions("/tim/holidays");
   const currentYear = new Date().getFullYear();
   const [rows, setRows] = useState<HolidayRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,23 +281,12 @@ export function HolidayManager() {
   const columnDefs = useMemo<ColDef<HolidayRow>[]>(
     () => [
       {
-        headerName: "선택",
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        width: 52,
-        pinned: "left",
-        sortable: false,
-        filter: false,
-        suppressMenu: true,
-        resizable: false,
-      },
-      {
         headerName: "삭제",
         width: 52,
         pinned: "left",
         sortable: false,
         filter: false,
-        suppressMenu: true,
+        suppressHeaderMenuButton: true,
         resizable: false,
         editable: false,
         cellRenderer: (params: ICellRendererParams<HolidayRow>) => {
@@ -359,6 +358,17 @@ export function HolidayManager() {
 
   const defaultColDef = useMemo<ColDef<HolidayRow>>(
     () => ({ sortable: true, filter: true, resizable: true, editable: false }),
+    [],
+  );
+  const selectionColumnDef = useMemo<ColDef<HolidayRow>>(
+    () => ({
+      width: 52,
+      pinned: "left",
+      sortable: false,
+      filter: false,
+      resizable: false,
+      suppressHeaderMenuButton: true,
+    }),
     [],
   );
 
@@ -571,6 +581,25 @@ export function HolidayManager() {
     toast.success("업로드는 다음 단계에서 연결합니다.");
   }
 
+  const toolbarActions = [
+    { key: "create", label: "입력", icon: Plus, onClick: addRow },
+    { key: "copy", label: "복사", icon: CopyPlus, onClick: copySelectedRows },
+    { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
+    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
+    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+
+  const toolbarSaveAction = can("save")
+    ? {
+        key: "save",
+        label: saving ? "저장중..." : "저장",
+        icon: Save,
+        onClick: () => void saveAllChanges(),
+        disabled: saving || menuActionLoading,
+        variant: "save" as const,
+      }
+    : undefined;
+
   /* -- 렌더링 ------------------------------------------------------ */
   if (loading) {
     return (
@@ -582,7 +611,11 @@ export function HolidayManager() {
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title="공휴일관리" onQuery={handleQueryRequest}>
+      <ManagerSearchSection
+        title="공휴일관리"
+        onQuery={handleQueryRequest}
+        queryDisabled={saving || copyLoading || menuActionLoading || !can("query")}
+      >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <div className="text-xs text-slate-500">조회 연도</div>
@@ -630,14 +663,8 @@ export function HolidayManager() {
         }
         headerRight={
           <GridToolbarActions
-            actions={[
-              { key: "create", label: "입력", icon: Plus, onClick: addRow },
-              { key: "copy", label: "복사", icon: CopyPlus, onClick: copySelectedRows },
-              { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-              { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
-              { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-            ]}
-            saveAction={{ key: "save", label: saving ? "저장중..." : "저장", icon: Save, onClick: () => void saveAllChanges(), disabled: saving }}
+            actions={toolbarActions}
+            saveAction={toolbarSaveAction}
           />
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
@@ -649,8 +676,8 @@ export function HolidayManager() {
             rowData={pagedRows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            rowSelection="multiple"
-            suppressRowClickSelection={true}
+            rowSelection={{ mode: "multiRow" }}
+            selectionColumnDef={selectionColumnDef}
             animateRows={false}
             rowClassRules={rowClassRules}
             getRowClass={(params) => getGridRowClass(params.data?._status)}

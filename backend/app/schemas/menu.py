@@ -117,3 +117,30 @@ class RoleMenuPermissionMatrixResponse(BaseModel):
 
 class RoleMenuPermissionMatrixUpdateRequest(BaseModel):
     mappings: List[RoleMenuPermissionItem] = Field(default_factory=list)
+
+
+class MenuActionPermissionItem(BaseModel):
+    action_code: str
+    allowed: bool
+
+
+class MenuActionPermissionResponse(BaseModel):
+    menu_code: str
+    path: Optional[str] = None
+    allowed_actions: List[str] = Field(default_factory=list)
+    actions: List[MenuActionPermissionItem] = Field(default_factory=list)
+
+
+class RoleMenuActionPermissionItem(BaseModel):
+    role_id: int
+    menu_id: int
+    action_code: str
+    allowed: bool
+
+
+class RoleMenuActionPermissionMatrixResponse(BaseModel):
+    mappings: List[RoleMenuActionPermissionItem] = Field(default_factory=list)
+
+
+class RoleMenuActionPermissionMatrixUpdateRequest(BaseModel):
+    mappings: List[RoleMenuActionPermissionItem] = Field(default_factory=list)

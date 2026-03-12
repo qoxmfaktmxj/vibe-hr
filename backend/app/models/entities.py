@@ -128,6 +128,39 @@ class AppMenuRole(SQLModel, table=True):
     role_id: int = Field(foreign_key="auth_roles.id", primary_key=True)
 
 
+class AppMenuAction(SQLModel, table=True):
+    """Per-menu toolbar action defaults."""
+
+    __tablename__ = "app_menu_actions"
+    __table_args__ = (
+        UniqueConstraint("menu_id", "action_code", name="uq_app_menu_actions_menu_action"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    menu_id: int = Field(foreign_key="app_menus.id", index=True)
+    action_code: str = Field(max_length=40, index=True)
+    enabled_default: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class AppRoleMenuAction(SQLModel, table=True):
+    """Per-role menu action override."""
+
+    __tablename__ = "app_role_menu_actions"
+    __table_args__ = (
+        UniqueConstraint("role_id", "menu_id", "action_code", name="uq_app_role_menu_actions_role_menu_action"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    role_id: int = Field(foreign_key="auth_roles.id", index=True)
+    menu_id: int = Field(foreign_key="app_menus.id", index=True)
+    action_code: str = Field(max_length=40, index=True)
+    allowed: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class AppCodeGroup(SQLModel, table=True):
     __tablename__ = "app_code_groups"
 

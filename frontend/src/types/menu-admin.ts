@@ -48,3 +48,14 @@ export type RoleMenuPermissionItem = {
 export type RoleMenuPermissionMatrixResponse = {
   mappings: RoleMenuPermissionItem[];
 };
+
+export type RoleMenuActionPermissionItem = {
+  role_id: number;
+  menu_id: number;
+  action_code: string;
+  allowed: boolean;
+};
+
+export type RoleMenuActionPermissionMatrixResponse = {
+  mappings: RoleMenuActionPermissionItem[];
+};

@@ -1,54 +1,29 @@
 import "server-only";
 
 import { cache } from "react";
-import { cookies } from "next/headers";
 
 import type { AuthUser } from "@/types/auth";
 import type { MenuNode, MenuTreeResponse } from "@/types/menu";
+import { fetchBackendJson, getServerAccessToken } from "@/lib/server/backend-client";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const AUTH_COOKIE_NAME = "vibe_hr_token";
-
-export const getAccessToken = cache(async (): Promise<string | null> => {
-  const cookieStore = await cookies();
-  return cookieStore.get(AUTH_COOKIE_NAME)?.value ?? null;
-});
+export const getAccessToken = getServerAccessToken;
 
 export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
-  const accessToken = await getAccessToken();
-  if (!accessToken) return null;
-
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+    return await fetchBackendJson<AuthUser>("/api/v1/auth/me", {
       next: { revalidate: 60 },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
     });
-
-    if (!response.ok) return null;
-    return (await response.json()) as AuthUser;
   } catch {
     return null;
   }
 });
 
 export const getMenuTree = cache(async (): Promise<MenuNode[]> => {
-  const accessToken = await getAccessToken();
-  if (!accessToken) return [];
-
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/menus/tree`, {
+    const data = await fetchBackendJson<MenuTreeResponse>("/api/v1/menus/tree", {
       next: { revalidate: 300 },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
     });
-
-    if (!response.ok) return [];
-    const data = (await response.json()) as MenuTreeResponse;
-    return data.menus;
+    return data?.menus ?? [];
   } catch {
     return [];
   }

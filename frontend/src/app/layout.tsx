@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { Providers } from "@/components/providers";
-import { getAuthUser, getMenuTree } from "@/lib/server/session";
 
 import "./globals.css";
 
@@ -49,12 +48,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [initialUser, initialMenus] = await Promise.all([getAuthUser(), getMenuTree()]);
-
   return (
-    <html lang="en">
+    <html lang="ko">
       <body className={`${inter.variable} antialiased`}>
-        <Providers initialUser={initialUser} initialMenus={initialMenus}>
+        <Providers initialUser={null} initialMenus={[]}>
           {children}
         </Providers>
       </body>

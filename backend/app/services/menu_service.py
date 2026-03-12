@@ -5,12 +5,23 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlmodel import Session, delete, select
 
-from app.models import AppMenu, AppMenuRole, AuthRole, AuthUserRole
+from app.models import AppMenu, AppMenuAction, AppMenuRole, AppRoleMenuAction, AuthRole, AuthUserRole
 from app.schemas.menu import MenuAdminItem, MenuNode, RoleItem
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+STANDARD_MENU_ACTION_CODES: tuple[str, ...] = (
+    "query",
+    "create",
+    "copy",
+    "template_download",
+    "upload",
+    "save",
+    "download",
+)
 
 
 def _build_tree(
@@ -246,6 +257,63 @@ def check_menu_access(session: Session, user_id: int, menu_code: str) -> bool:
     return link is not None
 
 
+def get_allowed_menu_actions_for_user(
+    session: Session,
+    *,
+    user_id: int,
+    menu_code: str | None = None,
+    path: str | None = None,
+) -> dict[str, bool]:
+    statement = select(AppMenu).where(AppMenu.is_active == True)
+    if menu_code:
+        statement = statement.where(AppMenu.code == menu_code)
+    elif path:
+        statement = statement.where(AppMenu.path == path)
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="menu_code or path is required.")
+
+    menu = session.exec(statement).first()
+    if menu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
+
+    if not check_menu_access(session, user_id, menu.code):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    default_rows = session.exec(
+        select(AppMenuAction).where(AppMenuAction.menu_id == menu.id)
+    ).all()
+    allowed_by_code = {
+        action_code: True for action_code in STANDARD_MENU_ACTION_CODES
+    }
+    if default_rows:
+        allowed_by_code = {
+            row.action_code: row.enabled_default
+            for row in default_rows
+            if row.action_code in STANDARD_MENU_ACTION_CODES
+        }
+
+    role_ids = list(
+        session.exec(select(AuthUserRole.role_id).where(AuthUserRole.user_id == user_id)).all()
+    )
+    if role_ids:
+        override_rows = session.exec(
+            select(AppRoleMenuAction).where(
+                AppRoleMenuAction.menu_id == menu.id,
+                AppRoleMenuAction.role_id.in_(role_ids),
+            )
+        ).all()
+        grouped: dict[str, list[bool]] = {}
+        for row in override_rows:
+            if row.action_code not in STANDARD_MENU_ACTION_CODES:
+                continue
+            grouped.setdefault(row.action_code, []).append(row.allowed)
+
+        for action_code, flags in grouped.items():
+            allowed_by_code[action_code] = any(flags)
+
+    return {action_code: bool(allowed_by_code.get(action_code, False)) for action_code in STANDARD_MENU_ACTION_CODES}
+
+
 def _get_role_or_404(session: Session, role_id: int) -> AuthRole:
     role = session.get(AuthRole, role_id)
     if role is None:
@@ -398,3 +466,91 @@ def replace_role_menu_permission_matrix(
     session.commit()
 
     return get_role_menu_permission_matrix(session, role_ids=role_ids)
+
+
+def get_role_menu_action_permission_matrix(
+    session: Session,
+    *,
+    role_ids: list[int] | None = None,
+) -> list[AppRoleMenuAction]:
+    if role_ids is None:
+        target_role_ids = list(session.exec(select(AuthRole.id).order_by(AuthRole.id)).all())
+    else:
+        valid_role_ids = set(session.exec(select(AuthRole.id)).all())
+        unknown = [role_id for role_id in role_ids if role_id not in valid_role_ids]
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid role_id: {unknown}",
+            )
+        target_role_ids = sorted(set(role_ids))
+
+    if not target_role_ids:
+        return []
+
+    return list(
+        session.exec(
+            select(AppRoleMenuAction).where(AppRoleMenuAction.role_id.in_(target_role_ids))
+        ).all()
+    )
+
+
+def replace_role_menu_action_permission_matrix(
+    session: Session,
+    *,
+    mappings: list[tuple[int, int, str, bool]],
+) -> list[AppRoleMenuAction]:
+    if not mappings:
+        session.exec(delete(AppRoleMenuAction))
+        session.commit()
+        return []
+
+    role_ids = sorted({role_id for role_id, _, _, _ in mappings})
+    valid_role_ids = set(session.exec(select(AuthRole.id)).all())
+    unknown_roles = [role_id for role_id in role_ids if role_id not in valid_role_ids]
+    if unknown_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role_id: {unknown_roles}",
+        )
+
+    valid_menu_ids = set(session.exec(select(AppMenu.id)).all())
+    unknown_menus = sorted({menu_id for _, menu_id, _, _ in mappings if menu_id not in valid_menu_ids})
+    if unknown_menus:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid menu_id: {unknown_menus}",
+        )
+
+    invalid_action_codes = sorted(
+        {
+            action_code
+            for _, _, action_code, _ in mappings
+            if action_code not in STANDARD_MENU_ACTION_CODES
+        }
+    )
+    if invalid_action_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid action_code: {invalid_action_codes}",
+        )
+
+    session.exec(delete(AppRoleMenuAction).where(AppRoleMenuAction.role_id.in_(role_ids)))
+    now = _utc_now()
+    deduped = {
+        (role_id, menu_id, action_code): allowed
+        for role_id, menu_id, action_code, allowed in mappings
+    }
+    for (role_id, menu_id, action_code), allowed in deduped.items():
+        session.add(
+            AppRoleMenuAction(
+                role_id=role_id,
+                menu_id=menu_id,
+                action_code=action_code,
+                allowed=allowed,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    session.commit()
+    return get_role_menu_action_permission_matrix(session, role_ids=role_ids)

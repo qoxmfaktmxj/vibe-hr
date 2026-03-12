@@ -137,6 +137,23 @@
       ],
       "ownerModule": "PAP"
     },
+    "pap.final-results": {
+      "path": "/pap/final-results",
+      "pageFile": "frontend/src/app/pap/final-results/page.tsx",
+      "componentFile": "frontend/src/components/pap/pap-final-result-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAP"
+    },
     "hr.admin.rewards": {
       "path": "/hr/admin/rewards",
       "pageFile": "frontend/src/app/hr/admin/rewards/page.tsx",

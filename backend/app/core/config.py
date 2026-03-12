@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     auth_token_algorithm: str = "HS256"
     auth_token_expires_min: int = 480
     auth_token_issuer: str = "vibe-hr"
+    auto_seed_on_start: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

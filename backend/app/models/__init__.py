@@ -1,8 +1,10 @@
 from app.models.entities import (
     AppCode,
     AppCodeGroup,
+    AppMenuAction,
     AppMenu,
     AppMenuRole,
+    AppRoleMenuAction,
     AppSystemSetting,
     AppSystemSettingHistory,
     AuthRole,
@@ -91,8 +93,10 @@ from app.models.tra import (
 __all__ = [
     "AppCodeGroup",
     "AppCode",
+    "AppMenuAction",
     "AppMenu",
     "AppMenuRole",
+    "AppRoleMenuAction",
     "AppSystemSetting",
     "AppSystemSettingHistory",
     "AuthRole",
