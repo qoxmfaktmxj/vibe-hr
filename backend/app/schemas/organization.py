@@ -11,6 +11,10 @@ class OrganizationDepartmentItem(BaseModel):
     name: str
     parent_id: int | None
     parent_name: str | None
+    organization_type: str | None = None
+    cost_center_code: str | None = None
+    description: str | None = None
+    employee_count: int = 0
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -32,6 +36,9 @@ class OrganizationDepartmentCreateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=30)
     name: str = Field(min_length=1, max_length=100)
     parent_id: int | None = None
+    organization_type: str | None = Field(default=None, max_length=50)
+    cost_center_code: str | None = Field(default=None, max_length=30)
+    description: str | None = Field(default=None, max_length=500)
     is_active: bool = True
 
 
@@ -39,6 +46,9 @@ class OrganizationDepartmentUpdateRequest(BaseModel):
     code: str | None = Field(default=None, min_length=1, max_length=30)
     name: str | None = Field(default=None, min_length=1, max_length=100)
     parent_id: int | None = None
+    organization_type: str | None = Field(default=None, max_length=50)
+    cost_center_code: str | None = Field(default=None, max_length=30)
+    description: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
 
 

@@ -22,6 +22,12 @@ def init_db() -> None:
                 """
                 DO $$
                 BEGIN
+                    IF to_regclass('public.org_departments') IS NOT NULL THEN
+                        EXECUTE 'ALTER TABLE org_departments ADD COLUMN IF NOT EXISTS organization_type VARCHAR(50)';
+                        EXECUTE 'ALTER TABLE org_departments ADD COLUMN IF NOT EXISTS cost_center_code VARCHAR(30)';
+                        EXECUTE 'ALTER TABLE org_departments ADD COLUMN IF NOT EXISTS description VARCHAR(500)';
+                    END IF;
+
                     IF to_regclass('public.pap_appraisal_masters') IS NOT NULL
                        AND to_regclass('public."PAP_APPRAISAL_MASTERS"') IS NULL THEN
                         EXECUTE 'ALTER TABLE pap_appraisal_masters RENAME TO "PAP_APPRAISAL_MASTERS"';

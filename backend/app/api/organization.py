@@ -125,11 +125,19 @@ def organization_departments(
     all: bool = Query(default=False),
     code: str | None = Query(default=None),
     name: str | None = Query(default=None),
+    organization_type: str | None = Query(default=None),
+    cost_center_code: str | None = Query(default=None),
     reference_date: date | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> OrganizationDepartmentListResponse:
     if all:
-        departments, total_count = list_departments(session, code=code, name=name)
+        departments, total_count = list_departments(
+            session,
+            code=code,
+            name=name,
+            organization_type=organization_type,
+            cost_center_code=cost_center_code,
+        )
         return OrganizationDepartmentListResponse(
             departments=departments,
             total_count=total_count,
@@ -142,6 +150,8 @@ def organization_departments(
         limit=limit,
         code=code,
         name=name,
+        organization_type=organization_type,
+        cost_center_code=cost_center_code,
     )
     return OrganizationDepartmentListResponse(
         departments=departments,

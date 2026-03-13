@@ -4,6 +4,10 @@ export type OrganizationDepartmentItem = {
   name: string;
   parent_id: number | null;
   parent_name: string | null;
+  organization_type: string | null;
+  cost_center_code: string | null;
+  description: string | null;
+  employee_count: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;

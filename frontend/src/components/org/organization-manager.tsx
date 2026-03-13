@@ -51,6 +51,9 @@ type OrgRow = OrganizationDepartmentItem & {
 const TRACKED_FIELDS: (keyof OrganizationDepartmentItem)[] = [
   "code",
   "name",
+  "organization_type",
+  "cost_center_code",
+  "description",
   "parent_id",
   "is_active",
 ];
@@ -73,7 +76,11 @@ const I18N = {
   colStatus: "상태",
   colCode: "조직코드",
   colName: "조직명",
+  colOrganizationType: "조직구분",
+  colCostCenter: "COST CENTER",
   colParentName: "상위조직",
+  colEmployeeCount: "인원",
+  colDescription: "조직설명",
   colActive: "사용",
   colUpdatedAt: "수정일",
 };
@@ -169,6 +176,7 @@ function stringifyErrorDetail(value: unknown): string | null {
 type SearchFilters = {
   code: string;
   name: string;
+  costCenterCode: string;
   referenceDate: string;
 };
 
@@ -176,7 +184,7 @@ type PendingReloadAction =
   | { type: "page"; page: number }
   | { type: "query"; filters: SearchFilters };
 
-const EMPTY_FILTERS: SearchFilters = { code: "", name: "", referenceDate: "" };
+const EMPTY_FILTERS: SearchFilters = { code: "", name: "", costCenterCode: "", referenceDate: "" };
 
 function createEmptyFilters(): SearchFilters {
   return { ...EMPTY_FILTERS };
@@ -311,6 +319,7 @@ export function OrganizationManager() {
     params.set("limit", String(pageSize));
     if (filters.code.trim()) params.set("code", filters.code.trim());
     if (filters.name.trim()) params.set("name", filters.name.trim());
+    if (filters.costCenterCode.trim()) params.set("cost_center_code", filters.costCenterCode.trim());
     if (filters.referenceDate.trim()) params.set("reference_date", filters.referenceDate.trim());
 
     const endpoint =
@@ -438,11 +447,38 @@ export function OrganizationManager() {
         editable: (params) => params.data?._status !== "deleted",
       },
       {
+        headerName: I18N.colOrganizationType,
+        field: "organization_type",
+        flex: 1,
+        minWidth: 140,
+        editable: (params) => params.data?._status !== "deleted",
+      },
+      {
+        headerName: I18N.colCostCenter,
+        field: "cost_center_code",
+        flex: 1,
+        minWidth: 150,
+        editable: (params) => params.data?._status !== "deleted",
+      },
+      {
         headerName: I18N.colParentName,
         field: "parent_name",
         editable: false,
         flex: 1.2,
         minWidth: 180,
+      },
+      {
+        headerName: I18N.colEmployeeCount,
+        field: "employee_count",
+        editable: false,
+        width: 96,
+      },
+      {
+        headerName: I18N.colDescription,
+        field: "description",
+        flex: 1.8,
+        minWidth: 240,
+        editable: (params) => params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colActive,
@@ -480,6 +516,10 @@ export function OrganizationManager() {
       name: "",
       parent_id: null,
       parent_name: null,
+      organization_type: null,
+      cost_center_code: null,
+      description: null,
+      employee_count: 0,
       is_active: true,
       created_at: now,
       updated_at: now,
@@ -500,6 +540,7 @@ export function OrganizationManager() {
       ...selectedRow,
       id: newId,
       code: `${selectedRow.code}_COPY`,
+      employee_count: 0,
       created_at: now,
       updated_at: now,
       _status: "added",
@@ -544,9 +585,13 @@ export function OrganizationManager() {
           id: rowId,
           code: cols[0] ?? "",
           name: cols[1] ?? "",
+          organization_type: cols[2] || null,
+          cost_center_code: cols[3] || null,
           parent_id: null,
-          parent_name: cols[2] || null,
-          is_active: (cols[3] ?? "Y").toUpperCase() !== "N",
+          parent_name: cols[4] || null,
+          description: cols[5] || null,
+          employee_count: 0,
+          is_active: (cols[6] ?? "Y").toUpperCase() !== "N",
           created_at: now,
           updated_at: now,
           _status: "added",
@@ -567,7 +612,11 @@ export function OrganizationManager() {
       상태: STATUS_LABELS[row._status],
       조직코드: row.code,
       조직명: row.name,
+      조직구분: row.organization_type ?? "",
+      COST_CENTER: row.cost_center_code ?? "",
       상위조직: row.parent_name ?? "",
+      인원: row.employee_count,
+      조직설명: row.description ?? "",
       사용: row.is_active ? "Y" : "N",
       수정일: row.updated_at ? new Date(row.updated_at).toLocaleString() : "",
     }));
@@ -607,6 +656,9 @@ export function OrganizationManager() {
               code: row.code,
               name: row.name,
               parent_id: row.parent_id,
+              organization_type: row.organization_type,
+              cost_center_code: row.cost_center_code,
+              description: row.description,
               is_active: row.is_active,
             }),
           });
@@ -625,6 +677,9 @@ export function OrganizationManager() {
               code: row.code,
               name: row.name,
               parent_id: row.parent_id,
+              organization_type: row.organization_type,
+              cost_center_code: row.cost_center_code,
+              description: row.description,
               is_active: row.is_active,
             }),
           });
@@ -740,7 +795,13 @@ export function OrganizationManager() {
         prev.map((row) => {
           if (row.id !== rowId) return row;
           const next = { ...row } as OrgRow;
-          if (field === "code" || field === "name") {
+          if (
+            field === "code" ||
+            field === "name" ||
+            field === "organization_type" ||
+            field === "cost_center_code" ||
+            field === "description"
+          ) {
             next[field] = String(event.newValue ?? "") as never;
           } else if (field === "is_active") {
             next.is_active =
@@ -775,7 +836,7 @@ export function OrganizationManager() {
         queryLabel={I18N.query}
         queryDisabled={saving || menuActionLoading || !can("query")}
       >
-        <SearchFieldGrid className="xl:grid-cols-3">
+        <SearchFieldGrid className="xl:grid-cols-4">
           <SearchTextField
             value={searchFilters.code}
             onChange={(value) => setSearchFilters((prev) => ({ ...prev, code: value }))}
@@ -787,6 +848,12 @@ export function OrganizationManager() {
             onChange={(value) => setSearchFilters((prev) => ({ ...prev, name: value }))}
             onKeyDown={handleSearchFieldEnter}
             placeholder={SEARCH_PLACEHOLDERS.organizationName}
+          />
+          <SearchTextField
+            value={searchFilters.costCenterCode}
+            onChange={(value) => setSearchFilters((prev) => ({ ...prev, costCenterCode: value }))}
+            onKeyDown={handleSearchFieldEnter}
+            placeholder="COST CENTER"
           />
           <CustomDatePicker
             value={searchFilters.referenceDate}

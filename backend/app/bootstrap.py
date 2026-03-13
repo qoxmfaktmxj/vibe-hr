@@ -162,12 +162,51 @@ KOREAN_POSITION_TITLES = [
 ]
 
 DEPARTMENT_SEEDS = [
-    ("HQ-HR", "\uC778\uC0AC\uBCF8\uBD80"),
-    ("HQ-ENG", "\uAC1C\uBC1C\uBCF8\uBD80"),
-    ("HQ-SALES", "\uC601\uC5C5\uBCF8\uBD80"),
-    ("HQ-FIN", "\uC7AC\uBB34\uBCF8\uBD80"),
-    ("HQ-OPS", "\uC6B4\uC601\uBCF8\uBD80"),
-    *[(f"ORG-{index:04d}", f"\uC870\uC9C1{index:02d}") for index in range(1, 46)],
+    {
+        "code": "HQ-HR",
+        "name": "\uC778\uC0AC\uBCF8\uBD80",
+        "organization_type": "HEADQUARTERS",
+        "cost_center_code": "CC-HR-001",
+        "description": "\uC778\uC0AC \uC815\uCC45, \uBC1C\uB839, \uD3C9\uAC00, \uAE09\uC5EC \uAE30\uC900 \uC6B4\uC601",
+    },
+    {
+        "code": "HQ-ENG",
+        "name": "\uAC1C\uBC1C\uBCF8\uBD80",
+        "organization_type": "HEADQUARTERS",
+        "cost_center_code": "CC-ENG-001",
+        "description": "\uC81C\uD488 \uAC1C\uBC1C, \uD50C\uB7AB\uD3FC \uAC1C\uC120, \uAE30\uC220 \uC6B4\uC601",
+    },
+    {
+        "code": "HQ-SALES",
+        "name": "\uC601\uC5C5\uBCF8\uBD80",
+        "organization_type": "HEADQUARTERS",
+        "cost_center_code": "CC-SALES-001",
+        "description": "\uC601\uC5C5 \uC804\uB7B5, \uACE0\uAC1D \uBC1C\uAD74, \uC218\uC8FC \uAD00\uB9AC",
+    },
+    {
+        "code": "HQ-FIN",
+        "name": "\uC7AC\uBB34\uBCF8\uBD80",
+        "organization_type": "HEADQUARTERS",
+        "cost_center_code": "CC-FIN-001",
+        "description": "\uD68C\uACC4, \uC790\uAE08, \uC608\uC0B0, \uACB0\uC0B0 \uAD00\uB9AC",
+    },
+    {
+        "code": "HQ-OPS",
+        "name": "\uC6B4\uC601\uBCF8\uBD80",
+        "organization_type": "HEADQUARTERS",
+        "cost_center_code": "CC-OPS-001",
+        "description": "\uC6B4\uC601 \uD45C\uC900, \uC9C0\uC6D0 \uD504\uB85C\uC138\uC2A4, \uD604\uC7A5 \uC6B4\uC601",
+    },
+    *[
+        {
+            "code": f"ORG-{index:04d}",
+            "name": f"\uC870\uC9C1{index:02d}",
+            "organization_type": "TEAM",
+            "cost_center_code": f"CC-ORG-{index:04d}",
+            "description": f"\uC0D8\uD50C \uC870\uC9C1 {index:02d} \uC6B4\uC601 \uB2E8\uC704",
+        }
+        for index in range(1, 46)
+    ],
 ]
 
 CORPORATION_SEEDS = [
@@ -898,17 +937,34 @@ def ensure_roles(session: Session) -> None:
 
 def ensure_departments(session: Session) -> list[OrgDepartment]:
     departments: list[OrgDepartment] = []
-    for code, name in DEPARTMENT_SEEDS:
+    for seed in DEPARTMENT_SEEDS:
+        code = seed["code"]
         department = session.exec(select(OrgDepartment).where(OrgDepartment.code == code)).first()
         if department is None:
-            department = OrgDepartment(code=code, name=name, is_active=True)
+            department = OrgDepartment(
+                code=code,
+                name=seed["name"],
+                organization_type=seed["organization_type"],
+                cost_center_code=seed["cost_center_code"],
+                description=seed["description"],
+                is_active=True,
+            )
             session.add(department)
             session.commit()
             session.refresh(department)
         else:
             changed = False
-            if department.name != name:
-                department.name = name
+            if department.name != seed["name"]:
+                department.name = seed["name"]
+                changed = True
+            if department.organization_type != seed["organization_type"]:
+                department.organization_type = seed["organization_type"]
+                changed = True
+            if department.cost_center_code != seed["cost_center_code"]:
+                department.cost_center_code = seed["cost_center_code"]
+                changed = True
+            if department.description != seed["description"]:
+                department.description = seed["description"]
                 changed = True
             if not department.is_active:
                 department.is_active = True
