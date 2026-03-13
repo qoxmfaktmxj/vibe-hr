@@ -25,6 +25,7 @@ const STATUS_META: Record<
   approved: { label: "승인", className: "bg-emerald-100 text-emerald-700" },
   rejected: { label: "반려", className: "bg-rose-100 text-rose-700" },
   payroll_reflected: { label: "급여반영", className: "bg-violet-100 text-violet-700" },
+  withdrawn: { label: "회수", className: "bg-slate-200 text-slate-600" },
 };
 
 function SummaryCard({

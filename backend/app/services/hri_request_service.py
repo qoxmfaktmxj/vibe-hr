@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 from sqlmodel import Session, select
 
 from app.core.time_utils import business_today, now_utc
@@ -26,6 +26,9 @@ from app.models import (
     HriReqTimCorrection,
     HriReqCertEmployment,
     HriReqLeave,
+    OrgDepartment,
+    WelBenefitRequest,
+    WelBenefitType,
 )
 from app.schemas.hri_request import (
     HriRequestActionResponse,
@@ -242,6 +245,114 @@ def _serialize_content(value: dict[str, Any]) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def _coerce_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _map_hri_status_to_welfare_status(status_code: str) -> str:
+    return {
+        "DRAFT": "draft",
+        "APPROVAL_IN_PROGRESS": "submitted",
+        "APPROVAL_REJECTED": "rejected",
+        "RECEIVE_IN_PROGRESS": "approved",
+        "RECEIVE_REJECTED": "rejected",
+        "COMPLETED": "payroll_reflected",
+        "WITHDRAWN": "withdrawn",
+    }.get(status_code, "draft")
+
+
+def _sync_welfare_request_projection(session: Session, request: HriRequestMaster) -> None:
+    content = _parse_content(request.content_json)
+    requester = session.exec(
+        select(HrEmployee).where(HrEmployee.user_id == request.requester_id)
+    ).first()
+    requester_user = session.get(AuthUser, request.requester_id)
+    department = None
+    if requester is not None:
+        department = session.get(OrgDepartment, requester.department_id)
+    elif request.requester_org_id is not None:
+        department = session.get(OrgDepartment, request.requester_org_id)
+
+    benefit_type_code = str(content.get("benefit_type_code") or "")
+    benefit_type_name = str(content.get("benefit_type_name") or "")
+    if benefit_type_name == "" and benefit_type_code:
+        benefit_type = session.exec(
+            select(WelBenefitType).where(WelBenefitType.code == benefit_type_code)
+        ).first()
+        benefit_type_name = benefit_type.name if benefit_type is not None else benefit_type_code
+
+    domain_status = _map_hri_status_to_welfare_status(request.status_code)
+    requested_amount = _coerce_int(content.get("requested_amount"), 0)
+    approved_amount = requested_amount if domain_status in {"approved", "payroll_reflected"} else None
+    approved_at = (
+        request.completed_at or request.updated_at
+        if domain_status in {"approved", "payroll_reflected"}
+        else None
+    )
+    payroll_run_label = None
+    if domain_status == "payroll_reflected":
+        payroll_basis = request.completed_at or request.updated_at or now_utc()
+        payroll_run_label = f"{payroll_basis:%Y-%m} 정기급여"
+
+    row = session.exec(
+        select(WelBenefitRequest).where(WelBenefitRequest.request_no == request.request_no)
+    ).first()
+
+    base_values = {
+        "request_no": request.request_no,
+        "benefit_type_code": benefit_type_code,
+        "benefit_type_name": benefit_type_name or benefit_type_code or "WEL",
+        "employee_no": requester.employee_no if requester is not None else f"USER-{request.requester_id}",
+        "employee_name": (
+            requester_user.display_name
+            if requester_user is not None
+            else (requester.employee_no if requester is not None else f"USER-{request.requester_id}")
+        ),
+        "department_name": department.name if department is not None else "-",
+        "status_code": domain_status,
+        "requested_amount": requested_amount,
+        "approved_amount": approved_amount,
+        "payroll_run_label": payroll_run_label,
+        "description": str(content.get("description") or content.get("reason") or ""),
+        "requested_at": request.submitted_at or request.created_at,
+        "approved_at": approved_at,
+        "updated_at": request.updated_at,
+    }
+
+    if row is None:
+        row = WelBenefitRequest(
+            **base_values,
+            created_at=request.created_at,
+        )
+    else:
+        row.benefit_type_code = base_values["benefit_type_code"]
+        row.benefit_type_name = base_values["benefit_type_name"]
+        row.employee_no = base_values["employee_no"]
+        row.employee_name = base_values["employee_name"]
+        row.department_name = base_values["department_name"]
+        row.status_code = base_values["status_code"]
+        row.requested_amount = base_values["requested_amount"]
+        row.approved_amount = base_values["approved_amount"]
+        row.payroll_run_label = base_values["payroll_run_label"]
+        row.description = base_values["description"]
+        row.requested_at = base_values["requested_at"]
+        row.approved_at = base_values["approved_at"]
+        row.updated_at = base_values["updated_at"]
+
+    session.add(row)
+
+
+def _sync_domain_projection(session: Session, request: HriRequestMaster) -> None:
+    form_type = session.get(HriFormType, request.form_type_id)
+    if form_type is None:
+        return
+    if form_type.form_code == "WEL_BENEFIT_REQUEST":
+        _sync_welfare_request_projection(session, request)
+
+
 def _resolve_requester_org_id(session: Session, user_id: int) -> int | None:
     department_id = session.exec(
         select(HrEmployee.department_id).where(HrEmployee.user_id == user_id)
@@ -255,8 +366,12 @@ def _resolve_admin_fallback_user_id(session: Session) -> int:
     admin_user_id = session.exec(
         select(AuthUserRole.user_id)
         .join(AuthRole, AuthRole.id == AuthUserRole.role_id)
-        .where(AuthRole.code == "admin")
-        .order_by(AuthUserRole.user_id)
+        .join(AuthUser, AuthUser.id == AuthUserRole.user_id)
+        .where(AuthRole.code == "admin", AuthUser.is_active == True)  # noqa: E712
+        .order_by(
+            case((AuthUser.login_id == "admin", 0), else_=1),
+            AuthUserRole.user_id,
+        )
     ).first()
     if admin_user_id is None:
         raise HTTPException(
@@ -279,7 +394,23 @@ def _parse_keywords(keywords_json: str | None) -> list[str]:
     return []
 
 
-def _resolve_role_actor_user_id(session: Session, requester_user_id: int, role_code: str) -> int:
+def _collect_department_chain_ids(session: Session, department_id: int | None) -> list[int]:
+    chain_ids: list[int] = []
+    visited: set[int] = set()
+    current_id = department_id
+
+    while current_id is not None and current_id not in visited:
+        visited.add(current_id)
+        chain_ids.append(current_id)
+        department = session.get(OrgDepartment, current_id)
+        if department is None or department.parent_id is None:
+            break
+        current_id = int(department.parent_id)
+
+    return chain_ids
+
+
+def _resolve_role_actor_user_id_legacy(session: Session, requester_user_id: int, role_code: str) -> int:
     """HriApprovalActorRule 설정 테이블을 기반으로 결재자 user_id를 결정한다.
 
     resolve_method:
@@ -357,6 +488,75 @@ def _resolve_role_actor_user_id(session: Session, requester_user_id: int, role_c
 
     return _apply_fallback(
         session, role_code, rule.fallback_rule,
+        f"역할 '{role_code}'에 해당하는 결재자를 찾지 못했습니다 (키워드: {keywords}).",
+    )
+
+
+def _resolve_role_actor_user_id(session: Session, requester_user_id: int, role_code: str) -> int:
+    rule = session.exec(
+        select(HriApprovalActorRule)
+        .where(HriApprovalActorRule.role_code == role_code, HriApprovalActorRule.is_active == True)  # noqa: E712
+    ).first()
+
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"결재 역할 '{role_code}'에 대한 설정이 없습니다. HriApprovalActorRule 테이블을 확인하세요.",
+        )
+
+    keywords = _parse_keywords(rule.position_keywords_json)
+    requester_emp = session.exec(
+        select(HrEmployee).where(HrEmployee.user_id == requester_user_id)
+    ).first()
+    if requester_emp is None:
+        return _apply_fallback(session, role_code, rule.fallback_rule, "신청자 사원 정보를 찾을 수 없습니다.")
+
+    if rule.resolve_method == "FIXED_USER":
+        return _resolve_admin_fallback_user_id(session)
+
+    if not keywords:
+        return _apply_fallback(
+            session,
+            role_code,
+            rule.fallback_rule,
+            f"역할 '{role_code}'의 position_keywords 설정이 비어 있습니다.",
+        )
+
+    keyword_conditions = [HrEmployee.position_title.ilike(f"%{kw}%") for kw in keywords]
+    found: HrEmployee | None = None
+
+    if rule.resolve_method == "ORG_CHAIN":
+        department_ids = _collect_department_chain_ids(session, requester_emp.department_id)
+        for department_id in department_ids:
+            found = session.exec(
+                select(HrEmployee)
+                .where(
+                    HrEmployee.department_id == department_id,
+                    HrEmployee.user_id != requester_user_id,
+                    HrEmployee.employment_status == "active",
+                    or_(*keyword_conditions),
+                )
+                .order_by(HrEmployee.id)
+            ).first()
+            if found is not None:
+                return found.user_id
+    elif rule.resolve_method == "JOB_POSITION":
+        found = session.exec(
+            select(HrEmployee)
+            .where(
+                HrEmployee.user_id != requester_user_id,
+                HrEmployee.employment_status == "active",
+                or_(*keyword_conditions),
+            )
+            .order_by(HrEmployee.id)
+        ).first()
+        if found is not None:
+            return found.user_id
+
+    return _apply_fallback(
+        session,
+        role_code,
+        rule.fallback_rule,
         f"역할 '{role_code}'에 해당하는 결재자를 찾지 못했습니다 (키워드: {keywords}).",
     )
 
@@ -580,6 +780,7 @@ def upsert_request_draft(
             to_status=row.status_code,
             payload={"title": row.title},
         )
+        _sync_domain_projection(session, row)
     else:
         row = session.get(HriRequestMaster, payload.request_id)
         if row is None or row.requester_id != requester_user_id:
@@ -608,6 +809,7 @@ def upsert_request_draft(
             from_status=from_status,
             to_status=row.status_code,
         )
+        _sync_domain_projection(session, row)
 
     session.commit()
     session.refresh(row)
@@ -661,6 +863,7 @@ def submit_request(session: Session, requester_user_id: int, request_id: int) ->
         to_status=row.status_code,
         payload={"template_id": template.id},
     )
+    _sync_domain_projection(session, row)
 
     session.commit()
     return HriRequestSubmitResponse(
@@ -715,6 +918,7 @@ def withdraw_request(session: Session, requester_user_id: int, request_id: int) 
         from_status=from_status,
         to_status=row.status_code,
     )
+    _sync_domain_projection(session, row)
 
     session.commit()
     return HriRequestActionResponse(request_id=row.id, status_code=row.status_code)
@@ -823,6 +1027,7 @@ def approve_request(
         to_status=request.status_code,
         payload={"comment": comment},
     )
+    _sync_domain_projection(session, request)
 
     session.commit()
     return HriRequestActionResponse(request_id=request.id, status_code=request.status_code)
@@ -872,6 +1077,7 @@ def reject_request(
         to_status=request.status_code,
         payload={"comment": comment},
     )
+    _sync_domain_projection(session, request)
 
     session.commit()
     return HriRequestActionResponse(request_id=request.id, status_code=request.status_code)
@@ -936,6 +1142,7 @@ def receive_complete_request(
         to_status=request.status_code,
         payload={"comment": comment},
     )
+    _sync_domain_projection(session, request)
 
     session.commit()
     return HriRequestActionResponse(request_id=request.id, status_code=request.status_code)
@@ -985,6 +1192,7 @@ def receive_reject_request(
         to_status=request.status_code,
         payload={"comment": comment},
     )
+    _sync_domain_projection(session, request)
 
     session.commit()
     return HriRequestActionResponse(request_id=request.id, status_code=request.status_code)

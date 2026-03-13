@@ -2225,6 +2225,16 @@ HRI_APPROVAL_ACTOR_RULE_SEEDS = [
     ("HR_ADMIN", "FIXED_USER", "HR_ADMIN", None),
 ]
 
+HRI_APPROVAL_ACTOR_RULE_SEEDS = [
+    (
+        role_code,
+        resolve_method,
+        "HR_ADMIN" if role_code in {"TEAM_LEADER", "DEPT_HEAD"} else fallback_rule,
+        position_keywords_json,
+    )
+    for role_code, resolve_method, fallback_rule, position_keywords_json in HRI_APPROVAL_ACTOR_RULE_SEEDS
+]
+
 HRI_APPROVAL_TEMPLATE_SEEDS = [
     {
         "template_code": "HRI_TMPL_CERT",
