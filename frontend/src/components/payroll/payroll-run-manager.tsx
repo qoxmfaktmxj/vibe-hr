@@ -16,7 +16,13 @@ import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summar
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
-import type { PayPayrollRunActionResponse, PayPayrollRunEmployeeItem, PayPayrollRunItem } from "@/types/pay";
+import type {
+  PayPayrollRunActionResponse,
+  PayPayrollRunEmployeeDetailItem,
+  PayPayrollRunEmployeeDetailResponse,
+  PayPayrollRunEmployeeItem,
+  PayPayrollRunItem,
+} from "@/types/pay";
 
 type EmployeeResponse = {
   items: PayPayrollRunEmployeeItem[];
@@ -56,11 +62,14 @@ export function PayrollRunManager() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [rows, setRows] = useState<RowData[]>([]);
   const [employeeRows, setEmployeeRows] = useState<PayPayrollRunEmployeeItem[]>([]);
+  const [detailRows, setDetailRows] = useState<PayPayrollRunEmployeeDetailItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [searchYearMonth, setSearchYearMonth] = useState(currentMonth);
   const [searchStatus, setSearchStatus] = useState("");
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [selectedRunEmployeeId, setSelectedRunEmployeeId] = useState<number | null>(null);
   const [createYearMonth, setCreateYearMonth] = useState(currentMonth);
   const [createPayrollCodeId, setCreatePayrollCodeId] = useState("1");
   const [createRunName, setCreateRunName] = useState("");
@@ -69,6 +78,14 @@ export function PayrollRunManager() {
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
   const pageSize = 100;
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
+  const singleRowSelection = useMemo(
+    () => ({
+      mode: "singleRow" as const,
+      checkboxes: false,
+      enableClickSelection: true,
+    }),
+    [],
+  );
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
 
   const loadRuns = useCallback(async () => {
@@ -101,10 +118,35 @@ export function PayrollRunManager() {
         throw new Error("Run 대상자 결과를 불러오지 못했습니다.");
       }
       const json = (await response.json()) as EmployeeResponse;
-      setEmployeeRows(json.items ?? []);
+      const nextItems = json.items ?? [];
+      setEmployeeRows(nextItems);
+      setSelectedRunEmployeeId((prev) => {
+        if (prev && nextItems.some((item) => item.id === prev)) {
+          return prev;
+        }
+        return nextItems[0]?.id ?? null;
+      });
     } catch (error) {
       setEmployeeRows([]);
+      setSelectedRunEmployeeId(null);
       toast.error(error instanceof Error ? error.message : "대상자 조회에 실패했습니다.");
+    }
+  }, []);
+
+  const loadRunEmployeeDetail = useCallback(async (runId: number, runEmployeeId: number) => {
+    setDetailLoading(true);
+    try {
+      const response = await fetch(`/api/pay/runs/${runId}/employees/${runEmployeeId}`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("대상자 항목 상세를 불러오지 못했습니다.");
+      }
+      const json = (await response.json()) as PayPayrollRunEmployeeDetailResponse;
+      setDetailRows(json.items ?? []);
+    } catch (error) {
+      setDetailRows([]);
+      toast.error(error instanceof Error ? error.message : "항목 상세 조회에 실패했습니다.");
+    } finally {
+      setDetailLoading(false);
     }
   }, []);
 
@@ -118,7 +160,17 @@ export function PayrollRunManager() {
       return;
     }
     setEmployeeRows([]);
+    setSelectedRunEmployeeId(null);
+    setDetailRows([]);
   }, [selectedRunId, loadRunEmployees]);
+
+  useEffect(() => {
+    if (selectedRunId && selectedRunEmployeeId) {
+      void loadRunEmployeeDetail(selectedRunId, selectedRunEmployeeId);
+      return;
+    }
+    setDetailRows([]);
+  }, [selectedRunId, selectedRunEmployeeId, loadRunEmployeeDetail]);
 
   const totalCount = rows.length;
   const pagedRows = useMemo(() => {
@@ -209,10 +261,48 @@ export function PayrollRunManager() {
     [],
   );
 
+  const detailColDefs = useMemo<ColDef<PayPayrollRunEmployeeDetailItem>[]>(
+    () => [
+      { headerName: "항목코드", field: "item_code", width: 110 },
+      { headerName: "항목명", field: "item_name", minWidth: 140, flex: 1 },
+      {
+        headerName: "구분",
+        field: "direction",
+        width: 110,
+        valueFormatter: (params) => (params.value === "earning" ? "지급" : "공제"),
+      },
+      {
+        headerName: "금액",
+        field: "amount",
+        width: 130,
+        valueFormatter: (params) => Number(params.value ?? 0).toLocaleString(),
+      },
+      { headerName: "과세구분", field: "tax_type", width: 120 },
+      { headerName: "계산방식", field: "calculation_type", width: 120 },
+      { headerName: "발생원천", field: "source_type", width: 110 },
+    ],
+    [],
+  );
+
   const selectedRow = useMemo(
     () => rows.find((row) => row.id === selectedRunId) ?? null,
     [rows, selectedRunId],
   );
+  const selectedEmployeeRow = useMemo(
+    () => employeeRows.find((row) => row.id === selectedRunEmployeeId) ?? null,
+    [employeeRows, selectedRunEmployeeId],
+  );
+  const detailSummary = useMemo(() => {
+    const earnings = detailRows
+      .filter((row) => row.direction === "earning")
+      .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+    const deductions = detailRows
+      .filter((row) => row.direction === "deduction")
+      .reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+    const welfareCount = detailRows.filter((row) => row.source_type === "welfare").length;
+    const insuranceCount = detailRows.filter((row) => row.tax_type === "insurance").length;
+    return { earnings, deductions, welfareCount, insuranceCount };
+  }, [detailRows]);
 
   async function createRun() {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(createYearMonth.trim())) {
@@ -382,8 +472,7 @@ export function PayrollRunManager() {
             rowData={pagedRows}
             columnDefs={columnDefs}
             defaultColDef={{ sortable: true, resizable: true, filter: false }}
-            rowSelection="single"
-            suppressRowClickSelection={false}
+            rowSelection={singleRowSelection}
             animateRows={false}
             rowClassRules={rowClassRules}
             getRowClass={(params) => getGridRowClass(params.data?._status)}
@@ -412,10 +501,71 @@ export function PayrollRunManager() {
               rowData={employeeRows}
               columnDefs={employeeColDefs}
               defaultColDef={{ sortable: true, resizable: true, filter: false }}
+              rowSelection={singleRowSelection}
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
+              onRowClicked={(event) => {
+                if (!event.data) return;
+                setSelectedRunEmployeeId(event.data.id);
+              }}
               localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
               overlayNoRowsTemplate='<span class="text-sm text-slate-400">대상자 계산 결과가 없습니다.</span>'
+              headerHeight={36}
+              rowHeight={34}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium text-slate-700">
+              {selectedEmployeeRow
+                ? `${selectedEmployeeRow.employee_no ?? "-"} ${selectedEmployeeRow.employee_name ?? ""} 항목 상세`
+                : "대상자를 선택하면 지급/공제 항목 상세가 표시됩니다."}
+            </div>
+            {selectedEmployeeRow ? (
+              <div className="text-xs text-slate-500">
+                과세소득 {selectedEmployeeRow.taxable_income.toLocaleString()} / 비과세 {selectedEmployeeRow.non_taxable_income.toLocaleString()}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-xs text-slate-500">지급 합계</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.earnings.toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-xs text-slate-500">공제 합계</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.deductions.toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-xs text-slate-500">복리후생 반영건</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.welfareCount.toLocaleString()}</div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-xs text-slate-500">사회보험 항목수</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.insuranceCount.toLocaleString()}</div>
+            </div>
+          </div>
+
+          {selectedEmployeeRow?.warning_message ? (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              경고: {selectedEmployeeRow.warning_message}
+            </div>
+          ) : null}
+
+          <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-gray-200">
+            <AgGridReact<PayPayrollRunEmployeeDetailItem>
+              theme="legacy"
+              rowData={detailRows}
+              columnDefs={detailColDefs}
+              defaultColDef={{ sortable: true, resizable: true, filter: false }}
+              animateRows={false}
+              loading={detailLoading}
+              getRowId={(params) => String(params.data.id)}
+              localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
+              overlayNoRowsTemplate='<span class="text-sm text-slate-400">항목 상세 데이터가 없습니다.</span>'
               headerHeight={36}
               rowHeight={34}
             />
