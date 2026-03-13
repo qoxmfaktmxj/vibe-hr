@@ -2,11 +2,19 @@ from datetime import date, datetime, timezone
 
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.models import HrEmployee, OrgDepartment, TimDepartmentScheduleAssignment, TimSchedulePattern
+from app.models import (
+    AuthUser,
+    HrEmployee,
+    OrgDepartment,
+    TimDepartmentScheduleAssignment,
+    TimEmployeeScheduleException,
+    TimSchedulePattern,
+)
 from app.schemas.tim_schedule import TimDepartmentScheduleAssignmentBatchRequest, TimDepartmentScheduleAssignmentUpsertRequest
 from app.services.tim_schedule_service import (
     batch_save_department_schedule_assignments,
     list_department_schedule_assignments,
+    list_employee_schedule_exceptions,
 )
 
 
@@ -121,3 +129,76 @@ def test_batch_save_department_schedule_assignments_supports_insert_and_delete()
 
         assert deleted.deleted_count == 1
         assert deleted.total_count == 0
+
+
+def test_list_employee_schedule_exceptions_includes_employee_and_pattern_metadata() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        user = AuthUser(
+            login_id="seed-user",
+            email="seed-user@vibe-hr.local",
+            password_hash="hash",
+            display_name="김근태",
+            is_active=True,
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        department = OrgDepartment(
+            code="HQ-HR",
+            name="인사본부",
+            organization_type="HEADQUARTERS",
+            cost_center_code="CC-HR-001",
+            description="인사 운영",
+            is_active=True,
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        pattern = TimSchedulePattern(code="PTN_SHIFT_1300", name="후반조", is_active=True)
+        session.add(user)
+        session.add(department)
+        session.add(pattern)
+        session.commit()
+        session.refresh(user)
+        session.refresh(department)
+        session.refresh(pattern)
+
+        employee = HrEmployee(
+            user_id=int(user.id),
+            employee_no="EMP-900001",
+            department_id=int(department.id),
+            position_title="사원",
+            hire_date=date(2026, 3, 13),
+            employment_status="active",
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(employee)
+        session.commit()
+        session.refresh(employee)
+
+        session.add(
+            TimEmployeeScheduleException(
+                employee_id=int(employee.id),
+                pattern_id=int(pattern.id),
+                effective_from=date(2026, 3, 1),
+                effective_to=date(2026, 3, 10),
+                reason="SEED-TIM-EXCEPTION-0001",
+                priority=1200,
+                is_active=True,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        items = list_employee_schedule_exceptions(session)
+
+        assert len(items) == 1
+        assert items[0].employee_no == "EMP-900001"
+        assert items[0].employee_name == "김근태"
+        assert items[0].department_code == "HQ-HR"
+        assert items[0].department_name == "인사본부"
+        assert items[0].pattern_code == "PTN_SHIFT_1300"
+        assert items[0].pattern_name == "후반조"

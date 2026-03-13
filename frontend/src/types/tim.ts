@@ -374,7 +374,14 @@ export type TimDepartmentScheduleAssignmentBatchResponse = {
 export type TimEmployeeScheduleExceptionItem = {
   id: number;
   employee_id: number;
+  employee_no: string | null;
+  employee_name: string | null;
+  department_id: number | null;
+  department_code: string | null;
+  department_name: string | null;
   pattern_id: number;
+  pattern_code: string | null;
+  pattern_name: string | null;
   effective_from: string;
   effective_to: string | null;
   reason: string | null;

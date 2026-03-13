@@ -27,8 +27,11 @@ from app.models import (
     HrCareer,
     HrLicense,
     HrMilitary,
+    HrRecruitFinalist,
     HrRewardPunish,
     HrRetireChecklistItem,
+    HrAppointmentOrder,
+    HrAppointmentOrderItem,
     PapFinalResult,
     PapAppraisalMaster,
     HrAnnualLeave,
@@ -59,6 +62,7 @@ from app.models import (
     TimSchedulePattern,
     TimSchedulePatternDay,
     TimDepartmentScheduleAssignment,
+    TimEmployeeScheduleException,
     MngCompany,
     MngManagerCompany,
     MngDevRequest,
@@ -1518,6 +1522,129 @@ TRA_APPLICATION_TARGET = max(DEV_EMPLOYEE_TOTAL // 2, 3000)
 TRA_REQUIRED_TARGET = max(DEV_EMPLOYEE_TOTAL // 3, 2000)
 TRA_HISTORY_TARGET = max(DEV_EMPLOYEE_TOTAL // 4, 1500)
 TRA_UPLOAD_TARGET = max(DEV_EMPLOYEE_TOTAL // 4, 1500)
+
+HR_RECRUIT_PIPELINE_SEEDS = [
+    {
+        "candidate_no": "RC-SEED-0001",
+        "full_name": "김채원",
+        "resident_no_masked": "990215-2******",
+        "birth_date": date(1999, 2, 15),
+        "phone_mobile": "010-9100-0001",
+        "email": "seed.recruit.0001@vibe-hr.local",
+        "hire_type": "new",
+        "career_years": 0,
+        "login_id": None,
+        "employee_no": None,
+        "expected_join_date": date(2026, 3, 17),
+        "status_code": "draft",
+        "note": "통합 채용 파이프라인 시드 - 초안",
+        "gender": "여성",
+        "job_family": "인사",
+        "education_name": "한성대학교 경영학과",
+        "target_department_code": "HQ-HR",
+        "target_position_title": "사원",
+    },
+    {
+        "candidate_no": "RC-SEED-0002",
+        "full_name": "박도윤",
+        "resident_no_masked": "950918-1******",
+        "birth_date": date(1995, 9, 18),
+        "phone_mobile": "010-9100-0002",
+        "email": "seed.recruit.0002@vibe-hr.local",
+        "hire_type": "experienced",
+        "career_years": 6,
+        "login_id": "seedhire0002",
+        "employee_no": "EMP-900002",
+        "expected_join_date": date(2026, 3, 18),
+        "status_code": "ready",
+        "note": "통합 채용 파이프라인 시드 - 사번발급 완료",
+        "gender": "남성",
+        "job_family": "개발",
+        "education_name": "한국공학대학교 컴퓨터공학과",
+        "target_department_code": "HQ-ENG",
+        "target_position_title": "과장",
+    },
+    {
+        "candidate_no": "RC-SEED-0003",
+        "full_name": "이하린",
+        "resident_no_masked": "970604-2******",
+        "birth_date": date(1997, 6, 4),
+        "phone_mobile": "010-9100-0003",
+        "email": "seed.recruit.0003@vibe-hr.local",
+        "hire_type": "new",
+        "career_years": 1,
+        "login_id": "seedhire0003",
+        "employee_no": "EMP-900003",
+        "expected_join_date": date(2026, 3, 19),
+        "status_code": "ready",
+        "note": "통합 채용 파이프라인 시드 - 입사대기",
+        "gender": "여성",
+        "job_family": "영업",
+        "education_name": "동해대학교 국제통상학과",
+        "target_department_code": "HQ-SALES",
+        "target_position_title": "사원",
+    },
+    {
+        "candidate_no": "RC-SEED-0004",
+        "full_name": "최서준",
+        "resident_no_masked": "930111-1******",
+        "birth_date": date(1993, 1, 11),
+        "phone_mobile": "010-9100-0004",
+        "email": "seed.recruit.0004@vibe-hr.local",
+        "hire_type": "experienced",
+        "career_years": 8,
+        "login_id": "seedhire0004",
+        "employee_no": "EMP-900004",
+        "expected_join_date": date(2026, 3, 10),
+        "status_code": "appointed",
+        "note": "채용 확정 후 경력채용 발령 완료",
+        "gender": "남성",
+        "job_family": "재무",
+        "education_name": "남서울대학교 회계학과",
+        "target_department_code": "HQ-FIN",
+        "target_position_title": "차장",
+    },
+    {
+        "candidate_no": "RC-SEED-0005",
+        "full_name": "정유진",
+        "resident_no_masked": "980722-2******",
+        "birth_date": date(1998, 7, 22),
+        "phone_mobile": "010-9100-0005",
+        "email": "seed.recruit.0005@vibe-hr.local",
+        "hire_type": "new",
+        "career_years": 1,
+        "login_id": "seedhire0005",
+        "employee_no": "EMP-900005",
+        "expected_join_date": date(2026, 3, 11),
+        "status_code": "appointed",
+        "note": "신입 입사발령 완료",
+        "gender": "여성",
+        "job_family": "운영",
+        "education_name": "미래대학교 산업경영학과",
+        "target_department_code": "HQ-OPS",
+        "target_position_title": "사원",
+    },
+    {
+        "candidate_no": "RC-SEED-0006",
+        "full_name": "강민재",
+        "resident_no_masked": "940305-1******",
+        "birth_date": date(1994, 3, 5),
+        "phone_mobile": "010-9100-0006",
+        "email": "seed.recruit.0006@vibe-hr.local",
+        "hire_type": "experienced",
+        "career_years": 5,
+        "login_id": "seedhire0006",
+        "employee_no": "EMP-900006",
+        "expected_join_date": date(2026, 3, 12),
+        "status_code": "appointed",
+        "note": "경력직 채용 후 발령/인사기본정보 반영 완료",
+        "gender": "남성",
+        "job_family": "영업",
+        "education_name": "서부대학교 경영정보학과",
+        "target_department_code": "HQ-SALES",
+        "target_position_title": "대리",
+    },
+]
 
 
 def _count_rows(session: Session, model: type) -> int:
@@ -3096,6 +3223,618 @@ def ensure_hri_form_type_template_maps(session: Session) -> None:
 
     session.commit()
 
+
+def ensure_hr_recruitment_cycle_seed(session: Session) -> None:
+    from app.services.hr_appointment_record_service import confirm_appointment_order
+
+    department_map = {
+        row.code: row
+        for row in session.exec(select(OrgDepartment).order_by(OrgDepartment.id)).all()
+    }
+    staging_department = department_map.get("HQ-HR")
+    if staging_department is None:
+        return
+
+    appointment_codes = {
+        row.code: row.id
+        for row in session.exec(
+            select(AppCode)
+            .join(AppCodeGroup, AppCode.group_id == AppCodeGroup.id)
+            .where(AppCodeGroup.code == "HR_APPOINTMENT_CODE")
+        ).all()
+    }
+    admin_user = session.exec(select(AuthUser).where(AuthUser.login_id == "admin")).first()
+    admin_user_id = admin_user.id if admin_user else None
+    existing_finalists = {
+        row.candidate_no: row
+        for row in session.exec(select(HrRecruitFinalist)).all()
+    }
+
+    for seed in HR_RECRUIT_PIPELINE_SEEDS:
+        finalist = existing_finalists.get(seed["candidate_no"])
+        if finalist is None:
+            finalist = HrRecruitFinalist(
+                candidate_no=seed["candidate_no"],
+                source_type="manual",
+                external_key=seed["candidate_no"],
+                full_name=seed["full_name"],
+                resident_no_masked=seed["resident_no_masked"],
+                birth_date=seed["birth_date"],
+                phone_mobile=seed["phone_mobile"],
+                email=seed["email"],
+                hire_type=seed["hire_type"],
+                career_years=seed["career_years"],
+                login_id=seed["login_id"],
+                employee_no=seed["employee_no"],
+                expected_join_date=seed["expected_join_date"],
+                status_code=seed["status_code"],
+                note=seed["note"],
+                is_active=True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(finalist)
+            session.commit()
+            session.refresh(finalist)
+            existing_finalists[seed["candidate_no"]] = finalist
+        else:
+            changed = False
+            for field_name in (
+                "full_name",
+                "resident_no_masked",
+                "birth_date",
+                "phone_mobile",
+                "email",
+                "hire_type",
+                "career_years",
+                "login_id",
+                "employee_no",
+                "expected_join_date",
+                "status_code",
+                "note",
+            ):
+                next_value = seed[field_name]
+                if getattr(finalist, field_name) != next_value:
+                    setattr(finalist, field_name, next_value)
+                    changed = True
+            if finalist.source_type != "manual":
+                finalist.source_type = "manual"
+                changed = True
+            if finalist.external_key != seed["candidate_no"]:
+                finalist.external_key = seed["candidate_no"]
+                changed = True
+            if not finalist.is_active:
+                finalist.is_active = True
+                changed = True
+            if changed:
+                finalist.updated_at = datetime.utcnow()
+                session.add(finalist)
+                session.commit()
+                session.refresh(finalist)
+
+        if seed["status_code"] != "appointed":
+            continue
+
+        target_department = department_map.get(seed["target_department_code"])
+        if target_department is None:
+            continue
+
+        login_id = str(seed["login_id"] or seed["candidate_no"].lower().replace("-", ""))
+        employee_no = str(seed["employee_no"] or seed["candidate_no"].replace("RC-", "EMP-"))
+        user = ensure_user(
+            session,
+            login_id=login_id,
+            email=seed["email"],
+            password="admin",
+            display_name=seed["full_name"],
+            reset_password=True,
+        )
+        ensure_user_roles(session, user, ["employee"])
+
+        employee = session.exec(select(HrEmployee).where(HrEmployee.user_id == user.id)).first()
+        if employee is None:
+            employee = HrEmployee(
+                user_id=user.id,
+                employee_no=employee_no,
+                department_id=staging_department.id,
+                position_title="채용대기",
+                hire_date=seed["expected_join_date"],
+                employment_status="leave",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(employee)
+            session.commit()
+            session.refresh(employee)
+        else:
+            changed = False
+            if employee.employee_no != employee_no:
+                employee.employee_no = employee_no
+                changed = True
+            if employee.hire_date != seed["expected_join_date"]:
+                employee.hire_date = seed["expected_join_date"]
+                changed = True
+            if changed:
+                employee.updated_at = datetime.utcnow()
+                session.add(employee)
+                session.commit()
+                session.refresh(employee)
+
+        finalist.login_id = login_id
+        finalist.employee_no = employee_no
+        finalist.status_code = "appointed"
+        finalist.updated_at = datetime.utcnow()
+        session.add(finalist)
+        session.commit()
+
+        profile = session.exec(
+            select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee.id)
+        ).first()
+        if profile is None:
+            profile = HrEmployeeBasicProfile(
+                employee_id=employee.id,
+                gender=seed["gender"],
+                resident_no_masked=seed["resident_no_masked"],
+                birth_date=seed["birth_date"],
+                probation_end_date=seed["expected_join_date"] + timedelta(days=90),
+                job_family=seed["job_family"],
+                job_role=seed["target_position_title"],
+                grade=seed["target_position_title"],
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        else:
+            profile.gender = seed["gender"]
+            profile.resident_no_masked = seed["resident_no_masked"]
+            profile.birth_date = seed["birth_date"]
+            profile.probation_end_date = seed["expected_join_date"] + timedelta(days=90)
+            profile.job_family = seed["job_family"]
+            profile.job_role = seed["target_position_title"]
+            profile.grade = seed["target_position_title"]
+            profile.updated_at = datetime.utcnow()
+        session.add(profile)
+
+        contact = session.exec(
+            select(HrContactPoint)
+            .where(HrContactPoint.employee_id == employee.id, HrContactPoint.contact_type == "채용연락처")
+            .order_by(HrContactPoint.id.desc())
+        ).first()
+        if contact is None:
+            contact = HrContactPoint(
+                employee_id=employee.id,
+                seq=1,
+                contact_type="채용연락처",
+                record_date=seed["expected_join_date"],
+                phone_mobile=seed["phone_mobile"],
+                email=seed["email"],
+                is_primary=True,
+                note="채용 시드 연락처",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+        else:
+            contact.record_date = seed["expected_join_date"]
+            contact.phone_mobile = seed["phone_mobile"]
+            contact.email = seed["email"]
+            contact.is_primary = True
+            contact.note = "채용 시드 연락처"
+            contact.updated_at = datetime.utcnow()
+        session.add(contact)
+
+        education = session.exec(
+            select(HrEmployeeInfoRecord)
+            .where(
+                HrEmployeeInfoRecord.employee_id == employee.id,
+                HrEmployeeInfoRecord.category == "education",
+                HrEmployeeInfoRecord.title == seed["education_name"],
+            )
+            .order_by(HrEmployeeInfoRecord.id.desc())
+        ).first()
+        if education is None:
+            education = HrEmployeeInfoRecord(
+                employee_id=employee.id,
+                category="education",
+                title=seed["education_name"],
+                type="학력",
+                organization=seed["target_department_code"],
+                value=seed["target_position_title"],
+                note="채용 시드 학력",
+                record_date=seed["expected_join_date"],
+                created_at=datetime.utcnow(),
+            )
+        else:
+            education.type = "학력"
+            education.organization = seed["target_department_code"]
+            education.value = seed["target_position_title"]
+            education.note = "채용 시드 학력"
+            education.record_date = seed["expected_join_date"]
+        session.add(education)
+
+        if int(seed["career_years"]) > 0:
+            career = session.exec(
+                select(HrCareer)
+                .where(HrCareer.employee_id == employee.id, HrCareer.company_name == "이전직장")
+                .order_by(HrCareer.id.desc())
+            ).first()
+            if career is None:
+                career = HrCareer(
+                    employee_id=employee.id,
+                    seq=1,
+                    career_scope="EXTERNAL",
+                    company_name="이전직장",
+                    department_name=seed["job_family"],
+                    position_title=seed["target_position_title"],
+                    start_date=seed["expected_join_date"] - timedelta(days=int(seed["career_years"]) * 365),
+                    end_date=seed["expected_join_date"] - timedelta(days=1),
+                    career_years=int(seed["career_years"]),
+                    description="채용 시드 경력",
+                    note="채용 시드 경력",
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            else:
+                career.department_name = seed["job_family"]
+                career.position_title = seed["target_position_title"]
+                career.start_date = seed["expected_join_date"] - timedelta(days=int(seed["career_years"]) * 365)
+                career.end_date = seed["expected_join_date"] - timedelta(days=1)
+                career.career_years = int(seed["career_years"])
+                career.description = "채용 시드 경력"
+                career.note = "채용 시드 경력"
+                career.updated_at = datetime.utcnow()
+            session.add(career)
+
+        session.commit()
+
+        appointment_no = f"APT-SEED-{seed['candidate_no'][-4:]}"
+        order = session.exec(
+            select(HrAppointmentOrder).where(HrAppointmentOrder.appointment_no == appointment_no)
+        ).first()
+        if order is None:
+            order = HrAppointmentOrder(
+                appointment_no=appointment_no,
+                appointment_code_id=appointment_codes.get("CAREER_HIRE" if seed["hire_type"] == "experienced" else "NEW_HIRE"),
+                title=f"{seed['full_name']} 입사발령",
+                description="채용 파이프라인 시드 발령",
+                effective_date=seed["expected_join_date"],
+                status="draft",
+                created_by=admin_user_id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(order)
+            session.commit()
+            session.refresh(order)
+
+        item = session.exec(
+            select(HrAppointmentOrderItem)
+            .where(HrAppointmentOrderItem.order_id == order.id, HrAppointmentOrderItem.employee_id == employee.id)
+        ).first()
+        if item is None:
+            item = HrAppointmentOrderItem(
+                order_id=order.id,
+                employee_id=employee.id,
+                appointment_code_id=appointment_codes.get("CAREER_HIRE" if seed["hire_type"] == "experienced" else "NEW_HIRE"),
+                appointment_kind="permanent",
+                action_type="JOIN",
+                start_date=seed["expected_join_date"],
+                end_date=None,
+                from_department_id=staging_department.id,
+                to_department_id=target_department.id,
+                from_position_title="채용대기",
+                to_position_title=seed["target_position_title"],
+                from_employment_status="leave",
+                to_employment_status="active",
+                apply_status="pending",
+                note="채용 시드 입사발령",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            session.add(item)
+            session.commit()
+            session.refresh(item)
+
+        if order.status == "draft" and admin_user_id is not None:
+            confirm_appointment_order(session, order.id, admin_user_id)
+
+
+def ensure_pay_welfare_allowance_definitions(session: Session) -> None:
+    extra_items = [
+        ("SCHOLARSHIP_GRANT", "학자금지원", "allowance", "taxable", "fixed", 210),
+        ("CONDOLENCE_GRANT", "경조금", "allowance", "taxable", "fixed", 220),
+        ("MEDICAL_GRANT", "의료비지원", "allowance", "taxable", "fixed", 230),
+        ("LOAN_REPAY", "사내대출상환", "deduction", "tax", "fixed", 310),
+        ("PENSION_DEDUCT", "개인연금공제", "deduction", "tax", "fixed", 320),
+        ("CLUB_DEDUCT", "동호회공제", "deduction", "tax", "fixed", 330),
+    ]
+
+    for code, name, item_type, tax_type, calc_type, sort_order in extra_items:
+        row = session.exec(select(PayAllowanceDeduction).where(PayAllowanceDeduction.code == code)).first()
+        if row is None:
+            session.add(
+                PayAllowanceDeduction(
+                    code=code,
+                    name=name,
+                    type=item_type,
+                    tax_type=tax_type,
+                    calculation_type=calc_type,
+                    is_active=True,
+                    sort_order=sort_order,
+                )
+            )
+            continue
+
+        changed = False
+        if row.name != name:
+            row.name = name
+            changed = True
+        if row.type != item_type:
+            row.type = item_type
+            changed = True
+        if row.tax_type != tax_type:
+            row.tax_type = tax_type
+            changed = True
+        if row.calculation_type != calc_type:
+            row.calculation_type = calc_type
+            changed = True
+        if row.sort_order != sort_order:
+            row.sort_order = sort_order
+            changed = True
+        if not row.is_active:
+            row.is_active = True
+            changed = True
+        if changed:
+            session.add(row)
+
+    session.commit()
+
+
+def ensure_schedule_operational_samples(session: Session) -> None:
+    from app.schemas.tim_schedule import TimScheduleGenerateRequest
+    from app.services.tim_schedule_service import generate_employee_daily_schedules
+
+    pattern_configs = [
+        {
+            "code": "PTN_DEPT_STD",
+            "name": "부서기본 근무(09-18)",
+            "priority": 100,
+            "selector": lambda index: True,
+            "days": {
+                0: (True, "09:00", "18:00", 60, 480, False),
+                1: (True, "09:00", "18:00", 60, 480, False),
+                2: (True, "09:00", "18:00", 60, 480, False),
+                3: (True, "09:00", "18:00", 60, 480, False),
+                4: (True, "09:00", "18:00", 60, 480, False),
+                5: (False, None, None, 0, 0, False),
+                6: (False, None, None, 0, 0, False),
+            },
+        },
+        {
+            "code": "PTN_FLEX_0830",
+            "name": "유연근무(08:30-17:30)",
+            "priority": 220,
+            "selector": lambda index: index % 3 == 0,
+            "days": {
+                0: (True, "08:30", "17:30", 60, 480, False),
+                1: (True, "08:30", "17:30", 60, 480, False),
+                2: (True, "08:30", "17:30", 60, 480, False),
+                3: (True, "08:30", "17:30", 60, 480, False),
+                4: (True, "08:30", "17:30", 60, 480, False),
+                5: (False, None, None, 0, 0, False),
+                6: (False, None, None, 0, 0, False),
+            },
+        },
+        {
+            "code": "PTN_SHIFT_1300",
+            "name": "후반조(13:00-22:00)",
+            "priority": 240,
+            "selector": lambda index: index % 5 == 0,
+            "days": {
+                0: (True, "13:00", "22:00", 60, 480, False),
+                1: (True, "13:00", "22:00", 60, 480, False),
+                2: (True, "13:00", "22:00", 60, 480, False),
+                3: (True, "13:00", "22:00", 60, 480, False),
+                4: (True, "13:00", "22:00", 60, 480, False),
+                5: (False, None, None, 0, 0, False),
+                6: (False, None, None, 0, 0, False),
+            },
+        },
+    ]
+
+    pattern_map: dict[str, TimSchedulePattern] = {}
+    for config in pattern_configs:
+        pattern = session.exec(select(TimSchedulePattern).where(TimSchedulePattern.code == config["code"])).first()
+        if pattern is None:
+            pattern = TimSchedulePattern(code=config["code"], name=config["name"], is_active=True)
+        else:
+            pattern.name = config["name"]
+            pattern.is_active = True
+        session.add(pattern)
+        session.commit()
+        session.refresh(pattern)
+        pattern_map[config["code"]] = pattern
+
+        for weekday, values in config["days"].items():
+            is_workday, start_time, end_time, break_minutes, expected_minutes, is_overnight = values
+            pattern_day = session.exec(
+                select(TimSchedulePatternDay).where(
+                    TimSchedulePatternDay.pattern_id == pattern.id,
+                    TimSchedulePatternDay.weekday == weekday,
+                )
+            ).first()
+            if pattern_day is None:
+                pattern_day = TimSchedulePatternDay(
+                    pattern_id=pattern.id,
+                    weekday=weekday,
+                    is_workday=is_workday,
+                    start_time=start_time,
+                    end_time=end_time,
+                    break_minutes=break_minutes,
+                    expected_minutes=expected_minutes,
+                    is_overnight=is_overnight,
+                )
+            else:
+                pattern_day.is_workday = is_workday
+                pattern_day.start_time = start_time
+                pattern_day.end_time = end_time
+                pattern_day.break_minutes = break_minutes
+                pattern_day.expected_minutes = expected_minutes
+                pattern_day.is_overnight = is_overnight
+            session.add(pattern_day)
+        session.commit()
+
+    departments = session.exec(select(OrgDepartment).order_by(OrgDepartment.code)).all()
+    existing_assignments = {
+        (row.department_id, row.pattern_id, row.effective_from, row.priority): row
+        for row in session.exec(select(TimDepartmentScheduleAssignment)).all()
+    }
+    current_month_start = date.today().replace(day=1)
+    for index, department in enumerate(departments, start=1):
+        expected_pattern = pattern_map["PTN_DEPT_STD"]
+        expected_priority = 100
+        for config in pattern_configs[1:]:
+            if config["selector"](index):
+                expected_pattern = pattern_map[config["code"]]
+                expected_priority = int(config["priority"])
+
+        key = (department.id, expected_pattern.id, current_month_start, expected_priority)
+        row = existing_assignments.get(key)
+        if row is None:
+            session.add(
+                TimDepartmentScheduleAssignment(
+                    department_id=department.id,
+                    pattern_id=expected_pattern.id,
+                    effective_from=current_month_start,
+                    effective_to=None,
+                    priority=expected_priority,
+                    is_active=True,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+        else:
+            if not row.is_active:
+                row.is_active = True
+                row.updated_at = datetime.utcnow()
+                session.add(row)
+    session.commit()
+
+    employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
+    ).all()
+    existing_exception_map = {
+        row.reason: row
+        for row in session.exec(select(TimEmployeeScheduleException)).all()
+        if row.reason
+    }
+    pattern_cycle = [pattern_map["PTN_FLEX_0830"], pattern_map["PTN_SHIFT_1300"]]
+    for index, employee in enumerate(employees[: min(180, len(employees))], start=1):
+        reason = f"SEED-TIM-EXCEPTION-{index:04d}"
+        pattern = pattern_cycle[(index - 1) % len(pattern_cycle)]
+        row = existing_exception_map.get(reason)
+        if row is None:
+            session.add(
+                TimEmployeeScheduleException(
+                    employee_id=employee.id,
+                    pattern_id=pattern.id,
+                    effective_from=current_month_start + timedelta(days=(index - 1) % 7),
+                    effective_to=current_month_start + timedelta(days=14 + ((index - 1) % 5)),
+                    reason=reason,
+                    priority=1000 + index,
+                    is_active=True,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            continue
+
+        row.employee_id = employee.id
+        row.pattern_id = pattern.id
+        row.effective_from = current_month_start + timedelta(days=(index - 1) % 7)
+        row.effective_to = current_month_start + timedelta(days=14 + ((index - 1) % 5))
+        row.priority = 1000 + index
+        row.is_active = True
+        row.updated_at = datetime.utcnow()
+        session.add(row)
+    session.commit()
+
+    generate_employee_daily_schedules(
+        session,
+        TimScheduleGenerateRequest(
+            target="all",
+            date_from=current_month_start,
+            date_to=(current_month_start + timedelta(days=31)).replace(day=1) - timedelta(days=1),
+            mode="overwrite",
+        ),
+    )
+
+
+def ensure_payroll_run_result_samples(session: Session) -> None:
+    from app.schemas.payroll_phase2 import PayPayrollRunCreateRequest
+    from app.services.payroll_phase2_service import (
+        calculate_payroll_run,
+        close_payroll_run,
+        create_payroll_run,
+        mark_payroll_run_paid,
+    )
+
+    payroll_code = session.exec(select(PayPayrollCode).where(PayPayrollCode.code == "P100")).first()
+    if payroll_code is None:
+        return
+
+    month_start = date.today().replace(day=1)
+    previous_month_start = (month_start - timedelta(days=1)).replace(day=1)
+    run_specs = [
+        {"year_month": previous_month_start.strftime("%Y-%m"), "run_name": "시드 정기급여 마감본", "target_status": "paid"},
+        {"year_month": month_start.strftime("%Y-%m"), "run_name": "시드 정기급여 계산본", "target_status": "calculated"},
+    ]
+
+    for spec in run_specs:
+        run = session.exec(
+            select(PayPayrollRun).where(
+                PayPayrollRun.year_month == spec["year_month"],
+                PayPayrollRun.payroll_code_id == payroll_code.id,
+            )
+        ).first()
+
+        if run is None:
+            created = create_payroll_run(
+                session,
+                PayPayrollRunCreateRequest(
+                    year_month=spec["year_month"],
+                    payroll_code_id=payroll_code.id,
+                    run_name=spec["run_name"],
+                ),
+            )
+            run = session.get(PayPayrollRun, created.run.id)
+
+        if run is None:
+            continue
+
+        if run.run_name != spec["run_name"]:
+            run.run_name = spec["run_name"]
+            run.updated_at = datetime.utcnow()
+            session.add(run)
+            session.commit()
+            session.refresh(run)
+
+        if run.status in {"closed", "paid"} and spec["target_status"] == "calculated":
+            continue
+
+        if run.status in {"draft", "calculated"}:
+            calculate_payroll_run(session, run.id)
+            run = session.get(PayPayrollRun, run.id)
+
+        if run is None:
+            continue
+
+        if spec["target_status"] == "paid":
+            if run.status == "calculated":
+                close_payroll_run(session, run.id)
+                run = session.get(PayPayrollRun, run.id)
+            if run is not None and run.status == "closed":
+                mark_payroll_run_paid(session, run.id)
 
 def _serialize_seed_content(content: dict[str, object]) -> str:
     return json.dumps(content, ensure_ascii=False, separators=(",", ":"))
@@ -4857,6 +5596,7 @@ def seed_initial_data(session: Session) -> None:
     )
 
     ensure_bulk_korean_employees(session, departments=departments, total=DEV_EMPLOYEE_TOTAL)
+    ensure_hr_recruitment_cycle_seed(session)
     ensure_sample_records(session, admin_local_employee)
     ensure_menus(session)
     ensure_welfare_menu_overrides(session)
@@ -4875,9 +5615,11 @@ def seed_initial_data(session: Session) -> None:
     ensure_holidays(session)
     ensure_annual_leave_seed(session)
     ensure_tim_transaction_samples(session)
+    ensure_schedule_operational_samples(session)
     ensure_pay_payroll_codes(session)
     ensure_pay_tax_rates(session)
     ensure_pay_allowance_deductions(session)
+    ensure_pay_welfare_allowance_definitions(session)
     ensure_pay_item_groups(session)
     ensure_pay_phase2_samples(session)
     ensure_hri_form_types(session)
@@ -4888,5 +5630,6 @@ def seed_initial_data(session: Session) -> None:
     ensure_wel_benefit_types(session)
     ensure_hri_request_samples(session)
     ensure_wel_benefit_requests(session)
+    ensure_payroll_run_result_samples(session)
     ensure_tra_seed_data(session)
 

@@ -13,7 +13,10 @@ export default async function PayrollRunsPage() {
   await requireMenuAccess("/payroll/runs");
 
   return (
-    <AppShell title="월 급여 Run 관리" description="월 급여 계산/마감/지급완료 상태 관리">
+    <AppShell
+      title="정기급여 Run 관리"
+      description="정기급여 계산, 재계산, 마감, 지급완료 상태를 관리합니다."
+    >
       <AgGridModulesProvider>
         <PayrollRunManager />
       </AgGridModulesProvider>

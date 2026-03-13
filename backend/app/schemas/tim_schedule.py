@@ -100,7 +100,14 @@ class TimDepartmentScheduleAssignmentBatchResponse(BaseModel):
 class TimEmployeeScheduleExceptionItem(BaseModel):
     id: int
     employee_id: int
+    employee_no: str | None = None
+    employee_name: str | None = None
+    department_id: int | None = None
+    department_code: str | None = None
+    department_name: str | None = None
     pattern_id: int
+    pattern_code: str | None = None
+    pattern_name: str | None = None
     effective_from: date
     effective_to: date | None
     reason: str | None

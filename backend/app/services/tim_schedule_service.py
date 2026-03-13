@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func
@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from app.core.time_utils import APP_TZ, business_today
 
 from app.models import (
+    AuthUser,
     HrEmployee,
     OrgDepartment,
     TimDepartmentScheduleAssignment,
@@ -108,9 +109,24 @@ def generate_employee_daily_schedules(session: Session, payload: TimScheduleGene
         employees_query = employees_query.where(HrEmployee.id.in_(payload.employee_ids))
 
     employees = session.exec(employees_query).all()
+    employee_ids = [employee.id for employee in employees if employee.id is not None]
     holidays = {
         item.holiday_date: item
         for item in session.exec(select(TimHoliday).where(TimHoliday.holiday_date >= payload.date_from, TimHoliday.holiday_date <= payload.date_to)).all()
+    }
+    existing_schedule_map = {
+        (item.employee_id, item.work_date): item
+        for item in (
+            session.exec(
+                select(TimEmployeeDailySchedule).where(
+                    TimEmployeeDailySchedule.employee_id.in_(employee_ids),
+                    TimEmployeeDailySchedule.work_date >= payload.date_from,
+                    TimEmployeeDailySchedule.work_date <= payload.date_to,
+                )
+            ).all()
+            if employee_ids
+            else []
+        )
     }
 
     created = 0
@@ -143,12 +159,7 @@ def generate_employee_daily_schedules(session: Session, payload: TimScheduleGene
             expected_minutes = pattern_day.expected_minutes if pattern_day else (480 if is_workday else 0)
             is_overnight = pattern_day.is_overnight if pattern_day else False
 
-            existing = session.exec(
-                select(TimEmployeeDailySchedule).where(
-                    TimEmployeeDailySchedule.employee_id == employee.id,
-                    TimEmployeeDailySchedule.work_date == day,
-                )
-            ).first()
+            existing = existing_schedule_map.get((employee.id, day))
 
             if existing and payload.mode != "overwrite":
                 skipped += 1
@@ -168,6 +179,7 @@ def generate_employee_daily_schedules(session: Session, payload: TimScheduleGene
             target.generated_at = datetime.utcnow()
             target.version_tag = version_tag
             session.add(target)
+            existing_schedule_map[(employee.id, day)] = target
 
             if existing:
                 updated += 1
@@ -341,11 +353,46 @@ def list_employee_schedule_exceptions(session: Session, employee_id: int | None 
     if employee_id is not None:
         query = query.where(TimEmployeeScheduleException.employee_id == employee_id)
     rows = session.exec(query).all()
+
+    if not rows:
+        return []
+
+    employee_ids = [row.employee_id for row in rows]
+    pattern_ids = [row.pattern_id for row in rows]
+    employee_map = {
+        row.id: row
+        for row in session.exec(select(HrEmployee).where(HrEmployee.id.in_(employee_ids))).all()
+    }
+    user_ids = [row.user_id for row in employee_map.values() if row.user_id is not None]
+    user_name_map = {
+        row.id: row.display_name
+        for row in session.exec(select(AuthUser).where(AuthUser.id.in_(user_ids))).all()
+    }
+    department_map = {
+        row.id: row
+        for row in session.exec(select(OrgDepartment)).all()
+    }
+    pattern_map = {
+        row.id: row
+        for row in session.exec(select(TimSchedulePattern).where(TimSchedulePattern.id.in_(pattern_ids))).all()
+    }
+
     return [
         TimEmployeeScheduleExceptionItem(
             id=row.id,
             employee_id=row.employee_id,
+            employee_no=employee_map.get(row.employee_id).employee_no if employee_map.get(row.employee_id) else None,
+            employee_name=user_name_map.get(employee_map.get(row.employee_id).user_id) if employee_map.get(row.employee_id) else None,
+            department_id=employee_map.get(row.employee_id).department_id if employee_map.get(row.employee_id) else None,
+            department_code=department_map.get(employee_map.get(row.employee_id).department_id).code
+            if employee_map.get(row.employee_id) and department_map.get(employee_map.get(row.employee_id).department_id)
+            else None,
+            department_name=department_map.get(employee_map.get(row.employee_id).department_id).name
+            if employee_map.get(row.employee_id) and department_map.get(employee_map.get(row.employee_id).department_id)
+            else None,
             pattern_id=row.pattern_id,
+            pattern_code=pattern_map.get(row.pattern_id).code if pattern_map.get(row.pattern_id) else None,
+            pattern_name=pattern_map.get(row.pattern_id).name if pattern_map.get(row.pattern_id) else None,
             effective_from=row.effective_from,
             effective_to=row.effective_to,
             reason=row.reason,

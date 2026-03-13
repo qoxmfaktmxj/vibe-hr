@@ -105,7 +105,7 @@ export function DepartmentScheduleAssignmentManager() {
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="text-sm font-semibold">부서 기본 근무패턴</h3>
+      <h3 className="text-sm font-semibold">조직 기본 근무패턴</h3>
 
       <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-5">
         <select
@@ -134,22 +134,10 @@ export function DepartmentScheduleAssignmentManager() {
             </option>
           ))}
         </select>
-        <Input
-          type="date"
-          value={effectiveFrom}
-          onChange={(event) => setEffectiveFrom(event.target.value)}
-        />
-        <Input
-          type="date"
-          value={effectiveTo}
-          onChange={(event) => setEffectiveTo(event.target.value)}
-        />
+        <Input type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} />
+        <Input type="date" value={effectiveTo} onChange={(event) => setEffectiveTo(event.target.value)} />
         <div className="flex gap-2">
-          <Input
-            value={priority}
-            onChange={(event) => setPriority(event.target.value)}
-            placeholder="우선순위"
-          />
+          <Input value={priority} onChange={(event) => setPriority(event.target.value)} placeholder="우선순위" />
           <Button onClick={addAssignment} disabled={saveDisabled || !canSubmit}>
             추가
           </Button>
@@ -166,8 +154,8 @@ export function DepartmentScheduleAssignmentManager() {
               <th className="py-2">COST CENTER</th>
               <th className="py-2">인원</th>
               <th className="py-2">근무패턴</th>
-              <th className="py-2">시작</th>
-              <th className="py-2">종료</th>
+              <th className="py-2">시작일</th>
+              <th className="py-2">종료일</th>
               <th className="py-2">우선순위</th>
               <th className="py-2">동작</th>
             </tr>
@@ -192,12 +180,7 @@ export function DepartmentScheduleAssignmentManager() {
                 <td className="py-2">{row.effective_to ?? "-"}</td>
                 <td className="py-2">{row.priority}</td>
                 <td className="py-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => removeAssignment(row.id)}
-                    disabled={saveDisabled}
-                  >
+                  <Button size="sm" variant="outline" onClick={() => removeAssignment(row.id)} disabled={saveDisabled}>
                     삭제
                   </Button>
                 </td>

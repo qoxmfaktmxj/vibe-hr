@@ -4,7 +4,7 @@ from calendar import monthrange
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import delete, or_
 from sqlmodel import Session, select
 
 from app.models import (
@@ -21,6 +21,8 @@ from app.models import (
     PayPayrollRunItem,
     PayTaxRate,
     PayVariableInput,
+    WelBenefitRequest,
+    WelBenefitType,
 )
 from app.schemas.payroll_phase2 import (
     PayEmployeeProfileBatchRequest,
@@ -406,6 +408,59 @@ def _find_rate(rate_rows: list[PayTaxRate], *keywords: str) -> float:
     return 0.0
 
 
+def _run_label(year_month: str) -> str:
+    return f"{year_month} 정기급여"
+
+
+def _build_welfare_request_map(
+    session: Session,
+    *,
+    run: PayPayrollRun,
+    employee_map: dict[int, HrEmployee],
+) -> dict[int, list[tuple[WelBenefitRequest, WelBenefitType]]]:
+    if not employee_map:
+        return {}
+
+    run_label = _run_label(run.year_month)
+    employee_no_to_id = {
+        employee.employee_no: employee.id
+        for employee in employee_map.values()
+        if employee.id is not None
+    }
+    if not employee_no_to_id:
+        return {}
+
+    benefit_types = {
+        row.code: row
+        for row in session.exec(select(WelBenefitType).where(WelBenefitType.is_active == True)).all()  # noqa: E712
+    }
+    benefit_rows = session.exec(
+        select(WelBenefitRequest).where(
+            WelBenefitRequest.employee_no.in_(list(employee_no_to_id.keys())),
+            WelBenefitRequest.status_code.in_(["approved", "payroll_reflected"]),
+            or_(
+                WelBenefitRequest.payroll_run_label == None,  # noqa: E711
+                WelBenefitRequest.payroll_run_label.ilike(f"%{run.year_month}%"),
+            ),
+        )
+    ).all()
+
+    welfare_map: dict[int, list[tuple[WelBenefitRequest, WelBenefitType]]] = {}
+    for benefit_row in benefit_rows:
+        employee_id = employee_no_to_id.get(benefit_row.employee_no)
+        benefit_type = benefit_types.get(benefit_row.benefit_type_code)
+        if employee_id is None or benefit_type is None:
+            continue
+
+        benefit_row.payroll_run_label = run_label
+        benefit_row.status_code = "payroll_reflected"
+        benefit_row.updated_at = _utc_now()
+        session.add(benefit_row)
+        welfare_map.setdefault(employee_id, []).append((benefit_row, benefit_type))
+
+    return welfare_map
+
+
 def _to_run_employee_item(
     row: PayPayrollRunEmployee,
     employee_map: dict[int, HrEmployee],
@@ -490,21 +545,32 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
 
     allowance_rows = session.exec(select(PayAllowanceDeduction)).all()
     allowance_map = {row.code: row for row in allowance_rows}
+    welfare_map = _build_welfare_request_map(session, run=run, employee_map=employee_map)
 
     tax_rows = session.exec(select(PayTaxRate).where(PayTaxRate.year == period_start.year)).all()
+    long_term_care_rate = _find_rate(tax_rows, "?κ린?붿뼇", "long_term_care")
     pension_rate = _find_rate(tax_rows, "국민연금", "pension")
     health_rate = _find_rate(tax_rows, "건강보험", "health")
     employment_rate = _find_rate(tax_rows, "고용보험", "employment")
     income_tax_rate = _find_rate(tax_rows, "소득세", "income_tax")
 
-    existing_run_employees = session.exec(select(PayPayrollRunEmployee).where(PayPayrollRunEmployee.run_id == run_id)).all()
-    for run_employee in existing_run_employees:
-        run_items = session.exec(
-            select(PayPayrollRunItem).where(PayPayrollRunItem.run_employee_id == run_employee.id)
-        ).all()
-        for item in run_items:
-            session.delete(item)
-        session.delete(run_employee)
+    pension_rate = _find_rate(tax_rows, "국민연금", "pension")
+    health_rate = _find_rate(tax_rows, "건강보험", "health")
+    long_term_care_rate = _find_rate(tax_rows, "장기요양", "long_term_care")
+    employment_rate = _find_rate(tax_rows, "고용보험", "employment")
+    income_tax_rate = _find_rate(tax_rows, "소득세", "income_tax")
+
+    existing_run_employee_ids = session.exec(
+        select(PayPayrollRunEmployee.id).where(PayPayrollRunEmployee.run_id == run_id)
+    ).all()
+    if existing_run_employee_ids:
+        session.exec(
+            delete(PayPayrollRunItem).where(PayPayrollRunItem.run_employee_id.in_(existing_run_employee_ids))
+        )
+        session.exec(
+            delete(PayPayrollRunEmployee).where(PayPayrollRunEmployee.id.in_(existing_run_employee_ids))
+        )
+        session.flush()
 
     total_gross = 0.0
     total_deductions = 0.0
@@ -579,13 +645,50 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
                 )
             )
 
+        for welfare_request, benefit_type in welfare_map.get(employee_id, []):
+            amount = float(welfare_request.approved_amount or welfare_request.requested_amount or 0)
+            if amount <= 0:
+                continue
+
+            item_code = benefit_type.pay_item_code or welfare_request.benefit_type_code
+            definition = allowance_map.get(item_code)
+            direction = "deduction" if benefit_type.is_deduction else "earning"
+            item_name = definition.name if definition else (welfare_request.benefit_type_name or benefit_type.name)
+            tax_type = definition.tax_type if definition else ("tax" if direction == "deduction" else "taxable")
+            calculation_type = definition.calculation_type if definition else "fixed"
+
+            if direction == "earning":
+                gross_pay += amount
+                if tax_type == "non-taxable":
+                    non_taxable_income += amount
+                else:
+                    taxable_income += amount
+            else:
+                deduction_amount += amount
+
+            session.add(
+                PayPayrollRunItem(
+                    run_employee_id=run_employee.id,
+                    item_code=item_code,
+                    item_name=item_name,
+                    direction=direction,
+                    amount=round(amount, 2),
+                    tax_type=tax_type,
+                    calculation_type=calculation_type,
+                    source_type="welfare",
+                    created_at=_utc_now(),
+                )
+            )
+
         pension = round(taxable_income * pension_rate / 100, 2)
         health = round(taxable_income * health_rate / 100, 2)
+        long_term_care = round(taxable_income * long_term_care_rate / 100, 2)
         employment = round(taxable_income * employment_rate / 100, 2)
         income_tax = round(taxable_income * income_tax_rate / 100, 2)
         local_income_tax = round(income_tax * 0.1, 2)
 
         statutory_deductions = [
+            ("LTC", "장기요양", long_term_care),
             ("PEN", "국민연금", pension),
             ("HIN", "건강보험", health),
             ("EMP", "고용보험", employment),
@@ -604,7 +707,7 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
                     item_name=name,
                     direction="deduction",
                     amount=amount,
-                    tax_type="insurance" if code in {"PEN", "HIN", "EMP"} else "tax",
+                    tax_type="insurance" if code in {"PEN", "HIN", "LTC", "EMP"} else "tax",
                     calculation_type="formula",
                     source_type="system",
                     created_at=_utc_now(),

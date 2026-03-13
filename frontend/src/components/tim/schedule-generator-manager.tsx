@@ -50,16 +50,14 @@ export function ScheduleGeneratorManager() {
         | (TimScheduleGenerateResponse & { detail?: string })
         | null;
       if (!response.ok) {
-        throw new Error(json?.detail ?? "스케줄 생성에 실패했습니다.");
+        throw new Error(json?.detail ?? "근무일정 생성에 실패했습니다.");
       }
       if (!json) {
-        throw new Error("스케줄 생성 결과를 불러오지 못했습니다.");
+        throw new Error("근무일정 생성 결과를 불러오지 못했습니다.");
       }
-      toast.success(
-        `생성 ${json.created_count} / 갱신 ${json.updated_count} / 건너뜀 ${json.skipped_count}`,
-      );
+      toast.success(`생성 ${json.created_count} / 갱신 ${json.updated_count} / 건너뜀 ${json.skipped_count}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "스케줄 생성에 실패했습니다.");
+      toast.error(error instanceof Error ? error.message : "근무일정 생성에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -67,7 +65,7 @@ export function ScheduleGeneratorManager() {
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="text-sm font-semibold">근무 스케줄 생성</h3>
+      <h3 className="text-sm font-semibold">근무일정 생성</h3>
       <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
         <select
           className="h-9 rounded-md border bg-card px-2 text-sm"
@@ -80,7 +78,7 @@ export function ScheduleGeneratorManager() {
           }}
         >
           <option value="all">전체</option>
-          <option value="department">부서</option>
+          <option value="department">조직</option>
           <option value="employee">개인</option>
         </select>
         <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
@@ -100,7 +98,7 @@ export function ScheduleGeneratorManager() {
       {target === "employee" ? (
         <div className="mt-2">
           <Input
-            placeholder="employee_ids (예: 3,4,5)"
+            placeholder="employee_ids 예: 3,4,5"
             value={employeeIdsText}
             onChange={(event) => setEmployeeIdsText(event.target.value)}
           />
@@ -122,7 +120,7 @@ export function ScheduleGeneratorManager() {
           <option value="overwrite">덮어쓰기</option>
         </select>
         <Button onClick={generate} disabled={loading || menuActionLoading || !can("save")}>
-          {loading ? "생성 중..." : "근무 스케줄 생성"}
+          {loading ? "생성 중..." : "근무일정 생성"}
         </Button>
       </div>
     </div>
