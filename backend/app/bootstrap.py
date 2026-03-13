@@ -81,7 +81,7 @@ from app.models import (
     TraCyberUpload,
 )
 
-DEV_EMPLOYEE_TOTAL = 2000
+DEV_EMPLOYEE_TOTAL = 6000
 DEV_EMPLOYEE_LOGIN_PREFIX = "kr-"
 DEV_EMPLOYEE_PASSWORD_HASH = hash_password("admin")
 PRIMARY_DEPARTMENT_CODE = "HQ-HR"
@@ -1507,7 +1507,17 @@ def ensure_common_codes(session: Session) -> None:
                     session.commit()
 
 
-HR_BASIC_SEED_TARGET_PER_CATEGORY = 200
+HR_BASIC_SEED_TARGET_PER_CATEGORY = DEV_EMPLOYEE_TOTAL
+TIM_ATTENDANCE_SEED_DAYS = 5
+TIM_LEAVE_REQUEST_SEED_TARGET = DEV_EMPLOYEE_TOTAL
+PAY_PROFILE_SEED_TARGET = DEV_EMPLOYEE_TOTAL
+HRI_BULK_REQUEST_TARGET = max(DEV_EMPLOYEE_TOTAL // 2, 3000)
+WEL_BULK_REQUEST_TARGET = max(DEV_EMPLOYEE_TOTAL // 2, 3000)
+TRA_EVENT_BATCH_PER_COURSE = 6
+TRA_APPLICATION_TARGET = max(DEV_EMPLOYEE_TOTAL // 2, 3000)
+TRA_REQUIRED_TARGET = max(DEV_EMPLOYEE_TOTAL // 3, 2000)
+TRA_HISTORY_TARGET = max(DEV_EMPLOYEE_TOTAL // 4, 1500)
+TRA_UPLOAD_TARGET = max(DEV_EMPLOYEE_TOTAL // 4, 1500)
 
 
 def _count_rows(session: Session, model: type) -> int:
@@ -1517,6 +1527,17 @@ def _count_rows(session: Session, model: type) -> int:
 
 def _seed_record_date(serial: int) -> date:
     return date(2025, (serial % 12) + 1, min(28, (serial % 28) + 1))
+
+
+def _recent_business_days(count: int) -> list[date]:
+    days: list[date] = []
+    cursor = date.today()
+    while len(days) < count:
+        if cursor.weekday() < 5:
+            days.append(cursor)
+        cursor -= timedelta(days=1)
+    days.reverse()
+    return days
 
 
 def _build_legacy_hr_basic_seed_fields(category: str, serial: int) -> tuple[str, str, str | None, str | None, str]:
@@ -1719,24 +1740,30 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
     if not employees:
         return
 
-    for index, employee in enumerate(employees[:HR_BASIC_SEED_TARGET_PER_CATEGORY], start=1):
-        profile = session.exec(
-            select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee.id)
-        ).first()
-        if profile is not None:
+    target_employees = employees[: min(HR_BASIC_SEED_TARGET_PER_CATEGORY, len(employees))]
+    target_employee_ids = [employee.id for employee in target_employees if employee.id is not None]
+    existing_profile_employee_ids = set(
+        session.exec(
+            select(HrEmployeeBasicProfile.employee_id).where(HrEmployeeBasicProfile.employee_id.in_(target_employee_ids))
+        ).all()
+    )
+
+    for index, employee in enumerate(target_employees, start=1):
+        if employee.id in existing_profile_employee_ids:
             continue
-        profile = HrEmployeeBasicProfile(
-            employee_id=employee.id,
-            gender="여" if index % 2 else "남",
-            resident_no_masked=f"90{(index % 12) + 1:02d}15-1******",
-            blood_type=["A", "B", "O", "AB"][index % 4],
-            marital_status="기혼" if index % 3 == 0 else "미혼",
-            mbti=["ISTJ", "ENFP", "INTJ", "ESFJ"][index % 4],
-            job_family=["경영지원", "개발", "영업", "운영"][index % 4],
-            job_role=employee.position_title,
-            grade=["사원", "대리", "과장", "차장", "부장"][index % 5],
+        session.add(
+            HrEmployeeBasicProfile(
+                employee_id=employee.id,
+                gender="여성" if index % 2 else "남성",
+                resident_no_masked=f"90{(index % 12) + 1:02d}15-1******",
+                blood_type=["A", "B", "O", "AB"][index % 4],
+                marital_status="기혼" if index % 3 == 0 else "미혼",
+                mbti=["ISTJ", "ENFP", "INTJ", "ESFJ"][index % 4],
+                job_family=["경영지원", "개발", "영업", "운영"][index % 4],
+                job_role=employee.position_title,
+                grade=["사원", "대리", "과장", "차장", "부장"][index % 5],
+            )
         )
-        session.add(profile)
 
     ensure_hr_basic_domain_migration(session)
 
@@ -1747,7 +1774,7 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
             HrContactPoint(
                 employee_id=employee.id,
                 seq=serial,
-                contact_type="주소연락처",
+                contact_type="주소/연락처",
                 record_date=_seed_record_date(serial),
                 addr1=f"서울시 테스트로 {serial}",
                 phone_mobile=f"010-2000-{serial % 10000:04d}",
@@ -1767,7 +1794,7 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
                 career_scope="INTERNAL" if is_internal else "EXTERNAL",
                 record_date=_seed_record_date(serial),
                 company_name="VIBE-HR" if is_internal else f"외부회사-{(serial % 70) + 1}",
-                department_name=f"경력부서-{(serial % 20) + 1}",
+                department_name=f"경력부서{(serial % 20) + 1}",
                 position_title=f"경력직무-{(serial % 15) + 1}",
                 note="자동 시드 경력 데이터",
             )
@@ -1798,7 +1825,7 @@ def ensure_hr_basic_seed_data(session: Session) -> None:
                 employee_id=employee.id,
                 seq=serial,
                 military_type="병역",
-                branch="대한민국 육군",
+                branch="대한민국육군",
                 rank=["병장", "중사", "하사", "대위"][serial % 4],
                 record_date=_seed_record_date(serial),
                 discharge_type="만기전역",
@@ -2202,6 +2229,117 @@ def ensure_annual_leave_seed(session: Session) -> None:
                 grant_type="auto",
             )
         )
+
+
+def ensure_tim_transaction_samples(session: Session) -> None:
+    employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
+    ).all()
+    if not employees:
+        return
+
+    business_days = _recent_business_days(TIM_ATTENDANCE_SEED_DAYS)
+    existing_attendance_keys = set(
+        session.exec(
+            select(HrAttendanceDaily.employee_id, HrAttendanceDaily.work_date).where(
+                HrAttendanceDaily.work_date.in_(business_days)
+            )
+        ).all()
+    )
+
+    for index, employee in enumerate(employees, start=1):
+        for day_index, work_date in enumerate(business_days):
+            key = (employee.id, work_date)
+            if key in existing_attendance_keys:
+                continue
+
+            status = "present"
+            check_in_at = datetime(work_date.year, work_date.month, work_date.day, 8, 55)
+            check_out_at = datetime(work_date.year, work_date.month, work_date.day, 18, 5)
+
+            if (index + day_index) % 53 == 0:
+                status = "absent"
+                check_in_at = None
+                check_out_at = None
+            elif (index + day_index) % 29 == 0:
+                status = "leave"
+                check_in_at = None
+                check_out_at = None
+            elif (index + day_index) % 23 == 0:
+                status = "remote"
+                check_in_at = datetime(work_date.year, work_date.month, work_date.day, 9, 5)
+                check_out_at = datetime(work_date.year, work_date.month, work_date.day, 18, 10)
+            elif (index + day_index) % 17 == 0:
+                status = "late"
+                check_in_at = datetime(work_date.year, work_date.month, work_date.day, 9, 35)
+                check_out_at = datetime(work_date.year, work_date.month, work_date.day, 18, 25)
+
+            session.add(
+                HrAttendanceDaily(
+                    employee_id=employee.id,
+                    work_date=work_date,
+                    check_in_at=check_in_at,
+                    check_out_at=check_out_at,
+                    attendance_status=status,
+                )
+            )
+
+    approver = session.exec(select(HrEmployee).where(HrEmployee.employee_no == "HR-0001")).first()
+    existing_seed_leave_reasons = set(
+        session.exec(
+            select(HrLeaveRequest.reason).where(HrLeaveRequest.reason.like("SEED-TIM-LEAVE-%"))
+        ).all()
+    )
+    leave_type_cycle = ("annual", "half_day", "sick", "other", "unpaid")
+    status_cycle = ("pending", "approved", "rejected", "cancelled")
+    target_employees = employees[: min(TIM_LEAVE_REQUEST_SEED_TARGET, len(employees))]
+
+    for index, employee in enumerate(target_employees, start=1):
+        reason = f"SEED-TIM-LEAVE-{index:05d}"
+        if reason in existing_seed_leave_reasons:
+            continue
+
+        leave_type = leave_type_cycle[(index - 1) % len(leave_type_cycle)]
+        status = status_cycle[(index - 1) % len(status_cycle)]
+        start_date = business_days[(index - 1) % len(business_days)] + timedelta(days=(index % 45) + 1)
+        end_date = start_date if leave_type != "annual" or index % 4 else start_date + timedelta(days=1)
+        decided_at = None
+        approved_at = None
+        decision_comment = None
+        decided_by = None
+        approver_employee_id = approver.id if approver is not None else None
+
+        if status != "pending":
+            decided_at = datetime(start_date.year, start_date.month, start_date.day, 17, 0)
+            approved_at = decided_at
+            decided_by = approver_employee_id
+            if status == "rejected":
+                decision_comment = "증빙 보완 필요"
+            elif status == "cancelled":
+                decision_comment = "신청자 취소"
+            else:
+                decision_comment = "시드 승인 완료"
+
+        session.add(
+            HrLeaveRequest(
+                employee_id=employee.id,
+                leave_type=leave_type,
+                start_date=start_date,
+                end_date=end_date,
+                reason=reason,
+                request_status=status,
+                approver_employee_id=approver_employee_id,
+                approved_at=approved_at,
+                decision_comment=decision_comment,
+                decided_by=decided_by,
+                decided_at=decided_at,
+            )
+        )
+
+    session.commit()
+
 PAY_PAYROLL_CODE_SEEDS = [
     # code, name, pay_type, payment_day, tax_deductible, social_ins_deductible
     ("P100", "정규급여", "급여", "25", True, True),
@@ -2215,15 +2353,25 @@ PAY_TAX_RATE_SEEDS = [
     (2025, "건강보험", 3.545, 3.545, 279266, 110332300),
     (2025, "장기요양", 0.4591, 0.4591, None, None),
     (2025, "고용보험", 0.9, 1.15, None, None),
+    (2026, "국민연금", 4.5, 4.5, 390000, 6170000),
+    (2026, "건강보험", 3.545, 3.545, 279266, 110332300),
+    (2026, "장기요양", 0.4591, 0.4591, None, None),
+    (2026, "고용보험", 0.9, 1.15, None, None),
 ]
 
 PAY_ALLOWANCE_DEDUCTION_SEEDS = [
     # code, name, type, tax_type, calculation_type, sort_order
     ("BSC", "기본급", "allowance", "taxable", "fixed", 10),
     ("MLA", "식대", "allowance", "non-taxable", "fixed", 20),
+    ("OTX", "연장수당", "allowance", "taxable", "fixed", 30),
+    ("NGT", "야간수당", "allowance", "taxable", "fixed", 40),
+    ("POS", "직책수당", "allowance", "taxable", "fixed", 50),
     ("PEN", "국민연금", "deduction", "insurance", "formula", 110),
     ("HIN", "건강보험", "deduction", "insurance", "formula", 120),
+    ("EMP", "고용보험", "deduction", "insurance", "formula", 125),
+    ("LTC", "장기요양", "deduction", "insurance", "formula", 127),
     ("ITX", "소득세", "deduction", "tax", "formula", 130),
+    ("LTX", "지방소득세", "deduction", "tax", "formula", 135),
 ]
 
 PAY_ITEM_GROUP_SEEDS = [
@@ -2598,46 +2746,60 @@ def ensure_pay_item_groups(session: Session) -> None:
 
 def ensure_pay_phase2_samples(session: Session) -> None:
     payroll_code = session.exec(select(PayPayrollCode).where(PayPayrollCode.code == "P100")).first()
-    item_group = session.exec(select(PayItemGroup).where(PayItemGroup.code == "GR-OFFICE")).first()
     if payroll_code is None:
         return
 
     month_start = date.today().replace(day=1)
     year_month = month_start.strftime("%Y-%m")
-
-    sample_employees = session.exec(
-        select(HrEmployee).where(HrEmployee.employee_no.in_(["HR-0001", "HR-0002"]))
+    employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
     ).all()
-
-    if not sample_employees:
+    if not employees:
         return
 
-    sample_rows = [
-        {"employee_no": "HR-0001", "base_salary": 4200000.0, "allowance": 200000.0, "deduction": 90000.0},
-        {"employee_no": "HR-0002", "base_salary": 3900000.0, "allowance": 150000.0, "deduction": 70000.0},
-    ]
-
-    employee_map = {employee.employee_no: employee for employee in sample_employees}
-
-    for sample in sample_rows:
-        employee = employee_map.get(sample["employee_no"])
-        if employee is None:
-            continue
-
-        existing_profile = session.exec(
+    target_employees = employees[: min(PAY_PROFILE_SEED_TARGET, len(employees))]
+    target_employee_ids = [employee.id for employee in target_employees if employee.id is not None]
+    item_groups = {
+        row.code: row
+        for row in session.exec(select(PayItemGroup).where(PayItemGroup.code.in_(["GR-OFFICE", "GR-PROD"]))).all()
+    }
+    existing_profiles = {
+        row.employee_id: row
+        for row in session.exec(
             select(PayEmployeeProfile).where(
-                PayEmployeeProfile.employee_id == employee.id,
+                PayEmployeeProfile.employee_id.in_(target_employee_ids),
                 PayEmployeeProfile.effective_from == month_start,
             )
-        ).first()
+        ).all()
+    }
+    existing_variable_inputs = {
+        (row.employee_id, row.item_code): row
+        for row in session.exec(
+            select(PayVariableInput).where(
+                PayVariableInput.year_month == year_month,
+                PayVariableInput.employee_id.in_(target_employee_ids),
+            )
+        ).all()
+    }
 
+    for index, employee in enumerate(target_employees, start=1):
+        item_group = item_groups.get("GR-PROD" if index % 5 == 0 else "GR-OFFICE")
+        base_salary = float(3_100_000 + ((index - 1) % 28) * 95_000)
+        if employee.position_title in {"차장", "부장"}:
+            base_salary += 350_000
+        elif employee.position_title == "과장":
+            base_salary += 180_000
+
+        existing_profile = existing_profiles.get(employee.id)
         if existing_profile is None:
             session.add(
                 PayEmployeeProfile(
                     employee_id=employee.id,
                     payroll_code_id=payroll_code.id,
                     item_group_id=item_group.id if item_group else None,
-                    base_salary=sample["base_salary"],
+                    base_salary=base_salary,
                     pay_type_code="regular",
                     payment_day_type="fixed_day",
                     payment_day_value=25,
@@ -2652,11 +2814,12 @@ def ensure_pay_phase2_samples(session: Session) -> None:
             if existing_profile.payroll_code_id != payroll_code.id:
                 existing_profile.payroll_code_id = payroll_code.id
                 changed = True
-            if existing_profile.item_group_id != (item_group.id if item_group else None):
-                existing_profile.item_group_id = item_group.id if item_group else None
+            expected_item_group_id = item_group.id if item_group else None
+            if existing_profile.item_group_id != expected_item_group_id:
+                existing_profile.item_group_id = expected_item_group_id
                 changed = True
-            if existing_profile.base_salary != sample["base_salary"]:
-                existing_profile.base_salary = sample["base_salary"]
+            if existing_profile.base_salary != base_salary:
+                existing_profile.base_salary = base_salary
                 changed = True
             if existing_profile.pay_type_code != "regular":
                 existing_profile.pay_type_code = "regular"
@@ -2683,50 +2846,66 @@ def ensure_pay_phase2_samples(session: Session) -> None:
             {
                 "item_code": "MLA",
                 "direction": "earning",
-                "amount": sample["allowance"],
-                "memo": "seed sample allowance",
-            },
-            {
-                "item_code": "HIN",
-                "direction": "deduction",
-                "amount": sample["deduction"],
-                "memo": "seed sample deduction",
+                "amount": float(120_000 + (index % 4) * 10_000),
+                "memo": "bulk meal allowance",
             },
         ]
+        if employee.position_title in {"과장", "차장", "부장"}:
+            variable_samples.append(
+                {
+                    "item_code": "POS",
+                    "direction": "earning",
+                    "amount": float(150_000 + (index % 3) * 50_000),
+                    "memo": "bulk position allowance",
+                }
+            )
+        if index % 3 == 0:
+            variable_samples.append(
+                {
+                    "item_code": "OTX",
+                    "direction": "earning",
+                    "amount": float(90_000 + (index % 5) * 35_000),
+                    "memo": "bulk overtime allowance",
+                }
+            )
+        if index % 8 == 0:
+            variable_samples.append(
+                {
+                    "item_code": "NGT",
+                    "direction": "earning",
+                    "amount": float(70_000 + (index % 4) * 25_000),
+                    "memo": "bulk night allowance",
+                }
+            )
 
-        for var_item in variable_samples:
-            existing_variable = session.exec(
-                select(PayVariableInput).where(
-                    PayVariableInput.year_month == year_month,
-                    PayVariableInput.employee_id == employee.id,
-                    PayVariableInput.item_code == var_item["item_code"],
-                )
-            ).first()
-
+        for variable_sample in variable_samples:
+            key = (employee.id, variable_sample["item_code"])
+            existing_variable = existing_variable_inputs.get(key)
             if existing_variable is None:
                 session.add(
                     PayVariableInput(
                         year_month=year_month,
                         employee_id=employee.id,
-                        item_code=var_item["item_code"],
-                        direction=var_item["direction"],
-                        amount=var_item["amount"],
-                        memo=var_item["memo"],
+                        item_code=str(variable_sample["item_code"]),
+                        direction=str(variable_sample["direction"]),
+                        amount=float(variable_sample["amount"]),
+                        memo=str(variable_sample["memo"]),
                     )
                 )
-            else:
-                changed = False
-                if existing_variable.direction != var_item["direction"]:
-                    existing_variable.direction = var_item["direction"]
-                    changed = True
-                if existing_variable.amount != var_item["amount"]:
-                    existing_variable.amount = var_item["amount"]
-                    changed = True
-                if existing_variable.memo != var_item["memo"]:
-                    existing_variable.memo = var_item["memo"]
-                    changed = True
-                if changed:
-                    session.add(existing_variable)
+                continue
+
+            changed = False
+            if existing_variable.direction != variable_sample["direction"]:
+                existing_variable.direction = str(variable_sample["direction"])
+                changed = True
+            if existing_variable.amount != variable_sample["amount"]:
+                existing_variable.amount = float(variable_sample["amount"])
+                changed = True
+            if existing_variable.memo != variable_sample["memo"]:
+                existing_variable.memo = str(variable_sample["memo"])
+                changed = True
+            if changed:
+                session.add(existing_variable)
 
     session.commit()
 
@@ -3416,6 +3595,313 @@ def ensure_hri_request_samples(session: Session) -> None:
             detail.updated_at = sample["completed_at"] or sample["submitted_at"] or sample["created_at"]
         session.add(detail)
 
+    benefit_types = session.exec(
+        select(WelBenefitType)
+        .where(WelBenefitType.is_active == True)  # noqa: E712
+        .order_by(WelBenefitType.sort_order, WelBenefitType.id)
+    ).all()
+    active_employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
+    ).all()
+    user_by_id = {
+        row.id: row
+        for row in session.exec(
+            select(AuthUser).where(AuthUser.id.in_([employee.user_id for employee in active_employees]))
+        ).all()
+    }
+
+    for index, employee in enumerate(active_employees[: min(HRI_BULK_REQUEST_TARGET, len(active_employees))], start=1):
+        requester = user_by_id.get(employee.user_id)
+        if requester is None:
+            continue
+
+        created_at = base_created_at - timedelta(days=index % 45) + timedelta(minutes=index % 60)
+        submitted_at = created_at + timedelta(minutes=12)
+        completed_at = submitted_at + timedelta(minutes=18)
+        is_leave_request = index % 2 == 1
+
+        if is_leave_request:
+            form_type = leave_form
+            request_no = f"HRI-BULK-LEAVE-{index:05d}"
+            leave_type_code = ["ANNUAL", "HALF_AM", "SICK", "ANNUAL"][index % 4]
+            start_date = (base_created_at.date() + timedelta(days=(index % 35) + 3)).isoformat()
+            end_date = start_date
+            status_code = ("DRAFT", "APPROVAL_IN_PROGRESS", "APPROVAL_REJECTED", "COMPLETED")[(index - 1) % 4]
+            content = {
+                "leave_type_code": leave_type_code,
+                "start_date": start_date,
+                "end_date": end_date,
+                "start_time": "09:00" if leave_type_code == "HALF_AM" else None,
+                "end_time": "13:00" if leave_type_code == "HALF_AM" else None,
+                "applied_minutes": 240 if leave_type_code == "HALF_AM" else 480,
+                "reason": f"SEED-HRI-LEAVE-{index:05d}",
+            }
+            if status_code == "DRAFT":
+                current_step_order = None
+                submitted_value = None
+                completed_value = None
+                steps: list[dict[str, object]] = []
+            elif status_code == "APPROVAL_IN_PROGRESS":
+                current_step_order = 1
+                submitted_value = submitted_at
+                completed_value = None
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "WAITING",
+                        "acted_at": None,
+                        "comment": None,
+                    }
+                ]
+            elif status_code == "APPROVAL_REJECTED":
+                current_step_order = None
+                submitted_value = submitted_at
+                completed_value = None
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "REJECTED",
+                        "acted_at": completed_at,
+                        "comment": "시드 반려",
+                    }
+                ]
+            else:
+                current_step_order = None
+                submitted_value = submitted_at
+                completed_value = completed_at
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "APPROVED",
+                        "acted_at": completed_at,
+                        "comment": "시드 승인",
+                    }
+                ]
+            title = f"통합신청 연차 시드 {index:05d}"
+        else:
+            form_type = welfare_form
+            request_no = f"HRI-BULK-WEL-{index:05d}"
+            benefit_row = benefit_types[(index - 1) % len(benefit_types)] if benefit_types else benefit_type
+            status_code = (
+                "DRAFT",
+                "APPROVAL_IN_PROGRESS",
+                "RECEIVE_IN_PROGRESS",
+                "RECEIVE_REJECTED",
+                "COMPLETED",
+            )[(index - 1) % 5]
+            content = {
+                "benefit_type_code": benefit_row.code,
+                "benefit_type_name": benefit_row.name,
+                "requested_amount": 80_000 + ((index - 1) % 15) * 45_000,
+                "description": f"SEED-HRI-WEL-{index:05d}",
+                "reason": "bulk welfare request",
+            }
+            if status_code == "DRAFT":
+                current_step_order = None
+                submitted_value = None
+                completed_value = None
+                steps = []
+            elif status_code == "APPROVAL_IN_PROGRESS":
+                current_step_order = 1
+                submitted_value = submitted_at
+                completed_value = None
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "WAITING",
+                        "acted_at": None,
+                        "comment": None,
+                    }
+                ]
+            elif status_code == "RECEIVE_IN_PROGRESS":
+                current_step_order = 3
+                submitted_value = submitted_at
+                completed_value = None
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=5),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 2,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "DEPT_HEAD",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=10),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 3,
+                        "step_type": "RECEIVE",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "HR_ADMIN",
+                        "action_status": "WAITING",
+                        "acted_at": None,
+                        "comment": None,
+                    },
+                ]
+            elif status_code == "RECEIVE_REJECTED":
+                current_step_order = None
+                submitted_value = submitted_at
+                completed_value = None
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=5),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 2,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "DEPT_HEAD",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=10),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 3,
+                        "step_type": "RECEIVE",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "HR_ADMIN",
+                        "action_status": "REJECTED",
+                        "acted_at": completed_at,
+                        "comment": "시드 반려",
+                    },
+                ]
+            else:
+                current_step_order = None
+                submitted_value = submitted_at
+                completed_value = completed_at
+                steps = [
+                    {
+                        "step_order": 1,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "TEAM_LEADER",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=5),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 2,
+                        "step_type": "APPROVAL",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "DEPT_HEAD",
+                        "action_status": "APPROVED",
+                        "acted_at": submitted_at + timedelta(minutes=10),
+                        "comment": "시드 승인",
+                    },
+                    {
+                        "step_order": 3,
+                        "step_type": "RECEIVE",
+                        "actor_user_id": actor_user.id,
+                        "actor_name": actor_name,
+                        "actor_org_id": actor_org_id,
+                        "actor_role_code": "HR_ADMIN",
+                        "action_status": "RECEIVED",
+                        "acted_at": completed_at,
+                        "comment": "시드 수신 완료",
+                    },
+                ]
+            title = f"통합신청 복리후생 시드 {index:05d}"
+
+        request = _upsert_hri_request_sample(
+            session,
+            request_no=request_no,
+            form_type_id=form_type.id,
+            requester_id=requester.id,
+            requester_org_id=employee.department_id,
+            title=title,
+            status_code=status_code,
+            content=content,
+            current_step_order=current_step_order,
+            submitted_at=submitted_value,
+            completed_at=completed_value,
+            created_at=created_at,
+            updated_at=completed_value or submitted_value or created_at,
+            steps=steps,
+        )
+
+        if not is_leave_request:
+            continue
+
+        leave_detail = session.exec(
+            select(HriReqLeave).where(HriReqLeave.request_id == request.id)
+        ).first()
+        if leave_detail is None:
+            leave_detail = HriReqLeave(
+                request_id=request.id,
+                leave_type_code=str(content["leave_type_code"]),
+                start_date=date.fromisoformat(str(content["start_date"])),
+                end_date=date.fromisoformat(str(content["end_date"])),
+                start_time=content.get("start_time"),
+                end_time=content.get("end_time"),
+                applied_minutes=int(content["applied_minutes"]),
+                reason=str(content["reason"]),
+                created_at=created_at,
+                updated_at=completed_value or submitted_value or created_at,
+            )
+        else:
+            leave_detail.leave_type_code = str(content["leave_type_code"])
+            leave_detail.start_date = date.fromisoformat(str(content["start_date"]))
+            leave_detail.end_date = date.fromisoformat(str(content["end_date"]))
+            leave_detail.start_time = content.get("start_time")
+            leave_detail.end_time = content.get("end_time")
+            leave_detail.applied_minutes = int(content["applied_minutes"])
+            leave_detail.reason = str(content["reason"])
+            leave_detail.created_at = created_at
+            leave_detail.updated_at = completed_value or submitted_value or created_at
+        session.add(leave_detail)
+
     session.commit()
 
 
@@ -3483,8 +3969,63 @@ def ensure_wel_benefit_requests(session: Session) -> None:
         row.request_no: row
         for row in session.exec(select(WelBenefitRequest)).all()
     }
+    departments = {
+        row.id: row.name
+        for row in session.exec(select(OrgDepartment)).all()
+    }
+    users = {
+        row.id: row
+        for row in session.exec(select(AuthUser)).all()
+    }
+    employees = session.exec(
+        select(HrEmployee)
+        .where(HrEmployee.employment_status == "active")
+        .order_by(HrEmployee.id)
+    ).all()
+    benefit_types = session.exec(
+        select(WelBenefitType)
+        .where(WelBenefitType.is_active == True)  # noqa: E712
+        .order_by(WelBenefitType.sort_order, WelBenefitType.id)
+    ).all()
 
-    for seed in WEL_BENEFIT_REQUEST_SEEDS:
+    seed_rows = list(WEL_BENEFIT_REQUEST_SEEDS)
+    status_cycle = ("draft", "submitted", "approved", "rejected", "payroll_reflected")
+    base_requested_at = datetime(2026, 3, 1, 9, 0, 0)
+    payroll_label = f"{date.today():%Y-%m} 정기급여"
+
+    for index, employee in enumerate(employees[: min(WEL_BULK_REQUEST_TARGET, len(employees))], start=1):
+        benefit_row = benefit_types[(index - 1) % len(benefit_types)] if benefit_types else None
+        user = users.get(employee.user_id)
+        if benefit_row is None or user is None:
+            continue
+
+        status_code = status_cycle[(index - 1) % len(status_cycle)]
+        requested_amount = int(80_000 + ((index - 1) % 16) * 55_000)
+        approved_amount = requested_amount if status_code in {"approved", "payroll_reflected"} else None
+        approved_at = (
+            base_requested_at + timedelta(days=index % 28, hours=6)
+            if status_code in {"approved", "rejected", "payroll_reflected"}
+            else None
+        )
+        seed_rows.append(
+            {
+                "request_no": f"WEL-BULK-{date.today():%Y%m}-{index:05d}",
+                "benefit_type_code": benefit_row.code,
+                "benefit_type_name": benefit_row.name,
+                "employee_no": employee.employee_no,
+                "employee_name": user.display_name,
+                "department_name": departments.get(employee.department_id, ""),
+                "status_code": status_code,
+                "requested_amount": requested_amount,
+                "approved_amount": approved_amount,
+                "payroll_run_label": payroll_label if status_code == "payroll_reflected" else None,
+                "description": f"bulk welfare seed {benefit_row.code.lower()} #{index:05d}",
+                "requested_at": base_requested_at + timedelta(days=index % 28, minutes=index % 60),
+                "approved_at": approved_at,
+            }
+        )
+
+    for seed in seed_rows:
         row = existing.get(seed["request_no"])
         if row is None:
             session.add(WelBenefitRequest(**seed))
@@ -3690,80 +4231,90 @@ def ensure_tra_seed_data(session: Session) -> None:
         return
 
     current_year = date.today().year
-    for idx, course in enumerate(course_rows[:2], start=1):
+    for course in course_rows:
         if course.id is None:
             continue
-        event_code = f"{current_year}{idx:02d}A"
-        start_date = date(current_year, idx, 10)
-        end_date = start_date + timedelta(days=1)
-        row = session.exec(
-            select(TraEvent).where(
-                TraEvent.course_id == course.id,
-                TraEvent.event_code == event_code,
-            )
-        ).first()
+        for batch in range(1, TRA_EVENT_BATCH_PER_COURSE + 1):
+            event_code = f"{current_year}{batch:02d}A"
+            start_month = ((batch - 1) % 12) + 1
+            start_date = date(current_year, start_month, min(24, 6 + ((course.id + batch) % 16)))
+            end_date = start_date + timedelta(days=1 if course.method_code != "ONLINE" else 0)
+            appl_start_date = start_date - timedelta(days=21)
+            appl_end_date = start_date - timedelta(days=2)
+            max_person = 120 if course.method_code == "ONLINE" else 48
+            expected_name = f"{course.course_name} {batch}차"
+            expected_place = "VIBE Campus" if course.method_code != "ONLINE" else "Cyber Campus"
 
-        if row is None:
-            session.add(
-                TraEvent(
-                    course_id=course.id,
-                    event_code=event_code,
-                    event_name=f"{course.course_name} {idx}차",
-                    status_code="open",
-                    organization_id=course.organization_id,
-                    place="HQ Training Room",
-                    start_date=start_date,
-                    end_date=end_date,
-                    appl_start_date=start_date - timedelta(days=14),
-                    appl_end_date=start_date - timedelta(days=1),
-                    edu_day=2,
-                    edu_hour=8.0,
-                    max_person=40,
-                    is_active=True,
-                    created_at=now_utc,
-                    updated_at=now_utc,
+            row = session.exec(
+                select(TraEvent).where(
+                    TraEvent.course_id == course.id,
+                    TraEvent.event_code == event_code,
                 )
-            )
-            continue
+            ).first()
 
-        changed = False
-        expected_name = f"{course.course_name} {idx}차"
-        if row.event_name != expected_name:
-            row.event_name = expected_name
-            changed = True
-        if row.status_code != "open":
-            row.status_code = "open"
-            changed = True
-        if row.organization_id != course.organization_id:
-            row.organization_id = course.organization_id
-            changed = True
-        if row.start_date != start_date:
-            row.start_date = start_date
-            changed = True
-        if row.end_date != end_date:
-            row.end_date = end_date
-            changed = True
-        if row.appl_start_date != start_date - timedelta(days=14):
-            row.appl_start_date = start_date - timedelta(days=14)
-            changed = True
-        if row.appl_end_date != start_date - timedelta(days=1):
-            row.appl_end_date = start_date - timedelta(days=1)
-            changed = True
-        if row.edu_day != 2:
-            row.edu_day = 2
-            changed = True
-        if row.edu_hour != 8.0:
-            row.edu_hour = 8.0
-            changed = True
-        if row.max_person != 40:
-            row.max_person = 40
-            changed = True
-        if not row.is_active:
-            row.is_active = True
-            changed = True
-        if changed:
-            row.updated_at = now_utc
-            session.add(row)
+            if row is None:
+                session.add(
+                    TraEvent(
+                        course_id=course.id,
+                        event_code=event_code,
+                        event_name=expected_name,
+                        status_code="open",
+                        organization_id=course.organization_id,
+                        place=expected_place,
+                        start_date=start_date,
+                        end_date=end_date,
+                        appl_start_date=appl_start_date,
+                        appl_end_date=appl_end_date,
+                        edu_day=2 if course.method_code != "ONLINE" else 5,
+                        edu_hour=8.0 if course.method_code != "ONLINE" else 16.0,
+                        max_person=max_person,
+                        is_active=True,
+                        created_at=now_utc,
+                        updated_at=now_utc,
+                    )
+                )
+                continue
+
+            changed = False
+            if row.event_name != expected_name:
+                row.event_name = expected_name
+                changed = True
+            if row.status_code != "open":
+                row.status_code = "open"
+                changed = True
+            if row.organization_id != course.organization_id:
+                row.organization_id = course.organization_id
+                changed = True
+            if row.place != expected_place:
+                row.place = expected_place
+                changed = True
+            if row.start_date != start_date:
+                row.start_date = start_date
+                changed = True
+            if row.end_date != end_date:
+                row.end_date = end_date
+                changed = True
+            if row.appl_start_date != appl_start_date:
+                row.appl_start_date = appl_start_date
+                changed = True
+            if row.appl_end_date != appl_end_date:
+                row.appl_end_date = appl_end_date
+                changed = True
+            if row.edu_day != (2 if course.method_code != "ONLINE" else 5):
+                row.edu_day = 2 if course.method_code != "ONLINE" else 5
+                changed = True
+            if row.edu_hour != (8.0 if course.method_code != "ONLINE" else 16.0):
+                row.edu_hour = 8.0 if course.method_code != "ONLINE" else 16.0
+                changed = True
+            if row.max_person != max_person:
+                row.max_person = max_person
+                changed = True
+            if not row.is_active:
+                row.is_active = True
+                changed = True
+            if changed:
+                row.updated_at = now_utc
+                session.add(row)
     session.commit()
 
     mandatory_courses = [course for course in course_rows if course.id is not None and course.mandatory_yn]
@@ -3817,6 +4368,13 @@ def ensure_tra_seed_data(session: Session) -> None:
             session.add(row)
     session.commit()
 
+    event_rows = session.exec(
+        select(TraEvent).order_by(TraEvent.course_id, TraEvent.start_date, TraEvent.id)
+    ).all()
+    events_by_course: dict[int, list[TraEvent]] = {}
+    for event in event_rows:
+        events_by_course.setdefault(event.course_id, []).append(event)
+
     employees = session.exec(
         select(HrEmployee)
         .where(HrEmployee.employment_status == "active")
@@ -3825,158 +4383,7 @@ def ensure_tra_seed_data(session: Session) -> None:
     if not employees:
         return
 
-    primary_employee = employees[0]
-    if primary_employee.id is None:
-        return
-
-    primary_course = next((course for course in course_rows if course.id is not None), None)
-    if primary_course is None or primary_course.id is None:
-        return
-
-    primary_event = session.exec(
-        select(TraEvent)
-        .where(TraEvent.course_id == primary_course.id)
-        .order_by(TraEvent.start_date, TraEvent.id)
-    ).first()
-
-    application_no = f"TRA-SEED-{current_year}-0001"
-    application = session.exec(
-        select(TraApplication).where(TraApplication.application_no == application_no)
-    ).first()
-    if application is None:
-        application = TraApplication(
-            application_no=application_no,
-            employee_id=primary_employee.id,
-            course_id=primary_course.id,
-            event_id=primary_event.id if primary_event else None,
-            in_out_type=primary_course.in_out_type,
-            year_plan_yn=True,
-            status="approved",
-            note="Seed application",
-            created_at=now_utc,
-            updated_at=now_utc,
-        )
-        session.add(application)
-        session.flush()
-    else:
-        changed = False
-        if application.employee_id != primary_employee.id:
-            application.employee_id = primary_employee.id
-            changed = True
-        if application.course_id != primary_course.id:
-            application.course_id = primary_course.id
-            changed = True
-        expected_event_id = primary_event.id if primary_event else None
-        if application.event_id != expected_event_id:
-            application.event_id = expected_event_id
-            changed = True
-        if application.status != "approved":
-            application.status = "approved"
-            changed = True
-        if not application.year_plan_yn:
-            application.year_plan_yn = True
-            changed = True
-        if changed:
-            application.updated_at = now_utc
-            session.add(application)
-    session.commit()
-
-    rule = session.exec(
-        select(TraRequiredRule)
-        .where(TraRequiredRule.year == current_year, TraRequiredRule.course_id == primary_course.id)
-        .order_by(TraRequiredRule.id)
-    ).first()
-    edu_month = f"{current_year}01"
-    if rule is not None and rule.id is not None:
-        target = session.exec(
-            select(TraRequiredTarget).where(
-                TraRequiredTarget.year == current_year,
-                TraRequiredTarget.employee_id == primary_employee.id,
-                TraRequiredTarget.rule_code == rule.rule_code,
-                TraRequiredTarget.course_id == primary_course.id,
-                TraRequiredTarget.edu_month == edu_month,
-            )
-        ).first()
-        if target is None:
-            session.add(
-                TraRequiredTarget(
-                    year=current_year,
-                    employee_id=primary_employee.id,
-                    rule_code=rule.rule_code,
-                    course_id=primary_course.id,
-                    edu_month=edu_month,
-                    event_id=primary_event.id if primary_event else None,
-                    application_id=application.id,
-                    standard_rule_id=rule.id,
-                    edu_level=rule.edu_level,
-                    completion_status="pending",
-                    completed_count=0,
-                    note="Seed target",
-                    created_at=now_utc,
-                    updated_at=now_utc,
-                )
-            )
-        else:
-            changed = False
-            expected_event_id = primary_event.id if primary_event else None
-            if target.event_id != expected_event_id:
-                target.event_id = expected_event_id
-                changed = True
-            if target.application_id != application.id:
-                target.application_id = application.id
-                changed = True
-            if target.standard_rule_id != rule.id:
-                target.standard_rule_id = rule.id
-                changed = True
-            if target.completion_status != "pending":
-                target.completion_status = "pending"
-                changed = True
-            if changed:
-                target.updated_at = now_utc
-                session.add(target)
-
-    if primary_event is not None and primary_event.id is not None:
-        history = session.exec(
-            select(TraHistory).where(
-                TraHistory.employee_id == primary_employee.id,
-                TraHistory.course_id == primary_course.id,
-                TraHistory.event_id == primary_event.id,
-            )
-        ).first()
-        if history is None:
-            session.add(
-                TraHistory(
-                    employee_id=primary_employee.id,
-                    course_id=primary_course.id,
-                    event_id=primary_event.id,
-                    application_id=application.id,
-                    confirm_type="1",
-                    app_point=8.0,
-                    note="Seed history",
-                    completed_at=primary_event.end_date,
-                    created_at=now_utc,
-                    updated_at=now_utc,
-                )
-            )
-        else:
-            changed = False
-            if history.application_id != application.id:
-                history.application_id = application.id
-                changed = True
-            if history.confirm_type != "1":
-                history.confirm_type = "1"
-                changed = True
-            if history.app_point != 8.0:
-                history.app_point = 8.0
-                changed = True
-            if history.completed_at != primary_event.end_date:
-                history.completed_at = primary_event.end_date
-                changed = True
-            if changed:
-                history.updated_at = now_utc
-                session.add(history)
-
-    for month in (1, 2):
+    for month in range(1, TRA_EVENT_BATCH_PER_COURSE + 1):
         year_month = f"{current_year}{month:02d}"
         start_date = date(current_year, month, 1)
         while start_date.weekday() != 0:
@@ -4013,63 +4420,336 @@ def ensure_tra_seed_data(session: Session) -> None:
             window.updated_at = now_utc
             session.add(window)
 
-    upload_ym = date.today().strftime("%Y%m")
-    upload = session.exec(
-        select(TraCyberUpload).where(
-            TraCyberUpload.upload_ym == upload_ym,
-            TraCyberUpload.employee_no == primary_employee.employee_no,
-            TraCyberUpload.course_name == primary_course.course_name,
-        )
-    ).first()
-    if upload is None:
-        session.add(
-            TraCyberUpload(
-                upload_ym=upload_ym,
-                employee_no=primary_employee.employee_no,
-                employee_id=primary_employee.id,
-                course_name=primary_course.course_name,
-                start_date=primary_event.start_date if primary_event else None,
-                end_date=primary_event.end_date if primary_event else None,
-                reward_hour=8.0,
-                edu_hour=8.0,
-                labor_apply_yn=False,
-                labor_amount=0.0,
-                per_expense_amount=0.0,
-                real_expense_amount=0.0,
-                confirm_type="1",
-                organization_name="Vibe Academy",
-                mandatory_yn=primary_course.mandatory_yn,
-                in_out_type=primary_course.in_out_type,
-                method_code=primary_course.method_code,
-                edu_level=primary_course.edu_level,
-                event_name=primary_event.event_name if primary_event else None,
-                place=primary_event.place if primary_event else None,
-                close_yn=False,
-                note="Seed cyber upload row",
-                created_at=now_utc,
-                updated_at=now_utc,
+    session.commit()
+
+    target_employees = employees[: min(TRA_APPLICATION_TARGET, len(employees))]
+    seed_application_prefix = f"TRA-SEED-{current_year}-"
+    existing_applications = {
+        row.application_no: row
+        for row in session.exec(
+            select(TraApplication).where(TraApplication.application_no.like(f"{seed_application_prefix}%"))
+        ).all()
+    }
+    course_cycle = [course for course in course_rows if course.id is not None]
+    if not course_cycle:
+        return
+
+    for index, employee in enumerate(target_employees, start=1):
+        course = course_cycle[(index - 1) % len(course_cycle)]
+        course_events = events_by_course.get(course.id, [])
+        event = course_events[(index - 1) % len(course_events)] if course_events else None
+        application_no = f"{seed_application_prefix}{index:05d}"
+        status = ("approved", "submitted", "rejected", "canceled")[(index - 1) % 4]
+        note = f"bulk tra seed application {index:05d}"
+        row = existing_applications.get(application_no)
+
+        if row is None:
+            session.add(
+                TraApplication(
+                    application_no=application_no,
+                    employee_id=employee.id,
+                    course_id=course.id,
+                    event_id=event.id if event else None,
+                    in_out_type=course.in_out_type,
+                    year_plan_yn=index % 2 == 0,
+                    note=note,
+                    status=status,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
             )
-        )
-    else:
+            continue
+
         changed = False
-        if upload.close_yn:
-            upload.close_yn = False
+        if row.employee_id != employee.id:
+            row.employee_id = employee.id
             changed = True
-        if upload.employee_id != primary_employee.id:
-            upload.employee_id = primary_employee.id
+        if row.course_id != course.id:
+            row.course_id = course.id
             changed = True
-        if upload.event_name != (primary_event.event_name if primary_event else None):
-            upload.event_name = primary_event.event_name if primary_event else None
+        expected_event_id = event.id if event else None
+        if row.event_id != expected_event_id:
+            row.event_id = expected_event_id
             changed = True
-        if upload.start_date != (primary_event.start_date if primary_event else None):
-            upload.start_date = primary_event.start_date if primary_event else None
+        if row.in_out_type != course.in_out_type:
+            row.in_out_type = course.in_out_type
             changed = True
-        if upload.end_date != (primary_event.end_date if primary_event else None):
-            upload.end_date = primary_event.end_date if primary_event else None
+        if row.year_plan_yn != (index % 2 == 0):
+            row.year_plan_yn = index % 2 == 0
+            changed = True
+        if row.status != status:
+            row.status = status
+            changed = True
+        if row.note != note:
+            row.note = note
             changed = True
         if changed:
-            upload.updated_at = now_utc
-            session.add(upload)
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    seed_applications = session.exec(
+        select(TraApplication).where(TraApplication.application_no.like(f"{seed_application_prefix}%"))
+    ).all()
+    application_by_employee_course = {
+        (row.employee_id, row.course_id): row
+        for row in seed_applications
+    }
+    required_rule_rows = session.exec(
+        select(TraRequiredRule).where(TraRequiredRule.year == current_year)
+    ).all()
+    required_rule_by_course = {row.course_id: row for row in required_rule_rows}
+    required_seed_employees = employees[: min(TRA_REQUIRED_TARGET, len(employees))]
+    existing_targets = {
+        (row.employee_id, row.course_id, row.edu_month): row
+        for row in session.exec(
+            select(TraRequiredTarget).where(TraRequiredTarget.year == current_year)
+        ).all()
+    }
+    mandatory_course_cycle = mandatory_courses or course_cycle
+
+    for index, employee in enumerate(required_seed_employees, start=1):
+        course = mandatory_course_cycle[(index - 1) % len(mandatory_course_cycle)]
+        rule = required_rule_by_course.get(course.id)
+        if rule is None:
+            continue
+        course_events = events_by_course.get(course.id, [])
+        event = course_events[(index - 1) % len(course_events)] if course_events else None
+        edu_month = f"{current_year}{((index - 1) % TRA_EVENT_BATCH_PER_COURSE) + 1:02d}"
+        completion_status = ("pending", "completed", "exempt")[(index - 1) % 3]
+        completed_count = 1 if completion_status == "completed" else 0
+        application = application_by_employee_course.get((employee.id, course.id))
+        key = (employee.id, course.id, edu_month)
+        row = existing_targets.get(key)
+
+        if row is None:
+            session.add(
+                TraRequiredTarget(
+                    year=current_year,
+                    employee_id=employee.id,
+                    rule_code=rule.rule_code,
+                    course_id=course.id,
+                    edu_month=edu_month,
+                    event_id=event.id if event else None,
+                    application_id=application.id if application else None,
+                    standard_rule_id=rule.id,
+                    edu_level=rule.edu_level,
+                    completion_status=completion_status,
+                    completed_count=completed_count,
+                    note=f"bulk tra seed target {index:05d}",
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        if row.rule_code != rule.rule_code:
+            row.rule_code = rule.rule_code
+            changed = True
+        expected_event_id = event.id if event else None
+        if row.event_id != expected_event_id:
+            row.event_id = expected_event_id
+            changed = True
+        expected_application_id = application.id if application else None
+        if row.application_id != expected_application_id:
+            row.application_id = expected_application_id
+            changed = True
+        if row.standard_rule_id != rule.id:
+            row.standard_rule_id = rule.id
+            changed = True
+        if row.edu_level != rule.edu_level:
+            row.edu_level = rule.edu_level
+            changed = True
+        if row.completion_status != completion_status:
+            row.completion_status = completion_status
+            changed = True
+        if row.completed_count != completed_count:
+            row.completed_count = completed_count
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    approved_seed_applications = [row for row in seed_applications if row.status == "approved"]
+    history_candidates = approved_seed_applications[: min(TRA_HISTORY_TARGET, len(approved_seed_applications))]
+    event_by_id = {row.id: row for row in event_rows if row.id is not None}
+    existing_histories = {
+        (row.employee_id, row.course_id, row.event_id): row
+        for row in session.exec(select(TraHistory)).all()
+    }
+    for index, application in enumerate(history_candidates, start=1):
+        event = event_by_id.get(application.event_id) if application.event_id is not None else None
+        key = (application.employee_id, application.course_id, application.event_id)
+        confirm_type = "0" if index % 7 == 0 else "1"
+        note = f"bulk tra seed history {index:05d}"
+        row = existing_histories.get(key)
+
+        if row is None:
+            session.add(
+                TraHistory(
+                    employee_id=application.employee_id,
+                    course_id=application.course_id,
+                    event_id=application.event_id,
+                    application_id=application.id,
+                    confirm_type=confirm_type,
+                    unconfirm_reason="seed pending confirm" if confirm_type == "0" else None,
+                    app_point=8.0 if confirm_type == "1" else None,
+                    note=note,
+                    completed_at=event.end_date if event else None,
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        if row.application_id != application.id:
+            row.application_id = application.id
+            changed = True
+        if row.confirm_type != confirm_type:
+            row.confirm_type = confirm_type
+            changed = True
+        expected_reason = "seed pending confirm" if confirm_type == "0" else None
+        if row.unconfirm_reason != expected_reason:
+            row.unconfirm_reason = expected_reason
+            changed = True
+        expected_point = 8.0 if confirm_type == "1" else None
+        if row.app_point != expected_point:
+            row.app_point = expected_point
+            changed = True
+        if row.note != note:
+            row.note = note
+            changed = True
+        if row.completed_at != (event.end_date if event else None):
+            row.completed_at = event.end_date if event else None
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
+    session.commit()
+
+    organization_by_id = {row.id: row for row in session.exec(select(TraOrganization)).all()}
+    course_by_id = {row.id: row for row in course_rows if row.id is not None}
+    employee_by_id = {row.id: row for row in employees if row.id is not None}
+    history_rows = session.exec(select(TraHistory).order_by(TraHistory.id)).all()
+    history_candidates = history_rows[: min(TRA_UPLOAD_TARGET, len(history_rows))]
+    existing_uploads = {
+        (row.upload_ym, row.employee_no, row.course_name): row
+        for row in session.exec(select(TraCyberUpload)).all()
+    }
+
+    for index, history in enumerate(history_candidates, start=1):
+        employee = employee_by_id.get(history.employee_id)
+        course = course_by_id.get(history.course_id)
+        event = event_by_id.get(history.event_id) if history.event_id is not None else None
+        organization = organization_by_id.get(course.organization_id) if course is not None else None
+        if employee is None or course is None:
+            continue
+
+        upload_ym = (event.start_date.strftime("%Y%m") if event and event.start_date else f"{current_year}01")
+        key = (upload_ym, employee.employee_no, course.course_name)
+        row = existing_uploads.get(key)
+        confirm_type = history.confirm_type or "1"
+
+        if row is None:
+            session.add(
+                TraCyberUpload(
+                    upload_ym=upload_ym,
+                    employee_no=employee.employee_no,
+                    employee_id=employee.id,
+                    course_name=course.course_name,
+                    start_date=event.start_date if event else None,
+                    end_date=event.end_date if event else None,
+                    reward_hour=8.0 if confirm_type == "1" else 0.0,
+                    edu_hour=8.0 if confirm_type == "1" else 0.0,
+                    labor_apply_yn=False,
+                    labor_amount=0.0,
+                    per_expense_amount=0.0,
+                    real_expense_amount=0.0,
+                    confirm_type=confirm_type,
+                    unconfirm_reason=history.unconfirm_reason,
+                    in_out_type=course.in_out_type,
+                    method_code=course.method_code,
+                    organization_name=organization.name if organization else None,
+                    business_no=organization.business_no if organization else None,
+                    mandatory_yn=course.mandatory_yn,
+                    edu_level=course.edu_level,
+                    event_name=event.event_name if event else None,
+                    place=event.place if event else None,
+                    close_yn=False,
+                    applied_course_id=course.id,
+                    applied_event_id=event.id if event else None,
+                    applied_history_id=history.id,
+                    note=f"bulk tra seed upload {index:05d}",
+                    created_at=now_utc,
+                    updated_at=now_utc,
+                )
+            )
+            continue
+
+        changed = False
+        if row.employee_id != employee.id:
+            row.employee_id = employee.id
+            changed = True
+        if row.start_date != (event.start_date if event else None):
+            row.start_date = event.start_date if event else None
+            changed = True
+        if row.end_date != (event.end_date if event else None):
+            row.end_date = event.end_date if event else None
+            changed = True
+        if row.reward_hour != (8.0 if confirm_type == "1" else 0.0):
+            row.reward_hour = 8.0 if confirm_type == "1" else 0.0
+            changed = True
+        if row.edu_hour != (8.0 if confirm_type == "1" else 0.0):
+            row.edu_hour = 8.0 if confirm_type == "1" else 0.0
+            changed = True
+        if row.confirm_type != confirm_type:
+            row.confirm_type = confirm_type
+            changed = True
+        if row.unconfirm_reason != history.unconfirm_reason:
+            row.unconfirm_reason = history.unconfirm_reason
+            changed = True
+        if row.in_out_type != course.in_out_type:
+            row.in_out_type = course.in_out_type
+            changed = True
+        if row.method_code != course.method_code:
+            row.method_code = course.method_code
+            changed = True
+        if row.organization_name != (organization.name if organization else None):
+            row.organization_name = organization.name if organization else None
+            changed = True
+        if row.business_no != (organization.business_no if organization else None):
+            row.business_no = organization.business_no if organization else None
+            changed = True
+        if row.mandatory_yn != course.mandatory_yn:
+            row.mandatory_yn = course.mandatory_yn
+            changed = True
+        if row.edu_level != course.edu_level:
+            row.edu_level = course.edu_level
+            changed = True
+        if row.event_name != (event.event_name if event else None):
+            row.event_name = event.event_name if event else None
+            changed = True
+        if row.place != (event.place if event else None):
+            row.place = event.place if event else None
+            changed = True
+        if row.applied_course_id != course.id:
+            row.applied_course_id = course.id
+            changed = True
+        if row.applied_event_id != (event.id if event else None):
+            row.applied_event_id = event.id if event else None
+            changed = True
+        if row.applied_history_id != history.id:
+            row.applied_history_id = history.id
+            changed = True
+        if row.close_yn:
+            row.close_yn = False
+            changed = True
+        if changed:
+            row.updated_at = now_utc
+            session.add(row)
 
     session.commit()
 
@@ -4194,6 +4874,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_schedule_foundations(session)
     ensure_holidays(session)
     ensure_annual_leave_seed(session)
+    ensure_tim_transaction_samples(session)
     ensure_pay_payroll_codes(session)
     ensure_pay_tax_rates(session)
     ensure_pay_allowance_deductions(session)
