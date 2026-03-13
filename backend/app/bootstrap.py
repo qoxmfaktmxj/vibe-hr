@@ -238,81 +238,109 @@ WEL_BENEFIT_TYPE_SEEDS = [
     {"code": "HEALTH_CHECK", "name": "건강검진", "module_path": "/wel/health-check", "is_deduction": False, "pay_item_code": None, "sort_order": 80},
 ]
 
-WEL_BENEFIT_REQUEST_SEEDS = [
+WEL_BENEFIT_REQUEST_TEMPLATE_SEEDS = [
     {
-        "request_no": "WEL-202603-001",
+        "request_suffix": "001",
         "benefit_type_code": "SCHOLARSHIP",
         "benefit_type_name": "\uD559\uC790\uAE08",
         "employee_no": "HR-0001",
         "employee_name": "\uAD00\uB9AC\uC790",
         "department_name": "\uC778\uC0AC\uCD1D\uAD04",
         "status_code": "payroll_reflected",
-        "requested_amount": 1500000,
-        "approved_amount": 1500000,
-        "payroll_run_label": "2026-03 \uC815\uAE30\uAE09\uC5EC",
+        "requested_amount": 1_500_000,
+        "approved_amount": 1_500_000,
+        "payroll_label_offset_months": 0,
+        "payroll_label_suffix": "\uC815\uAE30\uAE09\uC5EC",
         "description": "\uC790\uB140 1\uD559\uAE30 \uB4F1\uB85D\uAE08 \uC9C0\uC6D0",
-        "requested_at": datetime(2026, 3, 4, 9, 0),
-        "approved_at": datetime(2026, 3, 5, 11, 30),
+        "requested_offset": {"days": 3, "hours": 0, "minutes": 0},
+        "approved_offset": {"days": 4, "hours": 2, "minutes": 30},
     },
     {
-        "request_no": "WEL-202603-002",
+        "request_suffix": "002",
         "benefit_type_code": "CONDOLENCE",
         "benefit_type_name": "\uACBD\uC870\uAE08",
         "employee_no": "HR-0142",
         "employee_name": "\uC774\uC11C\uC900",
         "department_name": "\uACBD\uC601\uC9C0\uC6D0\uD300",
         "status_code": "submitted",
-        "requested_amount": 500000,
+        "requested_amount": 500_000,
         "approved_amount": None,
-        "payroll_run_label": None,
+        "payroll_label_offset_months": None,
+        "payroll_label_suffix": None,
         "description": "\uAC00\uC871 \uACBD\uC870 \uC99D\uBE59 \uC811\uC218 \uD6C4 \uC778\uC0AC \uAC80\uD1A0 \uB300\uAE30",
-        "requested_at": datetime(2026, 3, 8, 14, 10),
-        "approved_at": None,
+        "requested_offset": {"days": 7, "hours": 5, "minutes": 10},
+        "approved_offset": None,
     },
     {
-        "request_no": "WEL-202603-003",
+        "request_suffix": "003",
         "benefit_type_code": "LOAN",
         "benefit_type_name": "\uC0AC\uB0B4\uB300\uCD9C",
         "employee_no": "HR-0098",
         "employee_name": "\uBC15\uC9C0\uD6C8",
         "department_name": "\uAC1C\uBC1C\uC6B41\uD300",
         "status_code": "approved",
-        "requested_amount": 3000000,
-        "approved_amount": 3000000,
-        "payroll_run_label": "2026-04 \uACF5\uC81C \uC608\uC815",
-        "description": "\uC0AC\uB0B4\uB300\uCD9C \uC2B9\uC778 \uD6C4 4\uC6D4 \uAE09\uC5EC \uBD84\uBD80\uD130 \uC0C1\uD658 \uC2DC\uC791",
-        "requested_at": datetime(2026, 3, 9, 10, 20),
-        "approved_at": datetime(2026, 3, 10, 16, 0),
+        "requested_amount": 3_000_000,
+        "approved_amount": 3_000_000,
+        "payroll_label_offset_months": 1,
+        "payroll_label_suffix": "\uACF5\uC81C \uC608\uC815",
+        "description": "\uC0AC\uB0B4\uB300\uCD9C \uC2B9\uC778 \uD6C4 \uB2E4\uC74C \uAE09\uC5EC \uBD84\uBD80\uD130 \uC0C1\uD658 \uC2DC\uC791",
+        "requested_offset": {"days": 8, "hours": 1, "minutes": 20},
+        "approved_offset": {"days": 9, "hours": 7, "minutes": 0},
     },
     {
-        "request_no": "WEL-202603-004",
+        "request_suffix": "004",
         "benefit_type_code": "MEDICAL",
         "benefit_type_name": "\uC758\uB8CC\uBE44",
         "employee_no": "HR-0215",
         "employee_name": "\uCD5C\uC720\uC9C4",
         "department_name": "\uC0DD\uC0B0\uAD00\uB9AC\uD300",
         "status_code": "rejected",
-        "requested_amount": 320000,
+        "requested_amount": 320_000,
         "approved_amount": None,
-        "payroll_run_label": None,
+        "payroll_label_offset_months": None,
+        "payroll_label_suffix": None,
         "description": "\uC99D\uBE59 \uBCF4\uC644 \uD544\uC694\uB85C \uBC18\uB824",
-        "requested_at": datetime(2026, 3, 6, 15, 40),
-        "approved_at": datetime(2026, 3, 7, 13, 15),
+        "requested_offset": {"days": 5, "hours": 6, "minutes": 40},
+        "approved_offset": {"days": 6, "hours": 4, "minutes": 15},
     },
     {
-        "request_no": "WEL-202603-005",
+        "request_suffix": "005",
         "benefit_type_code": "RESORT",
         "benefit_type_name": "\uB9AC\uC870\uD2B8",
         "employee_no": "HR-0312",
         "employee_name": "\uC724\uD558\uB9BC",
         "department_name": "\uC601\uC5C5\uC9C0\uC6D0\uD300",
         "status_code": "draft",
-        "requested_amount": 200000,
+        "requested_amount": 200_000,
         "approved_amount": None,
-        "payroll_run_label": None,
+        "payroll_label_offset_months": None,
+        "payroll_label_suffix": None,
         "description": "\uD558\uACC4 \uB9AC\uC870\uD2B8 \uC774\uC6A9 \uC2E0\uCCAD\uC11C \uC791\uC131 \uC911",
-        "requested_at": datetime(2026, 3, 11, 18, 5),
-        "approved_at": None,
+        "requested_offset": {"days": 10, "hours": 9, "minutes": 5},
+        "approved_offset": None,
+    },
+]
+
+PAYROLL_DETAIL_VISUAL_SEED_SPECS = [
+    {
+        "employee_no": "HR-0001",
+        "items": [
+            {"item_code": "MLA", "direction": "earning", "amount": 130_000.0, "memo": "seed detail meal allowance"},
+        ],
+    },
+    {
+        "employee_no": "KR-0004",
+        "items": [
+            {"item_code": "MLA", "direction": "earning", "amount": 140_000.0, "memo": "seed detail meal allowance"},
+            {"item_code": "POS", "direction": "earning", "amount": 150_000.0, "memo": "seed detail position allowance"},
+            {"item_code": "OTX", "direction": "earning", "amount": 125_000.0, "memo": "seed detail overtime allowance"},
+        ],
+    },
+    {
+        "employee_no": "KR-0008",
+        "items": [
+            {"item_code": "NGT", "direction": "earning", "amount": 70_000.0, "memo": "seed detail night allowance"},
+        ],
     },
 ]
 
@@ -3037,6 +3065,120 @@ def ensure_pay_phase2_samples(session: Session) -> None:
     session.commit()
 
 
+def _month_start_offset(base_date: date, offset_months: int) -> date:
+    year = base_date.year + ((base_date.month - 1 + offset_months) // 12)
+    month = ((base_date.month - 1 + offset_months) % 12) + 1
+    return date(year, month, 1)
+
+
+def _build_wel_benefit_request_seed_rows(reference_date: date) -> list[dict[str, object]]:
+    current_month_start = reference_date.replace(day=1)
+    base_requested_at = datetime(reference_date.year, reference_date.month, 1, 9, 0, 0)
+    request_prefix = current_month_start.strftime("%Y%m")
+
+    seed_rows: list[dict[str, object]] = []
+    for template in WEL_BENEFIT_REQUEST_TEMPLATE_SEEDS:
+        requested_offset = template["requested_offset"]
+        approved_offset = template["approved_offset"]
+        payroll_label_offset_months = template["payroll_label_offset_months"]
+        payroll_label_suffix = template["payroll_label_suffix"]
+
+        requested_at = base_requested_at + timedelta(
+            days=int(requested_offset["days"]),
+            hours=int(requested_offset["hours"]),
+            minutes=int(requested_offset["minutes"]),
+        )
+        approved_at = None
+        if approved_offset is not None:
+            approved_at = base_requested_at + timedelta(
+                days=int(approved_offset["days"]),
+                hours=int(approved_offset["hours"]),
+                minutes=int(approved_offset["minutes"]),
+            )
+
+        payroll_run_label = None
+        if payroll_label_offset_months is not None and payroll_label_suffix:
+            payroll_month = _month_start_offset(current_month_start, int(payroll_label_offset_months))
+            payroll_run_label = f"{payroll_month:%Y-%m} {payroll_label_suffix}"
+
+        seed_rows.append(
+            {
+                "request_no": f"WEL-{request_prefix}-{template['request_suffix']}",
+                "benefit_type_code": template["benefit_type_code"],
+                "benefit_type_name": template["benefit_type_name"],
+                "employee_no": template["employee_no"],
+                "employee_name": template["employee_name"],
+                "department_name": template["department_name"],
+                "status_code": template["status_code"],
+                "requested_amount": template["requested_amount"],
+                "approved_amount": template["approved_amount"],
+                "payroll_run_label": payroll_run_label,
+                "description": template["description"],
+                "requested_at": requested_at,
+                "approved_at": approved_at,
+            }
+        )
+
+    return seed_rows
+
+
+def ensure_payroll_detail_visual_samples(session: Session) -> None:
+    year_month = date.today().replace(day=1).strftime("%Y-%m")
+    target_employee_nos = [spec["employee_no"] for spec in PAYROLL_DETAIL_VISUAL_SEED_SPECS]
+    employees = {
+        row.employee_no: row
+        for row in session.exec(
+            select(HrEmployee).where(HrEmployee.employee_no.in_(target_employee_nos))
+        ).all()
+    }
+    employee_ids = [row.id for row in employees.values() if row.id is not None]
+    existing_variable_inputs = {
+        (row.employee_id, row.item_code): row
+        for row in session.exec(
+            select(PayVariableInput).where(
+                PayVariableInput.year_month == year_month,
+                PayVariableInput.employee_id.in_(employee_ids),
+            )
+        ).all()
+    }
+
+    for spec in PAYROLL_DETAIL_VISUAL_SEED_SPECS:
+        employee = employees.get(spec["employee_no"])
+        if employee is None or employee.id is None:
+            continue
+
+        for item in spec["items"]:
+            key = (employee.id, str(item["item_code"]))
+            existing_variable = existing_variable_inputs.get(key)
+            if existing_variable is None:
+                session.add(
+                    PayVariableInput(
+                        year_month=year_month,
+                        employee_id=employee.id,
+                        item_code=str(item["item_code"]),
+                        direction=str(item["direction"]),
+                        amount=float(item["amount"]),
+                        memo=str(item["memo"]),
+                    )
+                )
+                continue
+
+            changed = False
+            if existing_variable.direction != item["direction"]:
+                existing_variable.direction = str(item["direction"])
+                changed = True
+            if existing_variable.amount != item["amount"]:
+                existing_variable.amount = float(item["amount"])
+                changed = True
+            if existing_variable.memo != item["memo"]:
+                existing_variable.memo = str(item["memo"])
+                changed = True
+            if changed:
+                session.add(existing_variable)
+
+    session.commit()
+
+
 def ensure_hri_form_types(session: Session) -> None:
     for form_code, form_name_ko, module_code, requires_receive, default_priority in HRI_FORM_TYPE_SEEDS:
         existing = session.exec(select(HriFormType).where(HriFormType.form_code == form_code)).first()
@@ -4727,9 +4869,10 @@ def ensure_wel_benefit_requests(session: Session) -> None:
         .order_by(WelBenefitType.sort_order, WelBenefitType.id)
     ).all()
 
-    seed_rows = list(WEL_BENEFIT_REQUEST_SEEDS)
+    seed_rows = _build_wel_benefit_request_seed_rows(date.today())
     status_cycle = ("draft", "submitted", "approved", "rejected", "payroll_reflected")
-    base_requested_at = datetime(2026, 3, 1, 9, 0, 0)
+    today = date.today()
+    base_requested_at = datetime(today.year, today.month, 1, 9, 0, 0)
     payroll_label = f"{date.today():%Y-%m} 정기급여"
 
     for index, employee in enumerate(employees[: min(WEL_BULK_REQUEST_TARGET, len(employees))], start=1):
@@ -5622,6 +5765,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_pay_welfare_allowance_definitions(session)
     ensure_pay_item_groups(session)
     ensure_pay_phase2_samples(session)
+    ensure_payroll_detail_visual_samples(session)
     ensure_hri_form_types(session)
     ensure_hri_form_type_policies(session)
     ensure_hri_approval_actor_rules(session)
