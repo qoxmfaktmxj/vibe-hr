@@ -17,7 +17,7 @@ router = APIRouter(prefix="/hri/form-types", tags=["hri-form-types"])
 @router.get(
     "",
     response_model=HriFormTypeListResponse,
-    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+    dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
 )
 def get_form_types(session: Session = Depends(get_session)) -> HriFormTypeListResponse:
     items = list_form_types(session)

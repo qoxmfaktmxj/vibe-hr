@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta
 import random
 import string
@@ -52,6 +53,9 @@ from app.models import (
     HriApprovalLineStep,
     HriFormTypeApprovalMap,
     HriApprovalActorRule,
+    HriRequestMaster,
+    HriRequestStepSnapshot,
+    HriReqLeave,
     TimSchedulePattern,
     TimSchedulePatternDay,
     TimDepartmentScheduleAssignment,
@@ -2174,6 +2178,8 @@ PAY_ITEM_GROUP_SEEDS = [
 
 HRI_FORM_TYPE_SEEDS = [
     # form_code, form_name_ko, module_code, requires_receive, default_priority
+    ("LEAVE_REQUEST", "Leave request", "TIM", False, 25),
+    ("WEL_BENEFIT_REQUEST", "Welfare benefit request", "WEL", True, 35),
     ("CERT_EMPLOYMENT", "재직증명서 신청", "HR", True, 10),
     ("TIM_CORRECTION", "근태 정정 신청", "TIM", False, 20),
     ("EXPENSE_COMMON", "공통 경비 신청", "CPN", True, 30),
@@ -2187,6 +2193,19 @@ HRI_FORM_TYPE_POLICY_SEEDS = {
     "TIM_CORRECTION": [
         ("attachment_required", "true"),
         ("max_attachment_count", "5"),
+    ],
+    "LEAVE_REQUEST": [
+        ("attachment_required", "false"),
+        ("max_attachment_count", "3"),
+        ("allow_past_date", "false"),
+        ("max_span_days", "31"),
+        ("require_reason", "true"),
+    ],
+    "WEL_BENEFIT_REQUEST": [
+        ("attachment_required", "false"),
+        ("max_attachment_count", "5"),
+        ("benefit_type_required", "true"),
+        ("require_reason", "true"),
     ],
     "EXPENSE_COMMON": [
         ("attachment_required", "true"),
@@ -2236,6 +2255,20 @@ HRI_APPROVAL_TEMPLATE_SEEDS = [
         ],
     },
     {
+        "template_code": "HRI_TMPL_WEL_RECEIVE",
+        "template_name": "복리후생 기본 결재선",
+        "scope_type": "GLOBAL",
+        "scope_id": None,
+        "is_default": False,
+        "is_active": True,
+        "priority": 115,
+        "steps": [
+            {"step_order": 1, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "TEAM_LEADER", "required_action": "APPROVE"},
+            {"step_order": 2, "step_type": "APPROVAL", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "DEPT_HEAD", "required_action": "APPROVE"},
+            {"step_order": 3, "step_type": "RECEIVE", "actor_resolve_type": "ROLE_BASED", "actor_role_code": "HR_ADMIN", "required_action": "RECEIVE"},
+        ],
+    },
+    {
         "template_code": "HRI_TMPL_DEFAULT",
         "template_name": "공통 기본 결재선",
         "scope_type": "GLOBAL",
@@ -2255,6 +2288,8 @@ HRI_FORM_TYPE_TEMPLATE_MAP_SEEDS = [
     # form_code, template_code
     ("CERT_EMPLOYMENT", "HRI_TMPL_CERT"),
     ("TIM_CORRECTION", "HRI_TMPL_TIM_SIMPLE"),
+    ("LEAVE_REQUEST", "HRI_TMPL_TIM_SIMPLE"),
+    ("WEL_BENEFIT_REQUEST", "HRI_TMPL_WEL_RECEIVE"),
     ("EXPENSE_COMMON", "HRI_TMPL_DEFAULT"),
 ]
 
@@ -2813,6 +2848,458 @@ def ensure_hri_form_type_template_maps(session: Session) -> None:
             if not existing.is_active:
                 existing.is_active = True
                 session.add(existing)
+
+    session.commit()
+
+
+def _serialize_seed_content(content: dict[str, object]) -> str:
+    return json.dumps(content, ensure_ascii=False, separators=(",", ":"))
+
+
+def _upsert_hri_request_sample(
+    session: Session,
+    *,
+    request_no: str,
+    form_type_id: int,
+    requester_id: int,
+    requester_org_id: int | None,
+    title: str,
+    status_code: str,
+    content: dict[str, object],
+    current_step_order: int | None,
+    submitted_at: datetime | None,
+    completed_at: datetime | None,
+    created_at: datetime,
+    updated_at: datetime,
+    steps: list[dict[str, object]],
+) -> HriRequestMaster:
+    row = session.exec(
+        select(HriRequestMaster).where(HriRequestMaster.request_no == request_no)
+    ).first()
+    if row is None:
+        row = HriRequestMaster(
+            request_no=request_no,
+            form_type_id=form_type_id,
+            requester_id=requester_id,
+            requester_org_id=requester_org_id,
+            title=title,
+            content_json=_serialize_seed_content(content),
+            status_code=status_code,
+            current_step_order=current_step_order,
+            submitted_at=submitted_at,
+            completed_at=completed_at,
+            created_at=created_at,
+            updated_at=updated_at,
+        )
+        session.add(row)
+        session.flush()
+    else:
+        row.form_type_id = form_type_id
+        row.requester_id = requester_id
+        row.requester_org_id = requester_org_id
+        row.title = title
+        row.content_json = _serialize_seed_content(content)
+        row.status_code = status_code
+        row.current_step_order = current_step_order
+        row.submitted_at = submitted_at
+        row.completed_at = completed_at
+        row.created_at = created_at
+        row.updated_at = updated_at
+        session.add(row)
+        session.flush()
+
+    existing_steps = session.exec(
+        select(HriRequestStepSnapshot).where(HriRequestStepSnapshot.request_id == row.id)
+    ).all()
+    for existing_step in existing_steps:
+        session.delete(existing_step)
+    session.flush()
+
+    for step in steps:
+        session.add(
+            HriRequestStepSnapshot(
+                request_id=row.id,
+                step_order=int(step["step_order"]),
+                step_type=str(step["step_type"]),
+                actor_user_id=int(step["actor_user_id"]),
+                actor_name=str(step["actor_name"]),
+                actor_org_id=step.get("actor_org_id"),
+                actor_role_code=step.get("actor_role_code"),
+                action_status=str(step["action_status"]),
+                acted_at=step.get("acted_at"),
+                comment=step.get("comment"),
+                created_at=created_at,
+                updated_at=updated_at,
+            )
+        )
+
+    return row
+
+
+def ensure_hri_request_samples(session: Session) -> None:
+    requester_user = session.exec(
+        select(AuthUser).where(AuthUser.login_id == "admin")
+    ).first()
+    actor_user = session.exec(
+        select(AuthUser).where(AuthUser.login_id == "admin-local")
+    ).first()
+    if requester_user is None or actor_user is None:
+        return
+
+    requester_employee = session.exec(
+        select(HrEmployee).where(HrEmployee.user_id == requester_user.id)
+    ).first()
+    actor_employee = session.exec(
+        select(HrEmployee).where(HrEmployee.user_id == actor_user.id)
+    ).first()
+    if requester_employee is None:
+        return
+
+    form_types = {
+        row.form_code: row
+        for row in session.exec(
+            select(HriFormType).where(
+                HriFormType.form_code.in_(["LEAVE_REQUEST", "WEL_BENEFIT_REQUEST"])
+            )
+        ).all()
+    }
+    leave_form = form_types.get("LEAVE_REQUEST")
+    welfare_form = form_types.get("WEL_BENEFIT_REQUEST")
+    if leave_form is None or welfare_form is None:
+        return
+
+    benefit_type = session.exec(
+        select(WelBenefitType)
+        .where(WelBenefitType.is_active == True)  # noqa: E712
+        .order_by(WelBenefitType.sort_order, WelBenefitType.id)
+    ).first()
+    if benefit_type is None:
+        return
+
+    actor_org_id = actor_employee.department_id if actor_employee else requester_employee.department_id
+    actor_name = actor_user.display_name
+    base_created_at = datetime(2026, 3, 13, 9, 0, 0)
+
+    samples = [
+        {
+            "request_no": "HRI-LEAVE-260313-01",
+            "form_type": leave_form,
+            "title": "3월 연차 임시저장",
+            "status_code": "DRAFT",
+            "current_step_order": None,
+            "submitted_at": None,
+            "completed_at": None,
+            "content": {
+                "leave_type_code": "ANNUAL",
+                "start_date": "2026-03-20",
+                "end_date": "2026-03-20",
+                "start_time": None,
+                "end_time": None,
+                "applied_minutes": 480,
+                "reason": "가족 일정",
+            },
+            "steps": [],
+            "created_at": base_created_at,
+        },
+        {
+            "request_no": "HRI-LEAVE-260313-02",
+            "form_type": leave_form,
+            "title": "3월 반차 승인대기",
+            "status_code": "APPROVAL_IN_PROGRESS",
+            "current_step_order": 1,
+            "submitted_at": base_created_at + timedelta(minutes=10),
+            "completed_at": None,
+            "content": {
+                "leave_type_code": "HALF_AM",
+                "start_date": "2026-03-24",
+                "end_date": "2026-03-24",
+                "start_time": "09:00",
+                "end_time": "13:00",
+                "applied_minutes": 240,
+                "reason": "병원 진료",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "WAITING",
+                    "acted_at": None,
+                    "comment": None,
+                }
+            ],
+            "created_at": base_created_at + timedelta(minutes=5),
+        },
+        {
+            "request_no": "HRI-LEAVE-260313-03",
+            "form_type": leave_form,
+            "title": "3월 휴가 반려",
+            "status_code": "APPROVAL_REJECTED",
+            "current_step_order": None,
+            "submitted_at": base_created_at + timedelta(minutes=20),
+            "completed_at": None,
+            "content": {
+                "leave_type_code": "ANNUAL",
+                "start_date": "2026-03-28",
+                "end_date": "2026-03-28",
+                "start_time": None,
+                "end_time": None,
+                "applied_minutes": 480,
+                "reason": "개인 일정",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "REJECTED",
+                    "acted_at": base_created_at + timedelta(minutes=25),
+                    "comment": "업무 일정과 중복",
+                }
+            ],
+            "created_at": base_created_at + timedelta(minutes=15),
+        },
+        {
+            "request_no": "HRI-LEAVE-260313-04",
+            "form_type": leave_form,
+            "title": "4월 연차 완료",
+            "status_code": "COMPLETED",
+            "current_step_order": None,
+            "submitted_at": base_created_at + timedelta(minutes=30),
+            "completed_at": base_created_at + timedelta(minutes=40),
+            "content": {
+                "leave_type_code": "ANNUAL",
+                "start_date": "2026-04-03",
+                "end_date": "2026-04-03",
+                "start_time": None,
+                "end_time": None,
+                "applied_minutes": 480,
+                "reason": "개인 정비",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=40),
+                    "comment": "승인",
+                }
+            ],
+            "created_at": base_created_at + timedelta(minutes=25),
+        },
+        {
+            "request_no": "HRI-WEL-260313-01",
+            "form_type": welfare_form,
+            "title": "복리후생 초안 샘플",
+            "status_code": "DRAFT",
+            "current_step_order": None,
+            "submitted_at": None,
+            "completed_at": None,
+            "content": {
+                "benefit_type_code": benefit_type.code,
+                "benefit_type_name": benefit_type.name,
+                "requested_amount": 120000,
+                "description": "복리후생 신청 초안",
+                "reason": "샘플 데이터",
+            },
+            "steps": [],
+            "created_at": base_created_at + timedelta(minutes=45),
+        },
+        {
+            "request_no": "HRI-WEL-260313-02",
+            "form_type": welfare_form,
+            "title": "복리후생 승인대기",
+            "status_code": "APPROVAL_IN_PROGRESS",
+            "current_step_order": 1,
+            "submitted_at": base_created_at + timedelta(minutes=55),
+            "completed_at": None,
+            "content": {
+                "benefit_type_code": benefit_type.code,
+                "benefit_type_name": benefit_type.name,
+                "requested_amount": 180000,
+                "description": "복리후생 지원금 신청",
+                "reason": "복지 포인트 사용",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "WAITING",
+                    "acted_at": None,
+                    "comment": None,
+                }
+            ],
+            "created_at": base_created_at + timedelta(minutes=50),
+        },
+        {
+            "request_no": "HRI-WEL-260313-03",
+            "form_type": welfare_form,
+            "title": "복리후생 수신반려",
+            "status_code": "RECEIVE_REJECTED",
+            "current_step_order": None,
+            "submitted_at": base_created_at + timedelta(minutes=65),
+            "completed_at": None,
+            "content": {
+                "benefit_type_code": benefit_type.code,
+                "benefit_type_name": benefit_type.name,
+                "requested_amount": 240000,
+                "description": "복리후생 반영 실패 예시",
+                "reason": "증빙 누락",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=70),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 2,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "DEPT_HEAD",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=75),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 3,
+                    "step_type": "RECEIVE",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "HR_ADMIN",
+                    "action_status": "REJECTED",
+                    "acted_at": base_created_at + timedelta(minutes=80),
+                    "comment": "증빙 보완 필요",
+                },
+            ],
+            "created_at": base_created_at + timedelta(minutes=60),
+        },
+        {
+            "request_no": "HRI-WEL-260313-04",
+            "form_type": welfare_form,
+            "title": "복리후생 완료",
+            "status_code": "COMPLETED",
+            "current_step_order": None,
+            "submitted_at": base_created_at + timedelta(minutes=85),
+            "completed_at": base_created_at + timedelta(minutes=100),
+            "content": {
+                "benefit_type_code": benefit_type.code,
+                "benefit_type_name": benefit_type.name,
+                "requested_amount": 300000,
+                "description": "복리후생 반영 완료 예시",
+                "reason": "정상 반영",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=90),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 2,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "DEPT_HEAD",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=95),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 3,
+                    "step_type": "RECEIVE",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "HR_ADMIN",
+                    "action_status": "RECEIVED",
+                    "acted_at": base_created_at + timedelta(minutes=100),
+                    "comment": "반영 완료",
+                },
+            ],
+            "created_at": base_created_at + timedelta(minutes=82),
+        },
+    ]
+
+    for sample in samples:
+        request = _upsert_hri_request_sample(
+            session,
+            request_no=str(sample["request_no"]),
+            form_type_id=sample["form_type"].id,
+            requester_id=requester_user.id,
+            requester_org_id=requester_employee.department_id,
+            title=str(sample["title"]),
+            status_code=str(sample["status_code"]),
+            content=sample["content"],
+            current_step_order=sample["current_step_order"],
+            submitted_at=sample["submitted_at"],
+            completed_at=sample["completed_at"],
+            created_at=sample["created_at"],
+            updated_at=sample["completed_at"] or sample["submitted_at"] or sample["created_at"],
+            steps=sample["steps"],
+        )
+
+        if sample["form_type"].form_code != "LEAVE_REQUEST":
+            continue
+
+        detail = session.exec(
+            select(HriReqLeave).where(HriReqLeave.request_id == request.id)
+        ).first()
+        content = sample["content"]
+        if detail is None:
+            detail = HriReqLeave(
+                request_id=request.id,
+                leave_type_code=str(content["leave_type_code"]),
+                start_date=date.fromisoformat(str(content["start_date"])),
+                end_date=date.fromisoformat(str(content["end_date"])),
+                start_time=content.get("start_time"),
+                end_time=content.get("end_time"),
+                applied_minutes=int(content["applied_minutes"]),
+                reason=str(content["reason"]),
+                created_at=sample["created_at"],
+                updated_at=sample["completed_at"] or sample["submitted_at"] or sample["created_at"],
+            )
+        else:
+            detail.leave_type_code = str(content["leave_type_code"])
+            detail.start_date = date.fromisoformat(str(content["start_date"]))
+            detail.end_date = date.fromisoformat(str(content["end_date"]))
+            detail.start_time = content.get("start_time")
+            detail.end_time = content.get("end_time")
+            detail.applied_minutes = int(content["applied_minutes"])
+            detail.reason = str(content["reason"])
+            detail.created_at = sample["created_at"]
+            detail.updated_at = sample["completed_at"] or sample["submitted_at"] or sample["created_at"]
+        session.add(detail)
 
     session.commit()
 
@@ -3603,6 +4090,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_hri_approval_templates(session)
     ensure_hri_form_type_template_maps(session)
     ensure_wel_benefit_types(session)
+    ensure_hri_request_samples(session)
     ensure_wel_benefit_requests(session)
     ensure_tra_seed_data(session)
 
