@@ -1,73 +1,192 @@
 "use client";
 
+import { useMemo } from "react";
+import type { ColDef } from "ag-grid-community";
+import { AgGridReact } from "ag-grid-react";
 import useSWR from "swr";
 
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { SearchFieldGrid } from "@/components/grid/search-controls";
+import {
+  buildGridRowClassRules,
+  getGridRowClass,
+  getGridStatusCellClass,
+  type GridStatus,
+} from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
-import type { TimReportSummaryResponse } from "@/types/tim";
+import type {
+  TimDepartmentSummaryItem,
+  TimLeaveTypeSummaryItem,
+  TimReportSummaryResponse,
+} from "@/types/tim";
 
-export function TimReportDashboard() {
-  const { data, isLoading } = useSWR<TimReportSummaryResponse>("/api/tim/reports/summary", fetcher, {
-    revalidateOnFocus: false,
-  });
+type ReportGridRowBase = {
+  id: string;
+  _status: GridStatus;
+  _original?: Record<string, unknown>;
+  _prevStatus?: GridStatus;
+};
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">리포트 로딩 중...</div>;
-  if (!data) return <div className="p-6 text-sm text-muted-foreground">리포트 데이터가 없습니다.</div>;
+type DepartmentReportRow = TimDepartmentSummaryItem & ReportGridRowBase;
+type LeaveTypeReportRow = TimLeaveTypeSummaryItem & ReportGridRowBase;
 
+function ReportMetricCard({
+  title,
+  value,
+  description,
+}: {
+  title: string;
+  value: string;
+  description: string;
+}) {
   return (
-    <div className="space-y-4 p-6">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">근태 집계 건수</p>
-          <p className="mt-1 text-2xl font-semibold">{data.total_attendance_records.toLocaleString()}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">휴가 신청 건수</p>
-          <p className="mt-1 text-2xl font-semibold">{data.total_leave_requests.toLocaleString()}</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground">집계 기간</p>
-          <p className="mt-1 text-sm font-medium">{data.start_date} ~ {data.end_date}</p>
-        </div>
-      </div>
-
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-2 text-sm font-semibold">상태별 근태 건수</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
-          <div>정상: <b>{data.status_counts.present}</b></div>
-          <div>지각: <b>{data.status_counts.late}</b></div>
-          <div>결근: <b>{data.status_counts.absent}</b></div>
-          <div>휴가: <b>{data.status_counts.leave}</b></div>
-          <div>재택: <b>{data.status_counts.remote}</b></div>
-        </div>
-      </div>
-
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-2 text-sm font-semibold">부서별 출근율</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-2">부서</th>
-                <th className="py-2">집계건수</th>
-                <th className="py-2">출근율</th>
-                <th className="py-2">지각율</th>
-                <th className="py-2">결근율</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.department_summaries.map((item) => (
-                <tr key={item.department_id} className="border-b last:border-b-0">
-                  <td className="py-2">{item.department_name}</td>
-                  <td className="py-2">{item.attendance_count}</td>
-                  <td className="py-2">{item.present_rate}%</td>
-                  <td className="py-2">{item.late_rate}%</td>
-                  <td className="py-2">{item.absent_rate}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-sm font-semibold text-slate-600">{title}</div>
+      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">{value}</div>
+      <div className="mt-1 text-sm text-slate-500">{description}</div>
     </div>
   );
 }
+
+export function TimReportDashboard() {
+  const { data, isLoading, mutate } = useSWR<TimReportSummaryResponse>("/api/tim/reports/summary", fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const departmentRowClassRules = useMemo(() => buildGridRowClassRules<DepartmentReportRow>(), []);
+  const leaveRowClassRules = useMemo(() => buildGridRowClassRules<LeaveTypeReportRow>(), []);
+
+  const departmentRows = useMemo<DepartmentReportRow[]>(
+    () =>
+      (data?.department_summaries ?? []).map((item) => ({
+        ...item,
+        id: `department-${item.department_id}`,
+        _status: "clean",
+        _original: item as unknown as Record<string, unknown>,
+      })),
+    [data?.department_summaries],
+  );
+
+  const leaveTypeRows = useMemo<LeaveTypeReportRow[]>(
+    () =>
+      (data?.leave_type_summaries ?? []).map((item) => ({
+        ...item,
+        id: `leave-${item.leave_type}`,
+        _status: "clean",
+        _original: item as unknown as Record<string, unknown>,
+      })),
+    [data?.leave_type_summaries],
+  );
+
+  const departmentColumns = useMemo<ColDef<DepartmentReportRow>[]>(
+    () => [
+      { field: "department_name", headerName: "부서", minWidth: 180, flex: 1 },
+      { field: "attendance_count", headerName: "집계건수", width: 120 },
+      { field: "present_rate", headerName: "출근율", width: 110 },
+      { field: "late_rate", headerName: "지각율", width: 110 },
+      { field: "absent_rate", headerName: "결근율", width: 110 },
+    ],
+    [],
+  );
+
+  const leaveTypeColumns = useMemo<ColDef<LeaveTypeReportRow>[]>(
+    () => [
+      { field: "leave_type", headerName: "휴가유형", minWidth: 160, flex: 1 },
+      { field: "request_count", headerName: "요청건수", width: 120 },
+      { field: "approved_count", headerName: "승인건수", width: 120 },
+      { field: "pending_count", headerName: "대기건수", width: 120 },
+    ],
+    [],
+  );
+
+  const departmentDefaultColDef = useMemo<ColDef<DepartmentReportRow>>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+      editable: false,
+      cellClass: (params) => getGridStatusCellClass(params.data?._status),
+    }),
+    [],
+  );
+  const leaveDefaultColDef = useMemo<ColDef<LeaveTypeReportRow>>(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+      editable: false,
+      cellClass: (params) => getGridStatusCellClass(params.data?._status),
+    }),
+    [],
+  );
+
+  return (
+    <ManagerPageShell>
+      <ManagerSearchSection title="근태 리포트" onQuery={() => void mutate()} queryDisabled={isLoading}>
+        <SearchFieldGrid className="md:grid-cols-3">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            집계 기간: {data?.start_date ?? "-"} ~ {data?.end_date ?? "-"}
+          </div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            출결 데이터: {(data?.total_attendance_records ?? 0).toLocaleString()}건
+          </div>
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            휴가 요청: {(data?.total_leave_requests ?? 0).toLocaleString()}건
+          </div>
+        </SearchFieldGrid>
+      </ManagerSearchSection>
+
+      <div className="grid gap-4 md:grid-cols-5">
+        <ReportMetricCard title="정상출근" value={String(data?.status_counts.present ?? 0)} description="정상 출근 건수" />
+        <ReportMetricCard title="지각" value={String(data?.status_counts.late ?? 0)} description="지각 건수" />
+        <ReportMetricCard title="결근" value={String(data?.status_counts.absent ?? 0)} description="결근 건수" />
+        <ReportMetricCard title="휴가" value={String(data?.status_counts.leave ?? 0)} description="휴가 사용 건수" />
+        <ReportMetricCard title="재택" value={String(data?.status_counts.remote ?? 0)} description="재택 근무 건수" />
+      </div>
+
+      <ManagerGridSection
+        headerLeft={<span className="text-sm text-slate-500">부서별 집계 {departmentRows.length.toLocaleString()}건</span>}
+        headerRight={<GridToolbarActions actions={[{ key: "query", label: "조회", onClick: () => void mutate() }]} />}
+      >
+        <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-b-xl border-t border-slate-200">
+          <AgGridReact<DepartmentReportRow>
+            theme="legacy"
+            rowData={departmentRows}
+            columnDefs={departmentColumns}
+            defaultColDef={departmentDefaultColDef}
+            rowClassRules={departmentRowClassRules}
+            getRowClass={(params) => getGridRowClass(params.data?._status)}
+            rowHeight={36}
+            headerHeight={36}
+            overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+          />
+        </div>
+      </ManagerGridSection>
+
+      <ManagerGridSection
+        headerLeft={<span className="text-sm text-slate-500">휴가유형별 집계 {leaveTypeRows.length.toLocaleString()}건</span>}
+        headerRight={<GridToolbarActions actions={[{ key: "query", label: "조회", onClick: () => void mutate() }]} />}
+      >
+        <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-b-xl border-t border-slate-200">
+          <AgGridReact<LeaveTypeReportRow>
+            theme="legacy"
+            rowData={leaveTypeRows}
+            columnDefs={leaveTypeColumns}
+            defaultColDef={leaveDefaultColDef}
+            rowClassRules={leaveRowClassRules}
+            getRowClass={(params) => getGridRowClass(params.data?._status)}
+            rowHeight={36}
+            headerHeight={36}
+            overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+          />
+        </div>
+      </ManagerGridSection>
+    </ManagerPageShell>
+  );
+}
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+void toggleDeletedStatus;

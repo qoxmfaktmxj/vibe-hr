@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  type ColDef,
-  type RowClickedEvent,
-} from "ag-grid-community";
+import type { ColDef, RowClickedEvent } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 
+import { AgGridModulesProvider } from "@/components/grid/ag-grid-modules-provider";
+import { cn } from "@/lib/utils";
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
   page: "페이지",
@@ -22,69 +21,85 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
   searchOoo: "검색...",
   blanks: "(빈값)",
   filterOoo: "필터...",
+  applyFilter: "적용",
+  equals: "같음",
+  notEqual: "같지 않음",
+  lessThan: "보다 작음",
+  greaterThan: "보다 큼",
+  contains: "포함",
+  notContains: "미포함",
+  startsWith: "시작",
+  endsWith: "끝",
+  andCondition: "그리고",
+  orCondition: "또는",
+  clearFilter: "초기화",
+  resetFilter: "리셋",
+  cancelFilter: "취소",
+  textFilter: "텍스트 필터",
+  numberFilter: "숫자 필터",
+  dateFilter: "날짜 필터",
+  selectAll: "전체 선택",
+  selectAllSearchResults: "검색 결과 전체 선택",
+  addCurrentSelectionToFilter: "현재 선택 추가",
+  noMatches: "일치 항목 없음",
 };
 
-type MngSimpleGridProps<T extends Record<string, unknown>> = {
-  rowData: T[];
-  columnDefs: ColDef<T>[];
-  onRowClick?: (row: T) => void;
-  getRowId?: (row: T) => string;
+type MngSimpleGridProps<Row> = {
+  rowData: Row[];
+  columnDefs: ColDef<Row>[];
+  onRowClick?: (row: Row) => void;
+  getRowId?: (row: Row) => string;
   selectedRowId?: string | null;
   height?: number;
+  className?: string;
 };
 
-export function MngSimpleGrid<T extends Record<string, unknown>>({
+export function MngSimpleGrid<Row>({
   rowData,
   columnDefs,
   onRowClick,
   getRowId,
   selectedRowId,
   height = 320,
-}: MngSimpleGridProps<T>) {
-  const defaultColDef = useMemo<ColDef<T>>(
+  className,
+}: MngSimpleGridProps<Row>) {
+  const defaultColDef = useMemo<ColDef<Row>>(
     () => ({
       sortable: true,
       filter: true,
       resizable: true,
-      editable: false,
+      minWidth: 100,
     }),
     [],
   );
 
   return (
-    <div className="ag-theme-quartz vibe-grid w-full overflow-hidden rounded border border-border" style={{ height }}>
-      <AgGridReact<T>
-        theme="legacy"
-        rowData={rowData}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        animateRows={false}
-        localeText={AG_GRID_LOCALE_KO}
-        rowHeight={36}
-        headerHeight={36}
-        getRowId={
-          getRowId
-            ? (params) => getRowId(params.data)
-            : undefined
-        }
-        getRowClass={
-          selectedRowId
-            ? (params) => {
-                if (!params.data) return "";
-                const id = getRowId ? getRowId(params.data) : "";
-                return id === selectedRowId ? "bg-primary/5" : "";
-              }
-            : undefined
-        }
-        onRowClicked={
-          onRowClick
-            ? (event: RowClickedEvent<T>) => {
-                if (event.data) onRowClick(event.data);
-              }
-            : undefined
-        }
-        overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
-      />
-    </div>
+    <AgGridModulesProvider>
+      <div
+        className={cn("ag-theme-quartz vibe-grid w-full overflow-hidden rounded-xl border border-slate-200", className)}
+        style={{ height }}
+      >
+        <AgGridReact<Row>
+          theme="legacy"
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowHeight={36}
+          headerHeight={36}
+          localeText={AG_GRID_LOCALE_KO}
+          getRowId={getRowId ? (params) => getRowId(params.data) : undefined}
+          getRowClass={(params) => {
+            if (!selectedRowId || !getRowId || !params.data) return "";
+            return getRowId(params.data) === selectedRowId ? "vibe-row-selected" : "";
+          }}
+          overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+          onRowClicked={(event: RowClickedEvent<Row>) => {
+            if (event.data && onRowClick) {
+              onRowClick(event.data);
+            }
+          }}
+        />
+      </div>
+    </AgGridModulesProvider>
   );
 }

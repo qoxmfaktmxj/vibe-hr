@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.core.time_utils import business_today
 from app.models import AuthUser, HrEmployee
 from app.schemas.tim_leave import (
@@ -61,23 +62,40 @@ def annual_leave_list(
     year: int = Query(default_factory=lambda: business_today().year),
     department_id: int | None = Query(default=None),
     keyword: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> TimAnnualLeaveListResponse:
     items = list_annual_leaves(session, year=year, department_id=department_id, keyword=keyword)
-    return TimAnnualLeaveListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return TimAnnualLeaveListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/leave-requests", response_model=TimLeaveRequestListResponse, dependencies=[Depends(require_roles("hr_manager", "admin"))])
-def leave_requests_list(status_filter: str | None = Query(default=None, alias="status"), pending_only: bool = Query(default=False), session: Session = Depends(get_session)) -> TimLeaveRequestListResponse:
+def leave_requests_list(
+    status_filter: str | None = Query(default=None, alias="status"),
+    pending_only: bool = Query(default=False),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> TimLeaveRequestListResponse:
     items = list_leave_requests(session, status_filter=status_filter, pending_only=pending_only)
-    return TimLeaveRequestListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return TimLeaveRequestListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/leave-requests/my", response_model=TimLeaveRequestListResponse)
-def leave_requests_my(status_filter: str | None = Query(default=None, alias="status"), session: Session = Depends(get_session), current_user: AuthUser = Depends(get_current_user)) -> TimLeaveRequestListResponse:
+def leave_requests_my(
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TimLeaveRequestListResponse:
     employee = _current_employee(session, current_user)
     items = list_leave_requests(session, employee_id=employee.id, status_filter=status_filter)
-    return TimLeaveRequestListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return TimLeaveRequestListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post("/leave-requests")

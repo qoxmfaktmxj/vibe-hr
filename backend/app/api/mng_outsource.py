@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.schemas.mng import (
     MngBulkDeleteRequest,
     MngBulkDeleteResponse,
@@ -42,10 +43,13 @@ _ROLES = [Depends(require_roles("admin", "hr_manager"))]
 @router.get("/outsource-contracts", response_model=MngOutsourceContractListResponse, dependencies=_ROLES)
 def mng_outsource_contract_list(
     search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngOutsourceContractListResponse:
     items = list_outsource_contracts(session, search=search)
-    return MngOutsourceContractListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngOutsourceContractListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/outsource-contracts/check-duplicate", response_model=MngOutsourceContractDuplicateResponse, dependencies=_ROLES)
@@ -88,22 +92,34 @@ def mng_outsource_contract_delete(payload: MngBulkDeleteRequest, session: Sessio
 # ── 외주 근태 ──
 
 @router.get("/outsource-attendances/summary", response_model=MngOutsourceAttendanceSummaryResponse, dependencies=_ROLES)
-def mng_outsource_attendance_summary(session: Session = Depends(get_session)) -> MngOutsourceAttendanceSummaryResponse:
+def mng_outsource_attendance_summary(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> MngOutsourceAttendanceSummaryResponse:
     items = list_outsource_attendance_summary(session)
-    return MngOutsourceAttendanceSummaryResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngOutsourceAttendanceSummaryResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/outsource-attendances/{contract_id}", response_model=MngOutsourceAttendanceListResponse, dependencies=_ROLES)
-def mng_outsource_attendance_list(contract_id: int, session: Session = Depends(get_session)) -> MngOutsourceAttendanceListResponse:
+def mng_outsource_attendance_list(
+    contract_id: int,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> MngOutsourceAttendanceListResponse:
     items = list_outsource_attendances(session, contract_id)
-    return MngOutsourceAttendanceListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngOutsourceAttendanceListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post("/outsource-attendances", response_model=MngOutsourceAttendanceListResponse, status_code=status.HTTP_201_CREATED, dependencies=_ROLES)
 def mng_outsource_attendance_create(payload: MngOutsourceAttendanceCreateRequest, session: Session = Depends(get_session)) -> MngOutsourceAttendanceListResponse:
     create_outsource_attendance(session, payload)
     items = list_outsource_attendances(session, payload.contract_id)
-    return MngOutsourceAttendanceListResponse(items=items, total_count=len(items))
+    total_count = len(items)
+    return MngOutsourceAttendanceListResponse(items=items, total_count=total_count, page=1, limit=max(total_count, 1))
 
 
 @router.delete("/outsource-attendances", response_model=MngBulkDeleteResponse, dependencies=_ROLES)

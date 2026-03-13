@@ -27,6 +27,8 @@ class TimAnnualLeaveResponse(BaseModel):
 class TimAnnualLeaveListResponse(BaseModel):
     items: list[TimAnnualLeaveItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class TimAnnualLeaveAdjustRequest(BaseModel):
@@ -61,6 +63,8 @@ class TimLeaveRequestItem(BaseModel):
 class TimLeaveRequestListResponse(BaseModel):
     items: list[TimLeaveRequestItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class TimLeaveRequestCreateRequest(BaseModel):

@@ -27,6 +27,8 @@ class MngCompanyItem(BaseModel):
 class MngCompanyListResponse(BaseModel):
     companies: list[MngCompanyItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngCompanyDetailResponse(BaseModel):
@@ -91,6 +93,8 @@ class MngManagerCompanyItem(BaseModel):
 class MngManagerCompanyListResponse(BaseModel):
     items: list[MngManagerCompanyItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngManagerCompanyCreateRequest(BaseModel):
@@ -138,6 +142,8 @@ class MngDevRequestItem(BaseModel):
 class MngDevRequestListResponse(BaseModel):
     items: list[MngDevRequestItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngDevRequestMonthlySummaryItem(BaseModel):
@@ -151,6 +157,8 @@ class MngDevRequestMonthlySummaryItem(BaseModel):
 class MngDevRequestMonthlySummaryResponse(BaseModel):
     items: list[MngDevRequestMonthlySummaryItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngDevRequestDetailResponse(BaseModel):
@@ -229,6 +237,8 @@ class MngDevProjectItem(BaseModel):
 class MngDevProjectListResponse(BaseModel):
     items: list[MngDevProjectItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngDevProjectDetailResponse(BaseModel):
@@ -292,6 +302,8 @@ class MngDevInquiryItem(BaseModel):
 class MngDevInquiryListResponse(BaseModel):
     items: list[MngDevInquiryItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngDevInquiryDetailResponse(BaseModel):
@@ -345,6 +357,8 @@ class MngDevStaffProjectItem(BaseModel):
 class MngDevStaffProjectListResponse(BaseModel):
     items: list[MngDevStaffProjectItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngDevStaffRevenueItem(BaseModel):
@@ -357,6 +371,8 @@ class MngDevStaffRevenueItem(BaseModel):
 class MngDevStaffRevenueSummaryResponse(BaseModel):
     items: list[MngDevStaffRevenueItem]
     total_count: int
+    page: int
+    limit: int
 
 
 # ──────────────────────────────────────────────
@@ -381,6 +397,8 @@ class MngOutsourceContractItem(BaseModel):
 class MngOutsourceContractListResponse(BaseModel):
     items: list[MngOutsourceContractItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngOutsourceContractDetailResponse(BaseModel):
@@ -429,6 +447,8 @@ class MngOutsourceAttendanceSummaryItem(BaseModel):
 class MngOutsourceAttendanceSummaryResponse(BaseModel):
     items: list[MngOutsourceAttendanceSummaryItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngOutsourceAttendanceItem(BaseModel):
@@ -451,6 +471,8 @@ class MngOutsourceAttendanceItem(BaseModel):
 class MngOutsourceAttendanceListResponse(BaseModel):
     items: list[MngOutsourceAttendanceItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngOutsourceAttendanceCreateRequest(BaseModel):
@@ -484,6 +506,8 @@ class MngInfraMasterItem(BaseModel):
 class MngInfraMasterListResponse(BaseModel):
     items: list[MngInfraMasterItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngInfraMasterCreateRequest(BaseModel):
@@ -510,6 +534,8 @@ class MngInfraConfigItem(BaseModel):
 class MngInfraConfigListResponse(BaseModel):
     items: list[MngInfraConfigItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class MngInfraConfigUpsertRow(BaseModel):

@@ -134,6 +134,8 @@ export type HriRequestItem = {
 export type HriRequestListResponse = {
   items: HriRequestItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type HriTaskItem = {
@@ -151,6 +153,8 @@ export type HriTaskItem = {
 export type HriTaskListResponse = {
   items: HriTaskItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type HriRequestDraftUpsertRequest = {

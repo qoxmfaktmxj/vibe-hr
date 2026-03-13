@@ -460,6 +460,295 @@
       ],
       "ownerModule": "TIM"
     },
+    "hr.retire.checklist": {
+      "path": "/hr/retire/checklist",
+      "pageFile": "frontend/src/app/hr/retire/checklist/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-retire-checklist-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
+    "tim.attendance-status": {
+      "path": "/tim/status",
+      "pageFile": "frontend/src/app/tim/status/page.tsx",
+      "componentFile": "frontend/src/components/tim/attendance-status-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.annual-leave": {
+      "path": "/tim/annual-leave",
+      "pageFile": "frontend/src/app/tim/annual-leave/page.tsx",
+      "componentFile": "frontend/src/components/tim/annual-leave-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.leave-approval": {
+      "path": "/tim/leave-approval",
+      "pageFile": "frontend/src/app/tim/leave-approval/page.tsx",
+      "componentFile": "frontend/src/components/tim/leave-approval-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.reports": {
+      "path": "/tim/reports",
+      "pageFile": "frontend/src/app/tim/reports/page.tsx",
+      "componentFile": "frontend/src/components/tim/tim-report-dashboard.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "hri.tasks.approvals": {
+      "path": "/hri/tasks/approvals",
+      "pageFile": "frontend/src/app/hri/tasks/approvals/page.tsx",
+      "componentFile": "frontend/src/components/hri/hri-approval-task-board.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HRI"
+    },
+    "hri.tasks.receives": {
+      "path": "/hri/tasks/receives",
+      "pageFile": "frontend/src/app/hri/tasks/receives/page.tsx",
+      "componentFile": "frontend/src/components/hri/hri-receive-task-board.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HRI"
+    },
+    "wel.requests": {
+      "path": "/wel/requests",
+      "pageFile": "frontend/src/app/wel/requests/page.tsx",
+      "componentFile": "frontend/src/components/wel/wel-benefit-request-overview.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "WEL"
+    },
+    "wel.benefit-types": {
+      "path": "/wel/benefit-types",
+      "pageFile": "frontend/src/app/wel/benefit-types/page.tsx",
+      "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "WEL"
+    },
+    "mng.dev-requests": {
+      "path": "/mng/dev-requests",
+      "pageFile": "frontend/src/app/mng/dev-requests/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.dev-projects": {
+      "path": "/mng/dev-projects",
+      "pageFile": "frontend/src/app/mng/dev-projects/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-project-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.dev-inquiries": {
+      "path": "/mng/dev-inquiries",
+      "pageFile": "frontend/src/app/mng/dev-inquiries/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.dev-staff": {
+      "path": "/mng/dev-staff",
+      "pageFile": "frontend/src/app/mng/dev-staff/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-staff-viewer.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.infra": {
+      "path": "/mng/infra",
+      "pageFile": "frontend/src/app/mng/infra/page.tsx",
+      "componentFile": "frontend/src/components/mng/infra-config-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.manager-status": {
+      "path": "/mng/manager-status",
+      "pageFile": "frontend/src/app/mng/manager-status/page.tsx",
+      "componentFile": "frontend/src/components/mng/manager-status-viewer.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.outsource-contracts": {
+      "path": "/mng/outsource-contracts",
+      "pageFile": "frontend/src/app/mng/outsource-contracts/page.tsx",
+      "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
+    "mng.outsource-attendance": {
+      "path": "/mng/outsource-attendance",
+      "pageFile": "frontend/src/app/mng/outsource-attendance/page.tsx",
+      "componentFile": "frontend/src/components/mng/outsource-attendance-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "MNG"
+    },
     "payroll.codes": {
       "path": "/payroll/codes",
       "pageFile": "frontend/src/app/payroll/codes/page.tsx",

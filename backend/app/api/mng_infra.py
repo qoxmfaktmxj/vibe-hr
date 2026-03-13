@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.schemas.mng import (
     MngBulkDeleteRequest,
     MngBulkDeleteResponse,
@@ -32,17 +33,21 @@ _ROLES = [Depends(require_roles("admin"))]
 @router.get("/infra-masters", response_model=MngInfraMasterListResponse, dependencies=_ROLES)
 def mng_infra_master_list(
     company_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngInfraMasterListResponse:
     items = list_infra_masters(session, company_id=company_id)
-    return MngInfraMasterListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngInfraMasterListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post("/infra-masters", response_model=MngInfraMasterListResponse, status_code=status.HTTP_201_CREATED, dependencies=_ROLES)
 def mng_infra_master_create(payload: MngInfraMasterCreateRequest, session: Session = Depends(get_session)) -> MngInfraMasterListResponse:
     create_infra_master(session, payload)
     items = list_infra_masters(session)
-    return MngInfraMasterListResponse(items=items, total_count=len(items))
+    total_count = len(items)
+    return MngInfraMasterListResponse(items=items, total_count=total_count, page=1, limit=max(total_count, 1))
 
 
 @router.delete("/infra-masters", response_model=MngBulkDeleteResponse, dependencies=_ROLES)
@@ -53,15 +58,22 @@ def mng_infra_master_delete(payload: MngBulkDeleteRequest, session: Session = De
 # ── 인프라 구성 상세 ──
 
 @router.get("/infra-configs/{master_id}", response_model=MngInfraConfigListResponse, dependencies=_ROLES)
-def mng_infra_config_list(master_id: int, session: Session = Depends(get_session)) -> MngInfraConfigListResponse:
+def mng_infra_config_list(
+    master_id: int,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> MngInfraConfigListResponse:
     items = list_infra_configs(session, master_id)
-    return MngInfraConfigListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngInfraConfigListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post("/infra-configs/{master_id}", response_model=MngInfraConfigListResponse, dependencies=_ROLES)
 def mng_infra_config_upsert(master_id: int, payload: MngInfraConfigUpsertRequest, session: Session = Depends(get_session)) -> MngInfraConfigListResponse:
     items = upsert_infra_configs(session, master_id, payload)
-    return MngInfraConfigListResponse(items=items, total_count=len(items))
+    total_count = len(items)
+    return MngInfraConfigListResponse(items=items, total_count=total_count, page=1, limit=max(total_count, 1))
 
 
 @router.delete("/infra-configs/{config_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=_ROLES)

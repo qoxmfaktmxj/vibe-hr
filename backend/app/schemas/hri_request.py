@@ -26,6 +26,8 @@ class HriRequestItem(BaseModel):
 class HriRequestListResponse(BaseModel):
     items: list[HriRequestItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class HriTaskItem(BaseModel):
@@ -43,6 +45,8 @@ class HriTaskItem(BaseModel):
 class HriTaskListResponse(BaseModel):
     items: list[HriTaskItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class HriRequestDraftUpsertRequest(BaseModel):

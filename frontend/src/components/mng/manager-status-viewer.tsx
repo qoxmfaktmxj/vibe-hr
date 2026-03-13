@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
 
-import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
+import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -27,6 +32,8 @@ type MappingForm = {
   note: string;
 };
 
+type ManagerStatusGridRow = MngManagerCompanyItem & ReadonlyGridRow;
+
 const EMPTY_FORM: MappingForm = {
   employee_id: "",
   company_id: "",
@@ -38,8 +45,12 @@ const EMPTY_FORM: MappingForm = {
 export function ManagerStatusViewer() {
   const [form, setForm] = useState<MappingForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { data, mutate } = useSWR<MngManagerCompanyListResponse>("/api/mng/manager-status", fetcher, {
+  const query = useMemo(() => `/api/mng/manager-status?page=${page}&limit=${pageSize}`, [page]);
+
+  const { data, mutate, isLoading } = useSWR<MngManagerCompanyListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
@@ -49,16 +60,18 @@ export function ManagerStatusViewer() {
     revalidateOnFocus: false,
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
   const employees = employeeData?.employees ?? [];
-  const columnDefs = useMemo<ColDef<MngManagerCompanyItem>[]>(
+  const rowData = useMemo<ManagerStatusGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  const columnDefs = useMemo<ColDef<ManagerStatusGridRow>[]>(
     () => [
       { field: "employee_name", headerName: "담당자", width: 130 },
       { field: "company_name", headerName: "고객사", width: 170 },
       { field: "start_date", headerName: "시작일", width: 120 },
       { field: "end_date", headerName: "종료일", width: 120 },
-      { field: "note", headerName: "비고", flex: 1 },
+      { field: "note", headerName: "비고", minWidth: 200, flex: 1 },
     ],
     [],
   );
@@ -84,6 +97,7 @@ export function ManagerStatusViewer() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "등록에 실패했습니다.");
+
       toast.success("등록되었습니다.");
       setForm(EMPTY_FORM);
       await mutate();
@@ -96,6 +110,7 @@ export function ManagerStatusViewer() {
 
   async function removeMapping(item: MngManagerCompanyItem) {
     if (!confirm("선택한 매핑을 삭제할까요?")) return;
+
     setSaving(true);
     try {
       const response = await fetch("/api/mng/manager-status", {
@@ -105,6 +120,7 @@ export function ManagerStatusViewer() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
+
       toast.success("삭제되었습니다.");
       await mutate();
     } catch (error) {
@@ -115,84 +131,110 @@ export function ManagerStatusViewer() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-5">
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>담당자 배정 등록</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <select
-            value={form.employee_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, employee_id: event.target.value }))}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">담당자 선택</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.display_name} ({employee.employee_no})
-              </option>
-            ))}
-          </select>
-          <select
-            value={form.company_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">고객사 선택</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.company_name}
-              </option>
-            ))}
-          </select>
-          <CustomDatePicker
-            value={form.start_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, start_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <CustomDatePicker
-            value={form.end_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, end_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <Input
-            value={form.note}
-            onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
-            placeholder="비고"
-          />
-          <Button variant="save" onClick={() => void createMapping()} disabled={saving}>
-            등록
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-3">
-        <CardHeader>
-          <CardTitle>담당자 현황</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <MngSimpleGrid<MngManagerCompanyItem>
-              rowData={items}
-              columnDefs={columnDefs}
-              height={360}
-            />
-            <div className="flex flex-wrap gap-2">
-              {items.map((item) => (
-                <Button
-                  key={item.id}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void removeMapping(item)}
-                  disabled={saving}
-                >
-                  {item.employee_name ?? "담당자"} 삭제
-                </Button>
-              ))}
-            </div>
+    <ReadonlyGridManager<ManagerStatusGridRow>
+      title="담당자 현황"
+      searchFields={
+        <SearchFieldGrid className="md:grid-cols-1">
+          <div className="flex items-center text-sm text-slate-500">
+            고객사별 담당자 매핑과 적용 기간을 관리합니다.
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </SearchFieldGrid>
+      }
+      beforeGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">담당자 배정 등록</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <select
+                value={form.employee_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, employee_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">담당자 선택</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.display_name} ({employee.employee_no})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={form.company_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">고객사 선택</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.company_name}
+                  </option>
+                ))}
+              </select>
+              <CustomDatePicker
+                value={form.start_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, start_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <CustomDatePicker
+                value={form.end_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, end_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <Input
+                value={form.note}
+                onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="비고"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="save" onClick={() => void createMapping()} disabled={saving}>
+                등록
+              </Button>
+              <Button variant="outline" onClick={() => setForm(EMPTY_FORM)} disabled={saving}>
+                초기화
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      }
+      afterGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">일괄 삭제</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {items.map((item) => (
+              <Button
+                key={item.id}
+                size="sm"
+                variant="outline"
+                onClick={() => void removeMapping(item)}
+                disabled={saving}
+              >
+                {item.employee_name ?? "담당자"} 삭제
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="담당자 매핑 데이터가 없습니다."
+    />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

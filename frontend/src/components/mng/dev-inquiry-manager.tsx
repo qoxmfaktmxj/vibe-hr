@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
 
-import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
+import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -31,6 +36,8 @@ type InquiryForm = {
   note: string;
   is_confirmed: boolean;
 };
+
+type InquiryGridRow = MngDevInquiryItem & ReadonlyGridRow;
 
 const EMPTY_FORM: InquiryForm = {
   id: null,
@@ -63,38 +70,51 @@ function toForm(item: MngDevInquiryItem): InquiryForm {
 }
 
 export function DevInquiryManager() {
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [companyFilterInput, setCompanyFilterInput] = useState("");
+  const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<InquiryForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const query = companyFilter ? `?company_id=${companyFilter}` : "";
-  const { data, mutate } = useSWR<MngDevInquiryListResponse>(`/api/mng/dev-inquiries${query}`, fetcher, {
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-inquiries?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
+
+  const { data, mutate, isLoading } = useSWR<MngDevInquiryListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
-  const columnDefs: ColDef<MngDevInquiryItem>[] = [
-    { field: "company_name", headerName: "고객사", width: 180 },
-    { field: "inquiry_content", headerName: "문의내용", flex: 1, minWidth: 220 },
-    { field: "progress_code", headerName: "진행코드", width: 120 },
-    {
-      field: "is_confirmed",
-      headerName: "확정",
-      width: 90,
-      valueFormatter: (params) => (params.value ? "Y" : "N"),
-    },
-  ];
+  const rowData = useMemo<InquiryGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  const columnDefs = useMemo<ColDef<InquiryGridRow>[]>(
+    () => [
+      { field: "company_name", headerName: "고객사", width: 180 },
+      { field: "inquiry_content", headerName: "문의내용", minWidth: 220, flex: 1.2 },
+      { field: "progress_code", headerName: "진행코드", width: 120 },
+      { field: "project_name", headerName: "프로젝트명", width: 160 },
+      {
+        field: "is_confirmed",
+        headerName: "확정",
+        width: 90,
+        valueFormatter: (params) => (params.value ? "Y" : "N"),
+      },
+    ],
+    [],
+  );
 
   function resetForm() {
     setForm(EMPTY_FORM);
-  }
-
-  function selectItem(item: MngDevInquiryItem) {
-    setForm(toForm(item));
   }
 
   async function saveItem() {
@@ -126,6 +146,7 @@ export function DevInquiryManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
+
       toast.success("저장되었습니다.");
       await mutate();
       resetForm();
@@ -149,6 +170,7 @@ export function DevInquiryManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
+
       toast.success("삭제되었습니다.");
       await mutate();
       resetForm();
@@ -160,115 +182,133 @@ export function DevInquiryManager() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-5">
-      <Card className="lg:col-span-3">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>문의 목록</CardTitle>
-          <div className="flex items-center gap-2">
-            <select
-              value={companyFilter}
-              onChange={(event) => setCompanyFilter(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">전체 고객사</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.company_name}
-                </option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={resetForm}>
-              신규
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <MngSimpleGrid<MngDevInquiryItem>
-            rowData={items}
-            columnDefs={columnDefs}
-            onRowClick={selectItem}
-            getRowId={(row) => String(row.id)}
-            selectedRowId={form.id ? String(form.id) : null}
-            height={340}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>문의 상세</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <ReadonlyGridManager<InquiryGridRow>
+      title="개발 문의 관리"
+      searchFields={
+        <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
-            value={form.company_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={companyFilterInput}
+            onChange={(event) => setCompanyFilterInput(event.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm"
           >
-            <option value="">고객사 선택</option>
+            <option value="">전체 고객사</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.company_name}
               </option>
             ))}
           </select>
-          <Input
-            value={form.inquiry_content}
-            onChange={(event) => setForm((prev) => ({ ...prev, inquiry_content: event.target.value }))}
-            placeholder="문의 내용"
-          />
-          <Input
-            value={form.progress_code}
-            onChange={(event) => setForm((prev) => ({ ...prev, progress_code: event.target.value }))}
-            placeholder="진행 코드"
-          />
-          <CustomDatePicker
-            value={form.hoped_start_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, hoped_start_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <Input
-            value={form.estimated_man_months}
-            onChange={(event) => setForm((prev) => ({ ...prev, estimated_man_months: event.target.value }))}
-            placeholder="예상 MM"
-          />
-          <Input
-            value={form.sales_rep_name}
-            onChange={(event) => setForm((prev) => ({ ...prev, sales_rep_name: event.target.value }))}
-            placeholder="영업 담당"
-          />
-          <Input
-            value={form.client_contact_name}
-            onChange={(event) => setForm((prev) => ({ ...prev, client_contact_name: event.target.value }))}
-            placeholder="고객 담당"
-          />
-          <Input
-            value={form.project_name}
-            onChange={(event) => setForm((prev) => ({ ...prev, project_name: event.target.value }))}
-            placeholder="프로젝트명"
-          />
-          <Input
-            value={form.note}
-            onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
-            placeholder="비고"
-          />
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={form.is_confirmed}
-              onChange={(event) => setForm((prev) => ({ ...prev, is_confirmed: event.target.checked }))}
-            />
-            확정 여부
-          </label>
-          <div className="flex gap-2">
-            <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
-              저장
-            </Button>
-            <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
-              삭제
-            </Button>
+          <div className="flex items-center text-sm text-slate-500">
+            고객 문의 접수, 확정 여부, 예상 투입량을 관리합니다.
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </SearchFieldGrid>
+      }
+      beforeGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">문의 상세</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <select
+                value={form.company_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">고객사 선택</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.company_name}
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={form.progress_code}
+                onChange={(event) => setForm((prev) => ({ ...prev, progress_code: event.target.value }))}
+                placeholder="진행 코드"
+              />
+              <CustomDatePicker
+                value={form.hoped_start_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, hoped_start_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <Input
+                value={form.estimated_man_months}
+                onChange={(event) => setForm((prev) => ({ ...prev, estimated_man_months: event.target.value }))}
+                placeholder="예상 MM"
+              />
+              <Input
+                value={form.sales_rep_name}
+                onChange={(event) => setForm((prev) => ({ ...prev, sales_rep_name: event.target.value }))}
+                placeholder="영업 담당"
+              />
+              <Input
+                value={form.client_contact_name}
+                onChange={(event) => setForm((prev) => ({ ...prev, client_contact_name: event.target.value }))}
+                placeholder="고객 담당"
+              />
+              <Input
+                value={form.project_name}
+                onChange={(event) => setForm((prev) => ({ ...prev, project_name: event.target.value }))}
+                placeholder="프로젝트명"
+              />
+              <Input
+                value={form.inquiry_content}
+                onChange={(event) => setForm((prev) => ({ ...prev, inquiry_content: event.target.value }))}
+                placeholder="문의 내용"
+                className="xl:col-span-2"
+              />
+              <Input
+                value={form.note}
+                onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="비고"
+                className="xl:col-span-2"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.is_confirmed}
+                  onChange={(event) => setForm((prev) => ({ ...prev, is_confirmed: event.target.checked }))}
+                />
+                확정 여부
+              </label>
+              <div className="flex gap-2">
+                <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
+                  저장
+                </Button>
+                <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
+                  삭제
+                </Button>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  초기화
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="개발 문의 데이터가 없습니다."
+    />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

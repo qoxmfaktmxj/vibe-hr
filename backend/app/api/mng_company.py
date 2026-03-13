@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.models import AuthUser
 from app.services.menu_service import get_allowed_menu_actions_for_user
 from app.schemas.mng import (
@@ -56,12 +57,15 @@ def _require_menu_action(
 )
 def mng_company_list(
     search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: AuthUser = Depends(get_current_user),
 ) -> MngCompanyListResponse:
     _require_menu_action(session, current_user, "query")
     items = list_companies(session, search=search)
-    return MngCompanyListResponse(companies=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngCompanyListResponse(companies=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get(
@@ -144,10 +148,13 @@ def mng_company_delete(
     dependencies=[Depends(require_roles("admin", "hr_manager"))],
 )
 def mng_manager_status_list(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngManagerCompanyListResponse:
     items = list_manager_companies(session)
-    return MngManagerCompanyListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngManagerCompanyListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post(
@@ -162,7 +169,8 @@ def mng_manager_status_create(
 ) -> MngManagerCompanyListResponse:
     create_manager_company(session, payload)
     items = list_manager_companies(session)
-    return MngManagerCompanyListResponse(items=items, total_count=len(items))
+    total_count = len(items)
+    return MngManagerCompanyListResponse(items=items, total_count=total_count, page=1, limit=max(total_count, 1))
 
 
 @router.delete(

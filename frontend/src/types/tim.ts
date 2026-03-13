@@ -239,6 +239,8 @@ export type TimAnnualLeaveResponse = {
 export type TimAnnualLeaveListResponse = {
   items: TimAnnualLeaveItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type TimLeaveRequestItem = {
@@ -261,6 +263,8 @@ export type TimLeaveRequestItem = {
 export type TimLeaveRequestListResponse = {
   items: TimLeaveRequestItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 // ── 근태 리포트 (Phase 4) ──

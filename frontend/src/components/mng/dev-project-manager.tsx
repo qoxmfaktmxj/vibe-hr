@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
 
-import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
+import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -33,6 +38,8 @@ type ProjectForm = {
   has_tax_bill: boolean;
   note: string;
 };
+
+type ProjectGridRow = MngDevProjectItem & ReadonlyGridRow;
 
 const EMPTY_FORM: ProjectForm = {
   id: null,
@@ -69,44 +76,57 @@ function toForm(item: MngDevProjectItem): ProjectForm {
 }
 
 export function DevProjectManager() {
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [companyFilterInput, setCompanyFilterInput] = useState("");
+  const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const query = companyFilter ? `?company_id=${companyFilter}` : "";
-  const { data, mutate } = useSWR<MngDevProjectListResponse>(`/api/mng/dev-projects${query}`, fetcher, {
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-projects?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
+
+  const { data, mutate, isLoading } = useSWR<MngDevProjectListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
-  const columnDefs: ColDef<MngDevProjectItem>[] = [
-    { field: "project_name", headerName: "프로젝트명", flex: 1, minWidth: 180 },
-    { field: "company_name", headerName: "고객사", width: 160 },
-    { field: "assigned_staff", headerName: "담당인력", width: 160 },
-    {
-      field: "contract_amount",
-      headerName: "계약금액",
-      width: 130,
-      valueFormatter: (params) => (params.value ? Number(params.value).toLocaleString() : "-"),
-    },
-    { field: "actual_man_months", headerName: "실투입MM", width: 120 },
-  ];
+  const rowData = useMemo<ProjectGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  const columnDefs = useMemo<ColDef<ProjectGridRow>[]>(
+    () => [
+      { field: "project_name", headerName: "프로젝트명", minWidth: 180, flex: 1.2 },
+      { field: "company_name", headerName: "고객사", width: 160 },
+      { field: "assigned_staff", headerName: "담당인력", width: 160 },
+      {
+        field: "contract_amount",
+        headerName: "계약금액",
+        width: 140,
+        valueFormatter: (params) => (params.value ? Number(params.value).toLocaleString() : "-"),
+      },
+      { field: "actual_man_months", headerName: "실제 MM", width: 120 },
+      { field: "inspection_status", headerName: "검수상태", width: 120 },
+    ],
+    [],
+  );
 
   function resetForm() {
     setForm(EMPTY_FORM);
   }
 
-  function selectItem(item: MngDevProjectItem) {
-    setForm(toForm(item));
-  }
-
   async function saveItem() {
     if (!form.project_name.trim() || !form.company_id) {
-      toast.error("프로젝트명/고객사는 필수입니다.");
+      toast.error("프로젝트명과 고객사는 필수입니다.");
       return;
     }
 
@@ -134,6 +154,7 @@ export function DevProjectManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
+
       toast.success("저장되었습니다.");
       await mutate();
       resetForm();
@@ -157,6 +178,7 @@ export function DevProjectManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
+
       toast.success("삭제되었습니다.");
       await mutate();
       resetForm();
@@ -168,115 +190,142 @@ export function DevProjectManager() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-5">
-      <Card className="lg:col-span-3">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>프로젝트 목록</CardTitle>
-          <div className="flex items-center gap-2">
-            <select
-              value={companyFilter}
-              onChange={(event) => setCompanyFilter(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">전체 고객사</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.company_name}
-                </option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={resetForm}>
-              신규
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <MngSimpleGrid<MngDevProjectItem>
-            rowData={items}
-            columnDefs={columnDefs}
-            onRowClick={selectItem}
-            getRowId={(row) => String(row.id)}
-            selectedRowId={form.id ? String(form.id) : null}
-            height={340}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>프로젝트 상세</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Input
-            value={form.project_name}
-            onChange={(event) => setForm((prev) => ({ ...prev, project_name: event.target.value }))}
-            placeholder="프로젝트명"
-          />
+    <ReadonlyGridManager<ProjectGridRow>
+      title="프로젝트 관리"
+      searchFields={
+        <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
-            value={form.company_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={companyFilterInput}
+            onChange={(event) => setCompanyFilterInput(event.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm"
           >
-            <option value="">고객사 선택</option>
+            <option value="">전체 고객사</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.company_name}
               </option>
             ))}
           </select>
-          <Input
-            value={form.assigned_staff}
-            onChange={(event) => setForm((prev) => ({ ...prev, assigned_staff: event.target.value }))}
-            placeholder="담당 인력"
-          />
-          <CustomDatePicker
-            value={form.contract_start_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, contract_start_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <CustomDatePicker
-            value={form.contract_end_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, contract_end_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <Input
-            value={form.contract_amount}
-            onChange={(event) => setForm((prev) => ({ ...prev, contract_amount: event.target.value }))}
-            placeholder="계약 금액"
-          />
-          <Input
-            value={form.actual_man_months}
-            onChange={(event) => setForm((prev) => ({ ...prev, actual_man_months: event.target.value }))}
-            placeholder="실투입 MM"
-          />
-          <Input
-            value={form.inspection_status}
-            onChange={(event) => setForm((prev) => ({ ...prev, inspection_status: event.target.value }))}
-            placeholder="검수 상태"
-          />
-          <Input
-            value={form.note}
-            onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
-            placeholder="비고"
-          />
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={form.has_tax_bill}
-              onChange={(event) => setForm((prev) => ({ ...prev, has_tax_bill: event.target.checked }))}
-            />
-            계산서 여부
-          </label>
-          <div className="flex gap-2">
-            <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
-              저장
-            </Button>
-            <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
-              삭제
-            </Button>
+          <div className="flex items-center text-sm text-slate-500">
+            고객사별 개발 프로젝트와 계약/투입 정보를 한 화면에서 관리합니다.
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </SearchFieldGrid>
+      }
+      beforeGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">프로젝트 상세</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Input
+                value={form.project_name}
+                onChange={(event) => setForm((prev) => ({ ...prev, project_name: event.target.value }))}
+                placeholder="프로젝트명"
+              />
+              <select
+                value={form.company_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">고객사 선택</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.company_name}
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={form.assigned_staff}
+                onChange={(event) => setForm((prev) => ({ ...prev, assigned_staff: event.target.value }))}
+                placeholder="담당 인력"
+              />
+              <Input
+                value={form.inspection_status}
+                onChange={(event) => setForm((prev) => ({ ...prev, inspection_status: event.target.value }))}
+                placeholder="검수 상태"
+              />
+              <CustomDatePicker
+                value={form.contract_start_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, contract_start_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <CustomDatePicker
+                value={form.contract_end_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, contract_end_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <CustomDatePicker
+                value={form.dev_start_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, dev_start_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <CustomDatePicker
+                value={form.dev_end_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, dev_end_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <Input
+                value={form.contract_amount}
+                onChange={(event) => setForm((prev) => ({ ...prev, contract_amount: event.target.value }))}
+                placeholder="계약 금액"
+              />
+              <Input
+                value={form.actual_man_months}
+                onChange={(event) => setForm((prev) => ({ ...prev, actual_man_months: event.target.value }))}
+                placeholder="실제 MM"
+              />
+              <Input
+                value={form.note}
+                onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="비고"
+                className="xl:col-span-2"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.has_tax_bill}
+                  onChange={(event) => setForm((prev) => ({ ...prev, has_tax_bill: event.target.checked }))}
+                />
+                계산서 여부
+              </label>
+              <div className="flex gap-2">
+                <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
+                  저장
+                </Button>
+                <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
+                  삭제
+                </Button>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  초기화
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="프로젝트 데이터가 없습니다."
+    />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

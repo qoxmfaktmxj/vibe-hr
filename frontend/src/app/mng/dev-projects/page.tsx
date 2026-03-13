@@ -2,13 +2,18 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DevProjectManager } from "@/components/mng/dev-project-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "mng.dev-projects",
+} as const;
+
 export default async function MngDevProjectsPage() {
   await requireMenuAccess("/mng/dev-projects");
 
   return (
-    <AppShell title="프로젝트관리" description="추가개발 프로젝트를 관리합니다.">
+    <AppShell title="프로젝트 관리" description="추가 개발 프로젝트를 관리합니다.">
       <DevProjectManager />
     </AppShell>
   );
 }
-

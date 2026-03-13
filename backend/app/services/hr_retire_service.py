@@ -173,24 +173,29 @@ def list_retire_cases(
 
     rows = session.exec(stmt.order_by(HrRetireCase.created_at.desc(), HrRetireCase.id.desc())).all()
 
+    items = [
+        HrRetireCaseListItem(
+            id=retire_case.id,
+            employee_id=employee.id,
+            employee_no=employee.employee_no,
+            employee_name=user.display_name,
+            department_name=department.name,
+            position_title=employee.position_title,
+            retire_date=retire_case.retire_date,
+            reason=retire_case.reason,
+            status=retire_case.status,
+            created_at=retire_case.created_at,
+            confirmed_at=retire_case.confirmed_at,
+            cancelled_at=retire_case.cancelled_at,
+        )
+        for retire_case, employee, user, department in rows
+    ]
+
     return HrRetireCaseListResponse(
-        items=[
-            HrRetireCaseListItem(
-                id=retire_case.id,
-                employee_id=employee.id,
-                employee_no=employee.employee_no,
-                employee_name=user.display_name,
-                department_name=department.name,
-                position_title=employee.position_title,
-                retire_date=retire_case.retire_date,
-                reason=retire_case.reason,
-                status=retire_case.status,
-                created_at=retire_case.created_at,
-                confirmed_at=retire_case.confirmed_at,
-                cancelled_at=retire_case.cancelled_at,
-            )
-            for retire_case, employee, user, department in rows
-        ]
+        items=items,
+        total_count=len(items),
+        page=1,
+        limit=max(len(items), 1),
     )
 
 
@@ -518,4 +523,3 @@ def cancel_retire_case(
     )
     session.commit()
     return get_retire_case_detail(session, case_id)
-

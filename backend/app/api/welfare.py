@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.schemas.welfare import (
     WelBenefitRequestListResponse,
     WelBenefitTypeBatchRequest,
@@ -26,10 +27,13 @@ router = APIRouter(prefix="/wel", tags=["welfare"])
     dependencies=[Depends(require_roles("employee", "hr_manager", "payroll_mgr", "admin"))],
 )
 def get_wel_benefit_types(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> WelBenefitTypeListResponse:
     items = list_wel_benefit_types(session)
-    return WelBenefitTypeListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return WelBenefitTypeListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.post(
@@ -51,7 +55,10 @@ def save_wel_benefit_types_batch(
     dependencies=[Depends(require_roles("hr_manager", "payroll_mgr", "admin"))],
 )
 def get_wel_benefit_requests(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> WelBenefitRequestListResponse:
     items = list_wel_benefit_requests(session)
-    return WelBenefitRequestListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return WelBenefitRequestListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)

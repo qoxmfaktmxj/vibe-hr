@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.models import AuthUser
 from app.schemas.hri_request import (
     HriRequestActionRequest,
@@ -133,11 +134,14 @@ def receive_reject(
     dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
 )
 def my_requests(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: AuthUser = Depends(get_current_user),
 ) -> HriRequestListResponse:
     items = list_my_requests(session, current_user.id)
-    return HriRequestListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return HriRequestListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get(
@@ -160,11 +164,14 @@ def get_detail(
     dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
 )
 def my_approval_tasks(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: AuthUser = Depends(get_current_user),
 ) -> HriTaskListResponse:
     items = list_my_approval_tasks(session, current_user.id)
-    return HriTaskListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return HriTaskListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get(
@@ -173,8 +180,11 @@ def my_approval_tasks(
     dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
 )
 def my_receive_tasks(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
     current_user: AuthUser = Depends(get_current_user),
 ) -> HriTaskListResponse:
     items = list_my_receive_tasks(session, current_user.id)
-    return HriTaskListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return HriTaskListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)

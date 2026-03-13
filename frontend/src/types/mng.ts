@@ -15,6 +15,8 @@ export type MngCompanyItem = {
 export type MngCompanyListResponse = {
   companies: MngCompanyItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngCompanyDropdownItem = {
@@ -43,6 +45,8 @@ export type MngManagerCompanyItem = {
 export type MngManagerCompanyListResponse = {
   items: MngManagerCompanyItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevRequestItem = {
@@ -69,6 +73,8 @@ export type MngDevRequestItem = {
 export type MngDevRequestListResponse = {
   items: MngDevRequestItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevRequestMonthlySummaryItem = {
@@ -82,6 +88,8 @@ export type MngDevRequestMonthlySummaryItem = {
 export type MngDevRequestMonthlySummaryResponse = {
   items: MngDevRequestMonthlySummaryItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevProjectItem = {
@@ -107,6 +115,8 @@ export type MngDevProjectItem = {
 export type MngDevProjectListResponse = {
   items: MngDevProjectItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevInquiryItem = {
@@ -129,6 +139,8 @@ export type MngDevInquiryItem = {
 export type MngDevInquiryListResponse = {
   items: MngDevInquiryItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevStaffProjectItem = {
@@ -148,6 +160,8 @@ export type MngDevStaffProjectItem = {
 export type MngDevStaffProjectListResponse = {
   items: MngDevStaffProjectItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngDevStaffRevenueItem = {
@@ -160,6 +174,8 @@ export type MngDevStaffRevenueItem = {
 export type MngDevStaffRevenueSummaryResponse = {
   items: MngDevStaffRevenueItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngOutsourceContractItem = {
@@ -180,6 +196,8 @@ export type MngOutsourceContractItem = {
 export type MngOutsourceContractListResponse = {
   items: MngOutsourceContractItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngOutsourceAttendanceSummaryItem = {
@@ -198,6 +216,8 @@ export type MngOutsourceAttendanceSummaryItem = {
 export type MngOutsourceAttendanceSummaryResponse = {
   items: MngOutsourceAttendanceSummaryItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngOutsourceAttendanceItem = {
@@ -218,6 +238,8 @@ export type MngOutsourceAttendanceItem = {
 export type MngOutsourceAttendanceListResponse = {
   items: MngOutsourceAttendanceItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngInfraMasterItem = {
@@ -234,6 +256,8 @@ export type MngInfraMasterItem = {
 export type MngInfraMasterListResponse = {
   items: MngInfraMasterItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type MngInfraConfigItem = {
@@ -250,4 +274,6 @@ export type MngInfraConfigItem = {
 export type MngInfraConfigListResponse = {
   items: MngInfraConfigItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };

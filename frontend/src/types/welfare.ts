@@ -14,6 +14,8 @@ export type WelBenefitTypeItem = {
 export type WelBenefitTypeListResponse = {
   items: WelBenefitTypeItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type WelBenefitRequestItem = {
@@ -38,4 +40,6 @@ export type WelBenefitRequestItem = {
 export type WelBenefitRequestListResponse = {
   items: WelBenefitRequestItem[];
   total_count: number;
+  page: number;
+  limit: number;
 };

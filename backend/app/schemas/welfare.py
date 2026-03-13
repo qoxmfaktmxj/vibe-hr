@@ -22,6 +22,8 @@ class WelBenefitTypeItem(BaseModel):
 class WelBenefitTypeListResponse(BaseModel):
     items: list[WelBenefitTypeItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class WelBenefitRequestItem(BaseModel):
@@ -46,6 +48,8 @@ class WelBenefitRequestItem(BaseModel):
 class WelBenefitRequestListResponse(BaseModel):
     items: list[WelBenefitRequestItem]
     total_count: int
+    page: int
+    limit: int
 
 
 class WelBenefitTypeRowInput(BaseModel):

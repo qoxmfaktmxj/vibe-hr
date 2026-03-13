@@ -12,6 +12,9 @@ export type HrRetireChecklistItem = {
 
 export type HrRetireChecklistListResponse = {
   items: HrRetireChecklistItem[];
+  total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type HrRetireCaseListItem = {
@@ -31,6 +34,9 @@ export type HrRetireCaseListItem = {
 
 export type HrRetireCaseListResponse = {
   items: HrRetireCaseListItem[];
+  total_count: number;
+  page: number;
+  limit: number;
 };
 
 export type HrRetireCaseChecklistItem = {
@@ -76,4 +82,3 @@ export type HrRetireCaseDetail = {
   checklist_items: HrRetireCaseChecklistItem[];
   audit_logs: HrRetireAuditLogItem[];
 };
-

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   }
 
   const search = request.nextUrl.search || "";
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/wel/benefit-types${search}`, {
+  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/wel/requests${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

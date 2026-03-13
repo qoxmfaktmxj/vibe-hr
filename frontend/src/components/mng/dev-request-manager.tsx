@@ -1,10 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
 
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
+import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +39,8 @@ type DevRequestForm = {
   actual_man_months: string;
   note: string;
 };
+
+type DevRequestGridRow = MngDevRequestItem & ReadonlyGridRow;
 
 const EMPTY_FORM: DevRequestForm = {
   id: null,
@@ -65,17 +73,36 @@ function toForm(item: MngDevRequestItem): DevRequestForm {
 }
 
 export function DevRequestManager() {
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [companyFilterInput, setCompanyFilterInput] = useState("");
+  const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<DevRequestForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const query = companyFilter ? `?company_id=${companyFilter}` : "";
-  const endpoint = `/api/mng/dev-requests${query}`;
-  const { data, mutate } = useSWR<MngDevRequestListResponse>(endpoint, fetcher, {
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-requests?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
+
+  const monthlyQuery = useMemo(() => {
+    const params = new URLSearchParams({
+      page: "1",
+      limit: "24",
+    });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-requests/monthly-summary?${params.toString()}`;
+  }, [appliedCompanyFilter]);
+
+  const { data, mutate, isLoading } = useSWR<MngDevRequestListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
-  const { data: monthly } = useSWR<MngDevRequestMonthlySummaryResponse>(
-    `/api/mng/dev-requests/monthly-summary${query}`,
+  const { data: monthlyData, mutate: mutateMonthly } = useSWR<MngDevRequestMonthlySummaryResponse>(
+    monthlyQuery,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -85,14 +112,17 @@ export function DevRequestManager() {
 
   const companies = companyData?.companies ?? [];
   const items = useMemo(() => data?.items ?? [], [data?.items]);
-  const monthlyItems = monthly?.items ?? [];
-  const requestColumnDefs = useMemo<ColDef<MngDevRequestItem>[]>(
+  const monthlyItems = monthlyData?.items ?? [];
+  const rowData = useMemo<DevRequestGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  const requestColumnDefs = useMemo<ColDef<DevRequestGridRow>[]>(
     () => [
       { field: "request_ym", headerName: "요청월", width: 120 },
-      { field: "request_seq", headerName: "SEQ", width: 90 },
+      { field: "request_seq", headerName: "순번", width: 90 },
       { field: "company_name", headerName: "고객사", width: 160 },
       { field: "requester_name", headerName: "요청자", width: 120 },
       { field: "status_code", headerName: "상태", width: 120 },
+      { field: "request_content", headerName: "요청내용", minWidth: 220, flex: 1 },
       {
         field: "is_paid",
         headerName: "유상",
@@ -102,6 +132,7 @@ export function DevRequestManager() {
     ],
     [],
   );
+
   const summaryColumnDefs = useMemo<ColDef<MngDevRequestMonthlySummaryItem>[]>(
     () => [
       { field: "request_ym", headerName: "월", width: 120 },
@@ -109,13 +140,13 @@ export function DevRequestManager() {
       { field: "paid_count", headerName: "유상건수", width: 120 },
       {
         field: "paid_man_months_total",
-        headerName: "유상MM 합계",
+        headerName: "유상 MM 합계",
         width: 140,
         valueFormatter: (params) => Number(params.value ?? 0).toFixed(2),
       },
       {
         field: "actual_man_months_total",
-        headerName: "실투입MM 합계",
+        headerName: "실제 MM 합계",
         width: 150,
         valueFormatter: (params) => Number(params.value ?? 0).toFixed(2),
       },
@@ -136,17 +167,13 @@ export function DevRequestManager() {
     setForm(EMPTY_FORM);
   }
 
-  function selectItem(item: MngDevRequestItem) {
-    setForm(toForm(item));
-  }
-
   async function saveItem() {
     if (!form.company_id) {
       toast.error("고객사를 선택해 주세요.");
       return;
     }
     if (!form.request_ym) {
-      toast.error("요청월을 입력해 주세요.");
+      toast.error("요청일을 입력해 주세요.");
       return;
     }
 
@@ -177,8 +204,9 @@ export function DevRequestManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
+
       toast.success("저장되었습니다.");
-      await mutate();
+      await Promise.all([mutate(), mutateMonthly()]);
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -200,8 +228,9 @@ export function DevRequestManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
+
       toast.success("삭제되었습니다.");
-      await mutate();
+      await Promise.all([mutate(), mutateMonthly()]);
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -211,136 +240,151 @@ export function DevRequestManager() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>추가개발 요청 목록</CardTitle>
-          <div className="flex items-center gap-2">
-            <select
-              value={companyFilter}
-              onChange={(event) => setCompanyFilter(event.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">전체 고객사</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.company_name}
-                </option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={resetForm}>
-              신규
-            </Button>
+    <ReadonlyGridManager<DevRequestGridRow>
+      title="추가 개발 요청 관리"
+      searchFields={
+        <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
+          <select
+            value={companyFilterInput}
+            onChange={(event) => setCompanyFilterInput(event.target.value)}
+            className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+          >
+            <option value="">전체 고객사</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.company_name}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center text-sm text-slate-500">
+            고객사별 추가 개발 요청과 월별 유상 현황을 함께 확인합니다.
           </div>
-        </CardHeader>
-        <CardContent>
-          <MngSimpleGrid<MngDevRequestItem>
-            rowData={items}
-            columnDefs={requestColumnDefs}
-            onRowClick={selectItem}
-            getRowId={(row) => String(row.id)}
-            selectedRowId={form.id ? String(form.id) : null}
-            height={340}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>요청 상세</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <select
-              value={form.company_id}
-              onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">고객사 선택</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.company_name}
-                </option>
-              ))}
-            </select>
-            <CustomDatePicker
-              value={form.request_ym}
-              onChange={(value) => setForm((prev) => ({ ...prev, request_ym: value }))}
-              holidays={HOLIDAY_DATE_KEYS}
-            />
-            <Input
-              value={form.requester_name}
-              onChange={(event) => setForm((prev) => ({ ...prev, requester_name: event.target.value }))}
-              placeholder="요청자명"
-            />
-            <Input
-              value={form.status_code}
-              onChange={(event) => setForm((prev) => ({ ...prev, status_code: event.target.value }))}
-              placeholder="상태코드"
-            />
-            <Input
-              value={form.paid_man_months}
-              onChange={(event) => setForm((prev) => ({ ...prev, paid_man_months: event.target.value }))}
-              placeholder="유상 MM"
-            />
-            <Input
-              value={form.actual_man_months}
-              onChange={(event) => setForm((prev) => ({ ...prev, actual_man_months: event.target.value }))}
-              placeholder="실투입 MM"
-            />
-            <Input
-              value={form.request_content}
-              onChange={(event) => setForm((prev) => ({ ...prev, request_content: event.target.value }))}
-              placeholder="요청내용"
-              className="md:col-span-2"
-            />
-            <Input
-              value={form.note}
-              onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
-              placeholder="비고"
-              className="md:col-span-2"
-            />
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={form.is_paid}
-                onChange={(event) => setForm((prev) => ({ ...prev, is_paid: event.target.checked }))}
+        </SearchFieldGrid>
+      }
+      beforeGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">요청 상세</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <select
+                value={form.company_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, company_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">고객사 선택</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.company_name}
+                  </option>
+                ))}
+              </select>
+              <CustomDatePicker
+                value={form.request_ym}
+                onChange={(value) => setForm((prev) => ({ ...prev, request_ym: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
               />
-              유상 여부
-            </label>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={form.has_tax_bill}
-                onChange={(event) => setForm((prev) => ({ ...prev, has_tax_bill: event.target.checked }))}
+              <Input
+                value={form.requester_name}
+                onChange={(event) => setForm((prev) => ({ ...prev, requester_name: event.target.value }))}
+                placeholder="요청자명"
               />
-              계산서 여부
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
-              저장
-            </Button>
-            <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
-              삭제
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>월별 집계</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MngSimpleGrid<MngDevRequestMonthlySummaryItem>
-            rowData={monthlyItems}
-            columnDefs={summaryColumnDefs}
-            getRowId={(row) => row.request_ym}
-            height={280}
-          />
-        </CardContent>
-      </Card>
-    </div>
+              <Input
+                value={form.status_code}
+                onChange={(event) => setForm((prev) => ({ ...prev, status_code: event.target.value }))}
+                placeholder="상태코드"
+              />
+              <Input
+                value={form.paid_man_months}
+                onChange={(event) => setForm((prev) => ({ ...prev, paid_man_months: event.target.value }))}
+                placeholder="유상 MM"
+              />
+              <Input
+                value={form.actual_man_months}
+                onChange={(event) => setForm((prev) => ({ ...prev, actual_man_months: event.target.value }))}
+                placeholder="실제 MM"
+              />
+              <Input
+                value={form.request_content}
+                onChange={(event) => setForm((prev) => ({ ...prev, request_content: event.target.value }))}
+                placeholder="요청 내용"
+                className="xl:col-span-2"
+              />
+              <Input
+                value={form.note}
+                onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="비고"
+                className="xl:col-span-2"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.is_paid}
+                  onChange={(event) => setForm((prev) => ({ ...prev, is_paid: event.target.checked }))}
+                />
+                유상 여부
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.has_tax_bill}
+                  onChange={(event) => setForm((prev) => ({ ...prev, has_tax_bill: event.target.checked }))}
+                />
+                계산서 여부
+              </label>
+              <div className="flex gap-2">
+                <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
+                  저장
+                </Button>
+                <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
+                  삭제
+                </Button>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  초기화
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      }
+      afterGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">월별 요약</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MngSimpleGrid<MngDevRequestMonthlySummaryItem>
+              rowData={monthlyItems}
+              columnDefs={summaryColumnDefs}
+              getRowId={(row) => row.request_ym}
+              height={260}
+            />
+          </CardContent>
+        </Card>
+      }
+      rowData={rowData}
+      columnDefs={requestColumnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void Promise.all([mutate(), mutateMonthly()]);
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="추가 개발 요청 데이터가 없습니다."
+    />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

@@ -19,6 +19,9 @@ class HrRetireChecklistItemResponse(BaseModel):
 
 class HrRetireChecklistListResponse(BaseModel):
     items: list[HrRetireChecklistItemResponse]
+    total_count: int
+    page: int
+    limit: int
 
 
 class HrRetireChecklistCreateRequest(BaseModel):
@@ -55,6 +58,9 @@ class HrRetireCaseListItem(BaseModel):
 
 class HrRetireCaseListResponse(BaseModel):
     items: list[HrRetireCaseListItem]
+    total_count: int
+    page: int
+    limit: int
 
 
 class HrRetireCaseCreateRequest(BaseModel):
@@ -114,4 +120,3 @@ class HrRetireCaseChecklistUpdateRequest(BaseModel):
 
 class HrRetireCaseCancelRequest(BaseModel):
     cancel_reason: str | None = None
-

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import ceil
-from typing import TypeVar
+from typing import Sequence, TypeVar
 
 from sqlmodel import Session, func, select
 from sqlmodel.sql.expression import SelectOfScalar
@@ -33,3 +33,15 @@ def calc_total_pages(total_count: int, limit: int) -> int:
     if limit <= 0:
         return 1
     return max(1, ceil(total_count / limit))
+
+
+def paginate_items(items: Sequence[T], page: int, limit: int) -> tuple[list[T], int]:
+    """Paginate an already-materialized result set for list APIs."""
+    total_count = len(items)
+    if limit <= 0:
+        return list(items), total_count
+
+    safe_page = max(1, page)
+    start = (safe_page - 1) * limit
+    end = start + limit
+    return list(items[start:end]), total_count

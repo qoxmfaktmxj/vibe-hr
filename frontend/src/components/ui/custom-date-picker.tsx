@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { Input } from "@/components/ui/input";
 import { VibeDatePicker } from "@/components/ui/vibe-date-picker";
 
 type CustomDatePickerProps = {
@@ -29,6 +30,27 @@ export function CustomDatePicker({
   ariaLabel,
   disabled = false,
 }: CustomDatePickerProps) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={className}
+        onKeyDown={onKeyDown as React.KeyboardEventHandler<HTMLInputElement> | undefined}
+        aria-label={ariaLabel ?? placeholder}
+        disabled={disabled}
+      />
+    );
+  }
+
   return (
     <VibeDatePicker
       value={value}

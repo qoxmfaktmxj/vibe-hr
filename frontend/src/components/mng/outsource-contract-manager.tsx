@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
 
-import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
+import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
@@ -25,6 +30,8 @@ type ContractForm = {
   note: string;
   is_active: boolean;
 };
+
+type OutsourceContractGridRow = MngOutsourceContractItem & ReadonlyGridRow;
 
 const EMPTY_FORM: ContractForm = {
   id: null,
@@ -51,59 +58,75 @@ function toForm(item: MngOutsourceContractItem): ContractForm {
 }
 
 export function OutsourceContractManager() {
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [form, setForm] = useState<ContractForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const query = appliedSearch ? `?search=${encodeURIComponent(appliedSearch)}` : "";
-  const { data, mutate } = useSWR<MngOutsourceContractListResponse>(`/api/mng/outsource-contracts${query}`, fetcher, {
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedSearch) params.set("search", appliedSearch);
+    return `/api/mng/outsource-contracts?${params.toString()}`;
+  }, [appliedSearch, page]);
+
+  const { data, mutate, isLoading } = useSWR<MngOutsourceContractListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
   });
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const employees = employeeData?.employees ?? [];
-  const columnDefs: ColDef<MngOutsourceContractItem>[] = [
-    { field: "employee_name", headerName: "사원", width: 130 },
-    { field: "employee_no", headerName: "사번", width: 120 },
-    { field: "start_date", headerName: "시작일", width: 120 },
-    { field: "end_date", headerName: "종료일", width: 120 },
-    {
-      headerName: "총연차",
-      width: 110,
-      valueGetter: (params) =>
-        Number(params.data?.total_leave_count ?? 0) + Number(params.data?.extra_leave_count ?? 0),
-    },
-  ];
+  const rowData = useMemo<OutsourceContractGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  const columnDefs = useMemo<ColDef<OutsourceContractGridRow>[]>(
+    () => [
+      { field: "employee_name", headerName: "사원", width: 130 },
+      { field: "employee_no", headerName: "사번", width: 120 },
+      { field: "start_date", headerName: "시작일", width: 120 },
+      { field: "end_date", headerName: "종료일", width: 120 },
+      {
+        headerName: "총 연차",
+        width: 110,
+        valueGetter: (params) =>
+          Number(params.data?.total_leave_count ?? 0) + Number(params.data?.extra_leave_count ?? 0),
+      },
+      {
+        field: "is_active",
+        headerName: "사용여부",
+        width: 100,
+        valueFormatter: (params) => (params.value ? "사용" : "중지"),
+      },
+    ],
+    [],
+  );
 
   function resetForm() {
     setForm(EMPTY_FORM);
   }
 
-  function selectItem(item: MngOutsourceContractItem) {
-    setForm(toForm(item));
-  }
-
   async function validateDuplicate() {
     const employeeId = Number(form.employee_id);
     if (!employeeId || !form.start_date) return false;
+
     const response = await fetch(
       `/api/mng/outsource-contracts/check-duplicate?employee_id=${employeeId}&start_date=${form.start_date}${form.id ? `&exclude_contract_id=${form.id}` : ""}`,
       { cache: "no-store" },
     );
     const json = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(json?.detail ?? "중복 체크에 실패했습니다.");
-    }
+    if (!response.ok) throw new Error(json?.detail ?? "중복 체크에 실패했습니다.");
     return Boolean(json?.is_duplicate);
   }
 
   async function saveItem() {
     if (!form.employee_id || !form.start_date || !form.end_date) {
-      toast.error("사원/시작일/종료일은 필수입니다.");
+      toast.error("사원, 시작일, 종료일은 필수입니다.");
       return;
     }
 
@@ -125,6 +148,7 @@ export function OutsourceContractManager() {
         note: form.note || null,
         is_active: form.is_active,
       };
+
       const response = await fetch("/api/mng/outsource-contracts", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,6 +156,7 @@ export function OutsourceContractManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
+
       toast.success("저장되었습니다.");
       await mutate();
       resetForm();
@@ -155,6 +180,7 @@ export function OutsourceContractManager() {
       });
       const json = await response.json().catch(() => null);
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
+
       toast.success("삭제되었습니다.");
       await mutate();
       resetForm();
@@ -166,100 +192,110 @@ export function OutsourceContractManager() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-5">
-      <Card className="lg:col-span-3">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>외주 계약 목록</CardTitle>
-          <div className="flex items-center gap-2">
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") setAppliedSearch(search.trim());
-              }}
-              placeholder="사번/이름 검색"
-              className="h-9"
-            />
-            <Button variant="query" onClick={() => setAppliedSearch(search.trim())}>
-              조회
-            </Button>
-            <Button variant="outline" onClick={resetForm}>
-              신규
-            </Button>
+    <ReadonlyGridManager<OutsourceContractGridRow>
+      title="외주 계약 관리"
+      searchFields={
+        <SearchFieldGrid className="md:grid-cols-[1fr_1fr]">
+          <SearchTextField
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="사번 또는 이름 검색"
+          />
+          <div className="flex items-center text-sm text-slate-500">
+            외주 인력 계약, 연차 수량, 사용 상태를 관리합니다.
           </div>
-        </CardHeader>
-        <CardContent>
-          <MngSimpleGrid<MngOutsourceContractItem>
-            rowData={items}
-            columnDefs={columnDefs}
-            onRowClick={selectItem}
-            getRowId={(row) => String(row.id)}
-            selectedRowId={form.id ? String(form.id) : null}
-            height={340}
-          />
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>외주 계약 상세</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <select
-            value={form.employee_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, employee_id: event.target.value }))}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">사원 선택</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.display_name} ({employee.employee_no})
-              </option>
-            ))}
-          </select>
-          <CustomDatePicker
-            value={form.start_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, start_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <CustomDatePicker
-            value={form.end_date}
-            onChange={(value) => setForm((prev) => ({ ...prev, end_date: value }))}
-            holidays={HOLIDAY_DATE_KEYS}
-          />
-          <Input
-            value={form.total_leave_count}
-            onChange={(event) => setForm((prev) => ({ ...prev, total_leave_count: event.target.value }))}
-            placeholder="생성 연차 개수"
-          />
-          <Input
-            value={form.extra_leave_count}
-            onChange={(event) => setForm((prev) => ({ ...prev, extra_leave_count: event.target.value }))}
-            placeholder="추가 연차 개수"
-          />
-          <Input
-            value={form.note}
-            onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
-            placeholder="비고"
-          />
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={form.is_active}
-              onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
-            />
-            사용 여부
-          </label>
-          <div className="flex gap-2">
-            <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
-              저장
-            </Button>
-            <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
-              삭제
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </SearchFieldGrid>
+      }
+      beforeGrid={
+        <Card className="border-slate-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm text-slate-700">계약 상세</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <select
+                value={form.employee_id}
+                onChange={(event) => setForm((prev) => ({ ...prev, employee_id: event.target.value }))}
+                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">사원 선택</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.display_name} ({employee.employee_no})
+                  </option>
+                ))}
+              </select>
+              <CustomDatePicker
+                value={form.start_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, start_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <CustomDatePicker
+                value={form.end_date}
+                onChange={(value) => setForm((prev) => ({ ...prev, end_date: value }))}
+                holidays={HOLIDAY_DATE_KEYS}
+              />
+              <Input
+                value={form.total_leave_count}
+                onChange={(event) => setForm((prev) => ({ ...prev, total_leave_count: event.target.value }))}
+                placeholder="기본 연차 수"
+              />
+              <Input
+                value={form.extra_leave_count}
+                onChange={(event) => setForm((prev) => ({ ...prev, extra_leave_count: event.target.value }))}
+                placeholder="추가 연차 수"
+              />
+              <Input
+                value={form.note}
+                onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="비고"
+                className="xl:col-span-2"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.checked }))}
+                />
+                사용 여부
+              </label>
+              <div className="flex gap-2">
+                <Button variant="save" onClick={() => void saveItem()} disabled={saving}>
+                  저장
+                </Button>
+                <Button variant="destructive" onClick={() => void deleteItem()} disabled={saving || !form.id}>
+                  삭제
+                </Button>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
+                  초기화
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedSearch(searchInput.trim());
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="외주 계약 데이터가 없습니다."
+    />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

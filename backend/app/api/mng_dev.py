@@ -5,6 +5,7 @@ from sqlmodel import Session
 
 from app.core.auth import require_roles
 from app.core.database import get_session
+from app.core.pagination import paginate_items
 from app.schemas.mng import (
     MngBulkDeleteRequest,
     MngBulkDeleteResponse,
@@ -56,20 +57,26 @@ _ROLES = [Depends(require_roles("admin", "hr_manager"))]
 def mng_dev_request_list(
     company_id: int | None = Query(default=None),
     status_code: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevRequestListResponse:
     items = list_dev_requests(session, company_id=company_id, status_code=status_code)
-    return MngDevRequestListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevRequestListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/dev-requests/monthly-summary", response_model=MngDevRequestMonthlySummaryResponse, dependencies=_ROLES)
 def mng_dev_request_monthly_summary(
     company_id: int | None = Query(default=None),
     status_code: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevRequestMonthlySummaryResponse:
     items = list_dev_request_monthly_summary(session, company_id=company_id, status_code=status_code)
-    return MngDevRequestMonthlySummaryResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevRequestMonthlySummaryResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/dev-requests/{request_id}", response_model=MngDevRequestDetailResponse, dependencies=_ROLES)
@@ -97,10 +104,13 @@ def mng_dev_request_delete(payload: MngBulkDeleteRequest, session: Session = Dep
 @router.get("/dev-projects", response_model=MngDevProjectListResponse, dependencies=_ROLES)
 def mng_dev_project_list(
     company_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevProjectListResponse:
     items = list_dev_projects(session, company_id=company_id)
-    return MngDevProjectListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevProjectListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/dev-projects/{project_id}", response_model=MngDevProjectDetailResponse, dependencies=_ROLES)
@@ -129,10 +139,13 @@ def mng_dev_project_delete(payload: MngBulkDeleteRequest, session: Session = Dep
 def mng_dev_inquiry_list(
     company_id: int | None = Query(default=None),
     progress_code: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevInquiryListResponse:
     items = list_dev_inquiries(session, company_id=company_id, progress_code=progress_code)
-    return MngDevInquiryListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevInquiryListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/dev-inquiries/{inquiry_id}", response_model=MngDevInquiryDetailResponse, dependencies=_ROLES)
@@ -160,16 +173,22 @@ def mng_dev_inquiry_delete(payload: MngBulkDeleteRequest, session: Session = Dep
 @router.get("/dev-staff/projects", response_model=MngDevStaffProjectListResponse, dependencies=_ROLES)
 def mng_dev_staff_projects(
     company_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevStaffProjectListResponse:
     items = list_dev_staff_projects(session, company_id=company_id)
-    return MngDevStaffProjectListResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevStaffProjectListResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
 
 
 @router.get("/dev-staff/revenue-summary", response_model=MngDevStaffRevenueSummaryResponse, dependencies=_ROLES)
 def mng_dev_staff_revenue_summary(
     company_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=50, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> MngDevStaffRevenueSummaryResponse:
     items = list_dev_staff_revenue_summary(session, company_id=company_id)
-    return MngDevStaffRevenueSummaryResponse(items=items, total_count=len(items))
+    paged_items, total_count = paginate_items(items, page, limit)
+    return MngDevStaffRevenueSummaryResponse(items=paged_items, total_count=total_count, page=page, limit=limit)
