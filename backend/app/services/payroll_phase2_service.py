@@ -399,13 +399,145 @@ def create_payroll_run(session: Session, payload: PayPayrollRunCreateRequest) ->
 
 
 def _find_rate(rate_rows: list[PayTaxRate], *keywords: str) -> float:
-    lowered_keywords = [k.lower() for k in keywords]
+    row = _find_rate_row(rate_rows, *keywords)
+    return float(row.employee_rate or 0) if row is not None else 0.0
+
+
+def _find_rate_row(rate_rows: list[PayTaxRate], *keywords: str) -> PayTaxRate | None:
+    lowered_keywords = [k.replace(" ", "").lower() for k in keywords]
 
     for row in rate_rows:
-        text = row.rate_type.lower()
+        text = (row.rate_type or "").replace(" ", "").lower()
         if any(keyword in text for keyword in lowered_keywords):
-            return float(row.employee_rate or 0)
-    return 0.0
+            return row
+    return None
+
+
+def _apply_rate_limits(base_amount: float, rate_row: PayTaxRate | None) -> float:
+    if base_amount <= 0:
+        return 0.0
+
+    if rate_row is None:
+        return round(base_amount, 2)
+
+    adjusted = float(base_amount)
+    if rate_row.min_limit is not None:
+        adjusted = max(adjusted, float(rate_row.min_limit))
+    if rate_row.max_limit is not None:
+        adjusted = min(adjusted, float(rate_row.max_limit))
+    return round(adjusted, 2)
+
+
+def _apply_item_amount(
+    *,
+    amount: float,
+    direction: str,
+    tax_type: str,
+    gross_pay: float,
+    taxable_income: float,
+    non_taxable_income: float,
+    deduction_amount: float,
+) -> tuple[float, float, float, float]:
+    if amount <= 0:
+        return gross_pay, taxable_income, non_taxable_income, deduction_amount
+
+    if direction == "earning":
+        gross_pay += amount
+        if tax_type == "non-taxable":
+            non_taxable_income += amount
+        else:
+            taxable_income += amount
+        return gross_pay, taxable_income, non_taxable_income, deduction_amount
+
+    deduction_amount += amount
+    return gross_pay, taxable_income, non_taxable_income, deduction_amount
+
+
+def _welfare_request_matches_run_month(benefit_row: WelBenefitRequest, run: PayPayrollRun) -> bool:
+    if benefit_row.payroll_run_label and run.year_month in benefit_row.payroll_run_label:
+        return True
+
+    if benefit_row.status_code == "payroll_reflected":
+        return False
+
+    basis_at = benefit_row.approved_at or benefit_row.requested_at or benefit_row.updated_at or benefit_row.created_at
+    return basis_at.strftime("%Y-%m") == run.year_month
+
+
+def _build_statutory_deductions(
+    *,
+    taxable_income: float,
+    allowance_map: dict[str, PayAllowanceDeduction],
+    tax_rows: list[PayTaxRate],
+) -> tuple[list[tuple[str, str, float, str, str]], list[str]]:
+    warnings: list[str] = []
+
+    pension_row = _find_rate_row(tax_rows, "국민연금", "pension")
+    health_row = _find_rate_row(tax_rows, "건강보험", "health")
+    long_term_care_row = _find_rate_row(tax_rows, "장기요양", "long_term_care")
+    employment_row = _find_rate_row(tax_rows, "고용보험", "employment")
+    income_tax_row = _find_rate_row(tax_rows, "소득세", "income_tax")
+
+    missing_rates = [
+        label
+        for label, row in (
+            ("국민연금", pension_row),
+            ("건강보험", health_row),
+            ("장기요양", long_term_care_row),
+            ("고용보험", employment_row),
+            ("소득세", income_tax_row),
+        )
+        if row is None
+    ]
+    if missing_rates:
+        warnings.append(f"missing tax rate master: {', '.join(missing_rates)}")
+
+    pension_base = _apply_rate_limits(taxable_income, pension_row)
+    health_base = _apply_rate_limits(taxable_income, health_row)
+    employment_base = _apply_rate_limits(taxable_income, employment_row)
+    income_tax_base = _apply_rate_limits(taxable_income, income_tax_row)
+
+    pension_rate = float(pension_row.employee_rate or 0) if pension_row is not None else 0.0
+    health_rate = float(health_row.employee_rate or 0) if health_row is not None else 0.0
+    long_term_care_rate = float(long_term_care_row.employee_rate or 0) if long_term_care_row is not None else 0.0
+    employment_rate = float(employment_row.employee_rate or 0) if employment_row is not None else 0.0
+    income_tax_rate = float(income_tax_row.employee_rate or 0) if income_tax_row is not None else 0.0
+
+    pension = round(pension_base * pension_rate / 100, 2)
+    health = round(health_base * health_rate / 100, 2)
+    if health > 0 and health_rate > 0 and long_term_care_rate > 0:
+        long_term_care = round(health * (long_term_care_rate / health_rate), 2)
+    else:
+        long_term_care_base = _apply_rate_limits(taxable_income, long_term_care_row)
+        long_term_care = round(long_term_care_base * long_term_care_rate / 100, 2)
+    employment = round(employment_base * employment_rate / 100, 2)
+    income_tax = round(income_tax_base * income_tax_rate / 100, 2)
+    local_income_tax = round(income_tax * 0.1, 2)
+
+    deductions: list[tuple[str, str, float, str, str]] = []
+    for code, fallback_name, amount in (
+        ("PEN", "국민연금", pension),
+        ("HIN", "건강보험", health),
+        ("LTC", "장기요양", long_term_care),
+        ("EMP", "고용보험", employment),
+        ("ITX", "소득세", income_tax),
+        ("LTX", "지방소득세", local_income_tax),
+    ):
+        if amount <= 0:
+            continue
+
+        definition = allowance_map.get(code)
+        deductions.append(
+            (
+                code,
+                definition.name if definition else fallback_name,
+                amount,
+                definition.tax_type if definition else ("insurance" if code in {"PEN", "HIN", "LTC", "EMP"} else "tax"),
+                definition.calculation_type if definition else "formula",
+            )
+        )
+
+    return deductions, warnings
 
 
 def _run_label(year_month: str) -> str:
@@ -447,6 +579,9 @@ def _build_welfare_request_map(
 
     welfare_map: dict[int, list[tuple[WelBenefitRequest, WelBenefitType]]] = {}
     for benefit_row in benefit_rows:
+        if not _welfare_request_matches_run_month(benefit_row, run):
+            continue
+
         employee_id = employee_no_to_id.get(benefit_row.employee_no)
         benefit_type = benefit_types.get(benefit_row.benefit_type_code)
         if employee_id is None or benefit_type is None:
@@ -548,18 +683,6 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
     welfare_map = _build_welfare_request_map(session, run=run, employee_map=employee_map)
 
     tax_rows = session.exec(select(PayTaxRate).where(PayTaxRate.year == period_start.year)).all()
-    long_term_care_rate = _find_rate(tax_rows, "?κ린?붿뼇", "long_term_care")
-    pension_rate = _find_rate(tax_rows, "국민연금", "pension")
-    health_rate = _find_rate(tax_rows, "건강보험", "health")
-    employment_rate = _find_rate(tax_rows, "고용보험", "employment")
-    income_tax_rate = _find_rate(tax_rows, "소득세", "income_tax")
-
-    pension_rate = _find_rate(tax_rows, "국민연금", "pension")
-    health_rate = _find_rate(tax_rows, "건강보험", "health")
-    long_term_care_rate = _find_rate(tax_rows, "장기요양", "long_term_care")
-    employment_rate = _find_rate(tax_rows, "고용보험", "employment")
-    income_tax_rate = _find_rate(tax_rows, "소득세", "income_tax")
-
     existing_run_employee_ids = session.exec(
         select(PayPayrollRunEmployee.id).where(PayPayrollRunEmployee.run_id == run_id)
     ).all()
@@ -621,15 +744,15 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
             item_name = definition.name if definition else variable.item_code
             tax_type = definition.tax_type if definition else "taxable"
             calc_type = definition.calculation_type if definition else "manual"
-
-            if variable.direction == "earning":
-                gross_pay += float(variable.amount)
-                if tax_type == "non-taxable":
-                    non_taxable_income += float(variable.amount)
-                else:
-                    taxable_income += float(variable.amount)
-            else:
-                deduction_amount += float(variable.amount)
+            gross_pay, taxable_income, non_taxable_income, deduction_amount = _apply_item_amount(
+                amount=float(variable.amount),
+                direction=variable.direction,
+                tax_type=tax_type,
+                gross_pay=gross_pay,
+                taxable_income=taxable_income,
+                non_taxable_income=non_taxable_income,
+                deduction_amount=deduction_amount,
+            )
 
             session.add(
                 PayPayrollRunItem(
@@ -656,15 +779,15 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
             item_name = definition.name if definition else (welfare_request.benefit_type_name or benefit_type.name)
             tax_type = definition.tax_type if definition else ("tax" if direction == "deduction" else "taxable")
             calculation_type = definition.calculation_type if definition else "fixed"
-
-            if direction == "earning":
-                gross_pay += amount
-                if tax_type == "non-taxable":
-                    non_taxable_income += amount
-                else:
-                    taxable_income += amount
-            else:
-                deduction_amount += amount
+            gross_pay, taxable_income, non_taxable_income, deduction_amount = _apply_item_amount(
+                amount=amount,
+                direction=direction,
+                tax_type=tax_type,
+                gross_pay=gross_pay,
+                taxable_income=taxable_income,
+                non_taxable_income=non_taxable_income,
+                deduction_amount=deduction_amount,
+            )
 
             session.add(
                 PayPayrollRunItem(
@@ -680,26 +803,25 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
                 )
             )
 
-        pension = round(taxable_income * pension_rate / 100, 2)
-        health = round(taxable_income * health_rate / 100, 2)
-        long_term_care = round(taxable_income * long_term_care_rate / 100, 2)
-        employment = round(taxable_income * employment_rate / 100, 2)
-        income_tax = round(taxable_income * income_tax_rate / 100, 2)
-        local_income_tax = round(income_tax * 0.1, 2)
+        statutory_deductions, system_warnings = _build_statutory_deductions(
+            taxable_income=taxable_income,
+            allowance_map=allowance_map,
+            tax_rows=tax_rows,
+        )
+        for warning in system_warnings:
+            if warning not in warning_messages:
+                warning_messages.append(warning)
 
-        statutory_deductions = [
-            ("LTC", "장기요양", long_term_care),
-            ("PEN", "국민연금", pension),
-            ("HIN", "건강보험", health),
-            ("EMP", "고용보험", employment),
-            ("ITX", "소득세", income_tax),
-            ("LTX", "지방소득세", local_income_tax),
-        ]
-
-        for code, name, amount in statutory_deductions:
-            if amount <= 0:
-                continue
-            deduction_amount += amount
+        for code, name, amount, tax_type, calculation_type in statutory_deductions:
+            gross_pay, taxable_income, non_taxable_income, deduction_amount = _apply_item_amount(
+                amount=amount,
+                direction="deduction",
+                tax_type=tax_type,
+                gross_pay=gross_pay,
+                taxable_income=taxable_income,
+                non_taxable_income=non_taxable_income,
+                deduction_amount=deduction_amount,
+            )
             session.add(
                 PayPayrollRunItem(
                     run_employee_id=run_employee.id,
@@ -707,8 +829,8 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
                     item_name=name,
                     direction="deduction",
                     amount=amount,
-                    tax_type="insurance" if code in {"PEN", "HIN", "LTC", "EMP"} else "tax",
-                    calculation_type="formula",
+                    tax_type=tax_type,
+                    calculation_type=calculation_type,
                     source_type="system",
                     created_at=_utc_now(),
                 )
