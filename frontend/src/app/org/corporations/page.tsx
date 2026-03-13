@@ -1,9 +1,14 @@
+import { CorporationManager } from "@/components/org/corporation-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export default async function Page() {
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "org.corporations",
+} as const;
+
+export default async function OrganizationCorporationsPage() {
   await requireMenuAccess("/org/corporations");
 
-  return (
-      <div className="p-6 text-sm text-slate-600">법인관리 화면 준비 완료. 다음 단계에서 상세 기능을 연결합니다.</div>
-  );
+  return <CorporationManager />;
 }

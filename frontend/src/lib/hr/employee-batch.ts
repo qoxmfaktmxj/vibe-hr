@@ -25,6 +25,7 @@ export function buildEmployeeBatchPayload(rows: EmployeeBatchRowLike[]): Employe
     mode: "atomic",
     request_id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     insert: toInsert.map((row) => ({
+      employee_no: row.employee_no.trim() || null,
       display_name: row.display_name.trim(),
       department_id: row.department_id,
       position_title: row.position_title.trim() || "사원",

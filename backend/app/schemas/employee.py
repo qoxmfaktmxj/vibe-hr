@@ -42,6 +42,7 @@ class EmployeeDetailResponse(BaseModel):
 
 
 class EmployeeCreateRequest(BaseModel):
+    employee_no: str | None = Field(default=None, min_length=1, max_length=30)
     display_name: str = Field(min_length=2, max_length=100)
     department_id: int
     position_title: str = Field(min_length=1, max_length=80)

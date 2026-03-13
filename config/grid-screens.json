@@ -52,6 +52,23 @@
       ],
       "ownerModule": "SETTINGS"
     },
+    "org.corporations": {
+      "path": "/org/corporations",
+      "pageFile": "frontend/src/app/org/corporations/page.tsx",
+      "componentFile": "frontend/src/components/org/corporation-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
     "org.departments": {
       "path": "/org/departments",
       "pageFile": "frontend/src/app/org/departments/page.tsx",

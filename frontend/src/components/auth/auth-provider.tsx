@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import type { AuthUser } from "@/types/auth";
 
 type LoginPayload = {
+  enterCd: string;
   loginId: string;
   password: string;
   remember?: boolean;
@@ -66,6 +67,7 @@ export function AuthProvider({
       },
       credentials: "include",
       body: JSON.stringify({
+        enter_cd: payload.enterCd,
         login_id: payload.loginId,
         password: payload.password,
         remember: payload.remember ?? false,

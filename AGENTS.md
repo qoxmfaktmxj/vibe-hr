@@ -67,6 +67,7 @@ Keep runtime marker contracts stable and non-destructive when overlays are appli
 - AG Grid screens: run `npm run validate:grid` before lint/build.
 - Frontend changes: run `npm run lint` in `frontend` when applicable.
 - Backend changes: run the appropriate FastAPI test or startup verification when applicable.
+- When editing user-facing Korean text, preserve UTF-8 encoding and verify real browser rendering with a screenshot; treat CLI snapshot text as non-authoritative for Korean.
 - If validation cannot run, explicitly record why.
 <!-- OMX:AGENTS-MANUAL:END -->
 

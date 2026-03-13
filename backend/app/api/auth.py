@@ -7,6 +7,7 @@ from app.core.rate_limit import check_login_rate_limit
 from app.models import AuthUser
 from app.schemas.auth import (
     ImpersonationCandidateListResponse,
+    LoginCorporationListResponse,
     ImpersonationLoginRequest,
     LoginRequest,
     LoginResponse,
@@ -18,11 +19,18 @@ from app.services.auth_service import (
     build_login_response,
     build_login_user,
     impersonate_user,
+    list_login_corporations,
     list_impersonation_candidates,
     social_exchange_login,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.get("/enter-cds", response_model=LoginCorporationListResponse)
+def enter_cds(session: Session = Depends(get_session)) -> LoginCorporationListResponse:
+    corporations = list_login_corporations(session)
+    return LoginCorporationListResponse(corporations=corporations, total_count=len(corporations))
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -32,7 +40,7 @@ def login(
     session: Session = Depends(get_session),
 ) -> LoginResponse:
     check_login_rate_limit(request)
-    user = authenticate_user(session, payload.login_id, payload.password)
+    user = authenticate_user(session, payload.enter_cd, payload.login_id, payload.password)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

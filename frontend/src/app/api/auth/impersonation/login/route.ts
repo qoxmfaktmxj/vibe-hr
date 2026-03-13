@@ -11,6 +11,7 @@ const API_BASE_URL =
   process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
+const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
 const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
 const AUTH_TOKEN_EXPIRES_MIN =
   Number.isFinite(tokenExpiresEnv) && tokenExpiresEnv > 0 ? tokenExpiresEnv : 480;
@@ -18,6 +19,7 @@ const AUTH_COOKIE_MAX_AGE_SECONDS = Math.max(60, AUTH_TOKEN_EXPIRES_MIN * 60);
 
 export async function POST(request: NextRequest) {
   const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const enterCd = request.cookies.get(ENTER_CD_COOKIE)?.value ?? null;
   if (!accessToken) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.json({ user: data.user }, { status: 200 });
+  const response = NextResponse.json({ user: { ...data.user, enter_cd: enterCd } }, { status: 200 });
   response.cookies.set({
     name: AUTH_COOKIE_NAME,
     value: data.access_token,

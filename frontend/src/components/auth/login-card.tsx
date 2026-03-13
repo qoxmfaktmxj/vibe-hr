@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LockKeyhole, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -14,6 +14,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import type { LoginCorporationItem, LoginCorporationListResponse } from "@/types/auth";
+
+const FALLBACK_CORPORATIONS: LoginCorporationItem[] = [
+  {
+    enter_cd: "VIBE",
+    company_code: "VIBE",
+    corporation_name: "VIBE-HR",
+    company_logo_url: "/vibehr_mark.svg",
+  },
+];
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
@@ -46,16 +56,64 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
   const { refreshMenus } = useMenu();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialErrorMessage ?? null);
+  const [corporations, setCorporations] = useState<LoginCorporationItem[]>(FALLBACK_CORPORATIONS);
+  const [selectedEnterCd, setSelectedEnterCd] = useState("VIBE");
+  const [isLoadingEnterCd, setIsLoadingEnterCd] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCorporations() {
+      try {
+        const response = await fetch("/api/auth/enter-cds", { cache: "no-store" });
+        const data = (await response.json().catch(() => null)) as LoginCorporationListResponse | null;
+        if (!isMounted) {
+          return;
+        }
+
+        const nextCorporations =
+          response.ok && Array.isArray(data?.corporations) && data.corporations.length > 0
+            ? data.corporations
+            : FALLBACK_CORPORATIONS;
+
+        setCorporations(nextCorporations);
+        setSelectedEnterCd((current) => {
+          const activeEnterCd = nextCorporations.some((corporation) => corporation.enter_cd === current)
+            ? current
+            : (nextCorporations.find((corporation) => corporation.enter_cd === "VIBE")?.enter_cd ??
+              nextCorporations[0]?.enter_cd ??
+              "VIBE");
+          return activeEnterCd;
+        });
+      } catch {
+        if (isMounted) {
+          setCorporations(FALLBACK_CORPORATIONS);
+          setSelectedEnterCd("VIBE");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingEnterCd(false);
+        }
+      }
+    }
+
+    void loadCorporations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
+    const enterCd = formData.get("enterCd");
     const loginId = formData.get("loginId");
     const password = formData.get("password");
     const remember = formData.get("remember") === "on";
 
-    if (typeof loginId !== "string" || typeof password !== "string") {
+    if (typeof enterCd !== "string" || typeof loginId !== "string" || typeof password !== "string") {
       setErrorMessage("아이디와 비밀번호를 올바르게 입력해 주세요.");
       return;
     }
@@ -64,7 +122,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
     setErrorMessage(null);
 
     try {
-      await login({ loginId, password, remember });
+      await login({ enterCd, loginId, password, remember });
       await refreshMenus();
       router.replace("/dashboard");
     } catch {
@@ -77,6 +135,33 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
   return (
     <CardContent className="space-y-6 px-8 pb-8 pt-4">
       <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <Label htmlFor="enterCd" className="font-semibold text-slate-700">
+            ENTER_CD
+          </Label>
+          <select
+            id="enterCd"
+            name="enterCd"
+            className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            autoComplete="organization"
+            value={selectedEnterCd}
+            onChange={(event) => setSelectedEnterCd(event.target.value)}
+            disabled={isLoadingEnterCd || isSubmitting}
+            required
+          >
+            {corporations.map((corporation) => (
+              <option key={corporation.enter_cd} value={corporation.enter_cd}>
+                {corporation.enter_cd} - {corporation.corporation_name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500">
+            {isLoadingEnterCd
+              ? "활성 ENTER_CD 목록을 불러오는 중입니다."
+              : "로그인할 회사의 ENTER_CD를 선택하세요."}
+          </p>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="loginId" className="font-semibold text-slate-700">
             아이디
@@ -188,3 +273,4 @@ export function LoginCard({ initialErrorMessage = null }: { initialErrorMessage?
     </AuthCard>
   );
 }
+

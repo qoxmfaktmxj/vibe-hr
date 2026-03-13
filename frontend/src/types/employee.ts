@@ -35,6 +35,7 @@ export type EmployeeBatchPayload = {
   mode?: "atomic";
   request_id?: string;
   insert: Array<{
+    employee_no?: string | null;
     display_name: string;
     department_id: number;
     position_title: string;

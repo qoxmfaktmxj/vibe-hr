@@ -5,12 +5,28 @@ from sqlmodel import Session, or_, select
 from app.core.auth import build_access_token, parse_access_token_payload
 from app.core.security import hash_password, verify_password
 from app.core.time_utils import business_today, now_utc
-from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
-from app.schemas.auth import ImpersonationCandidate, LoginResponse, LoginUser, SocialExchangeRequest
+from app.models import AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgCorporation, OrgDepartment
+from app.schemas.auth import (
+    ImpersonationCandidate,
+    LoginCorporationItem,
+    LoginResponse,
+    LoginUser,
+    SocialExchangeRequest,
+)
 from app.services.system_setting_service import get_auth_session_policy
 
 
-def authenticate_user(session: Session, login_id: str, password: str) -> AuthUser | None:
+def authenticate_user(session: Session, enter_cd: str, login_id: str, password: str) -> AuthUser | None:
+    normalized_enter_cd = enter_cd.strip().upper()
+    corporation = session.exec(
+        select(OrgCorporation).where(
+            OrgCorporation.enter_cd == normalized_enter_cd,
+            OrgCorporation.is_active == True,  # noqa: E712
+        )
+    ).first()
+    if corporation is None:
+        return None
+
     user = session.exec(select(AuthUser).where(AuthUser.login_id == login_id)).first()
     if user is None:
         return None
@@ -60,6 +76,24 @@ def build_login_response(session: Session, user: AuthUser) -> LoginResponse:
         remember_ttl_min=policy.remember_ttl_min,
         show_countdown=policy.show_countdown,
     )
+
+
+def list_login_corporations(session: Session) -> list[LoginCorporationItem]:
+    corporations = session.exec(
+        select(OrgCorporation)
+        .where(OrgCorporation.is_active == True)  # noqa: E712
+        .order_by(OrgCorporation.corporation_name, OrgCorporation.id)
+    ).all()
+
+    return [
+        LoginCorporationItem(
+            enter_cd=corporation.enter_cd,
+            company_code=corporation.company_code,
+            corporation_name=corporation.corporation_name,
+            company_logo_url=corporation.company_logo_url,
+        )
+        for corporation in corporations
+    ]
 
 
 def list_impersonation_candidates(

@@ -46,6 +46,11 @@ def create_employee_no_commit(session: Session, payload: EmployeeCreateRequest) 
     if department is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid department_id.")
 
+    employee_no = payload.employee_no.strip() if payload.employee_no else generate_employee_no(session)
+    employee_no_exists = session.exec(select(HrEmployee.id).where(HrEmployee.employee_no == employee_no)).first()
+    if employee_no_exists is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="employee_no already exists.")
+
     login_id = payload.login_id.strip() if payload.login_id else generate_login_id(session)
     login_exists = session.exec(select(AuthUser.id).where(AuthUser.login_id == login_id)).first()
     if login_exists is not None:
@@ -70,7 +75,7 @@ def create_employee_no_commit(session: Session, payload: EmployeeCreateRequest) 
 
     employee = HrEmployee(
         user_id=user.id,
-        employee_no=generate_employee_no(session),
+        employee_no=employee_no,
         department_id=payload.department_id,
         position_title=payload.position_title,
         hire_date=payload.hire_date or business_today(),

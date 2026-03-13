@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
+    enter_cd: str = Field(min_length=1, max_length=20)
     login_id: str = Field(min_length=2, max_length=50)
     password: str = Field(min_length=4, max_length=128)
 
@@ -13,6 +14,18 @@ class LoginUser(BaseModel):
     email: str
     display_name: str
     roles: List[str]
+
+
+class LoginCorporationItem(BaseModel):
+    enter_cd: str
+    company_code: str
+    corporation_name: str
+    company_logo_url: str | None = None
+
+
+class LoginCorporationListResponse(BaseModel):
+    corporations: list[LoginCorporationItem]
+    total_count: int
 
 
 class LoginResponse(BaseModel):

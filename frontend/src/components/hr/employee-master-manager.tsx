@@ -812,7 +812,7 @@ export function EmployeeMasterManager() {
             rowData={rows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            rowSelection={{ mode: "multiRow", enableClickSelection: true }}
+            rowSelection={{ mode: "multiRow", enableClickSelection: true, checkboxes: false, headerCheckbox: false }}
             singleClickEdit={true}
             animateRows={false}
             rowClassRules={rowClassRules}
