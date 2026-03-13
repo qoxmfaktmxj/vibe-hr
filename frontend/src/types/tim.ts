@@ -326,6 +326,51 @@ export type TimScheduleGenerateResponse = {
   version_tag: string;
 };
 
+export type TimDepartmentScheduleAssignmentItem = {
+  id: number;
+  department_id: number;
+  department_code: string;
+  department_name: string;
+  organization_type: string | null;
+  cost_center_code: string | null;
+  employee_count: number;
+  pattern_id: number;
+  pattern_code: string | null;
+  pattern_name: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  priority: number;
+  is_active: boolean;
+};
+
+export type TimDepartmentScheduleAssignmentListResponse = {
+  items: TimDepartmentScheduleAssignmentItem[];
+  total_count: number;
+};
+
+export type TimDepartmentScheduleAssignmentBatchItem = {
+  id?: number | null;
+  department_id: number;
+  pattern_id: number;
+  effective_from: string;
+  effective_to: string | null;
+  priority: number;
+  is_active: boolean;
+};
+
+export type TimDepartmentScheduleAssignmentBatchRequest = {
+  items: TimDepartmentScheduleAssignmentBatchItem[];
+  delete_ids: number[];
+};
+
+export type TimDepartmentScheduleAssignmentBatchResponse = {
+  items: TimDepartmentScheduleAssignmentItem[];
+  total_count: number;
+  inserted_count: number;
+  updated_count: number;
+  deleted_count: number;
+};
+
 export type TimEmployeeScheduleExceptionItem = {
   id: number;
   employee_id: number;

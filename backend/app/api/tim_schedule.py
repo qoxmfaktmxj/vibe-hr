@@ -5,6 +5,9 @@ from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
 from app.models import AuthUser, HrEmployee
 from app.schemas.tim_schedule import (
+    TimDepartmentScheduleAssignmentBatchRequest,
+    TimDepartmentScheduleAssignmentBatchResponse,
+    TimDepartmentScheduleAssignmentListResponse,
     TimEmployeeScheduleExceptionBatchRequest,
     TimEmployeeScheduleExceptionBatchResponse,
     TimEmployeeScheduleExceptionListResponse,
@@ -14,9 +17,11 @@ from app.schemas.tim_schedule import (
     TimScheduleTodayResponse,
 )
 from app.services.tim_schedule_service import (
+    batch_save_department_schedule_assignments,
     batch_save_employee_schedule_exceptions,
     generate_employee_daily_schedules,
     get_my_today_schedule,
+    list_department_schedule_assignments,
     list_employee_schedule_exceptions,
     list_schedule_patterns,
 )
@@ -55,6 +60,35 @@ def schedule_patterns(
     _require_menu_action(session, current_user, "/tim/work-codes", "query")
     items = list_schedule_patterns(session)
     return TimSchedulePatternListResponse(items=items, total_count=len(items))
+
+
+@router.get(
+    "/departments",
+    response_model=TimDepartmentScheduleAssignmentListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def department_assignments(
+    department_id: int | None = None,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TimDepartmentScheduleAssignmentListResponse:
+    _require_menu_action(session, current_user, "/tim/work-codes", "query")
+    items = list_department_schedule_assignments(session, department_id=department_id)
+    return TimDepartmentScheduleAssignmentListResponse(items=items, total_count=len(items))
+
+
+@router.post(
+    "/departments/batch",
+    response_model=TimDepartmentScheduleAssignmentBatchResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def department_assignments_batch(
+    payload: TimDepartmentScheduleAssignmentBatchRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TimDepartmentScheduleAssignmentBatchResponse:
+    _require_menu_action(session, current_user, "/tim/work-codes", "save")
+    return batch_save_department_schedule_assignments(session, payload)
 
 
 @router.get(

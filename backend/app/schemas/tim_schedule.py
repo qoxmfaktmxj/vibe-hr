@@ -52,6 +52,51 @@ class TimSchedulePatternListResponse(BaseModel):
     total_count: int
 
 
+class TimDepartmentScheduleAssignmentItem(BaseModel):
+    id: int
+    department_id: int
+    department_code: str
+    department_name: str
+    organization_type: str | None = None
+    cost_center_code: str | None = None
+    employee_count: int = 0
+    pattern_id: int
+    pattern_code: str | None = None
+    pattern_name: str | None = None
+    effective_from: date
+    effective_to: date | None
+    priority: int
+    is_active: bool
+
+
+class TimDepartmentScheduleAssignmentListResponse(BaseModel):
+    items: list[TimDepartmentScheduleAssignmentItem]
+    total_count: int
+
+
+class TimDepartmentScheduleAssignmentUpsertRequest(BaseModel):
+    id: int | None = None
+    department_id: int
+    pattern_id: int
+    effective_from: date
+    effective_to: date | None = None
+    priority: int = 100
+    is_active: bool = True
+
+
+class TimDepartmentScheduleAssignmentBatchRequest(BaseModel):
+    items: list[TimDepartmentScheduleAssignmentUpsertRequest]
+    delete_ids: list[int] = []
+
+
+class TimDepartmentScheduleAssignmentBatchResponse(BaseModel):
+    items: list[TimDepartmentScheduleAssignmentItem]
+    total_count: int
+    inserted_count: int
+    updated_count: int
+    deleted_count: int
+
+
 class TimEmployeeScheduleExceptionItem(BaseModel):
     id: int
     employee_id: int

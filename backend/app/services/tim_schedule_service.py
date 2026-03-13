@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.core.time_utils import APP_TZ, business_today
 
 from app.models import (
     HrEmployee,
+    OrgDepartment,
     TimDepartmentScheduleAssignment,
     TimEmployeeDailySchedule,
     TimEmployeeScheduleException,
@@ -17,6 +19,9 @@ from app.models import (
     TimSchedulePatternDay,
 )
 from app.schemas.tim_schedule import (
+    TimDepartmentScheduleAssignmentBatchRequest,
+    TimDepartmentScheduleAssignmentBatchResponse,
+    TimDepartmentScheduleAssignmentItem,
     TimEmployeeScheduleExceptionBatchRequest,
     TimEmployeeScheduleExceptionBatchResponse,
     TimEmployeeScheduleExceptionItem,
@@ -216,6 +221,119 @@ def list_schedule_patterns(session: Session) -> list[TimSchedulePatternItem]:
         .order_by(TimSchedulePattern.id.asc())
     ).all()
     return [TimSchedulePatternItem(id=row.id, code=row.code, name=row.name) for row in rows]
+
+
+def list_department_schedule_assignments(
+    session: Session,
+    department_id: int | None = None,
+) -> list[TimDepartmentScheduleAssignmentItem]:
+    query = (
+        select(TimDepartmentScheduleAssignment)
+        .order_by(
+            TimDepartmentScheduleAssignment.is_active.desc(),
+            TimDepartmentScheduleAssignment.priority.desc(),
+            TimDepartmentScheduleAssignment.department_id.asc(),
+            TimDepartmentScheduleAssignment.effective_from.desc(),
+            TimDepartmentScheduleAssignment.id.desc(),
+        )
+    )
+    if department_id is not None:
+        query = query.where(TimDepartmentScheduleAssignment.department_id == department_id)
+
+    rows = session.exec(query).all()
+    if not rows:
+        return []
+
+    department_map = {
+        row.id: row
+        for row in session.exec(select(OrgDepartment)).all()
+    }
+    pattern_map = {
+        row.id: row
+        for row in session.exec(select(TimSchedulePattern)).all()
+    }
+    employee_count_rows = session.exec(
+        select(HrEmployee.department_id, func.count(HrEmployee.id)).group_by(HrEmployee.department_id)
+    ).all()
+    employee_count_map = {
+        department_key: int(employee_count)
+        for department_key, employee_count in employee_count_rows
+        if department_key is not None
+    }
+
+    items: list[TimDepartmentScheduleAssignmentItem] = []
+    for row in rows:
+        department = department_map.get(row.department_id)
+        pattern = pattern_map.get(row.pattern_id)
+        items.append(
+            TimDepartmentScheduleAssignmentItem(
+                id=row.id,
+                department_id=row.department_id,
+                department_code=department.code if department else f"DEPT-{row.department_id}",
+                department_name=department.name if department else "미확인 조직",
+                organization_type=department.organization_type if department else None,
+                cost_center_code=department.cost_center_code if department else None,
+                employee_count=employee_count_map.get(row.department_id, 0),
+                pattern_id=row.pattern_id,
+                pattern_code=pattern.code if pattern else None,
+                pattern_name=pattern.name if pattern else None,
+                effective_from=row.effective_from,
+                effective_to=row.effective_to,
+                priority=row.priority,
+                is_active=row.is_active,
+            )
+        )
+    return items
+
+
+def batch_save_department_schedule_assignments(
+    session: Session,
+    payload: TimDepartmentScheduleAssignmentBatchRequest,
+) -> TimDepartmentScheduleAssignmentBatchResponse:
+    inserted = 0
+    updated = 0
+    deleted = 0
+
+    if payload.delete_ids:
+        targets = session.exec(
+            select(TimDepartmentScheduleAssignment).where(TimDepartmentScheduleAssignment.id.in_(payload.delete_ids))
+        ).all()
+        for row in targets:
+            session.delete(row)
+        deleted = len(targets)
+
+    for item in payload.items:
+        row = session.get(TimDepartmentScheduleAssignment, item.id) if item.id else None
+        if row is None:
+            row = TimDepartmentScheduleAssignment(
+                department_id=item.department_id,
+                pattern_id=item.pattern_id,
+                effective_from=item.effective_from,
+                effective_to=item.effective_to,
+                priority=item.priority,
+                is_active=item.is_active,
+            )
+            session.add(row)
+            inserted += 1
+        else:
+            row.department_id = item.department_id
+            row.pattern_id = item.pattern_id
+            row.effective_from = item.effective_from
+            row.effective_to = item.effective_to
+            row.priority = item.priority
+            row.is_active = item.is_active
+            session.add(row)
+            updated += 1
+
+    session.commit()
+    items = list_department_schedule_assignments(session)
+    return TimDepartmentScheduleAssignmentBatchResponse(
+        items=items,
+        total_count=len(items),
+        inserted_count=inserted,
+        updated_count=updated,
+        deleted_count=deleted,
+    )
 
 
 def list_employee_schedule_exceptions(session: Session, employee_id: int | None = None) -> list[TimEmployeeScheduleExceptionItem]:
