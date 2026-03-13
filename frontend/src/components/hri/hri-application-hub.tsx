@@ -44,6 +44,7 @@ import type {
   HriRequestListResponse,
   HriRequestStepSnapshotItem,
 } from "@/types/hri";
+import type { WelBenefitTypeItem, WelBenefitTypeListResponse } from "@/types/welfare";
 
 /* ------------------------------------------------------------------ */
 /* AG Grid 모듈 등록                                                    */
@@ -280,6 +281,26 @@ function FormDetailView({
   }
 
   // 기타 유형 — key-value 표
+  if (formCode === "WEL_BENEFIT_REQUEST") {
+    const requestedAmount = Number(data.requested_amount ?? 0);
+    return (
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+        <DetailField
+          label="복리후생 유형"
+          value={String(data.benefit_type_name ?? data.benefit_type_code ?? "-")}
+        />
+        <DetailField label="유형 코드" value={String(data.benefit_type_code ?? "-")} />
+        <DetailField label="신청 금액" value={`${requestedAmount.toLocaleString("ko-KR")}원`} />
+        <div className="col-span-2 sm:col-span-3">
+          <DetailField label="신청 내용" value={String(data.description ?? "-")} />
+        </div>
+        <div className="col-span-2 sm:col-span-3">
+          <DetailField label="사유" value={String(data.reason ?? "-")} />
+        </div>
+      </dl>
+    );
+  }
+
   const entries = Object.entries(data).filter(([k]) => k !== "reason");
   return (
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
@@ -313,6 +334,9 @@ const EMPTY_FORM: FormValues = {
   start_time: "",
   end_time: "",
   applied_minutes: "480",
+  benefit_type_code: "",
+  requested_amount: "",
+  description: "",
   reason: "",
   detail: "",
 };
@@ -328,7 +352,11 @@ function formValuesFromDetail(
   return base;
 }
 
-function buildContentJson(formCode: string | null, vals: FormValues): Record<string, unknown> {
+function buildContentJson(
+  formCode: string | null,
+  vals: FormValues,
+  welfareBenefitTypes: WelBenefitTypeItem[] = [],
+): Record<string, unknown> {
   if (formCode === "TIM_CORRECTION") {
     return {
       work_date: vals.work_date,
@@ -356,7 +384,26 @@ function buildContentJson(formCode: string | null, vals: FormValues): Record<str
       reason: vals.reason,
     };
   }
+  if (formCode === "WEL_BENEFIT_REQUEST") {
+    const benefitType =
+      welfareBenefitTypes.find((item) => item.code === vals.benefit_type_code) ?? null;
+    return {
+      benefit_type_code: vals.benefit_type_code,
+      benefit_type_name: benefitType?.name ?? vals.benefit_type_code,
+      requested_amount: Number(vals.requested_amount || "0"),
+      description: vals.description,
+      reason: vals.reason,
+    };
+  }
   return { detail: vals.detail, reason: vals.reason };
+}
+
+function validateFormValues(formCode: string | null, vals: FormValues): string | null {
+  if (formCode === "WEL_BENEFIT_REQUEST") {
+    if (!vals.benefit_type_code) return "복리후생 유형을 선택해 주세요.";
+    if (Number(vals.requested_amount || "0") <= 0) return "신청 금액을 입력해 주세요.";
+  }
+  return null;
 }
 
 function StatusSelect({
@@ -384,10 +431,12 @@ function FormEditView({
   formCode,
   vals,
   onChange,
+  welfareBenefitTypes,
 }: {
   formCode: string | null;
   vals: FormValues;
   onChange: (key: string, value: string) => void;
+  welfareBenefitTypes: WelBenefitTypeItem[];
 }) {
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     onChange(key, e.target.value);
@@ -485,6 +534,54 @@ function FormEditView({
     );
   }
 
+  if (formCode === "WEL_BENEFIT_REQUEST") {
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">복리후생 유형 *</label>
+          <select
+            className="h-9 w-full rounded-md border bg-card px-2 text-sm"
+            value={vals.benefit_type_code}
+            onChange={(event) => onChange("benefit_type_code", event.target.value)}
+          >
+            <option value="">유형 선택</option>
+            {welfareBenefitTypes.map((item) => (
+              <option key={item.id} value={item.code}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted-foreground">신청 금액 *</label>
+          <Input
+            type="number"
+            min="0"
+            step="1000"
+            value={vals.requested_amount}
+            onChange={set("requested_amount")}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs text-muted-foreground">신청 내용</label>
+          <Input
+            placeholder="예: 학자금 지원, 의료비 정산"
+            value={vals.description}
+            onChange={set("description")}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-xs text-muted-foreground">사유</label>
+          <textarea
+            className="min-h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            value={vals.reason}
+            onChange={set("reason")}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // 기타
   return (
     <div className="space-y-3">
@@ -525,11 +622,13 @@ function RequestDetailDialog({
   open,
   onClose,
   onRefresh,
+  welfareBenefitTypes,
 }: {
   requestId: number | null;
   open: boolean;
   onClose: () => void;
   onRefresh: () => void;
+  welfareBenefitTypes: WelBenefitTypeItem[];
 }) {
   const { data, isLoading, mutate: mutateDetail } = useSWR<HriRequestDetailFullResponse>(
     requestId ? `/api/hri/requests/${requestId}` : null,
@@ -572,6 +671,11 @@ function RequestDetailDialog({
 
   async function handleSaveAndSubmit() {
     if (!request) return;
+    const validationMessage = validateFormValues(request.form_code ?? null, editVals);
+    if (validationMessage) {
+      toast.error(validationMessage);
+      return;
+    }
     setSaving(true);
     try {
       // 임시저장
@@ -582,7 +686,7 @@ function RequestDetailDialog({
           request_id: request.id,
           form_type_id: request.form_type_id,
           title: editTitle.trim(),
-          content_json: buildContentJson(request.form_code ?? null, editVals),
+          content_json: buildContentJson(request.form_code ?? null, editVals, welfareBenefitTypes),
         }),
       });
       const draftJson = (await draftRes.json().catch(() => null)) as HriRequestDetailResponse | { detail?: string } | null;
@@ -607,6 +711,11 @@ function RequestDetailDialog({
 
   async function handleSaveDraft() {
     if (!request) return;
+    const validationMessage = validateFormValues(request.form_code ?? null, editVals);
+    if (validationMessage) {
+      toast.error(validationMessage);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/hri/requests/draft", {
@@ -616,7 +725,7 @@ function RequestDetailDialog({
           request_id: request.id,
           form_type_id: request.form_type_id,
           title: editTitle.trim(),
-          content_json: buildContentJson(request.form_code ?? null, editVals),
+          content_json: buildContentJson(request.form_code ?? null, editVals, welfareBenefitTypes),
         }),
       });
       const json = (await res.json().catch(() => null)) as { detail?: string } | null;
@@ -728,6 +837,7 @@ function RequestDetailDialog({
                       formCode={request.form_code ?? null}
                       vals={editVals}
                       onChange={setVal}
+                      welfareBenefitTypes={welfareBenefitTypes}
                     />
                   ) : (
                     <FormDetailView
@@ -791,11 +901,13 @@ function NewRequestDialog({
   onClose,
   formTypes,
   onCreated,
+  welfareBenefitTypes,
 }: {
   open: boolean;
   onClose: () => void;
   formTypes: HriFormTypeItem[];
   onCreated: () => void;
+  welfareBenefitTypes: WelBenefitTypeItem[];
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
@@ -819,6 +931,11 @@ function NewRequestDialog({
       toast.error("신청서 유형과 제목을 입력해 주세요.");
       return;
     }
+    const validationMessage = validateFormValues(selectedForm.form_code, vals);
+    if (validationMessage) {
+      toast.error(validationMessage);
+      return;
+    }
     setSaving(true);
     try {
       // 임시저장
@@ -829,7 +946,7 @@ function NewRequestDialog({
           request_id: null,
           form_type_id: selectedForm.id,
           title: title.trim(),
-          content_json: buildContentJson(selectedForm.form_code, vals),
+          content_json: buildContentJson(selectedForm.form_code, vals, welfareBenefitTypes),
         }),
       });
       const draftJson = (await draftRes.json().catch(() => null)) as HriRequestDetailResponse | { detail?: string } | null;
@@ -911,6 +1028,7 @@ function NewRequestDialog({
                   formCode={selectedForm.form_code}
                   vals={vals}
                   onChange={setVal}
+                  welfareBenefitTypes={welfareBenefitTypes}
                 />
               </div>
             </div>
@@ -954,6 +1072,11 @@ export function HriApplicationHub() {
   const { data: formTypeData } = useSWR<HriFormTypeListResponse>("/api/hri/form-types", fetcher, {
     revalidateOnFocus: false,
   });
+  const { data: welfareBenefitTypeData } = useSWR<WelBenefitTypeListResponse>(
+    "/api/wel/benefit-types",
+    fetcher,
+    { revalidateOnFocus: false },
+  );
   const { data: myData, isLoading } = useSWR<HriRequestListResponse>(
     "/api/hri/requests/my",
     fetcher,
@@ -963,6 +1086,10 @@ export function HriApplicationHub() {
   const formTypes = useMemo(
     () => (formTypeData?.items ?? []).filter((f) => f.is_active),
     [formTypeData?.items],
+  );
+  const welfareBenefitTypes = useMemo(
+    () => (welfareBenefitTypeData?.items ?? []).filter((item) => item.is_active),
+    [welfareBenefitTypeData?.items],
   );
 
   const filteredRows = useMemo(() => {
@@ -1166,6 +1293,7 @@ export function HriApplicationHub() {
         open={detailId !== null}
         onClose={() => setDetailId(null)}
         onRefresh={refreshList}
+        welfareBenefitTypes={welfareBenefitTypes}
       />
 
       {/* 신규 작성 Dialog */}
@@ -1174,6 +1302,7 @@ export function HriApplicationHub() {
         onClose={() => setNewOpen(false)}
         formTypes={formTypes}
         onCreated={refreshList}
+        welfareBenefitTypes={welfareBenefitTypes}
       />
     </ManagerPageShell>
   );

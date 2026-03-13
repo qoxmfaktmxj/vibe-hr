@@ -2940,20 +2940,17 @@ def ensure_hri_request_samples(session: Session) -> None:
     requester_user = session.exec(
         select(AuthUser).where(AuthUser.login_id == "admin")
     ).first()
-    actor_user = session.exec(
-        select(AuthUser).where(AuthUser.login_id == "admin-local")
-    ).first()
-    if requester_user is None or actor_user is None:
+    if requester_user is None:
         return
 
     requester_employee = session.exec(
         select(HrEmployee).where(HrEmployee.user_id == requester_user.id)
     ).first()
-    actor_employee = session.exec(
-        select(HrEmployee).where(HrEmployee.user_id == actor_user.id)
-    ).first()
     if requester_employee is None:
         return
+
+    actor_user = requester_user
+    actor_employee = requester_employee
 
     form_types = {
         row.form_code: row
@@ -3144,6 +3141,58 @@ def ensure_hri_request_samples(session: Session) -> None:
                 }
             ],
             "created_at": base_created_at + timedelta(minutes=50),
+        },
+        {
+            "request_no": "HRI-WEL-260313-05",
+            "form_type": welfare_form,
+            "title": "복리후생 수신대기",
+            "status_code": "RECEIVE_IN_PROGRESS",
+            "current_step_order": 3,
+            "submitted_at": base_created_at + timedelta(minutes=62),
+            "completed_at": None,
+            "content": {
+                "benefit_type_code": benefit_type.code,
+                "benefit_type_name": benefit_type.name,
+                "requested_amount": 210000,
+                "description": "복리후생 수신 처리 대기",
+                "reason": "정산 반영 전 대기",
+            },
+            "steps": [
+                {
+                    "step_order": 1,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "TEAM_LEADER",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=64),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 2,
+                    "step_type": "APPROVAL",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "DEPT_HEAD",
+                    "action_status": "APPROVED",
+                    "acted_at": base_created_at + timedelta(minutes=66),
+                    "comment": "승인",
+                },
+                {
+                    "step_order": 3,
+                    "step_type": "RECEIVE",
+                    "actor_user_id": actor_user.id,
+                    "actor_name": actor_name,
+                    "actor_org_id": actor_org_id,
+                    "actor_role_code": "HR_ADMIN",
+                    "action_status": "WAITING",
+                    "acted_at": None,
+                    "comment": None,
+                },
+            ],
+            "created_at": base_created_at + timedelta(minutes=58),
         },
         {
             "request_no": "HRI-WEL-260313-03",

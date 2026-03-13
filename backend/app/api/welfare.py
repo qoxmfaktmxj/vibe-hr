@@ -23,7 +23,7 @@ router = APIRouter(prefix="/wel", tags=["welfare"])
 @router.get(
     "/benefit-types",
     response_model=WelBenefitTypeListResponse,
-    dependencies=[Depends(require_roles("hr_manager", "payroll_mgr", "admin"))],
+    dependencies=[Depends(require_roles("employee", "hr_manager", "payroll_mgr", "admin"))],
 )
 def get_wel_benefit_types(
     session: Session = Depends(get_session),
