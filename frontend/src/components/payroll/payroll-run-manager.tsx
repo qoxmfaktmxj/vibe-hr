@@ -292,6 +292,13 @@ export function PayrollRunManager() {
     () => employeeRows.find((row) => row.id === selectedRunEmployeeId) ?? null,
     [employeeRows, selectedRunEmployeeId],
   );
+  const selectedRunStatus = selectedRow?.status ?? null;
+  const canCalculate = selectedRunStatus === "draft" || selectedRunStatus === "calculated";
+  const calculateActionLabel = selectedRunStatus === "calculated" ? "재계산" : "계산";
+  const calculateActionPath = selectedRunStatus === "calculated" ? "recalculate" : "calculate";
+  const canRefreshSnapshot = selectedRunStatus === "draft" || selectedRunStatus === "calculated";
+  const canClose = selectedRunStatus === "calculated";
+  const canMarkPaid = selectedRunStatus === "closed";
   const detailSummary = useMemo(() => {
     const earnings = detailRows
       .filter((row) => row.direction === "earning")
@@ -450,10 +457,38 @@ export function PayrollRunManager() {
             actions={[
               { key: "query", label: "조회", icon: Search, onClick: () => void loadRuns(), disabled: working },
               { key: "create", label: "Run 생성", icon: Plus, onClick: () => void createRun(), disabled: working },
-              { key: "copy", label: "계산", icon: Calculator, onClick: () => void runAction("calculate", "급여 계산을 완료했습니다."), disabled: working || !selectedRunId },
-              { key: "template", label: "재계산", icon: RefreshCcw, onClick: () => void runAction("recalculate", "재계산을 완료했습니다."), disabled: working || !selectedRunId },
-              { key: "upload", label: "마감", icon: Check, onClick: () => void runAction("close", "급여 마감을 완료했습니다."), disabled: working || !selectedRunId },
-              { key: "download", label: "지급완료", icon: CheckCircle2, onClick: () => void runAction("mark-paid", "지급완료 처리했습니다."), disabled: working || !selectedRunId },
+              {
+                key: "copy",
+                label: calculateActionLabel,
+                icon: Calculator,
+                onClick: () =>
+                  void runAction(
+                    calculateActionPath,
+                    selectedRunStatus === "calculated" ? "재계산을 완료했습니다." : "급여 계산을 완료했습니다.",
+                  ),
+                disabled: working || !selectedRunId || !canCalculate,
+              },
+              {
+                key: "template",
+                label: "스냅샷 갱신",
+                icon: RefreshCcw,
+                onClick: () => void runAction("snapshot-backfill", "대상자 스냅샷을 갱신했습니다."),
+                disabled: working || !selectedRunId || !canRefreshSnapshot,
+              },
+              {
+                key: "upload",
+                label: "마감",
+                icon: Check,
+                onClick: () => void runAction("close", "급여 마감을 완료했습니다."),
+                disabled: working || !selectedRunId || !canClose,
+              },
+              {
+                key: "download",
+                label: "지급완료",
+                icon: CheckCircle2,
+                onClick: () => void runAction("mark-paid", "지급완료 처리했습니다."),
+                disabled: working || !selectedRunId || !canMarkPaid,
+              },
             ]}
             saveAction={{
               key: "save",
