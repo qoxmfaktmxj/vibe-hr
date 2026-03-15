@@ -4,9 +4,10 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models import (
     AuthUser,
-    HrEmployee,
     HrAppointmentOrder,
     HrAppointmentOrderItem,
+    HrEmployee,
+    HrLeaveRequest,
     OrgDepartment,
     PayAllowanceDeduction,
     PayEmployeeProfile,
@@ -742,6 +743,95 @@ def test_create_payroll_run_collects_payroll_profile_change_events() -> None:
         salary_event = next(event for event in profile_events if event.event_code == "base_salary_changed")
         assert salary_event.payload_json["previous_base_salary"] == 3_100_000
         assert salary_event.payload_json["current_base_salary"] == 3_600_000
+
+
+def test_create_payroll_run_collects_tim_and_welfare_events() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        department, _, payroll_code, employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900555",
+            display_name="월반영이벤트",
+            base_salary=3_400_000,
+            effective_from=date(2026, 3, 1),
+        )
+        session.add(
+            HrLeaveRequest(
+                employee_id=int(employee.id),
+                leave_type="unpaid",
+                start_date=date(2026, 3, 10),
+                end_date=date(2026, 3, 11),
+                reason="무급휴가 테스트",
+                request_status="approved",
+                approved_at=datetime(2026, 3, 8, 9, 0),
+                decision_comment="승인 완료",
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.add(
+            WelBenefitType(
+                code="SCHOLARSHIP",
+                name="학자금",
+                module_path="/wel/scholarship",
+                is_deduction=False,
+                pay_item_code="SCHOLARSHIP_GRANT",
+                is_active=True,
+                sort_order=10,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.add(
+            WelBenefitRequest(
+                request_no="WEL-TEST-0555",
+                benefit_type_code="SCHOLARSHIP",
+                benefit_type_name="학자금",
+                employee_no="EMP-900555",
+                employee_name="월반영이벤트",
+                department_name=department.name,
+                status_code="approved",
+                requested_amount=250_000,
+                approved_amount=250_000,
+                payroll_run_label=None,
+                description="3월 복리후생 지급",
+                requested_at=datetime(2026, 3, 3, 9, 0),
+                approved_at=datetime(2026, 3, 4, 10, 0),
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="tim welfare event test",
+            ),
+        )
+
+        run_target = session.exec(
+            select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == created.run.id)
+        ).one()
+        target_events = session.exec(
+            select(PayPayrollRunTargetEvent).where(PayPayrollRunTargetEvent.run_id == created.run.id)
+        ).all()
+        event_codes = {event.event_code for event in target_events}
+
+        assert "unpaid_leave_approved" in event_codes
+        assert "welfare_allowance_approved" in event_codes
+        assert run_target.review_required is True
+
+        leave_event = next(event for event in target_events if event.event_code == "unpaid_leave_approved")
+        welfare_event = next(event for event in target_events if event.event_code == "welfare_allowance_approved")
+        assert leave_event.source_type == "tim_leave"
+        assert welfare_event.source_type == "welfare_request"
+        assert welfare_event.payload_json["approved_amount"] == 250_000
+        assert welfare_event.payload_json["pay_item_code"] == "SCHOLARSHIP_GRANT"
 
 
 def test_refresh_payroll_run_snapshot_recalculates_calculated_run() -> None:

@@ -7,7 +7,7 @@
 - 월 변동입력 API
 - 월 급여 Run 생성/계산/마감/지급완료 API
 - 급여 결과(사원 요약/항목 상세) 저장
-- Run 대상자 snapshot / 발령+급여프로필 이벤트 적재 / 소득세 bracket master / snapshot backfill
+- Run 대상자 snapshot / 발령+급여프로필+TIM/WEL 이벤트 적재 / 소득세 bracket master / snapshot backfill
 
 > 참고: 화면(UI)보다 백엔드 지급 파이프라인 우선 반영
 
@@ -24,7 +24,7 @@
 4. `pay_payroll_run_targets`
    - Run 생성 시 대상자/프로필 snapshot 고정
 5. `pay_payroll_run_target_events`
-   - confirmed 발령 + 급여프로필 변경 기반 급여 이벤트 판정 결과
+   - confirmed 발령 + 급여프로필 변경 + 승인된 무급휴가/TIM + 승인된 복리후생/WEL 기반 급여 이벤트 판정 결과
 6. `pay_payroll_run_employees`
    - 사원별 계산 요약(총지급, 공제, 실지급)
 7. `pay_payroll_run_items`

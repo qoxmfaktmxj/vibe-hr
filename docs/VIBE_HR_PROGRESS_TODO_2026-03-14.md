@@ -182,6 +182,7 @@
   - 소득세는 `pay_income_tax_brackets` 우선, 기존 flat rate fallback
   - 급여프로필 기준 `base_salary/item_group/payment schedule` 변경 이벤트 판정 추가
   - 기존 Run용 `snapshot-backfill` 경로 추가
+  - 승인된 `unpaid` 휴가와 승인된 복리후생 요청도 target event 에 반영
 
 ### E5 CPN 연말정산 / 마감취소
 

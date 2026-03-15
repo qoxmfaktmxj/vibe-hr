@@ -13,6 +13,7 @@ from app.models import (
     HrAppointmentOrderItem,
     HrEmployee,
     HrEmployeeBasicProfile,
+    HrLeaveRequest,
     OrgDepartment,
     PayAllowanceDeduction,
     PayEmployeeProfile,
@@ -65,6 +66,10 @@ def _parse_year_month(value: str) -> tuple[date, date]:
 
 
 def _as_date_text(value: date | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _as_datetime_text(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
 
 
@@ -247,6 +252,38 @@ def _build_payroll_profile_event_payload(
     }
 
 
+def _build_leave_request_event_payload(*, leave_request: HrLeaveRequest) -> dict[str, object]:
+    return {
+        "leave_type": leave_request.leave_type,
+        "start_date": _as_date_text(leave_request.start_date),
+        "end_date": _as_date_text(leave_request.end_date),
+        "reason": leave_request.reason,
+        "request_status": leave_request.request_status,
+        "approved_at": _as_datetime_text(leave_request.approved_at),
+        "decision_comment": leave_request.decision_comment,
+    }
+
+
+def _build_welfare_request_event_payload(
+    *,
+    benefit_row: WelBenefitRequest,
+    benefit_type: WelBenefitType,
+) -> dict[str, object]:
+    return {
+        "request_no": benefit_row.request_no,
+        "benefit_type_code": benefit_row.benefit_type_code,
+        "benefit_type_name": benefit_row.benefit_type_name,
+        "is_deduction": benefit_type.is_deduction,
+        "pay_item_code": benefit_type.pay_item_code,
+        "requested_amount": int(benefit_row.requested_amount or 0),
+        "approved_amount": int(benefit_row.approved_amount or benefit_row.requested_amount or 0),
+        "status_code": benefit_row.status_code,
+        "payroll_run_label": benefit_row.payroll_run_label,
+        "approved_at": _as_datetime_text(benefit_row.approved_at),
+        "description": benefit_row.description,
+    }
+
+
 def _collect_payroll_target_events(
     *,
     item: HrAppointmentOrderItem,
@@ -295,6 +332,20 @@ def _collect_payroll_target_events(
     return unique_events
 
 
+def _collect_leave_request_events(
+    *,
+    leave_request: HrLeaveRequest,
+) -> list[tuple[str, str, str, dict[str, object]]]:
+    if leave_request.request_status != "approved":
+        return []
+
+    payload = _build_leave_request_event_payload(leave_request=leave_request)
+    if leave_request.leave_type == "unpaid":
+        return [("unpaid_leave_approved", "무급휴가 승인", "review", payload)]
+
+    return []
+
+
 def _collect_payroll_profile_events(
     *,
     previous_profile: PayEmployeeProfile,
@@ -326,6 +377,17 @@ def _collect_payroll_profile_events(
         events.append(("pay_type_changed", "급여유형 변경", "review", payload))
 
     return events
+
+
+def _collect_welfare_request_events(
+    *,
+    benefit_row: WelBenefitRequest,
+    benefit_type: WelBenefitType,
+) -> list[tuple[str, str, str, dict[str, object]]]:
+    payload = _build_welfare_request_event_payload(benefit_row=benefit_row, benefit_type=benefit_type)
+    if benefit_type.is_deduction:
+        return [("welfare_deduction_approved", "복리후생 공제 승인", "apply", payload)]
+    return [("welfare_allowance_approved", "복리후생 지급 승인", "apply", payload)]
 
 
 def _add_target_event(
@@ -531,6 +593,88 @@ def _materialize_payroll_targets(
                     )
                     event_count += 1
             previous_profile = profile
+
+    leave_rows = session.exec(
+        select(HrLeaveRequest)
+        .where(
+            HrLeaveRequest.employee_id.in_(employee_ids),
+            HrLeaveRequest.request_status == "approved",
+            HrLeaveRequest.start_date <= period_end,
+            HrLeaveRequest.end_date >= period_start,
+        )
+        .order_by(HrLeaveRequest.employee_id, HrLeaveRequest.start_date, HrLeaveRequest.id)
+    ).all() if employee_ids else []
+    for leave_row in leave_rows:
+        target = target_by_employee.get(leave_row.employee_id)
+        if target is None:
+            continue
+
+        for event_code, event_name, decision_code, payload in _collect_leave_request_events(
+            leave_request=leave_row,
+        ):
+            _add_target_event(
+                session,
+                run=run,
+                target=target,
+                employee_id=leave_row.employee_id,
+                source_type="tim_leave",
+                source_table="tim_leave_requests",
+                source_id=leave_row.id,
+                effective_date=leave_row.start_date,
+                event_code=event_code,
+                event_name=event_name,
+                decision_code=decision_code,
+                payload=payload,
+            )
+            event_count += 1
+
+    employee_no_to_target = {
+        str(target.snapshot_json.get("employee_no")): target
+        for target in run_targets
+        if target.snapshot_json.get("employee_no")
+    }
+    benefit_types = {
+        row.code: row
+        for row in session.exec(select(WelBenefitType).where(WelBenefitType.is_active == True)).all()  # noqa: E712
+    } if employee_no_to_target else {}
+    welfare_rows = session.exec(
+        select(WelBenefitRequest).where(
+            WelBenefitRequest.employee_no.in_(list(employee_no_to_target.keys())),
+            WelBenefitRequest.status_code.in_(["approved", "payroll_reflected"]),
+            or_(
+                WelBenefitRequest.payroll_run_label == None,  # noqa: E711
+                WelBenefitRequest.payroll_run_label.ilike(f"%{run.year_month}%"),
+            ),
+        )
+    ).all() if employee_no_to_target else []
+    for benefit_row in welfare_rows:
+        if not _welfare_request_matches_run_month(benefit_row, run):
+            continue
+
+        target = employee_no_to_target.get(benefit_row.employee_no)
+        benefit_type = benefit_types.get(benefit_row.benefit_type_code)
+        if target is None or benefit_type is None:
+            continue
+
+        for event_code, event_name, decision_code, payload in _collect_welfare_request_events(
+            benefit_row=benefit_row,
+            benefit_type=benefit_type,
+        ):
+            _add_target_event(
+                session,
+                run=run,
+                target=target,
+                employee_id=target.employee_id,
+                source_type="welfare_request",
+                source_table="wel_benefit_requests",
+                source_id=benefit_row.id,
+                effective_date=(benefit_row.approved_at or benefit_row.requested_at).date(),
+                event_code=event_code,
+                event_name=event_name,
+                decision_code=decision_code,
+                payload=payload,
+            )
+            event_count += 1
 
     return len(run_targets), event_count
 
