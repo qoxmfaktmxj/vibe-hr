@@ -9,16 +9,22 @@ from sqlmodel import Session, select
 
 from app.models import (
     AuthUser,
+    HrAppointmentOrder,
+    HrAppointmentOrderItem,
     HrEmployee,
     HrEmployeeBasicProfile,
+    OrgDepartment,
     PayAllowanceDeduction,
     PayEmployeeProfile,
+    PayIncomeTaxBracket,
     PayItemGroup,
     PayPayrollCode,
     PayPayrollRun,
     PayPayrollRunEmployee,
     PayPayrollRunEvent,
     PayPayrollRunItem,
+    PayPayrollRunTarget,
+    PayPayrollRunTargetEvent,
     PayTaxRate,
     PayVariableInput,
     WelBenefitRequest,
@@ -58,6 +64,366 @@ def _parse_year_month(value: str) -> tuple[date, date]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="year_month must be YYYY-MM format.") from exc
 
 
+def _as_date_text(value: date | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _normalize_action_code(value: str | None) -> str:
+    return (value or "").replace(" ", "").strip().lower()
+
+
+def _select_active_payroll_profiles(
+    session: Session,
+    *,
+    payroll_code_id: int,
+    period_start: date,
+    period_end: date,
+) -> dict[int, PayEmployeeProfile]:
+    rows = session.exec(
+        select(PayEmployeeProfile)
+        .where(
+            PayEmployeeProfile.payroll_code_id == payroll_code_id,
+            PayEmployeeProfile.is_active == True,  # noqa: E712
+            PayEmployeeProfile.effective_from <= period_end,
+            or_(PayEmployeeProfile.effective_to == None, PayEmployeeProfile.effective_to >= period_start),  # noqa: E711
+        )
+        .order_by(PayEmployeeProfile.employee_id, PayEmployeeProfile.effective_from.desc(), PayEmployeeProfile.id.desc())
+    ).all()
+
+    profile_by_employee: dict[int, PayEmployeeProfile] = {}
+    for row in rows:
+        profile_by_employee.setdefault(row.employee_id, row)
+    return profile_by_employee
+
+
+def _resolve_payroll_targets(
+    session: Session,
+    *,
+    run: PayPayrollRun,
+    period_start: date,
+    period_end: date,
+) -> list[tuple[HrEmployee, PayEmployeeProfile, str | None, str | None, date | None]]:
+    profile_by_employee = _select_active_payroll_profiles(
+        session,
+        payroll_code_id=run.payroll_code_id,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    employee_ids = list(profile_by_employee.keys())
+    if not employee_ids:
+        return []
+
+    employee_rows = session.exec(
+        select(HrEmployee).where(
+            HrEmployee.id.in_(employee_ids),
+            HrEmployee.hire_date <= period_end,
+        )
+    ).all()
+    employee_map = {employee.id: employee for employee in employee_rows}
+
+    user_rows = session.exec(
+        select(AuthUser).where(AuthUser.id.in_([employee.user_id for employee in employee_rows]))
+    ).all()
+    user_name_map = {user.id: user.display_name for user in user_rows}
+
+    department_ids = sorted({employee.department_id for employee in employee_rows})
+    department_rows = session.exec(select(OrgDepartment).where(OrgDepartment.id.in_(department_ids))).all() if department_ids else []
+    department_name_map = {department.id: department.name for department in department_rows}
+
+    basic_profiles = session.exec(
+        select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id.in_(employee_ids))
+    ).all()
+    retire_date_map = {profile.employee_id: profile.retire_date for profile in basic_profiles}
+
+    targets: list[tuple[HrEmployee, PayEmployeeProfile, str | None, str | None, date | None]] = []
+    for employee_id in employee_ids:
+        employee = employee_map.get(employee_id)
+        if employee is None:
+            continue
+
+        retire_date = retire_date_map.get(employee_id)
+        if retire_date is not None and retire_date < period_start:
+            continue
+
+        targets.append(
+            (
+                employee,
+                profile_by_employee[employee_id],
+                user_name_map.get(employee.user_id),
+                department_name_map.get(employee.department_id),
+                retire_date,
+            )
+        )
+
+    return targets
+
+
+def _build_run_target_snapshot(
+    *,
+    employee: HrEmployee,
+    profile: PayEmployeeProfile,
+    employee_name: str | None,
+    department_name: str | None,
+    retire_date: date | None,
+    period_start: date,
+    period_end: date,
+) -> dict[str, object]:
+    return {
+        "employee_id": employee.id or 0,
+        "employee_no": employee.employee_no,
+        "employee_name": employee_name,
+        "department_id": employee.department_id,
+        "department_name": department_name,
+        "position_title": employee.position_title,
+        "hire_date": _as_date_text(employee.hire_date),
+        "employment_status": employee.employment_status,
+        "retire_date": _as_date_text(retire_date),
+        "profile_id": profile.id,
+        "payroll_code_id": profile.payroll_code_id,
+        "item_group_id": profile.item_group_id,
+        "base_salary": round(float(profile.base_salary), 2),
+        "pay_type_code": profile.pay_type_code,
+        "payment_day_type": profile.payment_day_type,
+        "payment_day_value": profile.payment_day_value,
+        "holiday_adjustment": profile.holiday_adjustment,
+        "effective_from": _as_date_text(profile.effective_from),
+        "effective_to": _as_date_text(profile.effective_to),
+        "period_start": _as_date_text(period_start),
+        "period_end": _as_date_text(period_end),
+    }
+
+
+def _build_payroll_target_event_payload(
+    *,
+    item: HrAppointmentOrderItem,
+    order: HrAppointmentOrder,
+    department_name_map: dict[int, str],
+) -> dict[str, object]:
+    return {
+        "appointment_no": order.appointment_no,
+        "order_title": order.title,
+        "appointment_kind": item.appointment_kind,
+        "action_type": item.action_type,
+        "from_department_id": item.from_department_id,
+        "from_department_name": department_name_map.get(item.from_department_id or 0),
+        "to_department_id": item.to_department_id,
+        "to_department_name": department_name_map.get(item.to_department_id or 0),
+        "from_position_title": item.from_position_title,
+        "to_position_title": item.to_position_title,
+        "from_employment_status": item.from_employment_status,
+        "to_employment_status": item.to_employment_status,
+        "start_date": _as_date_text(item.start_date),
+        "end_date": _as_date_text(item.end_date),
+        "temporary_reason": item.temporary_reason,
+        "note": item.note,
+    }
+
+
+def _collect_payroll_target_events(
+    *,
+    item: HrAppointmentOrderItem,
+    order: HrAppointmentOrder,
+    department_name_map: dict[int, str],
+) -> list[tuple[str, str, str, dict[str, object]]]:
+    payload = _build_payroll_target_event_payload(item=item, order=order, department_name_map=department_name_map)
+    action_code = _normalize_action_code(item.action_type)
+    events: list[tuple[str, str, str, dict[str, object]]] = [
+        ("appointment_order_confirmed", "발령 오더 확정", "apply", payload),
+    ]
+
+    if item.to_department_id is not None and item.to_department_id != item.from_department_id:
+        events.append(("department_changed", "부서 변경", "apply", payload))
+
+    if item.to_position_title is not None and item.to_position_title != item.from_position_title:
+        events.append(("position_changed", "직위 변경", "apply", payload))
+
+    before_status = (item.from_employment_status or "").strip().lower()
+    after_status = (item.to_employment_status or "").strip().lower()
+    if item.appointment_kind == "temporary":
+        events.append(("temporary_assignment_started", "임시 발령 시작", "review", payload))
+        if item.end_date is not None:
+            events.append(("temporary_assignment_ended", "임시 발령 종료 예정", "review", payload))
+
+    if "입사" in action_code:
+        events.append(("hire_started", "입사 이벤트", "review", payload))
+
+    if after_status and after_status != before_status:
+        if after_status == "resigned" or "퇴사" in action_code:
+            events.append(("resigned", "퇴사 이벤트", "review", payload))
+        elif before_status == "active" and after_status == "leave":
+            events.append(("leave_status_started", "휴직 시작", "review", payload))
+        elif before_status == "leave" and after_status == "active":
+            events.append(("leave_status_ended", "복직/휴직 종료", "review", payload))
+        else:
+            events.append(("employment_status_changed", "고용상태 변경", "apply", payload))
+
+    unique_events: list[tuple[str, str, str, dict[str, object]]] = []
+    seen_codes: set[str] = set()
+    for event in events:
+        if event[0] in seen_codes:
+            continue
+        seen_codes.add(event[0])
+        unique_events.append(event)
+    return unique_events
+
+
+def _materialize_payroll_targets(
+    session: Session,
+    *,
+    run: PayPayrollRun,
+    period_start: date,
+    period_end: date,
+    replace_existing: bool,
+) -> tuple[int, int]:
+    if replace_existing:
+        session.exec(delete(PayPayrollRunTargetEvent).where(PayPayrollRunTargetEvent.run_id == run.id))
+        session.exec(delete(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == run.id))
+        session.flush()
+
+    targets = _resolve_payroll_targets(session, run=run, period_start=period_start, period_end=period_end)
+    if not targets:
+        return 0, 0
+
+    run_targets: list[PayPayrollRunTarget] = []
+    for employee, profile, employee_name, department_name, retire_date in targets:
+        run_target = PayPayrollRunTarget(
+            run_id=run.id or 0,
+            employee_id=employee.id or 0,
+            profile_id=profile.id,
+            event_count=0,
+            review_required=False,
+            snapshot_json=_build_run_target_snapshot(
+                employee=employee,
+                profile=profile,
+                employee_name=employee_name,
+                department_name=department_name,
+                retire_date=retire_date,
+                period_start=period_start,
+                period_end=period_end,
+            ),
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(run_target)
+        run_targets.append(run_target)
+
+    session.flush()
+
+    employee_ids = [target.employee_id for target in run_targets]
+    department_ids = sorted(
+        {
+            department_id
+            for target in run_targets
+            for department_id in (
+                int(target.snapshot_json.get("department_id") or 0),
+            )
+            if department_id > 0
+        }
+    )
+    appointment_rows = session.exec(
+        select(HrAppointmentOrderItem, HrAppointmentOrder)
+        .join(HrAppointmentOrder, HrAppointmentOrder.id == HrAppointmentOrderItem.order_id)
+        .where(
+            HrAppointmentOrder.status == "confirmed",
+            HrAppointmentOrderItem.employee_id.in_(employee_ids),
+            HrAppointmentOrderItem.start_date <= period_end,
+            or_(HrAppointmentOrderItem.end_date == None, HrAppointmentOrderItem.end_date >= period_start),  # noqa: E711
+        )
+        .order_by(HrAppointmentOrderItem.employee_id, HrAppointmentOrderItem.start_date, HrAppointmentOrderItem.id)
+    ).all()
+    department_ids.extend(
+        department_id
+        for item, _ in appointment_rows
+        for department_id in (item.from_department_id, item.to_department_id)
+        if department_id is not None
+    )
+    department_name_map = {
+        department.id: department.name
+        for department in session.exec(
+            select(OrgDepartment).where(OrgDepartment.id.in_(sorted(set(department_ids))))
+        ).all()
+    } if department_ids else {}
+
+    target_by_employee = {target.employee_id: target for target in run_targets}
+    event_count = 0
+    for item, order in appointment_rows:
+        target = target_by_employee.get(item.employee_id)
+        if target is None:
+            continue
+
+        for event_code, event_name, decision_code, payload in _collect_payroll_target_events(
+            item=item,
+            order=order,
+            department_name_map=department_name_map,
+        ):
+            session.add(
+                PayPayrollRunTargetEvent(
+                    run_id=run.id or 0,
+                    target_id=target.id,
+                    employee_id=item.employee_id,
+                    event_code=event_code,
+                    event_name=event_name,
+                    source_type="appointment",
+                    source_table="hr_appointment_order_items",
+                    source_id=item.id,
+                    effective_date=item.start_date,
+                    decision_code=decision_code,
+                    payload_json=payload,
+                    created_at=_utc_now(),
+                )
+            )
+            target.event_count += 1
+            if decision_code == "review":
+                target.review_required = True
+            target.updated_at = _utc_now()
+            session.add(target)
+            event_count += 1
+
+    return len(run_targets), event_count
+
+
+def _ensure_payroll_targets(
+    session: Session,
+    *,
+    run: PayPayrollRun,
+    period_start: date,
+    period_end: date,
+) -> list[PayPayrollRunTarget]:
+    targets = session.exec(
+        select(PayPayrollRunTarget)
+        .where(PayPayrollRunTarget.run_id == run.id)
+        .order_by(PayPayrollRunTarget.employee_id, PayPayrollRunTarget.id)
+    ).all()
+    if targets:
+        return targets
+
+    target_count, event_count = _materialize_payroll_targets(
+        session,
+        run=run,
+        period_start=period_start,
+        period_end=period_end,
+        replace_existing=True,
+    )
+    session.add(
+        PayPayrollRunEvent(
+            run_id=run.id,
+            event_type="snapshot_backfill",
+            message=f"Payroll target snapshot backfilled for {target_count} employees ({event_count} events).",
+            created_at=_utc_now(),
+        )
+    )
+    session.commit()
+    return session.exec(
+        select(PayPayrollRunTarget)
+        .where(PayPayrollRunTarget.run_id == run.id)
+        .order_by(PayPayrollRunTarget.employee_id, PayPayrollRunTarget.id)
+    ).all()
+
+
+def _snapshot_value(snapshot: dict[str, object], key: str, default: object = None) -> object:
+    return snapshot.get(key, default)
+
+
 def _build_employee_maps(session: Session, employee_ids: list[int]) -> tuple[dict[int, HrEmployee], dict[int, str]]:
     if not employee_ids:
         return {}, {}
@@ -69,6 +435,13 @@ def _build_employee_maps(session: Session, employee_ids: list[int]) -> tuple[dic
     emp_map = {e.id: e for e in employees}
     emp_name_map = {e.id: user_name_map.get(e.user_id, "") for e in employees}
     return emp_map, emp_name_map
+
+
+def _build_run_target_snapshot_map(session: Session, run_id: int) -> dict[int, dict[str, object]]:
+    rows = session.exec(
+        select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == run_id)
+    ).all()
+    return {row.employee_id: row.snapshot_json for row in rows}
 
 
 def _build_profile_item(
@@ -356,7 +729,7 @@ def list_payroll_runs(session: Session, year_month: str | None = None, status_va
 
 
 def create_payroll_run(session: Session, payload: PayPayrollRunCreateRequest) -> PayPayrollRunActionResponse:
-    _parse_year_month(payload.year_month)
+    period_start, period_end = _parse_year_month(payload.year_month)
 
     payroll_code = session.get(PayPayrollCode, payload.payroll_code_id)
     if payroll_code is None:
@@ -380,8 +753,15 @@ def create_payroll_run(session: Session, payload: PayPayrollRunCreateRequest) ->
         updated_at=_utc_now(),
     )
     session.add(run)
-    session.commit()
-    session.refresh(run)
+    session.flush()
+
+    target_count, event_count = _materialize_payroll_targets(
+        session,
+        run=run,
+        period_start=period_start,
+        period_end=period_end,
+        replace_existing=True,
+    )
 
     session.add(
         PayPayrollRunEvent(
@@ -391,7 +771,16 @@ def create_payroll_run(session: Session, payload: PayPayrollRunCreateRequest) ->
             created_at=_utc_now(),
         )
     )
+    session.add(
+        PayPayrollRunEvent(
+            run_id=run.id,
+            event_type="snapshot_created",
+            message=f"Payroll target snapshot created for {target_count} employees ({event_count} events).",
+            created_at=_utc_now(),
+        )
+    )
     session.commit()
+    session.refresh(run)
 
     return PayPayrollRunActionResponse(
         run=_build_run_item(run, {payload.payroll_code_id: payroll_code.name}),
@@ -411,6 +800,49 @@ def _find_rate_row(rate_rows: list[PayTaxRate], *keywords: str) -> PayTaxRate | 
         if any(keyword in text for keyword in lowered_keywords):
             return row
     return None
+
+
+def _find_income_tax_bracket(
+    bracket_rows: list[PayIncomeTaxBracket],
+    annual_taxable_income: float,
+) -> PayIncomeTaxBracket | None:
+    annual_income = max(float(annual_taxable_income), 0.0)
+    for row in bracket_rows:
+        upper_bound = float(row.annual_taxable_to) if row.annual_taxable_to is not None else None
+        if annual_income < float(row.annual_taxable_from):
+            continue
+        if upper_bound is not None and annual_income > upper_bound:
+            continue
+        return row
+    return None
+
+
+def _calculate_income_tax(
+    *,
+    taxable_income: float,
+    bracket_rows: list[PayIncomeTaxBracket],
+    fallback_rate_row: PayTaxRate | None,
+) -> tuple[float, list[str]]:
+    if taxable_income <= 0:
+        return 0.0, []
+
+    annual_taxable_income = float(taxable_income) * 12
+    bracket = _find_income_tax_bracket(bracket_rows, annual_taxable_income)
+    if bracket is not None:
+        annual_income_tax = max(
+            annual_taxable_income * (float(bracket.tax_rate) / 100) - float(bracket.quick_deduction or 0),
+            0.0,
+        )
+        return round(annual_income_tax / 12, 2), []
+
+    if fallback_rate_row is not None:
+        fallback_tax = round(
+            _apply_rate_limits(taxable_income, fallback_rate_row) * float(fallback_rate_row.employee_rate or 0) / 100,
+            2,
+        )
+        return fallback_tax, ["income tax bracket master missing; legacy flat tax rate used"]
+
+    return 0.0, ["income tax bracket master missing"]
 
 
 def _apply_rate_limits(base_amount: float, rate_row: PayTaxRate | None) -> float:
@@ -469,6 +901,7 @@ def _build_statutory_deductions(
     taxable_income: float,
     allowance_map: dict[str, PayAllowanceDeduction],
     tax_rows: list[PayTaxRate],
+    income_tax_brackets: list[PayIncomeTaxBracket],
 ) -> tuple[list[tuple[str, str, float, str, str]], list[str]]:
     warnings: list[str] = []
 
@@ -485,7 +918,6 @@ def _build_statutory_deductions(
             ("건강보험", health_row),
             ("장기요양", long_term_care_row),
             ("고용보험", employment_row),
-            ("소득세", income_tax_row),
         )
         if row is None
     ]
@@ -501,7 +933,6 @@ def _build_statutory_deductions(
     health_rate = float(health_row.employee_rate or 0) if health_row is not None else 0.0
     long_term_care_rate = float(long_term_care_row.employee_rate or 0) if long_term_care_row is not None else 0.0
     employment_rate = float(employment_row.employee_rate or 0) if employment_row is not None else 0.0
-    income_tax_rate = float(income_tax_row.employee_rate or 0) if income_tax_row is not None else 0.0
 
     pension = round(pension_base * pension_rate / 100, 2)
     health = round(health_base * health_rate / 100, 2)
@@ -511,7 +942,14 @@ def _build_statutory_deductions(
         long_term_care_base = _apply_rate_limits(taxable_income, long_term_care_row)
         long_term_care = round(long_term_care_base * long_term_care_rate / 100, 2)
     employment = round(employment_base * employment_rate / 100, 2)
-    income_tax = round(income_tax_base * income_tax_rate / 100, 2)
+    income_tax, income_tax_warnings = _calculate_income_tax(
+        taxable_income=income_tax_base,
+        bracket_rows=income_tax_brackets,
+        fallback_rate_row=income_tax_row,
+    )
+    for warning in income_tax_warnings:
+        if warning not in warnings:
+            warnings.append(warning)
     local_income_tax = round(income_tax * 0.1, 2)
 
     deductions: list[tuple[str, str, float, str, str]] = []
@@ -600,14 +1038,16 @@ def _to_run_employee_item(
     row: PayPayrollRunEmployee,
     employee_map: dict[int, HrEmployee],
     employee_name_map: dict[int, str],
+    snapshot_map: dict[int, dict[str, object]] | None = None,
 ) -> PayPayrollRunEmployeeItem:
     employee = employee_map.get(row.employee_id)
+    snapshot = snapshot_map.get(row.employee_id, {}) if snapshot_map is not None else {}
     return PayPayrollRunEmployeeItem(
         id=row.id,
         run_id=row.run_id,
         employee_id=row.employee_id,
-        employee_no=employee.employee_no if employee else None,
-        employee_name=employee_name_map.get(row.employee_id),
+        employee_no=employee.employee_no if employee else (_snapshot_value(snapshot, "employee_no") if snapshot else None),
+        employee_name=employee_name_map.get(row.employee_id) or (_snapshot_value(snapshot, "employee_name") if snapshot else None),
         profile_id=row.profile_id,
         gross_pay=row.gross_pay,
         taxable_income=row.taxable_income,
@@ -630,50 +1070,26 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed/paid run cannot be recalculated.")
 
     period_start, period_end = _parse_year_month(run.year_month)
+    run_targets = _ensure_payroll_targets(session, run=run, period_start=period_start, period_end=period_end)
+    employee_ids = [target.employee_id for target in run_targets]
+    employee_map, employee_name_map = _build_employee_maps(session, employee_ids)
+    snapshot_map = {target.employee_id: target.snapshot_json for target in run_targets}
 
-    profiles = session.exec(
-        select(PayEmployeeProfile).where(
-            PayEmployeeProfile.payroll_code_id == run.payroll_code_id,
-            PayEmployeeProfile.is_active == True,  # noqa: E712
-            PayEmployeeProfile.effective_from <= period_end,
-            or_(PayEmployeeProfile.effective_to == None, PayEmployeeProfile.effective_to >= period_start),  # noqa: E711
-        )
+    target_event_rows = session.exec(
+        select(PayPayrollRunTargetEvent)
+        .where(PayPayrollRunTargetEvent.run_id == run_id)
+        .order_by(PayPayrollRunTargetEvent.employee_id, PayPayrollRunTargetEvent.effective_date, PayPayrollRunTargetEvent.id)
     ).all()
-
-    profile_by_employee = {profile.employee_id: profile for profile in profiles}
-    employee_ids = list(profile_by_employee.keys())
-
-    employee_rows = session.exec(
-        select(HrEmployee).where(
-            HrEmployee.id.in_(employee_ids),
-            HrEmployee.hire_date <= period_end,
-        )
-    ).all() if employee_ids else []
-    employee_map = {employee.id: employee for employee in employee_rows}
-
-    basic_profiles = session.exec(
-        select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id.in_(employee_ids))
-    ).all() if employee_ids else []
-    retire_date_map = {bp.employee_id: bp.retire_date for bp in basic_profiles}
-
-    eligible_employee_ids = []
-    for employee_id in employee_ids:
-        employee = employee_map.get(employee_id)
-        if employee is None:
-            continue
-
-        retire_date = retire_date_map.get(employee_id)
-        if retire_date is not None and retire_date < period_start:
-            continue
-
-        eligible_employee_ids.append(employee_id)
+    target_events_map: dict[int, list[PayPayrollRunTargetEvent]] = {}
+    for row in target_event_rows:
+        target_events_map.setdefault(row.employee_id, []).append(row)
 
     variable_rows = session.exec(
         select(PayVariableInput).where(
             PayVariableInput.year_month == run.year_month,
-            PayVariableInput.employee_id.in_(eligible_employee_ids),
+            PayVariableInput.employee_id.in_(employee_ids),
         )
-    ).all() if eligible_employee_ids else []
+    ).all() if employee_ids else []
     variable_map: dict[int, list[PayVariableInput]] = {}
     for row in variable_rows:
         variable_map.setdefault(row.employee_id, []).append(row)
@@ -683,6 +1099,11 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
     welfare_map = _build_welfare_request_map(session, run=run, employee_map=employee_map)
 
     tax_rows = session.exec(select(PayTaxRate).where(PayTaxRate.year == period_start.year)).all()
+    income_tax_brackets = session.exec(
+        select(PayIncomeTaxBracket)
+        .where(PayIncomeTaxBracket.year == period_start.year)
+        .order_by(PayIncomeTaxBracket.annual_taxable_from)
+    ).all()
     existing_run_employee_ids = session.exec(
         select(PayPayrollRunEmployee.id).where(PayPayrollRunEmployee.run_id == run_id)
     ).all()
@@ -700,18 +1121,32 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
     total_net = 0.0
     total_employees = 0
 
-    for employee_id in eligible_employee_ids:
-        profile = profile_by_employee[employee_id]
-        gross_pay = float(profile.base_salary)
-        taxable_income = float(profile.base_salary)
+    review_target_count = 0
+
+    for target in run_targets:
+        employee_id = target.employee_id
+        snapshot = target.snapshot_json
+        base_salary = float(_snapshot_value(snapshot, "base_salary", 0) or 0)
+        gross_pay = base_salary
+        taxable_income = base_salary
         non_taxable_income = 0.0
         deduction_amount = 0.0
         warning_messages: list[str] = []
+        review_events = [
+            event
+            for event in target_events_map.get(employee_id, [])
+            if event.decision_code == "review"
+        ]
+        if review_events:
+            warning_messages.append(
+                "payroll events: " + ", ".join(event.event_name for event in review_events)
+            )
+            review_target_count += 1
 
         run_employee = PayPayrollRunEmployee(
             run_id=run_id,
             employee_id=employee_id,
-            profile_id=profile.id,
+            profile_id=target.profile_id,
             gross_pay=0,
             taxable_income=0,
             non_taxable_income=0,
@@ -731,10 +1166,10 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
                 item_code="BSC",
                 item_name="기본급",
                 direction="earning",
-                amount=round(float(profile.base_salary), 2),
+                amount=round(base_salary, 2),
                 tax_type="taxable",
                 calculation_type="fixed",
-                source_type="profile",
+                source_type="snapshot",
                 created_at=_utc_now(),
             )
         )
@@ -807,6 +1242,7 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
             taxable_income=taxable_income,
             allowance_map=allowance_map,
             tax_rows=tax_rows,
+            income_tax_brackets=income_tax_brackets,
         )
         for warning in system_warnings:
             if warning not in warning_messages:
@@ -868,7 +1304,7 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
         PayPayrollRunEvent(
             run_id=run.id,
             event_type="calculated",
-            message=f"Payroll calculated for {total_employees} employees.",
+            message=f"Payroll calculated for {total_employees} employees (review targets: {review_target_count}).",
             created_at=_utc_now(),
         )
     )
@@ -948,8 +1384,9 @@ def list_payroll_run_employees(session: Session, run_id: int) -> PayPayrollRunEm
 
     employee_ids = [row.employee_id for row in rows]
     employee_map, employee_name_map = _build_employee_maps(session, employee_ids)
+    snapshot_map = _build_run_target_snapshot_map(session, run_id)
 
-    items = [_to_run_employee_item(row, employee_map, employee_name_map) for row in rows]
+    items = [_to_run_employee_item(row, employee_map, employee_name_map, snapshot_map) for row in rows]
     return PayPayrollRunEmployeeListResponse(items=items, total_count=len(items))
 
 
@@ -963,7 +1400,8 @@ def get_payroll_run_employee_detail(session: Session, run_id: int, run_employee_
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run employee not found.")
 
     employee_map, employee_name_map = _build_employee_maps(session, [row.employee_id])
-    employee_item = _to_run_employee_item(row, employee_map, employee_name_map)
+    snapshot_map = _build_run_target_snapshot_map(session, run_id)
+    employee_item = _to_run_employee_item(row, employee_map, employee_name_map, snapshot_map)
 
     run_items = session.exec(
         select(PayPayrollRunItem).where(PayPayrollRunItem.run_employee_id == run_employee_id).order_by(PayPayrollRunItem.id)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Column, Index, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -861,6 +861,25 @@ class PayTaxRate(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class PayIncomeTaxBracket(SQLModel, table=True):
+    """간이 소득세 마스터 (연간 과세표준 구간 기반)."""
+
+    __tablename__ = "pay_income_tax_brackets"
+    __table_args__ = (
+        UniqueConstraint("year", "annual_taxable_from", name="uq_pay_income_tax_brackets_year_from"),
+        Index("ix_pay_income_tax_brackets_year_range", "year", "annual_taxable_from", "annual_taxable_to"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int = Field(index=True)
+    annual_taxable_from: int = Field(index=True)
+    annual_taxable_to: Optional[int] = Field(default=None, index=True)
+    tax_rate: float = Field(default=0)
+    quick_deduction: float = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class PayAllowanceDeduction(SQLModel, table=True):
     """수당/공제 항목 마스터"""
 
@@ -982,6 +1001,29 @@ class PayPayrollRun(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class PayPayrollRunTarget(SQLModel, table=True):
+    """Run 생성 시점 대상자/프로필 고정 스냅샷."""
+
+    __tablename__ = "pay_payroll_run_targets"
+    __table_args__ = (
+        UniqueConstraint("run_id", "employee_id", name="uq_pay_payroll_run_targets_run_employee"),
+        Index("ix_pay_payroll_run_targets_run", "run_id", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    profile_id: Optional[int] = Field(default=None, foreign_key="pay_employee_profiles.id")
+    event_count: int = Field(default=0)
+    review_required: bool = Field(default=False)
+    snapshot_json: dict[str, object] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class PayPayrollRunEmployee(SQLModel, table=True):
     """월 급여 실행 대상자별 결과 요약"""
 
@@ -1039,6 +1081,33 @@ class PayPayrollRunEvent(SQLModel, table=True):
     event_type: str = Field(max_length=30)  # created | calculated | closed | paid
     message: str = Field(max_length=500)
     created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class PayPayrollRunTargetEvent(SQLModel, table=True):
+    """대상자 snapshot 생성 시 수집한 인사/발령 이벤트."""
+
+    __tablename__ = "pay_payroll_run_target_events"
+    __table_args__ = (
+        Index("ix_pay_payroll_run_target_events_run_employee", "run_id", "employee_id", "effective_date"),
+        Index("ix_pay_payroll_run_target_events_run_code", "run_id", "event_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    target_id: Optional[int] = Field(default=None, foreign_key="pay_payroll_run_targets.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    event_code: str = Field(max_length=50)
+    event_name: str = Field(max_length=120)
+    source_type: str = Field(max_length=30)
+    source_table: str = Field(max_length=50)
+    source_id: Optional[int] = Field(default=None)
+    effective_date: date = Field(index=True)
+    decision_code: str = Field(default="apply", max_length=20)
+    payload_json: dict[str, object] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=utc_now)
 
 

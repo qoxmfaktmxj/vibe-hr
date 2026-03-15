@@ -175,6 +175,11 @@
 - `P_CPN_CAL_PAY_MAIN` 대응 계산 단계 분해
 - 소득세 master/산식
 - 급여 Run 대상자 고정 / 계산요소 생성 / 검증 경고 고도화
+- 1차 반영 완료
+  - Run 생성 시 `pay_payroll_run_targets` snapshot 적재
+  - confirmed 발령을 `pay_payroll_run_target_events` 로 고정
+  - 계산은 target snapshot 기준으로 수행
+  - 소득세는 `pay_income_tax_brackets` 우선, 기존 flat rate fallback
 
 ### E5 CPN 연말정산 / 마감취소
 

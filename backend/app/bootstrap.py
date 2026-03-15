@@ -43,6 +43,7 @@ from app.models import (
     TimWorkScheduleCode,
     PayPayrollCode,
     PayTaxRate,
+    PayIncomeTaxBracket,
     PayAllowanceDeduction,
     PayItemGroup,
     PayItemGroupDetail,
@@ -2514,6 +2515,26 @@ PAY_TAX_RATE_SEEDS = [
     (2026, "고용보험", 0.9, 1.15, None, None),
 ]
 
+PAY_INCOME_TAX_BRACKET_SEEDS = [
+    # year, annual_taxable_from, annual_taxable_to, tax_rate, quick_deduction
+    (2025, 0, 14_000_000, 6.0, 0.0),
+    (2025, 14_000_000, 50_000_000, 15.0, 1_260_000.0),
+    (2025, 50_000_000, 88_000_000, 24.0, 5_760_000.0),
+    (2025, 88_000_000, 150_000_000, 35.0, 15_440_000.0),
+    (2025, 150_000_000, 300_000_000, 38.0, 19_940_000.0),
+    (2025, 300_000_000, 500_000_000, 40.0, 25_940_000.0),
+    (2025, 500_000_000, 1_000_000_000, 42.0, 35_940_000.0),
+    (2025, 1_000_000_000, None, 45.0, 65_940_000.0),
+    (2026, 0, 14_000_000, 6.0, 0.0),
+    (2026, 14_000_000, 50_000_000, 15.0, 1_260_000.0),
+    (2026, 50_000_000, 88_000_000, 24.0, 5_760_000.0),
+    (2026, 88_000_000, 150_000_000, 35.0, 15_440_000.0),
+    (2026, 150_000_000, 300_000_000, 38.0, 19_940_000.0),
+    (2026, 300_000_000, 500_000_000, 40.0, 25_940_000.0),
+    (2026, 500_000_000, 1_000_000_000, 42.0, 35_940_000.0),
+    (2026, 1_000_000_000, None, 45.0, 65_940_000.0),
+]
+
 PAY_ALLOWANCE_DEDUCTION_SEEDS = [
     # code, name, type, tax_type, calculation_type, sort_order
     ("BSC", "기본급", "allowance", "taxable", "fixed", 10),
@@ -4806,6 +4827,43 @@ def ensure_pay_tax_rates(session: Session) -> None:
     session.commit()
 
 
+def ensure_pay_income_tax_brackets(session: Session) -> None:
+    for year, annual_from, annual_to, tax_rate, quick_deduction in PAY_INCOME_TAX_BRACKET_SEEDS:
+        existing = session.exec(
+            select(PayIncomeTaxBracket).where(
+                PayIncomeTaxBracket.year == year,
+                PayIncomeTaxBracket.annual_taxable_from == annual_from,
+            )
+        ).first()
+        if existing is None:
+            session.add(
+                PayIncomeTaxBracket(
+                    year=year,
+                    annual_taxable_from=annual_from,
+                    annual_taxable_to=annual_to,
+                    tax_rate=tax_rate,
+                    quick_deduction=quick_deduction,
+                )
+            )
+            continue
+
+        changed = False
+        if existing.annual_taxable_to != annual_to:
+            existing.annual_taxable_to = annual_to
+            changed = True
+        if existing.tax_rate != tax_rate:
+            existing.tax_rate = tax_rate
+            changed = True
+        if existing.quick_deduction != quick_deduction:
+            existing.quick_deduction = quick_deduction
+            changed = True
+        if changed:
+            existing.updated_at = datetime.utcnow()
+            session.add(existing)
+
+    session.commit()
+
+
 def ensure_wel_benefit_types(session: Session) -> None:
     existing = {
         row.code: row
@@ -5761,6 +5819,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_schedule_operational_samples(session)
     ensure_pay_payroll_codes(session)
     ensure_pay_tax_rates(session)
+    ensure_pay_income_tax_brackets(session)
     ensure_pay_allowance_deductions(session)
     ensure_pay_welfare_allowance_definitions(session)
     ensure_pay_item_groups(session)

@@ -5,19 +5,25 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from app.models import (
     AuthUser,
     HrEmployee,
+    HrAppointmentOrder,
+    HrAppointmentOrderItem,
     OrgDepartment,
     PayAllowanceDeduction,
     PayEmployeeProfile,
+    PayIncomeTaxBracket,
     PayPayrollCode,
     PayPayrollRun,
     PayPayrollRunEmployee,
     PayPayrollRunItem,
+    PayPayrollRunTarget,
+    PayPayrollRunTargetEvent,
     PayTaxRate,
     PayVariableInput,
     WelBenefitRequest,
     WelBenefitType,
 )
-from app.services.payroll_phase2_service import calculate_payroll_run
+from app.schemas.payroll_phase2 import PayPayrollRunCreateRequest
+from app.services.payroll_phase2_service import calculate_payroll_run, create_payroll_run
 
 
 def _utc_now() -> datetime:
@@ -139,6 +145,27 @@ def _seed_tax_rates(
                 employer_rate=employee_rate,
                 min_limit=min_limit,
                 max_limit=max_limit,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+    session.commit()
+
+
+def _seed_income_tax_brackets(
+    session: Session,
+    *,
+    year: int,
+    rows: list[tuple[int, int | None, float, float]],
+) -> None:
+    for annual_from, annual_to, tax_rate, quick_deduction in rows:
+        session.add(
+            PayIncomeTaxBracket(
+                year=year,
+                annual_taxable_from=annual_from,
+                annual_taxable_to=annual_to,
+                tax_rate=tax_rate,
+                quick_deduction=quick_deduction,
                 created_at=_utc_now(),
                 updated_at=_utc_now(),
             )
@@ -526,3 +553,206 @@ def test_calculate_payroll_run_applies_tax_limits_and_filters_welfare_to_run_mon
         assert pension_item.amount == 277_650
         assert health_item.amount == 141_800
         assert long_term_care_item.amount == round(health_item.amount * (0.4591 / 3.545), 2)
+
+
+def test_create_payroll_run_captures_target_snapshot_and_appointment_events() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        department, _, payroll_code, employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900400",
+            display_name="스냅샷테스트",
+            base_salary=3_200_000,
+            effective_from=date(2026, 3, 1),
+        )
+        employee.position_title = "채용대기"
+        employee.employment_status = "leave"
+        employee.updated_at = _utc_now()
+        session.add(employee)
+        session.commit()
+
+        order = HrAppointmentOrder(
+            appointment_no="APT-TEST-0001",
+            appointment_code_id=None,
+            title="입사발령",
+            description="급여 이벤트 snapshot 검증",
+            effective_date=date(2026, 3, 15),
+            status="confirmed",
+            confirmed_at=_utc_now(),
+            confirmed_by=employee.user_id,
+            created_by=employee.user_id,
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(order)
+        session.commit()
+        session.refresh(order)
+
+        session.add(
+            HrAppointmentOrderItem(
+                order_id=int(order.id),
+                employee_id=int(employee.id),
+                appointment_code_id=None,
+                appointment_kind="permanent",
+                action_type="입사",
+                start_date=date(2026, 3, 15),
+                end_date=None,
+                from_department_id=int(department.id),
+                to_department_id=int(department.id),
+                from_position_title="채용대기",
+                to_position_title="사원",
+                from_employment_status="leave",
+                to_employment_status="active",
+                apply_status="applied",
+                applied_at=_utc_now(),
+                temporary_reason=None,
+                note="신규 입사",
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="snapshot capture",
+            ),
+        )
+
+        run_target = session.exec(
+            select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == created.run.id)
+        ).one()
+        target_events = session.exec(
+            select(PayPayrollRunTargetEvent).where(PayPayrollRunTargetEvent.run_id == created.run.id)
+        ).all()
+
+        assert run_target.snapshot_json["employee_no"] == "EMP-900400"
+        assert run_target.snapshot_json["base_salary"] == 3_200_000
+        assert run_target.review_required is True
+        assert run_target.event_count == len(target_events)
+
+        event_codes = {event.event_code for event in target_events}
+        assert "appointment_order_confirmed" in event_codes
+        assert "position_changed" in event_codes
+        assert "hire_started" in event_codes
+        assert "leave_status_ended" in event_codes
+
+
+def test_calculate_payroll_run_uses_target_snapshot_when_profile_changes() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        _, _, payroll_code, employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900500",
+            display_name="snapshot salary",
+            base_salary=3_000_000,
+            effective_from=date(2026, 3, 1),
+        )
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="snapshot salary test",
+            ),
+        )
+
+        profile = session.exec(
+            select(PayEmployeeProfile).where(PayEmployeeProfile.employee_id == employee.id)
+        ).one()
+        profile.base_salary = 5_000_000
+        profile.updated_at = _utc_now()
+        session.add(profile)
+        session.commit()
+
+        calculate_payroll_run(session, created.run.id)
+
+        run_target = session.exec(
+            select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == created.run.id)
+        ).one()
+        run_employee = session.exec(
+            select(PayPayrollRunEmployee).where(PayPayrollRunEmployee.run_id == created.run.id)
+        ).one()
+
+        assert run_target.snapshot_json["base_salary"] == 3_000_000
+        assert run_employee.gross_pay == 3_000_000
+
+
+def test_calculate_payroll_run_uses_income_tax_bracket_master() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        _, _, payroll_code, _ = _seed_payroll_context(
+            session,
+            employee_no="EMP-900600",
+            display_name="세율마스터",
+            base_salary=4_000_000,
+            effective_from=date(2026, 3, 1),
+        )
+        _seed_allowance_definitions(
+            session,
+            [
+                ("PEN", "국민연금", "deduction", "insurance", 110),
+                ("HIN", "건강보험", "deduction", "insurance", 120),
+                ("EMP", "고용보험", "deduction", "insurance", 125),
+                ("LTC", "장기요양", "deduction", "insurance", 127),
+                ("ITX", "소득세", "deduction", "tax", 130),
+                ("LTX", "지방소득세", "deduction", "tax", 135),
+            ],
+        )
+        _seed_tax_rates(
+            session,
+            year=2026,
+            rows=[
+                ("국민연금", 4.5, None, None),
+                ("건강보험", 3.545, None, None),
+                ("장기요양", 0.4591, None, None),
+                ("고용보험", 0.9, None, None),
+            ],
+        )
+        _seed_income_tax_brackets(
+            session,
+            year=2026,
+            rows=[
+                (0, 14_000_000, 6.0, 0.0),
+                (14_000_000, 50_000_000, 15.0, 1_260_000.0),
+                (50_000_000, 88_000_000, 24.0, 5_760_000.0),
+                (88_000_000, None, 35.0, 15_440_000.0),
+            ],
+        )
+
+        run = PayPayrollRun(
+            year_month="2026-03",
+            payroll_code_id=int(payroll_code.id),
+            run_name="소득세 master 검증",
+            status="draft",
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(run)
+        session.commit()
+        session.refresh(run)
+
+        calculate_payroll_run(session, int(run.id))
+
+        run_employee = session.exec(
+            select(PayPayrollRunEmployee).where(PayPayrollRunEmployee.run_id == run.id)
+        ).one()
+        run_items = session.exec(
+            select(PayPayrollRunItem).where(PayPayrollRunItem.run_employee_id == run_employee.id)
+        ).all()
+        item_map = {item.item_code: item for item in run_items}
+
+        expected_income_tax = round(((4_000_000 * 12) * 0.15 - 1_260_000) / 12, 2)
+        assert item_map["ITX"].amount == expected_income_tax
+        assert item_map["LTX"].amount == round(expected_income_tax * 0.1, 2)
+        assert "legacy flat tax rate used" not in (run_employee.warning_message or "")
