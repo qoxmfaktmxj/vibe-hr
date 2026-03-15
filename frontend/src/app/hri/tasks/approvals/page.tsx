@@ -2,11 +2,13 @@ import { HriApprovalTaskBoard } from "@/components/hri/hri-approval-task-board";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "hri.tasks.approvals",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function HriApprovalTasksPage() {
   await requireMenuAccess("/hri/tasks/approvals");

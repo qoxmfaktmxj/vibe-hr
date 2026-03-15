@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DevStaffViewer } from "@/components/mng/dev-staff-viewer";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.dev-staff",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngDevStaffPage() {
   await requireMenuAccess("/mng/dev-staff");

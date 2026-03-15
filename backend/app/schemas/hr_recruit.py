@@ -107,3 +107,24 @@ class HrRecruitGenerateEmployeeNoResponse(BaseModel):
     updated_count: int
     skipped_count: int
 
+
+class HrRecruitCreateEmployeesRequest(BaseModel):
+    ids: list[int] = Field(min_length=1)
+
+
+class HrRecruitCreateEmployeesResult(BaseModel):
+    finalist_id: int
+    candidate_no: str
+    full_name: str
+    outcome: str
+    detail: str
+    employee_id: int | None = None
+    employee_no: str | None = None
+    login_id: str | None = None
+
+
+class HrRecruitCreateEmployeesResponse(BaseModel):
+    created_count: int
+    skipped_count: int
+    error_count: int
+    results: list[HrRecruitCreateEmployeesResult]

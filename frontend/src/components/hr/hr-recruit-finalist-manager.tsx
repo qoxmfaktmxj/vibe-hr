@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   CellValueChangedEvent,
   ColDef,
@@ -11,6 +12,7 @@ import type {
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import {
+  ArrowRight,
   Copy,
   Download,
   FileDown,
@@ -18,6 +20,7 @@ import {
   RefreshCw,
   Save,
   Upload,
+  UserPlus,
   UserRoundPlus,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +56,7 @@ import {
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
 import type {
+  HrRecruitCreateEmployeesResponse,
   HrRecruitFinalistItem,
   HrRecruitFinalistListResponse,
 } from "@/types/hr-recruit";
@@ -153,6 +157,7 @@ async function parseErrorDetail(response: Response, fallback: string) {
 }
 
 export function HrRecruitFinalistManager() {
+  const router = useRouter();
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [rows, setRows] = useState<RecruitGridRow[]>([]);
@@ -160,6 +165,7 @@ export function HrRecruitFinalistManager() {
   const [pageSize] = useState(100);
   const [saving, setSaving] = useState(false);
   const [generatingNo, setGeneratingNo] = useState(false);
+  const [creatingEmployees, setCreatingEmployees] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [pendingReloadAction, setPendingReloadAction] = useState<PendingReloadAction | null>(null);
   const gridApiRef = useRef<GridApi<RecruitGridRow> | null>(null);
@@ -477,6 +483,10 @@ export function HrRecruitFinalistManager() {
   }, []);
 
   const generateEmployeeNoForSelected = useCallback(async () => {
+    if (hasDirtyRows) {
+      toast.error("저장되지 않은 변경 사항이 있어 사번 채번을 진행할 수 없습니다. 먼저 저장해 주세요.");
+      return;
+    }
     const selected = gridApiRef.current?.getSelectedRows() ?? [];
     const targetIds = selected.filter((row) => row._status !== "deleted" && row.id > 0).map((row) => row.id);
     if (targetIds.length === 0) {
@@ -494,7 +504,81 @@ export function HrRecruitFinalistManager() {
     } finally {
       setGeneratingNo(false);
     }
-  }, [mutate]);
+  }, [hasDirtyRows, mutate]);
+
+  const createEmployeesForSelected = useCallback(async () => {
+    if (hasDirtyRows) {
+      toast.error("저장되지 않은 변경 사항이 있어 사원 생성을 진행할 수 없습니다. 먼저 저장해 주세요.");
+      return;
+    }
+
+    const selected = gridApiRef.current?.getSelectedRows() ?? [];
+    const targetIds = selected.filter((row) => row._status !== "deleted" && row.id > 0).map((row) => row.id);
+    if (targetIds.length === 0) {
+      toast.error("사원으로 전환할 저장된 합격자 행을 선택하세요.");
+      return;
+    }
+
+    setCreatingEmployees(true);
+    try {
+      const response = await fetch("/api/hr/recruit/finalists/create-employees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: targetIds }),
+      });
+      const data = (await response.json().catch(() => null)) as HrRecruitCreateEmployeesResponse | null;
+      if (!response.ok) {
+        const detail =
+          data && typeof data === "object" && "detail" in data && typeof data.detail === "string"
+            ? data.detail
+            : "사원 생성에 실패했습니다.";
+        throw new Error(detail);
+      }
+
+      await mutate();
+
+      const summary = `사원 생성 완료 (생성 ${data?.created_count ?? 0}건 / 기존연결 ${data?.skipped_count ?? 0}건 / 오류 ${data?.error_count ?? 0}건)`;
+      if ((data?.created_count ?? 0) > 0) {
+        toast.success(summary);
+      } else if ((data?.skipped_count ?? 0) > 0 && (data?.error_count ?? 0) === 0) {
+        toast.info(`이미 연결된 합격자만 선택되어 ${data?.skipped_count ?? 0}건을 건너뛰었습니다.`);
+      } else {
+        toast.error(summary);
+      }
+
+      const firstError = data?.results.find((result) => result.outcome === "error");
+      if (firstError) {
+        toast.error(`${firstError.full_name}: ${firstError.detail}`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "사원 생성에 실패했습니다.");
+    } finally {
+      setCreatingEmployees(false);
+    }
+  }, [hasDirtyRows, mutate]);
+
+  const moveToAppointmentForSelected = useCallback(() => {
+    if (hasDirtyRows) {
+      toast.error("저장되지 않은 변경 사항이 있어 발령 화면으로 이동할 수 없습니다. 먼저 저장해 주세요.");
+      return;
+    }
+
+    const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
+    if (selected.length !== 1) {
+      toast.error("발령으로 넘길 합격자 1건만 선택해 주세요.");
+      return;
+    }
+
+    const target = selected[0];
+    if (!target.employee_no) {
+      toast.error("사번이 없습니다. 먼저 사번 채번 또는 사원 생성을 진행해 주세요.");
+      return;
+    }
+
+    const params = new URLSearchParams({ employeeNo: target.employee_no });
+    if (target.full_name?.trim()) params.set("name", target.full_name.trim());
+    router.push(`/hr/appointment/records?${params.toString()}`);
+  }, [hasDirtyRows, router]);
 
   const columnDefs = useMemo<ColDef<RecruitGridRow>[]>(() => [
     { headerName: "삭제", width: 62, pinned: "left", sortable: false, filter: false, suppressHeaderMenuButton: true, editable: false, cellRenderer: (params: ICellRendererParams<RecruitGridRow>) => { const row = params.data; if (!row) return null; return <div className="flex h-full items-center justify-center"><input type="checkbox" checked={row._status === "deleted"} className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]" onChange={(event) => toggleDeleteById(row.id, event.target.checked)} onClick={(event) => event.stopPropagation()} /></div>; } },
@@ -521,14 +605,14 @@ export function HrRecruitFinalistManager() {
   const selectionColumnDef = useMemo<ColDef<RecruitGridRow>>(() => ({ width: 44, pinned: "left", sortable: false, filter: false, editable: false, resizable: false, suppressHeaderMenuButton: true }), []);
 
   const toolbarActions = [
-    { key: "create", label: "입력", icon: Plus, onClick: addRow, disabled: isLoading || saving || generatingNo },
-    { key: "copy", label: "복사", icon: Copy, onClick: copyRows, disabled: isLoading || saving || generatingNo },
-    { key: "template", label: "양식 다운로드", icon: FileDown, onClick: () => void downloadTemplate(), disabled: isLoading || saving || generatingNo },
-    { key: "upload", label: "업로드", icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: isLoading || saving || generatingNo },
-    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadCurrentSheet(), disabled: isLoading || saving || generatingNo },
+    { key: "create", label: "입력", icon: Plus, onClick: addRow, disabled: isLoading || saving || generatingNo || creatingEmployees },
+    { key: "copy", label: "복사", icon: Copy, onClick: copyRows, disabled: isLoading || saving || generatingNo || creatingEmployees },
+    { key: "template", label: "양식 다운로드", icon: FileDown, onClick: () => void downloadTemplate(), disabled: isLoading || saving || generatingNo || creatingEmployees },
+    { key: "upload", label: "업로드", icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: isLoading || saving || generatingNo || creatingEmployees },
+    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadCurrentSheet(), disabled: isLoading || saving || generatingNo || creatingEmployees },
   ];
 
-  const toolbarSaveAction = { key: "save", label: saving ? "저장 중..." : "저장", icon: Save, onClick: () => void saveAll(), disabled: isLoading || saving || generatingNo, variant: "save" as const };
+  const toolbarSaveAction = { key: "save", label: saving ? "저장 중..." : "저장", icon: Save, onClick: () => void saveAll(), disabled: isLoading || saving || generatingNo || creatingEmployees, variant: "save" as const };
 
   const handleQuery = () => requestReloadAction({ type: "query", filters: { ...searchFilters } });
   const handleSearchEnter = (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => { if (event.key === "Enter") { event.preventDefault(); handleQuery(); } };
@@ -537,7 +621,7 @@ export function HrRecruitFinalistManager() {
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title="채용합격자관리" onQuery={handleQuery} queryLabel="조회" queryDisabled={isLoading || saving || generatingNo}>
+      <ManagerSearchSection title="채용합격자관리" onQuery={handleQuery} queryLabel="조회" queryDisabled={isLoading || saving || generatingNo || creatingEmployees}>
         <SearchFieldGrid className="xl:grid-cols-3">
           <SearchTextField value={searchFilters.keyword} onChange={(value) => setSearchFilters((prev) => ({ ...prev, keyword: value }))} onKeyDown={handleSearchEnter} placeholder="이름 / 후보번호 / 사번 / 로그인ID" />
           <select value={searchFilters.status} onChange={(event) => setSearchFilters((prev) => ({ ...prev, status: event.target.value as SearchFilters["status"] }))} onKeyDown={handleSearchEnter} aria-label="진행상태" className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground">
@@ -550,8 +634,8 @@ export function HrRecruitFinalistManager() {
       </ManagerSearchSection>
 
       <ManagerGridSection
-        headerLeft={<><GridPaginationControls page={page} totalPages={totalPages} pageInput={pageInput} setPageInput={setPageInput} goPrev={goPrev} goNext={goNext} goToPage={goToPage} disabled={isLoading || saving || generatingNo} className="mt-0 justify-start" /><span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span><GridChangeSummaryBadges summary={changeSummary} /></>}
-        headerRight={<><GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} /><Button size="sm" variant="action" onClick={() => void syncFromIf()} disabled><RefreshCw className="h-3.5 w-3.5" />IF 동기화</Button><Button size="sm" variant="action" onClick={() => void generateEmployeeNoForSelected()} disabled={isLoading || saving || generatingNo}><UserRoundPlus className="h-3.5 w-3.5" />{generatingNo ? "채번중..." : "사번 채번"}</Button><input ref={uploadInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleUploadFile(file); event.currentTarget.value = ""; }} /></>}
+        headerLeft={<><GridPaginationControls page={page} totalPages={totalPages} pageInput={pageInput} setPageInput={setPageInput} goPrev={goPrev} goNext={goNext} goToPage={goToPage} disabled={isLoading || saving || generatingNo || creatingEmployees} className="mt-0 justify-start" /><span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span><GridChangeSummaryBadges summary={changeSummary} /></>}
+        headerRight={<><GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} /><Button size="sm" variant="action" onClick={() => void syncFromIf()} disabled><RefreshCw className="h-3.5 w-3.5" />IF 동기화</Button><Button size="sm" variant="action" onClick={() => void generateEmployeeNoForSelected()} disabled={isLoading || saving || generatingNo || creatingEmployees || hasDirtyRows}><UserRoundPlus className="h-3.5 w-3.5" />{generatingNo ? "채번중..." : "사번 채번"}</Button><Button size="sm" variant="action" onClick={() => void createEmployeesForSelected()} disabled={isLoading || saving || generatingNo || creatingEmployees || hasDirtyRows}><UserPlus className="h-3.5 w-3.5" />{creatingEmployees ? "사원생성중..." : "사원 생성"}</Button><Button size="sm" variant="action" onClick={moveToAppointmentForSelected} disabled={isLoading || saving || generatingNo || creatingEmployees || hasDirtyRows}><ArrowRight className="h-3.5 w-3.5" />발령 이동</Button><input ref={uploadInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleUploadFile(file); event.currentTarget.value = ""; }} /></>}
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">

@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 import { PayrollTaxRateManager } from "@/components/payroll/payroll-tax-rate-manager";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
     engine: "ag-grid",
     profile: "standard-v2",
     registryKey: "payroll.tax-rates",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function PayrollTaxRatesPage() {
     await requireMenuAccess("/payroll/tax-rates");

@@ -2,11 +2,13 @@ import { HriReceiveTaskBoard } from "@/components/hri/hri-receive-task-board";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "hri.tasks.receives",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function HriReceiveTasksPage() {
   await requireMenuAccess("/hri/tasks/receives");

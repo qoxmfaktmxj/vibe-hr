@@ -25,3 +25,20 @@ export type HrRecruitFinalistListResponse = {
   total_count: number;
 };
 
+export type HrRecruitCreateEmployeesResult = {
+  finalist_id: number;
+  candidate_no: string;
+  full_name: string;
+  outcome: "created" | "skipped" | "error";
+  detail: string;
+  employee_id?: number | null;
+  employee_no?: string | null;
+  login_id?: string | null;
+};
+
+export type HrRecruitCreateEmployeesResponse = {
+  created_count: number;
+  skipped_count: number;
+  error_count: number;
+  results: HrRecruitCreateEmployeesResult[];
+};

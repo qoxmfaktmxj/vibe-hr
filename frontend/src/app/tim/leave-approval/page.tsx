@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { LeaveApprovalManager } from "@/components/tim/leave-approval-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "tim.leave-approval",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function Page() {
   await requireMenuAccess("/tim/leave-approval");

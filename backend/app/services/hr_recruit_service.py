@@ -1,17 +1,24 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlmodel import Session, select
 
-from app.models import HrEmployee, HrRecruitFinalist
+from app.models import AuthUser, HrEmployee, HrRecruitFinalist, OrgDepartment
+from app.schemas.employee import EmployeeCreateRequest
 from app.schemas.hr_recruit import (
+    HrRecruitCreateEmployeesResponse,
+    HrRecruitCreateEmployeesResult,
     HrRecruitFinalistCreateRequest,
     HrRecruitFinalistItem,
     HrRecruitFinalistUpdateRequest,
     HrRecruitIfInboundRow,
 )
+from app.services.employee_command_service import create_employee_no_commit
+
+_EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
 
 def _utc_now() -> datetime:
@@ -85,6 +92,97 @@ def _next_employee_no(session: Session) -> str:
         except ValueError:
             continue
     return f"EMP-{max_seq + 1:06d}"
+
+
+def _find_recruit_staging_department(session: Session) -> OrgDepartment:
+    department = session.exec(
+        select(OrgDepartment).where(OrgDepartment.code == "HQ-HR"),
+    ).first()
+    if department is None:
+        department = session.exec(
+            select(OrgDepartment)
+            .where(OrgDepartment.is_active == True)  # noqa: E712
+            .order_by(OrgDepartment.id),
+        ).first()
+    if department is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="사원 생성에 사용할 기본 부서를 찾을 수 없습니다.",
+        )
+    return department
+
+
+def _next_login_id_from_employee_no(session: Session, employee_no: str) -> str:
+    base = employee_no.lower().replace("-", "")
+    candidate = base[:50]
+    suffix = 1
+
+    while session.exec(select(AuthUser.id).where(AuthUser.login_id == candidate)).first() is not None:
+        suffix += 1
+        suffix_text = str(suffix)
+        candidate = f"{base[: max(1, 50 - len(suffix_text))]}{suffix_text}"
+
+    return candidate
+
+
+def _find_existing_employee_for_finalist(session: Session, finalist: HrRecruitFinalist) -> HrEmployee | None:
+    if finalist.employee_no:
+        employee = session.exec(
+            select(HrEmployee).where(HrEmployee.employee_no == finalist.employee_no),
+        ).first()
+        if employee is not None:
+            return employee
+
+    if finalist.login_id:
+        employee = session.exec(
+            select(HrEmployee)
+            .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+            .where(AuthUser.login_id == finalist.login_id),
+        ).first()
+        if employee is not None:
+            return employee
+
+    return None
+
+
+def _sync_finalist_links_from_employee(
+    session: Session,
+    finalist: HrRecruitFinalist,
+    employee: HrEmployee,
+) -> tuple[str | None, bool]:
+    user = session.get(AuthUser, employee.user_id)
+    changed = False
+
+    if finalist.employee_no != employee.employee_no:
+        finalist.employee_no = employee.employee_no
+        changed = True
+
+    if user is not None and finalist.login_id != user.login_id:
+        finalist.login_id = user.login_id
+        changed = True
+
+    if finalist.status_code == "draft":
+        finalist.status_code = "ready"
+        changed = True
+
+    if changed:
+        finalist.updated_at = _utc_now()
+        session.add(finalist)
+
+    return user.login_id if user is not None else None, changed
+
+
+def _build_employee_email(finalist: HrRecruitFinalist) -> str | None:
+    email = _strip_or_none(finalist.email)
+    if email:
+        try:
+            return str(_EMAIL_ADAPTER.validate_python(email))
+        except ValidationError:
+            pass
+
+    if finalist.login_id:
+        return f"{finalist.login_id}@hr.minosek91.cloud"
+    return None
 
 
 def list_finalists(session: Session, *, search: str | None = None) -> list[HrRecruitFinalistItem]:
@@ -279,3 +377,114 @@ def generate_employee_numbers(session: Session, ids: list[int]) -> tuple[int, in
     session.commit()
     return len(needs_no), skipped_count
 
+
+def create_employees_from_finalists(
+    session: Session,
+    ids: list[int],
+) -> HrRecruitCreateEmployeesResponse:
+    finalists = session.exec(
+        select(HrRecruitFinalist)
+        .where(HrRecruitFinalist.id.in_(ids))
+        .order_by(HrRecruitFinalist.id),
+    ).all()
+    if not finalists:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="대상 채용합격자 데이터가 없습니다.")
+
+    staging_department = _find_recruit_staging_department(session)
+    results: list[HrRecruitCreateEmployeesResult] = []
+    created_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    base_seq = int(_next_employee_no(session).replace("EMP-", ""))
+    next_seq = base_seq
+
+    for finalist in finalists:
+        try:
+            if not finalist.employee_no:
+                finalist.employee_no = f"EMP-{next_seq:06d}"
+                next_seq += 1
+
+            if not finalist.login_id:
+                finalist.login_id = _next_login_id_from_employee_no(session, finalist.employee_no)
+
+            existing_employee = _find_existing_employee_for_finalist(session, finalist)
+            if existing_employee is not None:
+                login_id, changed = _sync_finalist_links_from_employee(session, finalist, existing_employee)
+                if changed:
+                    session.commit()
+                    session.refresh(finalist)
+
+                skipped_count += 1
+                results.append(
+                    HrRecruitCreateEmployeesResult(
+                        finalist_id=finalist.id or 0,
+                        candidate_no=finalist.candidate_no,
+                        full_name=finalist.full_name,
+                        outcome="skipped",
+                        detail="이미 생성된 사원과 연결되어 있어 건너뛰었습니다.",
+                        employee_id=existing_employee.id,
+                        employee_no=existing_employee.employee_no,
+                        login_id=login_id,
+                    )
+                )
+                continue
+
+            employee_item = create_employee_no_commit(
+                session,
+                EmployeeCreateRequest(
+                    employee_no=finalist.employee_no,
+                    display_name=finalist.full_name.strip(),
+                    department_id=staging_department.id or 0,
+                    position_title="채용대기",
+                    hire_date=finalist.expected_join_date or date.today(),
+                    employment_status="leave",
+                    login_id=finalist.login_id,
+                    email=_build_employee_email(finalist),
+                    password="admin",
+                ),
+            )
+
+            if finalist.status_code == "draft":
+                finalist.status_code = "ready"
+            finalist.employee_no = employee_item.employee_no
+            finalist.login_id = employee_item.login_id
+            finalist.updated_at = _utc_now()
+            session.add(finalist)
+            session.commit()
+            session.refresh(finalist)
+
+            created_count += 1
+            results.append(
+                HrRecruitCreateEmployeesResult(
+                    finalist_id=finalist.id or 0,
+                    candidate_no=finalist.candidate_no,
+                    full_name=finalist.full_name,
+                    outcome="created",
+                    detail="사원 생성이 완료되었습니다. 발령 전까지 채용대기 상태로 유지됩니다.",
+                    employee_id=employee_item.id,
+                    employee_no=employee_item.employee_no,
+                    login_id=employee_item.login_id,
+                )
+            )
+        except HTTPException as error:
+            session.rollback()
+            error_count += 1
+            results.append(
+                HrRecruitCreateEmployeesResult(
+                    finalist_id=finalist.id or 0,
+                    candidate_no=finalist.candidate_no,
+                    full_name=finalist.full_name,
+                    outcome="error",
+                    detail=str(error.detail),
+                    employee_no=finalist.employee_no,
+                    login_id=finalist.login_id,
+                )
+            )
+
+    return HrRecruitCreateEmployeesResponse(
+        created_count=created_count,
+        skipped_count=skipped_count,
+        error_count=error_count,
+        results=results,
+    )

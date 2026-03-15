@@ -3,11 +3,13 @@ import { HriApplicationHub } from "@/components/hri/hri-application-hub";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v1",
   registryKey: "hri.requests.mine",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function HriMyRequestsPage() {
   await requireMenuAccess("/hri/requests/mine");

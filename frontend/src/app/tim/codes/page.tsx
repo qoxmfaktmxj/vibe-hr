@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 import { AttendanceCodeManager } from "@/components/tim/attendance-code-manager";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "tim.attendance-codes",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function TimCodesPage() {
   await requireMenuAccess("/tim/codes");

@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PayrollRunManager } from "@/components/payroll/payroll-run-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "payroll.runs",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function PayrollRunsPage() {
   await requireMenuAccess("/payroll/runs");

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   type CellValueChangedEvent,
   type ColDef,
@@ -10,7 +11,7 @@ import {
   type RowClassParams,
 } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import { Copy, Download, FileDown, Plus, Save, Upload } from "lucide-react";
+import { ArrowRight, Copy, Download, FileDown, Plus, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
@@ -18,10 +19,17 @@ import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
-import { getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  buildGridRowClassRules,
+  getGridRowClass,
+  getGridStatusCellClass,
+  summarizeGridStatuses,
+} from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
 import { runConcurrentOrThrow } from "@/lib/utils/run-concurrent";
+import type { EmployeeItem, EmployeeListResponse } from "@/types/employee";
 import type {
   HrAppointmentOrderConfirmResponse,
   HrAppointmentRecordListResponse,
@@ -40,14 +48,6 @@ type AppointmentRecordRow = HrAppointmentRecordItem & {
   _status: RowStatus;
   _original?: Record<string, unknown>;
   _prevStatus?: RowStatus;
-};
-
-const EMPTY_FILTERS: SearchFilters = {
-  appointmentNo: "",
-  employeeNo: "",
-  name: "",
-  department: "",
-  orderStatus: "",
 };
 
 const TRACKED_FIELDS: (keyof HrAppointmentRecordItem)[] = [
@@ -78,6 +78,30 @@ const ORDER_STATUS_LABELS = {
   cancelled: "취소",
 } as const;
 
+function buildFiltersFromSearchParams(searchParams: { get(name: string): string | null }): SearchFilters {
+  const orderStatus = searchParams.get("orderStatus");
+  return {
+    appointmentNo: searchParams.get("appointmentNo")?.trim() ?? "",
+    employeeNo: searchParams.get("employeeNo")?.trim() ?? "",
+    name: searchParams.get("name")?.trim() ?? "",
+    department: searchParams.get("department")?.trim() ?? "",
+    orderStatus:
+      orderStatus === "draft" || orderStatus === "confirmed" || orderStatus === "cancelled"
+        ? orderStatus
+        : "",
+  };
+}
+
+function isSameFilters(left: SearchFilters, right: SearchFilters): boolean {
+  return (
+    left.appointmentNo === right.appointmentNo &&
+    left.employeeNo === right.employeeNo &&
+    left.name === right.name &&
+    left.department === right.department &&
+    left.orderStatus === right.orderStatus
+  );
+}
+
 function normalizeDate(value?: string | null): string {
   if (!value) return "";
   return value.slice(0, 10);
@@ -88,13 +112,32 @@ async function parseErrorDetail(response: Response, fallback: string): Promise<s
   return json?.detail ?? fallback;
 }
 
+async function fetchEmployeeByEmployeeNo(employeeNo: string): Promise<EmployeeItem> {
+  const params = new URLSearchParams({ all: "true", employee_no: employeeNo.trim() });
+  const response = await fetch(`/api/employees?${params.toString()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error(await parseErrorDetail(response, "사원 정보를 불러오지 못했습니다."));
+
+  const data = (await response.json()) as EmployeeListResponse;
+  const employee = data.employees?.[0];
+  if (!employee) {
+    throw new Error(`사번 ${employeeNo} 에 해당하는 사원을 찾지 못했습니다.`);
+  }
+  return employee;
+}
+
 export function HrAppointmentRecordManager() {
-  const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialFilters = useMemo(() => buildFiltersFromSearchParams(searchParams), [searchParams]);
+
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(initialFilters);
   const [rows, setRows] = useState<AppointmentRecordRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmingOrderId, setConfirmingOrderId] = useState<number | null>(null);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [pendingFilters, setPendingFilters] = useState<SearchFilters | null>(null);
 
   const gridApiRef = useRef<GridApi<AppointmentRecordRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -102,6 +145,7 @@ export function HrAppointmentRecordManager() {
   const rowsRef = useRef<AppointmentRecordRow[]>([]);
 
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
+  const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
 
   const defaultColDef = useMemo<ColDef<AppointmentRecordRow>>(
     () => ({
@@ -208,54 +252,87 @@ export function HrAppointmentRecordManager() {
     void refresh(appliedFilters);
   }, [appliedFilters, refresh]);
 
+  useEffect(() => {
+    setSearchFilters((prev) => (isSameFilters(prev, initialFilters) ? prev : initialFilters));
+    setAppliedFilters((prev) => (isSameFilters(prev, initialFilters) ? prev : initialFilters));
+  }, [initialFilters]);
+
   const handleQuery = useCallback(() => {
-    setAppliedFilters({ ...searchFilters });
-  }, [searchFilters]);
+    const nextFilters = { ...searchFilters };
+    gridApiRef.current?.stopEditing();
+    if (hasDirtyRows) {
+      setPendingFilters(nextFilters);
+      setDiscardDialogOpen(true);
+      return;
+    }
+    gridApiRef.current?.deselectAll();
+    setAppliedFilters(nextFilters);
+  }, [hasDirtyRows, searchFilters]);
 
   const addRow = useCallback(() => {
-    const tempId = issueTempId();
-    const today = new Date().toISOString().slice(0, 10);
-    // 선택된 행이 있으면 직원 정보를 기본값으로 활용, 없으면 빈 행으로 입력
-    const selected = gridApiRef.current?.getSelectedRows().find((row) => row._status !== "deleted");
-    const newRow: AppointmentRecordRow = {
-      id: tempId,
-      order_id: tempId,
-      appointment_no: "",
-      order_title: "",
-      order_description: "",
-      order_status: "draft",
-      confirmed_at: null,
-      confirmed_by: null,
-      employee_id: selected?.employee_id ?? 0,
-      employee_no: selected?.employee_no ?? "",
-      display_name: selected?.display_name ?? "",
-      department_name: selected?.department_name ?? "",
-      employment_status: selected?.employment_status ?? "active",
-      appointment_code_id: null,
-      appointment_code_name: null,
-      appointment_kind: "permanent",
-      action_type: "",
-      effective_date: today,
-      start_date: today,
-      end_date: null,
-      from_department_id: selected?.from_department_id ?? null,
-      to_department_id: null,
-      from_position_title: selected?.from_position_title ?? null,
-      to_position_title: null,
-      from_employment_status: selected?.from_employment_status ?? null,
-      to_employment_status: null,
-      apply_status: "pending",
-      applied_at: null,
-      temporary_reason: "",
-      note: "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      _status: "added",
-      _original: undefined,
-      _prevStatus: undefined,
-    };
-    commitRows((prev) => [newRow, ...prev]);
-  }, [commitRows, issueTempId]);
+    void (async () => {
+      const tempId = issueTempId();
+      const now = new Date().toISOString();
+      const today = now.slice(0, 10);
+      const employeeNoFilter = searchFilters.employeeNo.trim() || appliedFilters.employeeNo.trim();
+      const selected = gridApiRef.current?.getSelectedRows().find((row) => row._status !== "deleted");
+      let fallbackEmployee: EmployeeItem | null = null;
+
+      if (!selected && !employeeNoFilter) {
+        toast.error("첫 발령 초안은 사번 검색 후 입력하거나 기존 발령 행을 선택한 뒤 생성해 주세요.");
+        return;
+      }
+
+      if (!selected && employeeNoFilter) {
+        try {
+          fallbackEmployee = await fetchEmployeeByEmployeeNo(employeeNoFilter);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "사원 정보를 불러오지 못했습니다.");
+          return;
+        }
+      }
+
+      const isNewHire = (selected?.employment_status ?? fallbackEmployee?.employment_status) === "leave";
+      const newRow: AppointmentRecordRow = {
+        id: tempId,
+        order_id: tempId,
+        appointment_no: "",
+        order_title: isNewHire ? "입사발령" : "",
+        order_description: "",
+        order_status: "draft",
+        confirmed_at: null,
+        confirmed_by: null,
+        employee_id: selected?.employee_id ?? fallbackEmployee?.id ?? 0,
+        employee_no: selected?.employee_no ?? fallbackEmployee?.employee_no ?? "",
+        display_name: selected?.display_name ?? fallbackEmployee?.display_name ?? "",
+        department_name: selected?.department_name ?? fallbackEmployee?.department_name ?? "",
+        employment_status: selected?.employment_status ?? fallbackEmployee?.employment_status ?? "active",
+        appointment_code_id: null,
+        appointment_code_name: null,
+        appointment_kind: "permanent",
+        action_type: isNewHire ? "입사" : "",
+        effective_date: today,
+        start_date: today,
+        end_date: null,
+        from_department_id: selected?.from_department_id ?? fallbackEmployee?.department_id ?? null,
+        to_department_id: null,
+        from_position_title: selected?.from_position_title ?? fallbackEmployee?.position_title ?? null,
+        to_position_title: null,
+        from_employment_status: selected?.from_employment_status ?? fallbackEmployee?.employment_status ?? null,
+        to_employment_status: isNewHire ? "active" : null,
+        apply_status: "pending",
+        applied_at: null,
+        temporary_reason: "",
+        note: "",
+        created_at: now,
+        updated_at: now,
+        _status: "added",
+        _original: undefined,
+        _prevStatus: undefined,
+      };
+      commitRows((prev) => [newRow, ...prev]);
+    })();
+  }, [appliedFilters.employeeNo, commitRows, issueTempId, searchFilters.employeeNo]);
 
   const copyRows = useCallback(() => {
     const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
@@ -412,6 +489,22 @@ export function HrAppointmentRecordManager() {
     }
   }, [appliedFilters, refresh]);
 
+  const moveToHrBasicForSelected = useCallback(() => {
+    const selected = gridApiRef.current?.getSelectedRows().filter((row) => row._status !== "deleted") ?? [];
+    if (selected.length !== 1) {
+      toast.error("인사기본으로 이동할 발령 행 1건을 선택해 주세요.");
+      return;
+    }
+
+    const target = selected[0];
+    if (!target.employee_no) {
+      toast.error("선택한 발령 행에 사번이 없습니다.");
+      return;
+    }
+
+    router.push(`/hr/basic?employeeNo=${encodeURIComponent(target.employee_no)}`);
+  }, [router]);
+
   const columnDefs = useMemo<ColDef<AppointmentRecordRow>[]>(() => [
     {
       headerName: "삭제",
@@ -560,6 +653,7 @@ export function HrAppointmentRecordManager() {
   ], [confirmOrder, confirmingOrderId, loading, saving, toggleDeleteById]);
 
   const getRowClass = useCallback((params: RowClassParams<AppointmentRecordRow>) => getGridRowClass(params.data?._status), []);
+  const rowClassRules = useMemo(() => buildGridRowClassRules<AppointmentRecordRow>(), []);
 
   const downloadTemplate = useCallback(async () => {
     try {
@@ -699,6 +793,24 @@ export function HrAppointmentRecordManager() {
     }
   }
 
+  const handleDiscardDialogOpenChange = useCallback((open: boolean) => {
+    setDiscardDialogOpen(open);
+    if (!open) setPendingFilters(null);
+  }, []);
+
+  const handleDiscardAndContinue = useCallback(() => {
+    if (!pendingFilters) {
+      setDiscardDialogOpen(false);
+      return;
+    }
+    gridApiRef.current?.deselectAll();
+    rowsRef.current = [];
+    setRows([]);
+    setAppliedFilters(pendingFilters);
+    setPendingFilters(null);
+    setDiscardDialogOpen(false);
+  }, [pendingFilters]);
+
   return (
     <ManagerPageShell>
       <ManagerSearchSection title="발령처리관리" onQuery={handleQuery} queryLabel="조회" queryDisabled={loading || saving}>
@@ -721,6 +833,10 @@ export function HrAppointmentRecordManager() {
         headerRight={(
           <>
             <GridToolbarActions actions={toolbarActions} />
+            <Button size="sm" variant="action" onClick={moveToHrBasicForSelected} disabled={loading || saving || confirmingOrderId !== null}>
+              <ArrowRight className="h-3.5 w-3.5" />
+              인사기본 이동
+            </Button>
             <input
               ref={uploadInputRef}
               type="file"
@@ -746,6 +862,7 @@ export function HrAppointmentRecordManager() {
               rowSelection={{ mode: "multiRow", enableClickSelection: true }}
               singleClickEdit
               animateRows={false}
+              rowClassRules={rowClassRules}
               getRowClass={getRowClass}
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
@@ -758,6 +875,17 @@ export function HrAppointmentRecordManager() {
           </div>
         </div>
       </ManagerGridSection>
+
+      <ConfirmDialog
+        open={discardDialogOpen}
+        onOpenChange={handleDiscardDialogOpenChange}
+        title="저장되지 않은 변경 사항이 있습니다."
+        description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+        confirmLabel="무시하고 이동"
+        cancelLabel="취소"
+        confirmVariant="destructive"
+        onConfirm={handleDiscardAndContinue}
+      />
     </ManagerPageShell>
   );
 }

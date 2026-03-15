@@ -17,7 +17,7 @@ A screen is treated as an AG Grid screen when all conditions are true:
 Every AG Grid page file (`src/app/**/page.tsx`) must include:
 
 ```ts
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "module.screen",

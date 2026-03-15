@@ -6,6 +6,8 @@ from app.core.database import get_session
 from app.schemas.hr_recruit import (
     HrRecruitBulkDeleteRequest,
     HrRecruitBulkDeleteResponse,
+    HrRecruitCreateEmployeesRequest,
+    HrRecruitCreateEmployeesResponse,
     HrRecruitFinalistCreateRequest,
     HrRecruitFinalistDetailResponse,
     HrRecruitFinalistListResponse,
@@ -16,6 +18,7 @@ from app.schemas.hr_recruit import (
     HrRecruitIfSyncResponse,
 )
 from app.services.hr_recruit_service import (
+    create_employees_from_finalists,
     create_finalist,
     delete_finalists,
     generate_employee_numbers,
@@ -106,3 +109,14 @@ def hr_recruit_finalist_generate_employee_no(
     updated_count, skipped_count = generate_employee_numbers(session, payload.ids)
     return HrRecruitGenerateEmployeeNoResponse(updated_count=updated_count, skipped_count=skipped_count)
 
+
+@router.post(
+    "/finalists/create-employees",
+    response_model=HrRecruitCreateEmployeesResponse,
+    dependencies=[Depends(require_roles("admin", "hr_manager"))],
+)
+def hr_recruit_finalist_create_employees(
+    payload: HrRecruitCreateEmployeesRequest,
+    session: Session = Depends(get_session),
+) -> HrRecruitCreateEmployeesResponse:
+    return create_employees_from_finalists(session, payload.ids)

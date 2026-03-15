@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { WelBenefitTypeOverview } from "@/components/wel/wel-benefit-type-overview";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "wel.benefit-types",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function WelBenefitTypesPage() {
   await requireMenuAccess("/wel/benefit-types");

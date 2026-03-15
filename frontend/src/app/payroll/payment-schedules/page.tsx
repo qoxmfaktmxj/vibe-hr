@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PayPaymentScheduleManager } from "@/components/payroll/pay-payment-schedule-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "payroll.payment-schedules",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function PayrollPaymentSchedulesPage() {
   await requireMenuAccess("/payroll/payment-schedules");

@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ManagerStatusViewer } from "@/components/mng/manager-status-viewer";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.manager-status",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngManagerStatusPage() {
   await requireMenuAccess("/mng/manager-status");

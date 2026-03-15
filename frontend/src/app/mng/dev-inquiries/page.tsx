@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DevInquiryManager } from "@/components/mng/dev-inquiry-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.dev-inquiries",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngDevInquiriesPage() {
   await requireMenuAccess("/mng/dev-inquiries");

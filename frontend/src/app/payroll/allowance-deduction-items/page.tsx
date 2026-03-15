@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 import { PayAllowanceDeductionManager } from "@/components/payroll/pay-allowance-deduction-manager";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "payroll.allowance-deduction-items",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function Page() {
   await requireMenuAccess("/payroll/allowance-deduction-items");

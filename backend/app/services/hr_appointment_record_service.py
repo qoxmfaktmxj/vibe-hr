@@ -13,6 +13,7 @@ from app.models import (
     HrAppointmentOrder,
     HrAppointmentOrderItem,
     HrEmployee,
+    HrEmployeeInfoRecord,
     HrPersonnelHistory,
     OrgDepartment,
 )
@@ -75,6 +76,13 @@ def _validate_employment_status(value: str | None) -> str | None:
     if normalized not in VALID_EMPLOYMENT_STATUSES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid employment status.")
     return normalized
+
+
+def _resolve_department_name(session: Session, department_id: int | None) -> str | None:
+    if department_id is None:
+        return None
+    department = session.get(OrgDepartment, department_id)
+    return department.name if department is not None else None
 
 
 def _ensure_end_date_rule(kind: str, end_date) -> None:
@@ -505,6 +513,20 @@ def confirm_appointment_order(
                     created_at=now,
                 )
             )
+
+        session.add(
+            HrEmployeeInfoRecord(
+                employee_id=employee.id or 0,
+                category="appointment",
+                record_date=item.start_date,
+                title=order.title,
+                type=item.action_type,
+                organization=_resolve_department_name(session, item.to_department_id or employee.department_id),
+                value=item.to_position_title or item.to_employment_status or order.appointment_no,
+                note=item.note,
+                created_at=now,
+            )
+        )
 
         item.apply_status = "applied"
         item.applied_at = now

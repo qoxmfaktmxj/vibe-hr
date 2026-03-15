@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { OutsourceContractManager } from "@/components/mng/outsource-contract-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.outsource-contracts",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngOutsourceContractsPage() {
   await requireMenuAccess("/mng/outsource-contracts");

@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { HolidayManager } from "@/components/tim/holiday-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "tim.holidays",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function TimHolidaysPage() {
   await requireMenuAccess("/tim/holidays");

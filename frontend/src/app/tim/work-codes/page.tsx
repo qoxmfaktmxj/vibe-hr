@@ -6,11 +6,13 @@ import { ScheduleGeneratorManager } from "@/components/tim/schedule-generator-ma
 import { WorkScheduleManager } from "@/components/tim/work-schedule-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "tim.work-schedules",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function TimWorkCodesPage() {
   await requireMenuAccess("/tim/work-codes");

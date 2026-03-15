@@ -489,7 +489,7 @@ POST /api/v1/wel/loan/interest-generate     → 이자 생성 (월말 배치)
 각 페이지 파일(`frontend/src/app/**/page.tsx`)에 다음 메타데이터를 선언한다.
 
 ```ts
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "wel.<screen-key>",

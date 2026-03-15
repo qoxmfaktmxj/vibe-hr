@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { TimReportDashboard } from "@/components/tim/tim-report-dashboard";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "tim.reports",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function Page() {
   await requireMenuAccess("/tim/reports");

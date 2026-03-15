@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { CompanyManager } from "@/components/mng/company-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.companies",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngCompaniesPage() {
   await requireMenuAccess("/mng/companies");

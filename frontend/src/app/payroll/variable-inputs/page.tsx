@@ -3,11 +3,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PayVariableInputManager } from "@/components/payroll/pay-variable-input-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "payroll.variable-inputs",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function PayrollVariableInputsPage() {
   await requireMenuAccess("/payroll/variable-inputs");

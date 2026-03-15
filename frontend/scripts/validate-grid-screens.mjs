@@ -34,6 +34,10 @@ function extractProfile(pageSource) {
   return match?.[1] ?? null;
 }
 
+function hasGridScreenDeclaration(pageSource) {
+  return /\b(?:export\s+)?const\s+GRID_SCREEN\s*=/.test(pageSource);
+}
+
 if (!fs.existsSync(registryPath)) {
   fail(`Missing registry: ${registryPath}`);
   process.exit(process.exitCode ?? 1);
@@ -70,7 +74,7 @@ for (const [key, screen] of Object.entries(screens)) {
   const page = readText(pageFile);
   const component = readText(componentFile);
 
-  if (!page.includes("export const GRID_SCREEN")) {
+  if (!hasGridScreenDeclaration(page)) {
     fail(`[${key}] GRID_SCREEN metadata missing in ${screen.pageFile}`);
   }
   if (!page.includes(`registryKey: "${key}"`) && !page.includes(`registryKey: '${key}'`)) {

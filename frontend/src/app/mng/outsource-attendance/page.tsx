@@ -2,11 +2,13 @@ import { AppShell } from "@/components/layout/app-shell";
 import { OutsourceAttendanceManager } from "@/components/mng/outsource-attendance-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
+const GRID_SCREEN = {
   engine: "ag-grid",
   profile: "standard-v2",
   registryKey: "mng.outsource-attendance",
 } as const;
+
+void GRID_SCREEN;
 
 export default async function MngOutsourceAttendancePage() {
   await requireMenuAccess("/mng/outsource-attendance");
