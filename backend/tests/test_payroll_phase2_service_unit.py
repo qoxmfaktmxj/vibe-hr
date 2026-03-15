@@ -14,6 +14,7 @@ from app.models import (
     PayPayrollCode,
     PayPayrollRun,
     PayPayrollRunEmployee,
+    PayPayrollRunEvent,
     PayPayrollRunItem,
     PayPayrollRunTarget,
     PayPayrollRunTargetEvent,
@@ -23,7 +24,7 @@ from app.models import (
     WelBenefitType,
 )
 from app.schemas.payroll_phase2 import PayPayrollRunCreateRequest
-from app.services.payroll_phase2_service import calculate_payroll_run, create_payroll_run
+from app.services.payroll_phase2_service import calculate_payroll_run, create_payroll_run, refresh_payroll_run_snapshot
 
 
 def _utc_now() -> datetime:
@@ -684,6 +685,113 @@ def test_calculate_payroll_run_uses_target_snapshot_when_profile_changes() -> No
 
         assert run_target.snapshot_json["base_salary"] == 3_000_000
         assert run_employee.gross_pay == 3_000_000
+
+
+def test_create_payroll_run_collects_payroll_profile_change_events() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        _, _, payroll_code, employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900550",
+            display_name="급여변경",
+            base_salary=3_100_000,
+            effective_from=date(2026, 1, 1),
+        )
+        session.add(
+            PayEmployeeProfile(
+                employee_id=int(employee.id),
+                payroll_code_id=int(payroll_code.id),
+                item_group_id=None,
+                base_salary=3_600_000,
+                pay_type_code="regular",
+                payment_day_type="fixed_day",
+                payment_day_value=25,
+                holiday_adjustment="previous_business_day",
+                effective_from=date(2026, 3, 20),
+                effective_to=None,
+                is_active=True,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="pay profile event test",
+            ),
+        )
+
+        run_target = session.exec(
+            select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == created.run.id)
+        ).one()
+        target_events = session.exec(
+            select(PayPayrollRunTargetEvent).where(PayPayrollRunTargetEvent.run_id == created.run.id)
+        ).all()
+
+        profile_events = [event for event in target_events if event.source_type == "payroll_profile"]
+        assert profile_events
+        assert "base_salary_changed" in {event.event_code for event in profile_events}
+        assert run_target.review_required is True
+
+        salary_event = next(event for event in profile_events if event.event_code == "base_salary_changed")
+        assert salary_event.payload_json["previous_base_salary"] == 3_100_000
+        assert salary_event.payload_json["current_base_salary"] == 3_600_000
+
+
+def test_refresh_payroll_run_snapshot_recalculates_calculated_run() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        _, _, payroll_code, employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900560",
+            display_name="백필테스트",
+            base_salary=3_000_000,
+            effective_from=date(2026, 3, 1),
+        )
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="snapshot refresh test",
+            ),
+        )
+        calculate_payroll_run(session, created.run.id)
+
+        profile = session.exec(
+            select(PayEmployeeProfile).where(PayEmployeeProfile.employee_id == employee.id)
+        ).one()
+        profile.base_salary = 4_200_000
+        profile.updated_at = _utc_now()
+        session.add(profile)
+        session.commit()
+
+        refreshed = refresh_payroll_run_snapshot(session, created.run.id)
+
+        run_target = session.exec(
+            select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == created.run.id)
+        ).one()
+        run_employee = session.exec(
+            select(PayPayrollRunEmployee).where(PayPayrollRunEmployee.run_id == created.run.id)
+        ).one()
+        refresh_events = session.exec(
+            select(PayPayrollRunEvent)
+            .where(PayPayrollRunEvent.run_id == created.run.id, PayPayrollRunEvent.event_type == "snapshot_refreshed")
+        ).all()
+
+        assert refreshed.run.status == "calculated"
+        assert run_target.snapshot_json["base_salary"] == 4_200_000
+        assert run_employee.gross_pay == 4_200_000
+        assert refresh_events
 
 
 def test_calculate_payroll_run_uses_income_tax_bracket_master() -> None:

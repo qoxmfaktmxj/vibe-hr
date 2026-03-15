@@ -30,6 +30,7 @@ from app.services.payroll_phase2_service import (
     list_payroll_runs,
     list_variable_inputs,
     mark_payroll_run_paid,
+    refresh_payroll_run_snapshot,
 )
 
 router = APIRouter(prefix="/pay", tags=["payroll-phase2"])
@@ -129,6 +130,18 @@ def recalculate_payroll_run_api(
     session: Session = Depends(get_session),
 ) -> PayPayrollRunActionResponse:
     return calculate_payroll_run(session, run_id)
+
+
+@router.post(
+    "/runs/{run_id}/snapshot-backfill",
+    response_model=PayPayrollRunActionResponse,
+    dependencies=[Depends(require_roles("payroll_mgr", "admin"))],
+)
+def refresh_payroll_run_snapshot_api(
+    run_id: int,
+    session: Session = Depends(get_session),
+) -> PayPayrollRunActionResponse:
+    return refresh_payroll_run_snapshot(session, run_id)
 
 
 @router.post(

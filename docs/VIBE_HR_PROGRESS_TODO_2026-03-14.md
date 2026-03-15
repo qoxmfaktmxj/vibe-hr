@@ -180,6 +180,8 @@
   - confirmed 발령을 `pay_payroll_run_target_events` 로 고정
   - 계산은 target snapshot 기준으로 수행
   - 소득세는 `pay_income_tax_brackets` 우선, 기존 flat rate fallback
+  - 급여프로필 기준 `base_salary/item_group/payment schedule` 변경 이벤트 판정 추가
+  - 기존 Run용 `snapshot-backfill` 경로 추가
 
 ### E5 CPN 연말정산 / 마감취소
 

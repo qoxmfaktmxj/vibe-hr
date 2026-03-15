@@ -7,7 +7,7 @@
 - 월 변동입력 API
 - 월 급여 Run 생성/계산/마감/지급완료 API
 - 급여 결과(사원 요약/항목 상세) 저장
-- Run 대상자 snapshot / 발령 이벤트 적재 / 소득세 bracket master
+- Run 대상자 snapshot / 발령+급여프로필 이벤트 적재 / 소득세 bracket master / snapshot backfill
 
 > 참고: 화면(UI)보다 백엔드 지급 파이프라인 우선 반영
 
@@ -24,7 +24,7 @@
 4. `pay_payroll_run_targets`
    - Run 생성 시 대상자/프로필 snapshot 고정
 5. `pay_payroll_run_target_events`
-   - confirmed 발령 기반 급여 이벤트 판정 결과
+   - confirmed 발령 + 급여프로필 변경 기반 급여 이벤트 판정 결과
 6. `pay_payroll_run_employees`
    - 사원별 계산 요약(총지급, 공제, 실지급)
 7. `pay_payroll_run_items`
@@ -58,6 +58,12 @@
   - 지방소득세: 소득세의 10%
   - 실지급 = 총지급 - 총공제
 
+4-1) 기존 Run snapshot/event 재적재
+- `POST /api/v1/pay/runs/{run_id}/snapshot-backfill`
+- `draft`/`calculated` 상태에서만 허용
+- 기존 `pay_payroll_run_targets` / `pay_payroll_run_target_events` 를 다시 만들고,
+  이미 `calculated` 인 Run은 즉시 재계산까지 수행한다.
+
 5) 계산 결과 검토
 - `GET /api/v1/pay/runs/{run_id}/employees`
 - `GET /api/v1/pay/runs/{run_id}/employees/{run_employee_id}`
@@ -74,6 +80,7 @@
 
 - `draft` -> `calculated` -> `closed` -> `paid`
 - `closed`/`paid` 상태에서는 재계산 금지
+- `closed`/`paid` 상태에서는 snapshot backfill 금지
 
 ---
 

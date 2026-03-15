@@ -219,6 +219,34 @@ def _build_payroll_target_event_payload(
     }
 
 
+def _build_payroll_profile_event_payload(
+    *,
+    previous_profile: PayEmployeeProfile,
+    current_profile: PayEmployeeProfile,
+    item_group_name_map: dict[int, str],
+) -> dict[str, object]:
+    return {
+        "previous_profile_id": previous_profile.id,
+        "current_profile_id": current_profile.id,
+        "effective_from": _as_date_text(current_profile.effective_from),
+        "effective_to": _as_date_text(current_profile.effective_to),
+        "previous_base_salary": round(float(previous_profile.base_salary), 2),
+        "current_base_salary": round(float(current_profile.base_salary), 2),
+        "previous_item_group_id": previous_profile.item_group_id,
+        "previous_item_group_name": item_group_name_map.get(previous_profile.item_group_id or 0),
+        "current_item_group_id": current_profile.item_group_id,
+        "current_item_group_name": item_group_name_map.get(current_profile.item_group_id or 0),
+        "previous_pay_type_code": previous_profile.pay_type_code,
+        "current_pay_type_code": current_profile.pay_type_code,
+        "previous_payment_day_type": previous_profile.payment_day_type,
+        "current_payment_day_type": current_profile.payment_day_type,
+        "previous_payment_day_value": previous_profile.payment_day_value,
+        "current_payment_day_value": current_profile.payment_day_value,
+        "previous_holiday_adjustment": previous_profile.holiday_adjustment,
+        "current_holiday_adjustment": current_profile.holiday_adjustment,
+    }
+
+
 def _collect_payroll_target_events(
     *,
     item: HrAppointmentOrderItem,
@@ -265,6 +293,77 @@ def _collect_payroll_target_events(
         seen_codes.add(event[0])
         unique_events.append(event)
     return unique_events
+
+
+def _collect_payroll_profile_events(
+    *,
+    previous_profile: PayEmployeeProfile,
+    current_profile: PayEmployeeProfile,
+    item_group_name_map: dict[int, str],
+) -> list[tuple[str, str, str, dict[str, object]]]:
+    payload = _build_payroll_profile_event_payload(
+        previous_profile=previous_profile,
+        current_profile=current_profile,
+        item_group_name_map=item_group_name_map,
+    )
+    events: list[tuple[str, str, str, dict[str, object]]] = []
+
+    if round(float(previous_profile.base_salary), 2) != round(float(current_profile.base_salary), 2):
+        events.append(("base_salary_changed", "기본급 변경", "review", payload))
+
+    if previous_profile.item_group_id != current_profile.item_group_id:
+        events.append(("pay_item_group_changed", "급여항목 그룹 변경", "review", payload))
+
+    payment_schedule_changed = (
+        previous_profile.payment_day_type != current_profile.payment_day_type
+        or previous_profile.payment_day_value != current_profile.payment_day_value
+        or previous_profile.holiday_adjustment != current_profile.holiday_adjustment
+    )
+    if payment_schedule_changed:
+        events.append(("payment_schedule_changed", "지급기준 변경", "review", payload))
+
+    if previous_profile.pay_type_code != current_profile.pay_type_code:
+        events.append(("pay_type_changed", "급여유형 변경", "review", payload))
+
+    return events
+
+
+def _add_target_event(
+    session: Session,
+    *,
+    run: PayPayrollRun,
+    target: PayPayrollRunTarget,
+    employee_id: int,
+    source_type: str,
+    source_table: str,
+    source_id: int | None,
+    effective_date: date | None,
+    event_code: str,
+    event_name: str,
+    decision_code: str,
+    payload: dict[str, object],
+) -> None:
+    session.add(
+        PayPayrollRunTargetEvent(
+            run_id=run.id or 0,
+            target_id=target.id,
+            employee_id=employee_id,
+            event_code=event_code,
+            event_name=event_name,
+            source_type=source_type,
+            source_table=source_table,
+            source_id=source_id,
+            effective_date=effective_date,
+            decision_code=decision_code,
+            payload_json=payload,
+            created_at=_utc_now(),
+        )
+    )
+    target.event_count += 1
+    if decision_code == "review":
+        target.review_required = True
+    target.updated_at = _utc_now()
+    session.add(target)
 
 
 def _materialize_payroll_targets(
@@ -356,28 +455,82 @@ def _materialize_payroll_targets(
             order=order,
             department_name_map=department_name_map,
         ):
-            session.add(
-                PayPayrollRunTargetEvent(
-                    run_id=run.id or 0,
-                    target_id=target.id,
-                    employee_id=item.employee_id,
-                    event_code=event_code,
-                    event_name=event_name,
-                    source_type="appointment",
-                    source_table="hr_appointment_order_items",
-                    source_id=item.id,
-                    effective_date=item.start_date,
-                    decision_code=decision_code,
-                    payload_json=payload,
-                    created_at=_utc_now(),
+            _add_target_event(
+                session,
+                run=run,
+                target=target,
+                employee_id=item.employee_id,
+                source_type="appointment",
+                source_table="hr_appointment_order_items",
+                source_id=item.id,
+                effective_date=item.start_date,
+                event_code=event_code,
+                event_name=event_name,
+                decision_code=decision_code,
+                payload=payload,
+            )
+            event_count += 1
+
+    profile_rows = session.exec(
+        select(PayEmployeeProfile)
+        .where(
+            PayEmployeeProfile.employee_id.in_(employee_ids),
+            PayEmployeeProfile.payroll_code_id == run.payroll_code_id,
+            PayEmployeeProfile.effective_from <= period_end,
+        )
+        .order_by(PayEmployeeProfile.employee_id, PayEmployeeProfile.effective_from, PayEmployeeProfile.id)
+    ).all() if employee_ids else []
+    profile_item_group_name_map = {
+        item_group.id: item_group.name
+        for item_group in session.exec(
+            select(PayItemGroup).where(
+                PayItemGroup.id.in_(
+                    sorted(
+                        {
+                            item_group_id
+                            for row in profile_rows
+                            for item_group_id in (row.item_group_id,)
+                            if item_group_id is not None
+                        }
+                    )
                 )
             )
-            target.event_count += 1
-            if decision_code == "review":
-                target.review_required = True
-            target.updated_at = _utc_now()
-            session.add(target)
-            event_count += 1
+        ).all()
+    } if profile_rows else {}
+
+    profile_rows_by_employee: dict[int, list[PayEmployeeProfile]] = {}
+    for row in profile_rows:
+        profile_rows_by_employee.setdefault(row.employee_id, []).append(row)
+
+    for employee_id, employee_profiles in profile_rows_by_employee.items():
+        target = target_by_employee.get(employee_id)
+        if target is None:
+            continue
+
+        previous_profile: PayEmployeeProfile | None = None
+        for profile in employee_profiles:
+            if previous_profile is not None and period_start <= profile.effective_from <= period_end:
+                for event_code, event_name, decision_code, payload in _collect_payroll_profile_events(
+                    previous_profile=previous_profile,
+                    current_profile=profile,
+                    item_group_name_map=profile_item_group_name_map,
+                ):
+                    _add_target_event(
+                        session,
+                        run=run,
+                        target=target,
+                        employee_id=employee_id,
+                        source_type="payroll_profile",
+                        source_table="pay_employee_profiles",
+                        source_id=profile.id,
+                        effective_date=profile.effective_from,
+                        event_code=event_code,
+                        event_name=event_name,
+                        decision_code=decision_code,
+                        payload=payload,
+                    )
+                    event_count += 1
+            previous_profile = profile
 
     return len(run_targets), event_count
 
@@ -418,6 +571,46 @@ def _ensure_payroll_targets(
         .where(PayPayrollRunTarget.run_id == run.id)
         .order_by(PayPayrollRunTarget.employee_id, PayPayrollRunTarget.id)
     ).all()
+
+
+def _build_run_action_response(session: Session, run: PayPayrollRun) -> PayPayrollRunActionResponse:
+    code_name = session.exec(select(PayPayrollCode.name).where(PayPayrollCode.id == run.payroll_code_id)).first()
+    return PayPayrollRunActionResponse(run=_build_run_item(run, {run.payroll_code_id: code_name or ""}))
+
+
+def refresh_payroll_run_snapshot(session: Session, run_id: int) -> PayPayrollRunActionResponse:
+    run = session.get(PayPayrollRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payroll run not found.")
+
+    if run.status in {"closed", "paid"}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed/paid run cannot refresh snapshot.")
+
+    period_start, period_end = _parse_year_month(run.year_month)
+    target_count, event_count = _materialize_payroll_targets(
+        session,
+        run=run,
+        period_start=period_start,
+        period_end=period_end,
+        replace_existing=True,
+    )
+    run.updated_at = _utc_now()
+    session.add(run)
+    session.add(
+        PayPayrollRunEvent(
+            run_id=run.id,
+            event_type="snapshot_refreshed",
+            message=f"Payroll target snapshot refreshed for {target_count} employees ({event_count} events).",
+            created_at=_utc_now(),
+        )
+    )
+    session.commit()
+
+    if run.status == "calculated":
+        return calculate_payroll_run(session, run_id)
+
+    session.refresh(run)
+    return _build_run_action_response(session, run)
 
 
 def _snapshot_value(snapshot: dict[str, object], key: str, default: object = None) -> object:
@@ -782,9 +975,7 @@ def create_payroll_run(session: Session, payload: PayPayrollRunCreateRequest) ->
     session.commit()
     session.refresh(run)
 
-    return PayPayrollRunActionResponse(
-        run=_build_run_item(run, {payload.payroll_code_id: payroll_code.name}),
-    )
+    return PayPayrollRunActionResponse(run=_build_run_item(run, {payload.payroll_code_id: payroll_code.name}))
 
 
 def _find_rate(rate_rows: list[PayTaxRate], *keywords: str) -> float:
@@ -1312,8 +1503,7 @@ def calculate_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionR
     session.commit()
     session.refresh(run)
 
-    code_name = session.exec(select(PayPayrollCode.name).where(PayPayrollCode.id == run.payroll_code_id)).first()
-    return PayPayrollRunActionResponse(run=_build_run_item(run, {run.payroll_code_id: code_name or ""}))
+    return _build_run_action_response(session, run)
 
 
 def close_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionResponse:
@@ -1340,8 +1530,7 @@ def close_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionRespo
     session.commit()
     session.refresh(run)
 
-    code_name = session.exec(select(PayPayrollCode.name).where(PayPayrollCode.id == run.payroll_code_id)).first()
-    return PayPayrollRunActionResponse(run=_build_run_item(run, {run.payroll_code_id: code_name or ""}))
+    return _build_run_action_response(session, run)
 
 
 def mark_payroll_run_paid(session: Session, run_id: int) -> PayPayrollRunActionResponse:
@@ -1369,8 +1558,7 @@ def mark_payroll_run_paid(session: Session, run_id: int) -> PayPayrollRunActionR
     session.commit()
     session.refresh(run)
 
-    code_name = session.exec(select(PayPayrollCode.name).where(PayPayrollCode.id == run.payroll_code_id)).first()
-    return PayPayrollRunActionResponse(run=_build_run_item(run, {run.payroll_code_id: code_name or ""}))
+    return _build_run_action_response(session, run)
 
 
 def list_payroll_run_employees(session: Session, run_id: int) -> PayPayrollRunEmployeeListResponse:
