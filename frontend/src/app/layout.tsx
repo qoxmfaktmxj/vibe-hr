@@ -5,12 +5,25 @@ import { Providers } from "@/components/providers";
 
 import "./globals.css";
 
+const DEFAULT_APP_ORIGIN = "http://localhost:3000";
+
+function resolveMetadataBase(): URL {
+  const appOrigin = process.env.APP_ORIGIN ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? DEFAULT_APP_ORIGIN;
+
+  try {
+    return new URL(appOrigin);
+  } catch {
+    return new URL(DEFAULT_APP_ORIGIN);
+  }
+}
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
+  metadataBase: resolveMetadataBase(),
   title: "VIBE-HR",
   description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
   icons: {
