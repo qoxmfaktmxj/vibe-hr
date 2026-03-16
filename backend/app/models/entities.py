@@ -1922,6 +1922,7 @@ class WelBenefitRequest(SQLModel, table=True):
     request_no: str = Field(index=True, max_length=40)
     benefit_type_code: str = Field(index=True, max_length=40)
     benefit_type_name: str = Field(max_length=100)
+    employee_id: Optional[int] = Field(default=None, foreign_key="hr_employees.id", index=True)
     employee_no: str = Field(index=True, max_length=40)
     employee_name: str = Field(max_length=100)
     department_name: str = Field(max_length=120)

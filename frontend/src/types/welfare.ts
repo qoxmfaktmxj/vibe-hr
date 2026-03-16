@@ -43,3 +43,22 @@ export type WelBenefitRequestListResponse = {
   page: number;
   limit: number;
 };
+
+export type WelBenefitRequestCreateRequest = {
+  benefit_type_code: string;
+  requested_amount: number;
+  description?: string | null;
+};
+
+export type WelBenefitRequestApproveRequest = {
+  approved_amount: number;
+  note?: string | null;
+};
+
+export type WelBenefitRequestRejectRequest = {
+  reason?: string | null;
+};
+
+export type WelBenefitRequestActionResponse = {
+  item: WelBenefitRequestItem;
+};

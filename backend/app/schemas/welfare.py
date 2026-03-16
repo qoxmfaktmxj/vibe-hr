@@ -72,3 +72,22 @@ class WelBenefitTypeBatchResponse(BaseModel):
     created: int
     updated: int
     deleted: int
+
+
+class WelBenefitRequestCreateRequest(BaseModel):
+    benefit_type_code: str
+    requested_amount: int
+    description: Optional[str] = None
+
+
+class WelBenefitRequestApproveRequest(BaseModel):
+    approved_amount: int
+    note: Optional[str] = None
+
+
+class WelBenefitRequestRejectRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class WelBenefitRequestActionResponse(BaseModel):
+    item: WelBenefitRequestItem

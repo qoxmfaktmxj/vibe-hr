@@ -4987,10 +4987,10 @@ def ensure_wel_benefit_requests(session: Session) -> None:
 
 
 def ensure_welfare_menu_overrides(session: Session) -> None:
-    role_codes = ["hr_manager", "payroll_mgr", "admin"]
+    all_role_codes = ["employee", "hr_manager", "payroll_mgr", "admin"]
     role_map = {
         row.code: row
-        for row in session.exec(select(AuthRole).where(AuthRole.code.in_(role_codes))).all()
+        for row in session.exec(select(AuthRole).where(AuthRole.code.in_(all_role_codes))).all()
     }
 
     menu_specs = [
@@ -5001,6 +5001,7 @@ def ensure_welfare_menu_overrides(session: Session) -> None:
             "path": None,
             "icon": "HeartHandshake",
             "sort_order": 650,
+            "roles": ["hr_manager", "payroll_mgr", "admin"],
         },
         {
             "code": "wel.requests",
@@ -5009,6 +5010,16 @@ def ensure_welfare_menu_overrides(session: Session) -> None:
             "path": "/wel/requests",
             "icon": "ListOrdered",
             "sort_order": 651,
+            "roles": ["hr_manager", "payroll_mgr", "admin"],
+        },
+        {
+            "code": "wel.my-requests",
+            "parent_code": "wel",
+            "name": "\ub0b4 \ubcf5\ub9ac\ud6c4\uc0dd \uc2e0\uccad",
+            "path": "/wel/my-requests",
+            "icon": "ClipboardList",
+            "sort_order": 652,
+            "roles": ["employee", "hr_manager", "admin"],
         },
         {
             "code": "wel.benefit-types",
@@ -5016,7 +5027,8 @@ def ensure_welfare_menu_overrides(session: Session) -> None:
             "name": "\uBCF5\uB9AC\uD6C4\uC0DD \uC720\uD615\uAD00\uB9AC",
             "path": "/wel/benefit-types",
             "icon": "Gift",
-            "sort_order": 652,
+            "sort_order": 653,
+            "roles": ["hr_manager", "payroll_mgr", "admin"],
         },
     ]
 
@@ -5067,9 +5079,10 @@ def ensure_welfare_menu_overrides(session: Session) -> None:
                 session.refresh(row)
             menus[row.code] = row
 
+        spec_role_codes = spec.get("roles", all_role_codes)
         target_role_ids = {
             role_map[role_code].id
-            for role_code in role_codes
+            for role_code in spec_role_codes
             if role_code in role_map
         }
         existing_roles = {
