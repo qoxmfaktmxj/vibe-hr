@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.models import (
     PayAllowanceDeduction,
+    PayIncomeTaxBracket,
     PayItemGroup,
     PayItemGroupDetail,
     PayPayrollCode,
@@ -17,6 +18,10 @@ from app.schemas.pay_setup_schema import (
     PayAllowanceDeductionBatchRequest,
     PayAllowanceDeductionBatchResponse,
     PayAllowanceDeductionItem,
+    PayIncomeTaxBracketBatchItem,
+    PayIncomeTaxBracketBatchRequest,
+    PayIncomeTaxBracketBatchResponse,
+    PayIncomeTaxBracketItem,
     PayItemGroupBatchItem,
     PayItemGroupBatchRequest,
     PayItemGroupBatchResponse,
@@ -194,6 +199,93 @@ def batch_save_pay_tax_rates(
     session.commit()
     items = list_pay_tax_rates(session)
     return PayTaxRateBatchResponse(
+        items=items,
+        total_count=len(items),
+        inserted_count=inserted,
+        updated_count=updated,
+        deleted_count=deleted,
+    )
+
+
+# -------------------------------------------------------------------------
+# PayIncomeTaxBracket Logic
+# -------------------------------------------------------------------------
+def list_pay_income_tax_brackets(session: Session) -> list[PayIncomeTaxBracketItem]:
+    rows = session.exec(
+        select(PayIncomeTaxBracket).order_by(
+            PayIncomeTaxBracket.year.desc(),
+            PayIncomeTaxBracket.annual_taxable_from,
+        )
+    ).all()
+    return [
+        PayIncomeTaxBracketItem(
+            id=row.id,
+            year=row.year,
+            annual_taxable_from=row.annual_taxable_from,
+            annual_taxable_to=row.annual_taxable_to,
+            tax_rate=row.tax_rate,
+            quick_deduction=row.quick_deduction,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+        for row in rows
+    ]
+
+
+def batch_save_pay_income_tax_brackets(
+    session: Session, payload: PayIncomeTaxBracketBatchRequest
+) -> PayIncomeTaxBracketBatchResponse:
+    inserted = 0
+    updated = 0
+    deleted = 0
+
+    for del_id in payload.delete_ids:
+        row = session.get(PayIncomeTaxBracket, del_id)
+        if row:
+            session.delete(row)
+            deleted += 1
+
+    for item in payload.items:
+        if item.id and item.id > 0:
+            row = session.get(PayIncomeTaxBracket, item.id)
+            if row:
+                row.year = item.year
+                row.annual_taxable_from = item.annual_taxable_from
+                row.annual_taxable_to = item.annual_taxable_to
+                row.tax_rate = item.tax_rate
+                row.quick_deduction = item.quick_deduction
+                row.updated_at = _utc_now()
+                session.add(row)
+                updated += 1
+                continue
+
+        dup = session.exec(
+            select(PayIncomeTaxBracket).where(
+                PayIncomeTaxBracket.year == item.year,
+                PayIncomeTaxBracket.annual_taxable_from == item.annual_taxable_from,
+            )
+        ).first()
+        if dup:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"연도 '{item.year}' 구간 '{item.annual_taxable_from}'이 이미 존재합니다.",
+            )
+
+        session.add(
+            PayIncomeTaxBracket(
+                year=item.year,
+                annual_taxable_from=item.annual_taxable_from,
+                annual_taxable_to=item.annual_taxable_to,
+                tax_rate=item.tax_rate,
+                quick_deduction=item.quick_deduction,
+                created_at=_utc_now(),
+            )
+        )
+        inserted += 1
+
+    session.commit()
+    items = list_pay_income_tax_brackets(session)
+    return PayIncomeTaxBracketBatchResponse(
         items=items,
         total_count=len(items),
         inserted_count=inserted,

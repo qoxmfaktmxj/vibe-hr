@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import secrets
+import string
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
 from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlmodel import Session, select
 
-from app.models import AuthUser, HrEmployee, HrRecruitFinalist, OrgDepartment
+from app.models import AuthUser, HrEmployee, HrEmployeeBasicProfile, HrRecruitFinalist, OrgDepartment
 from app.schemas.employee import EmployeeCreateRequest
 from app.schemas.hr_recruit import (
     HrRecruitCreateEmployeesResponse,
@@ -23,6 +25,45 @@ _EMAIL_ADAPTER = TypeAdapter(EmailStr)
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    """임시 비밀번호 생성: 영문 대소문자 + 숫자 + 특수문자 조합."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    # 각 문자 종류 최소 1개씩 보장
+    must_have = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%"),
+    ]
+    rest = [secrets.choice(alphabet) for _ in range(length - len(must_have))]
+    combined = must_have + rest
+    secrets.SystemRandom().shuffle(combined)
+    return "".join(combined)
+
+
+def _ensure_basic_profile_from_finalist(
+    session: Session,
+    employee_id: int,
+    finalist: HrRecruitFinalist,
+) -> None:
+    """합격자 데이터를 기반으로 HrEmployeeBasicProfile이 없으면 자동 생성."""
+    existing = session.exec(
+        select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee_id)
+    ).first()
+    if existing is not None:
+        return
+
+    now = _utc_now()
+    profile = HrEmployeeBasicProfile(
+        employee_id=employee_id,
+        birth_date=finalist.birth_date,
+        resident_no_masked=finalist.resident_no_masked,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(profile)
 
 
 def _strip_or_none(value: str | None) -> str | None:
@@ -430,6 +471,7 @@ def create_employees_from_finalists(
                 )
                 continue
 
+            temp_password = _generate_temp_password()
             employee_item = create_employee_no_commit(
                 session,
                 EmployeeCreateRequest(
@@ -441,9 +483,12 @@ def create_employees_from_finalists(
                     employment_status="leave",
                     login_id=finalist.login_id,
                     email=_build_employee_email(finalist),
-                    password="admin",
+                    password=temp_password,
                 ),
             )
+
+            # 합격자 데이터로 인사기본 프로필 자동 생성 (birth_date, resident_no_masked)
+            _ensure_basic_profile_from_finalist(session, employee_item.id or 0, finalist)
 
             if finalist.status_code == "draft":
                 finalist.status_code = "ready"

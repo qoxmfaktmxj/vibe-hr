@@ -78,6 +78,81 @@ class OrgCorporation(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class OrgDeptChangeHistory(SQLModel, table=True):
+    """부서 직접 수정 이력 (B안: 즉시 수정 시 자동 기록)."""
+
+    __tablename__ = "org_dept_change_histories"
+    __table_args__ = (
+        Index("ix_org_dept_change_histories_dept_changed", "department_id", "changed_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    department_id: int = Field(foreign_key="org_departments.id", index=True)
+    changed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    field_name: str = Field(max_length=60)
+    before_value: Optional[str] = Field(default=None, max_length=500)
+    after_value: Optional[str] = Field(default=None, max_length=500)
+    change_reason: Optional[str] = Field(default=None, max_length=300)
+    changed_at: datetime = Field(default_factory=utc_now, index=True)
+
+
+class OrgRestructurePlan(SQLModel, table=True):
+    """조직개편안 헤더 (A안: 초안→검토→적용)."""
+
+    __tablename__ = "org_restructure_plans"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'reviewing', 'applied', 'cancelled')",
+            name="ck_org_restructure_plans_status",
+        ),
+        Index("ix_org_restructure_plans_status_created", "status", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(max_length=200)
+    description: Optional[str] = Field(default=None, max_length=1000)
+    planned_date: Optional[date] = Field(default=None)
+    status: str = Field(default="draft", max_length=20)
+    applied_at: Optional[datetime] = Field(default=None)
+    applied_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    created_by: int = Field(foreign_key="auth_users.id")
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class OrgRestructurePlanItem(SQLModel, table=True):
+    """조직개편안 항목 (부서별 액션)."""
+
+    __tablename__ = "org_restructure_plan_items"
+    __table_args__ = (
+        CheckConstraint(
+            "action_type IN ('move', 'rename', 'create', 'deactivate', 'reactivate')",
+            name="ck_org_restructure_plan_items_action",
+        ),
+        CheckConstraint(
+            "item_status IN ('pending', 'applied', 'skipped')",
+            name="ck_org_restructure_plan_items_status",
+        ),
+        Index("ix_org_restructure_plan_items_plan", "plan_id", "sort_order"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    plan_id: int = Field(foreign_key="org_restructure_plans.id", index=True)
+    action_type: str = Field(max_length=20)        # move|rename|create|deactivate|reactivate
+    target_dept_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    new_parent_id: Optional[int] = Field(default=None, foreign_key="org_departments.id")
+    new_name: Optional[str] = Field(default=None, max_length=100)
+    new_code: Optional[str] = Field(default=None, max_length=30)
+    new_organization_type: Optional[str] = Field(default=None, max_length=50)
+    new_cost_center_code: Optional[str] = Field(default=None, max_length=30)
+    sort_order: int = Field(default=0)
+    item_status: str = Field(default="pending", max_length=20)
+    memo: Optional[str] = Field(default=None, max_length=500)
+    applied_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrEmployee(SQLModel, table=True):
     __tablename__ = "hr_employees"
     __table_args__ = (
@@ -1571,6 +1646,34 @@ class TimEmployeeDailySchedule(SQLModel, table=True):
     is_overnight: bool = Field(default=False)
     generated_at: datetime = Field(default_factory=utc_now)
     version_tag: Optional[str] = Field(default=None, max_length=50)
+
+
+class TimMonthClose(SQLModel, table=True):
+    """근태 월마감 — 특정 년/월을 확정(잠금) 처리"""
+
+    __tablename__ = "tim_month_closes"
+    __table_args__ = (
+        UniqueConstraint("year", "month", name="uq_tim_month_closes_ym"),
+        CheckConstraint("month BETWEEN 1 AND 12", name="ck_tim_month_closes_month"),
+        CheckConstraint("close_status IN ('open','closed')", name="ck_tim_month_closes_status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int = Field(index=True)
+    month: int  # 1-12
+    close_status: str = Field(default="open", max_length=10)  # open | closed
+    employee_count: int = Field(default=0)       # 마감 시점 집계 인원
+    present_days: int = Field(default=0)         # 출근 건수 합계
+    absent_days: int = Field(default=0)          # 결근 건수 합계
+    late_days: int = Field(default=0)            # 지각 건수 합계
+    leave_days: int = Field(default=0)           # 휴가 건수 합계
+    closed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    closed_at: Optional[datetime] = None
+    reopened_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    reopened_at: Optional[datetime] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 # ──────────────────────────────────────────────────────────────────────

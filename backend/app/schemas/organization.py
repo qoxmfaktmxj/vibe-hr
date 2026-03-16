@@ -100,3 +100,119 @@ class OrganizationCorporationUpdateRequest(BaseModel):
     certificate_seal_url: str | None = Field(default=None, max_length=500)
     company_logo_url: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# OrgDeptChangeHistory Schemas
+# ---------------------------------------------------------------------------
+class OrgDeptChangeHistoryItem(BaseModel):
+    id: int
+    department_id: int
+    department_name: str | None = None
+    changed_by: int | None = None
+    changed_by_name: str | None = None
+    field_name: str
+    before_value: str | None = None
+    after_value: str | None = None
+    change_reason: str | None = None
+    changed_at: datetime
+
+
+class OrgDeptChangeHistoryListResponse(BaseModel):
+    items: list[OrgDeptChangeHistoryItem]
+    total_count: int
+
+
+# ---------------------------------------------------------------------------
+# OrgRestructurePlan Schemas
+# ---------------------------------------------------------------------------
+class OrgRestructurePlanItem(BaseModel):
+    id: int
+    title: str
+    description: str | None = None
+    planned_date: date | None = None
+    status: str
+    applied_at: datetime | None = None
+    applied_by: int | None = None
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+    item_count: int = 0
+
+
+class OrgRestructurePlanListResponse(BaseModel):
+    items: list[OrgRestructurePlanItem]
+    total_count: int
+
+
+class OrgRestructurePlanCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
+    planned_date: date | None = None
+
+
+class OrgRestructurePlanUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=1000)
+    planned_date: date | None = None
+    status: str | None = None   # draft → reviewing (manual), applied/cancelled via actions
+
+
+# ---------------------------------------------------------------------------
+# OrgRestructurePlanItem Schemas
+# ---------------------------------------------------------------------------
+class OrgRestructurePlanItemDetail(BaseModel):
+    id: int
+    plan_id: int
+    action_type: str
+    target_dept_id: int | None = None
+    target_dept_name: str | None = None
+    target_dept_code: str | None = None
+    new_parent_id: int | None = None
+    new_parent_name: str | None = None
+    new_name: str | None = None
+    new_code: str | None = None
+    new_organization_type: str | None = None
+    new_cost_center_code: str | None = None
+    sort_order: int
+    item_status: str
+    memo: str | None = None
+    applied_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrgRestructurePlanItemListResponse(BaseModel):
+    items: list[OrgRestructurePlanItemDetail]
+    total_count: int
+
+
+class OrgRestructurePlanItemCreateRequest(BaseModel):
+    action_type: str = Field(pattern="^(move|rename|create|deactivate|reactivate)$")
+    target_dept_id: int | None = None
+    new_parent_id: int | None = None
+    new_name: str | None = Field(default=None, max_length=100)
+    new_code: str | None = Field(default=None, max_length=30)
+    new_organization_type: str | None = Field(default=None, max_length=50)
+    new_cost_center_code: str | None = Field(default=None, max_length=30)
+    sort_order: int = 0
+    memo: str | None = Field(default=None, max_length=500)
+
+
+class OrgRestructurePlanItemUpdateRequest(BaseModel):
+    action_type: str | None = Field(default=None, pattern="^(move|rename|create|deactivate|reactivate)$")
+    target_dept_id: int | None = None
+    new_parent_id: int | None = None
+    new_name: str | None = Field(default=None, max_length=100)
+    new_code: str | None = Field(default=None, max_length=30)
+    new_organization_type: str | None = Field(default=None, max_length=50)
+    new_cost_center_code: str | None = Field(default=None, max_length=30)
+    sort_order: int | None = None
+    memo: str | None = Field(default=None, max_length=500)
+
+
+class OrgRestructureApplyResponse(BaseModel):
+    plan_id: int
+    applied_count: int
+    skipped_count: int
+    messages: list[str] = []

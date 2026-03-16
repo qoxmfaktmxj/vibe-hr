@@ -7,6 +7,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.models import HrEmployee, OrgCorporation, OrgDepartment
+from app.services.org_restructure_service import record_dept_change
 from app.schemas.organization import (
     OrganizationCorporationCreateRequest,
     OrganizationCorporationItem,
@@ -152,6 +153,7 @@ def update_department(
     session: Session,
     department_id: int,
     payload: OrganizationDepartmentUpdateRequest,
+    changed_by: int | None = None,
 ) -> OrganizationDepartmentItem:
     department = session.get(OrgDepartment, department_id)
     if department is None:
@@ -167,14 +169,20 @@ def update_department(
         ).first()
         if duplicate is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="code already exists.")
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="code", before_value=department.code, after_value=next_code)
         department.code = next_code
 
     if payload.name is not None:
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="name", before_value=department.name, after_value=payload.name.strip())
         department.name = payload.name.strip()
     if payload.organization_type is not None:
-        department.organization_type = _strip_or_none(payload.organization_type)
+        new_val = _strip_or_none(payload.organization_type)
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="organization_type", before_value=department.organization_type, after_value=new_val)
+        department.organization_type = new_val
     if payload.cost_center_code is not None:
-        department.cost_center_code = _strip_or_none(payload.cost_center_code)
+        new_val = _strip_or_none(payload.cost_center_code)
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="cost_center_code", before_value=department.cost_center_code, after_value=new_val)
+        department.cost_center_code = new_val
     if payload.description is not None:
         department.description = _strip_or_none(payload.description)
 
@@ -184,9 +192,11 @@ def update_department(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Department cannot be its own parent.")
         _ensure_parent_exists(session, next_parent_id)
         _ensure_no_cycle(session, department.id, next_parent_id)
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="parent_id", before_value=str(department.parent_id), after_value=str(next_parent_id))
         department.parent_id = next_parent_id
 
     if payload.is_active is not None:
+        record_dept_change(session, department_id=department_id, changed_by=changed_by, field_name="is_active", before_value=str(department.is_active), after_value=str(payload.is_active))
         department.is_active = payload.is_active
 
     department.updated_at = _utc_now()

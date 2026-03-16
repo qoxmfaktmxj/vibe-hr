@@ -8,6 +8,9 @@ from app.schemas.pay_setup_schema import (
     PayAllowanceDeductionBatchRequest,
     PayAllowanceDeductionBatchResponse,
     PayAllowanceDeductionListResponse,
+    PayIncomeTaxBracketBatchRequest,
+    PayIncomeTaxBracketBatchResponse,
+    PayIncomeTaxBracketListResponse,
     PayItemGroupBatchRequest,
     PayItemGroupBatchResponse,
     PayItemGroupListResponse,
@@ -21,10 +24,12 @@ from app.schemas.pay_setup_schema import (
 from app.services.menu_service import get_allowed_menu_actions_for_user
 from app.services.pay_setup_service import (
     batch_save_pay_allowance_deductions,
+    batch_save_pay_income_tax_brackets,
     batch_save_pay_item_groups,
     batch_save_pay_payroll_codes,
     batch_save_pay_tax_rates,
     list_pay_allowance_deductions,
+    list_pay_income_tax_brackets,
     list_pay_item_groups,
     list_pay_payroll_codes,
     list_pay_tax_rates,
@@ -111,6 +116,37 @@ def save_tax_rates_batch(
 ) -> PayTaxRateBatchResponse:
     _require_menu_action(session, current_user, "payroll.tax-rates", "save")
     return batch_save_pay_tax_rates(session, payload)
+
+
+# -------------------------------------------------------------------------
+# PayIncomeTaxBracket Endpoints
+# -------------------------------------------------------------------------
+@router.get(
+    "/income-tax-brackets",
+    response_model=PayIncomeTaxBracketListResponse,
+    dependencies=[Depends(require_roles("payroll_mgr", "admin"))],
+)
+def get_income_tax_brackets(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> PayIncomeTaxBracketListResponse:
+    _require_menu_action(session, current_user, "payroll.income-tax-brackets", "query")
+    items = list_pay_income_tax_brackets(session)
+    return PayIncomeTaxBracketListResponse(items=items, total_count=len(items))
+
+
+@router.post(
+    "/income-tax-brackets/batch",
+    response_model=PayIncomeTaxBracketBatchResponse,
+    dependencies=[Depends(require_roles("payroll_mgr", "admin"))],
+)
+def save_income_tax_brackets_batch(
+    payload: PayIncomeTaxBracketBatchRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> PayIncomeTaxBracketBatchResponse:
+    _require_menu_action(session, current_user, "payroll.income-tax-brackets", "save")
+    return batch_save_pay_income_tax_brackets(session, payload)
 
 
 # -------------------------------------------------------------------------

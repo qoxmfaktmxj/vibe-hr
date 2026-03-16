@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
 from app.core.time_utils import APP_TZ, business_today
-from app.models import AuthUser, HrEmployee, TimEmployeeDailySchedule, TimHoliday, TimSchedulePattern, TimWorkScheduleCode
+from app.models import AuthUser, HrAttendanceDaily, HrEmployee, TimEmployeeDailySchedule, TimHoliday, TimSchedulePattern, TimWorkScheduleCode
 from app.schemas.tim_attendance_daily import (
     TimAttendanceCorrectionListResponse,
     TimAttendanceCorrectRequest,
@@ -29,6 +29,7 @@ from app.services.tim_attendance_daily_service import (
     list_corrections,
     resolve_target_employee_id,
 )
+from app.services.tim_month_close_service import is_month_closed
 
 router = APIRouter(prefix="/tim/attendance-daily", tags=["tim-attendance-daily"])
 
@@ -214,6 +215,16 @@ def attendance_correct(
     employee = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
     if employee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="관리자 사원 프로필을 찾을 수 없습니다.")
+
+    record = session.get(HrAttendanceDaily, attendance_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="근태 기록을 찾을 수 없습니다.")
+
+    if is_month_closed(session, record.work_date.year, record.work_date.month):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{record.work_date.year}년 {record.work_date.month}월은 마감된 월입니다. 수정이 제한됩니다.",
+        )
 
     return correct_attendance(
         session,

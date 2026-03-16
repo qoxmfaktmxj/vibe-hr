@@ -86,6 +86,43 @@
       ],
       "ownerModule": "ORG"
     },
+    "org.dept-history": {
+      "path": "/org/dept-history",
+      "pageFile": "frontend/src/app/org/dept-history/page.tsx",
+      "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
+    "org.restructure": {
+      "path": "/org/restructure",
+      "pageFile": "frontend/src/app/org/restructure/page.tsx",
+      "componentFile": "frontend/src/components/org/org-restructure-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "save"
+      ],
+      "ownerModule": "ORG"
+    },
+    "tim.month-close": {
+      "path": "/tim/month-close",
+      "pageFile": "frontend/src/app/tim/month-close/page.tsx",
+      "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
+      "engine": "custom",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "save"
+      ],
+      "ownerModule": "TIM"
+    },
     "mng.companies": {
       "path": "/mng/companies",
       "pageFile": "frontend/src/app/mng/companies/page.tsx",
@@ -812,6 +849,21 @@
         "copy",
         "template",
         "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.income-tax-brackets": {
+      "path": "/payroll/income-tax-brackets",
+      "pageFile": "frontend/src/app/payroll/income-tax-brackets/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-income-tax-bracket-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
         "save",
         "download"
       ],

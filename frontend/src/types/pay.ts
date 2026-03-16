@@ -51,6 +51,31 @@ export interface PayTaxRateBatchResponse {
     deleted_count: number;
 }
 
+export interface PayIncomeTaxBracketItem {
+    [key: string]: unknown;
+    id: number;
+    year: number;
+    annual_taxable_from: number;
+    annual_taxable_to: number | null;
+    tax_rate: number;
+    quick_deduction: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PayIncomeTaxBracketBatchRequest {
+    items: Array<Partial<PayIncomeTaxBracketItem>>;
+    delete_ids: number[];
+}
+
+export interface PayIncomeTaxBracketBatchResponse {
+    items: PayIncomeTaxBracketItem[];
+    total_count: number;
+    inserted_count: number;
+    updated_count: number;
+    deleted_count: number;
+}
+
 export interface PayAllowanceDeductionItem {
     [key: string]: unknown;
     id: number;

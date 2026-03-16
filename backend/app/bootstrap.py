@@ -596,7 +596,8 @@ MENU_TREE: list[dict] = [
                 "children": [
                     {"code": "tim.annual-leave", "name": "연차관리", "path": "/tim/annual-leave", "icon": "CalendarDays", "sort_order": 421, "roles": ["employee", "hr_manager", "admin"]},
                     {"code": "tim.leave-request", "name": "휴가신청", "path": "/tim/leave-request", "icon": "CalendarCheck2", "sort_order": 422, "roles": ["employee", "hr_manager", "admin"]},
-                    {"code": "tim.leave-approval", "name": "휴가승인", "path": "/tim/leave-approval", "icon": "ListOrdered", "sort_order": 423, "roles": ["hr_manager", "admin"]}
+                    {"code": "tim.leave-approval", "name": "휴가승인", "path": "/tim/leave-approval", "icon": "ListOrdered", "sort_order": 423, "roles": ["hr_manager", "admin"]},
+                    {"code": "tim.month-close", "name": "근태월마감", "path": "/tim/month-close", "icon": "CalendarOff", "sort_order": 424, "roles": ["hr_manager", "admin"]}
                 ],
             },
             {
@@ -665,6 +666,7 @@ MENU_TREE: list[dict] = [
                     {"code": "payroll.item-groups", "name": "항목그룹관리", "path": "/payroll/item-groups", "icon": "Calculator", "sort_order": 503, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.codes", "name": "급여코드관리", "path": "/payroll/codes", "icon": "Calculator", "sort_order": 504, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.income-tax-brackets", "name": "소득세구간관리", "path": "/payroll/income-tax-brackets", "icon": "Calculator", "sort_order": 505.5, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.payment-schedules", "name": "월급여일자관리", "path": "/payroll/payment-schedules", "icon": "CalendarDays", "sort_order": 506, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.employee-profiles", "name": "직원급여프로필관리", "path": "/payroll/employee-profiles", "icon": "Users", "sort_order": 507, "roles": ["payroll_mgr", "admin"]}
                 ],

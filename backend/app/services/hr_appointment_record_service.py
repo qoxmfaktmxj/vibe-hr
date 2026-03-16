@@ -128,6 +128,83 @@ def _next_appointment_no(session: Session) -> str:
     return f"{prefix}{max_seq + 1:04d}"
 
 
+def _auto_resolve_employment_status(
+    employee: HrEmployee,
+    to_employment_status: str | None,
+    action_type: str,
+) -> str | None:
+    """신규입사 발령 시 to_employment_status를 자동으로 'active'로 설정.
+
+    직원이 '채용대기(leave)' 상태이고 action_type이 입사 관련이면 active로 자동 지정.
+    명시적으로 값이 들어온 경우에는 그대로 사용.
+    """
+    if to_employment_status is not None:
+        return to_employment_status
+    hire_action_keywords = ("입사", "신규", "hire", "onboard", "join")
+    is_hire_action = any(keyword in action_type.lower() for keyword in hire_action_keywords)
+    if employee.employment_status == "leave" and is_hire_action:
+        return "active"
+    return None
+
+
+def _ensure_no_overlapping_appointments(
+    session: Session,
+    employee_id: int,
+    start_date,
+    end_date,
+    exclude_item_id: int | None = None,
+) -> None:
+    """같은 직원에게 날짜가 겹치는 draft/confirmed 발령이 이미 있으면 에러."""
+    stmt = (
+        select(HrAppointmentOrderItem.id)
+        .join(HrAppointmentOrder, HrAppointmentOrder.id == HrAppointmentOrderItem.order_id)
+        .where(
+            HrAppointmentOrderItem.employee_id == employee_id,
+            HrAppointmentOrder.status.in_(["draft", "confirmed"]),
+        )
+    )
+    if exclude_item_id is not None:
+        stmt = stmt.where(HrAppointmentOrderItem.id != exclude_item_id)
+
+    existing_items = session.exec(stmt).all()
+    if not existing_items:
+        return
+
+    # 실제 날짜 범위 비교
+    existing_date_rows = session.exec(
+        select(HrAppointmentOrderItem.start_date, HrAppointmentOrderItem.end_date)
+        .join(HrAppointmentOrder, HrAppointmentOrder.id == HrAppointmentOrderItem.order_id)
+        .where(
+            HrAppointmentOrderItem.employee_id == employee_id,
+            HrAppointmentOrder.status.in_(["draft", "confirmed"]),
+            *(
+                [HrAppointmentOrderItem.id != exclude_item_id]
+                if exclude_item_id is not None
+                else []
+            ),
+        )
+    ).all()
+
+    for existing_start, existing_end in existing_date_rows:
+        # 기존 발령이 종료일 없음(permanent) → 무조건 겹침
+        if existing_end is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="해당 직원에게 겹치는 발령이 이미 존재합니다. 기존 발령을 취소한 후 진행하세요.",
+            )
+        # 날짜 범위 겹침 체크: new_start <= existing_end AND new_end(or ∞) >= existing_start
+        new_end = end_date
+        if new_end is None:
+            overlap = start_date <= existing_end
+        else:
+            overlap = start_date <= existing_end and new_end >= existing_start
+        if overlap:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"해당 직원의 기존 발령 기간({existing_start}~{existing_end})과 겹칩니다.",
+            )
+
+
 def _ensure_appointment_no_unique(session: Session, appointment_no: str, exclude_order_id: int | None = None) -> None:
     stmt = select(HrAppointmentOrder.id).where(HrAppointmentOrder.appointment_no == appointment_no)
     if exclude_order_id is not None:
@@ -284,6 +361,16 @@ def create_appointment_record(
     item_code_id = _validate_appointment_code_id(session, payload.item_appointment_code_id)
     employee, _, _ = _employee_context_or_404(session, payload.employee_id)
 
+    # 신규입사 발령 시 to_employment_status 자동 지정
+    to_employment_status = _auto_resolve_employment_status(
+        employee, to_employment_status, payload.action_type
+    )
+
+    # 날짜 중복 발령 방지
+    _ensure_no_overlapping_appointments(
+        session, employee.id or 0, payload.start_date, payload.end_date
+    )
+
     appointment_no = _normalize_text(payload.appointment_no) or _next_appointment_no(session)
     _ensure_appointment_no_unique(session, appointment_no)
 
@@ -391,6 +478,9 @@ def update_appointment_record(
 
     _ensure_end_date_rule(item.appointment_kind, item.end_date)
     _ensure_date_range(item.start_date, item.end_date)
+    _ensure_no_overlapping_appointments(
+        session, item.employee_id, item.start_date, item.end_date, exclude_item_id=item.id
+    )
 
     order.updated_at = _utc_now()
     item.updated_at = _utc_now()

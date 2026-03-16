@@ -94,6 +94,47 @@ class PayTaxRateBatchResponse(BaseModel):
 
 
 # -------------------------------------------------------------------------
+# PayIncomeTaxBracket Schemas
+# -------------------------------------------------------------------------
+class PayIncomeTaxBracketItem(BaseModel):
+    id: int
+    year: int
+    annual_taxable_from: int
+    annual_taxable_to: int | None = None
+    tax_rate: float
+    quick_deduction: float
+    created_at: datetime
+    updated_at: datetime
+
+
+class PayIncomeTaxBracketListResponse(BaseModel):
+    items: list[PayIncomeTaxBracketItem]
+    total_count: int
+
+
+class PayIncomeTaxBracketBatchItem(BaseModel):
+    id: int | None = None
+    year: int
+    annual_taxable_from: int = Field(ge=0)
+    annual_taxable_to: int | None = None
+    tax_rate: float = Field(ge=0)
+    quick_deduction: float = Field(ge=0)
+
+
+class PayIncomeTaxBracketBatchRequest(BaseModel):
+    items: list[PayIncomeTaxBracketBatchItem]
+    delete_ids: list[int] = []
+
+
+class PayIncomeTaxBracketBatchResponse(BaseModel):
+    items: list[PayIncomeTaxBracketItem]
+    total_count: int
+    inserted_count: int
+    updated_count: int
+    deleted_count: int
+
+
+# -------------------------------------------------------------------------
 # PayAllowanceDeduction Schemas
 # -------------------------------------------------------------------------
 class PayAllowanceDeductionItem(BaseModel):
