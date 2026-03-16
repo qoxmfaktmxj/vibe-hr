@@ -258,3 +258,47 @@ export interface PayPayrollRunEmployeeDetailResponse {
     employee: PayPayrollRunEmployeeItem;
     items: PayPayrollRunEmployeeDetailItem[];
 }
+
+export interface PayRunTargetSnapshotItem {
+    employee_id: number;
+    employee_no: string | null;
+    employee_name: string | null;
+    department_id: number | null;
+    department_name: string | null;
+    position_title: string | null;
+    hire_date: string | null;
+    employment_status: string | null;
+    retire_date: string | null;
+    profile_id: number | null;
+    payroll_code_id: number | null;
+    item_group_id: number | null;
+    base_salary: number | null;
+    pay_type_code: string | null;
+    payment_day_type: string | null;
+    payment_day_value: number | null;
+    holiday_adjustment: string | null;
+    effective_from: string | null;
+    effective_to: string | null;
+    period_start: string | null;
+    period_end: string | null;
+    event_count: number;
+    review_required: boolean;
+}
+
+export interface PayRunTargetEventItem {
+    id: number;
+    event_code: string;
+    event_name: string;
+    source_type: string;
+    source_table: string;
+    source_id: number | null;
+    effective_date: string;
+    decision_code: string;
+    payload_json: Record<string, unknown>;
+    created_at: string;
+}
+
+export interface PayRunTargetDetailResponse {
+    snapshot: PayRunTargetSnapshotItem;
+    events: PayRunTargetEventItem[];
+}

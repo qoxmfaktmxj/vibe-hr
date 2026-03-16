@@ -43,6 +43,9 @@ from app.schemas.payroll_phase2 import (
     PayPayrollRunEmployeeListResponse,
     PayPayrollRunItemSchema,
     PayPayrollRunListResponse,
+    PayRunTargetDetailResponse,
+    PayRunTargetEventItem,
+    PayRunTargetSnapshotItem,
     PayVariableInputBatchRequest,
     PayVariableInputBatchResponse,
     PayVariableInputItem,
@@ -779,6 +782,70 @@ def _build_run_target_snapshot_map(session: Session, run_id: int) -> dict[int, d
         select(PayPayrollRunTarget).where(PayPayrollRunTarget.run_id == run_id)
     ).all()
     return {row.employee_id: row.snapshot_json for row in rows}
+
+
+def get_run_target_detail(session: Session, run_id: int, employee_id: int) -> PayRunTargetDetailResponse:
+    """사원 스냅샷 + 이벤트 목록 조회."""
+    target = session.exec(
+        select(PayPayrollRunTarget)
+        .where(PayPayrollRunTarget.run_id == run_id, PayPayrollRunTarget.employee_id == employee_id)
+    ).first()
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 사원의 스냅샷을 찾을 수 없습니다.")
+
+    snap = target.snapshot_json
+    snapshot = PayRunTargetSnapshotItem(
+        employee_id=int(snap.get("employee_id") or 0),
+        employee_no=snap.get("employee_no"),
+        employee_name=snap.get("employee_name"),
+        department_id=snap.get("department_id") and int(snap["department_id"]),
+        department_name=snap.get("department_name"),
+        position_title=snap.get("position_title"),
+        hire_date=snap.get("hire_date"),
+        employment_status=snap.get("employment_status"),
+        retire_date=snap.get("retire_date"),
+        profile_id=snap.get("profile_id") and int(snap["profile_id"]),
+        payroll_code_id=snap.get("payroll_code_id") and int(snap["payroll_code_id"]),
+        item_group_id=snap.get("item_group_id") and int(snap["item_group_id"]),
+        base_salary=snap.get("base_salary") and float(snap["base_salary"]),
+        pay_type_code=snap.get("pay_type_code"),
+        payment_day_type=snap.get("payment_day_type"),
+        payment_day_value=snap.get("payment_day_value") and int(snap["payment_day_value"]),
+        holiday_adjustment=snap.get("holiday_adjustment"),
+        effective_from=snap.get("effective_from"),
+        effective_to=snap.get("effective_to"),
+        period_start=snap.get("period_start"),
+        period_end=snap.get("period_end"),
+        event_count=target.event_count,
+        review_required=target.review_required,
+    )
+
+    event_rows = session.exec(
+        select(PayPayrollRunTargetEvent)
+        .where(
+            PayPayrollRunTargetEvent.run_id == run_id,
+            PayPayrollRunTargetEvent.employee_id == employee_id,
+        )
+        .order_by(PayPayrollRunTargetEvent.effective_date, PayPayrollRunTargetEvent.id)
+    ).all()
+
+    events = [
+        PayRunTargetEventItem(
+            id=e.id,
+            event_code=e.event_code,
+            event_name=e.event_name,
+            source_type=e.source_type,
+            source_table=e.source_table,
+            source_id=e.source_id,
+            effective_date=e.effective_date,
+            decision_code=e.decision_code,
+            payload_json=e.payload_json,
+            created_at=e.created_at,
+        )
+        for e in event_rows
+    ]
+
+    return PayRunTargetDetailResponse(snapshot=snapshot, events=events)
 
 
 def _build_profile_item(

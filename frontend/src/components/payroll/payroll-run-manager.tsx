@@ -22,6 +22,9 @@ import type {
   PayPayrollRunEmployeeDetailResponse,
   PayPayrollRunEmployeeItem,
   PayPayrollRunItem,
+  PayRunTargetDetailResponse,
+  PayRunTargetEventItem,
+  PayRunTargetSnapshotItem,
 } from "@/types/pay";
 
 type EmployeeResponse = {
@@ -66,6 +69,9 @@ export function PayrollRunManager() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const [snapshotData, setSnapshotData] = useState<PayRunTargetDetailResponse | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<"items" | "snapshot" | "events">("items");
   const [searchYearMonth, setSearchYearMonth] = useState(currentMonth);
   const [searchStatus, setSearchStatus] = useState("");
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -150,6 +156,23 @@ export function PayrollRunManager() {
     }
   }, []);
 
+  const loadRunTargetDetail = useCallback(async (runId: number, employeeId: number) => {
+    setSnapshotLoading(true);
+    try {
+      const response = await fetch(`/api/pay/runs/${runId}/targets/${employeeId}`, { cache: "no-store" });
+      if (!response.ok) {
+        setSnapshotData(null);
+        return;
+      }
+      const json = (await response.json()) as PayRunTargetDetailResponse;
+      setSnapshotData(json);
+    } catch {
+      setSnapshotData(null);
+    } finally {
+      setSnapshotLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadRuns();
   }, [loadRuns]);
@@ -171,6 +194,17 @@ export function PayrollRunManager() {
     }
     setDetailRows([]);
   }, [selectedRunId, selectedRunEmployeeId, loadRunEmployeeDetail]);
+
+  useEffect(() => {
+    if (selectedRunId && selectedRunEmployeeId) {
+      const empRow = employeeRows.find((row) => row.id === selectedRunEmployeeId);
+      if (empRow?.employee_id) {
+        void loadRunTargetDetail(selectedRunId, empRow.employee_id);
+        return;
+      }
+    }
+    setSnapshotData(null);
+  }, [selectedRunId, selectedRunEmployeeId, employeeRows, loadRunTargetDetail]);
 
   const totalCount = rows.length;
   const pagedRows = useMemo(() => {
@@ -257,6 +291,24 @@ export function PayrollRunManager() {
       },
       { headerName: "상태", field: "status", width: 100 },
       { headerName: "경고", field: "warning_message", flex: 1, minWidth: 220 },
+    ],
+    [],
+  );
+
+  const eventColDefs = useMemo<ColDef<PayRunTargetEventItem>[]>(
+    () => [
+      { headerName: "이벤트코드", field: "event_code", width: 130 },
+      { headerName: "이벤트명", field: "event_name", width: 180 },
+      { headerName: "발생원천", field: "source_type", width: 110 },
+      { headerName: "적용일", field: "effective_date", width: 110 },
+      {
+        headerName: "반영여부",
+        field: "decision_code",
+        width: 100,
+        valueFormatter: (params) => (params.value === "apply" ? "반영" : "제외"),
+      },
+      { headerName: "소스테이블", field: "source_table", width: 160 },
+      { headerName: "소스ID", field: "source_id", width: 90 },
     ],
     [],
   );
@@ -555,8 +607,8 @@ export function PayrollRunManager() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-medium text-slate-700">
               {selectedEmployeeRow
-                ? `${selectedEmployeeRow.employee_no ?? "-"} ${selectedEmployeeRow.employee_name ?? ""} 항목 상세`
-                : "대상자를 선택하면 지급/공제 항목 상세가 표시됩니다."}
+                ? `${selectedEmployeeRow.employee_no ?? "-"} ${selectedEmployeeRow.employee_name ?? ""} 상세 정보`
+                : "대상자를 선택하면 상세 정보가 표시됩니다."}
             </div>
             {selectedEmployeeRow ? (
               <div className="text-xs text-slate-500">
@@ -565,48 +617,141 @@ export function PayrollRunManager() {
             ) : null}
           </div>
 
-          <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">지급 합계</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.earnings.toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">공제 합계</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.deductions.toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">복리후생 반영건</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.welfareCount.toLocaleString()}</div>
-            </div>
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-xs text-slate-500">사회보험 항목수</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.insuranceCount.toLocaleString()}</div>
-            </div>
+          {/* Tab switcher */}
+          <div className="mb-3 flex gap-1 border-b border-slate-200">
+            {(["items", "snapshot", "events"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveDetailTab(tab)}
+                className={`rounded-t px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeDetailTab === tab
+                    ? "border border-b-white border-slate-200 bg-white text-slate-800"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {tab === "items" ? "계산결과" : tab === "snapshot" ? "스냅샷" : `이벤트 (${snapshotData?.events.length ?? 0})`}
+              </button>
+            ))}
           </div>
 
-          {selectedEmployeeRow?.warning_message ? (
-            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              경고: {selectedEmployeeRow.warning_message}
-            </div>
-          ) : null}
+          {/* 계산결과 탭 */}
+          {activeDetailTab === "items" && (
+            <>
+              <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-xs text-slate-500">지급 합계</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.earnings.toLocaleString()}</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-xs text-slate-500">공제 합계</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.deductions.toLocaleString()}</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-xs text-slate-500">복리후생 반영건</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.welfareCount.toLocaleString()}</div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="text-xs text-slate-500">사회보험 항목수</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.insuranceCount.toLocaleString()}</div>
+                </div>
+              </div>
+              {selectedEmployeeRow?.warning_message ? (
+                <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  경고: {selectedEmployeeRow.warning_message}
+                </div>
+              ) : null}
+              <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-gray-200">
+                <AgGridReact<PayPayrollRunEmployeeDetailItem>
+                  theme="legacy"
+                  rowData={detailRows}
+                  columnDefs={detailColDefs}
+                  defaultColDef={{ sortable: true, resizable: true, filter: false }}
+                  animateRows={false}
+                  loading={detailLoading}
+                  getRowId={(params) => String(params.data.id)}
+                  localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
+                  overlayNoRowsTemplate='<span class="text-sm text-slate-400">항목 상세 데이터가 없습니다.</span>'
+                  headerHeight={36}
+                  rowHeight={34}
+                />
+              </div>
+            </>
+          )}
 
-          <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-gray-200">
-            <AgGridReact<PayPayrollRunEmployeeDetailItem>
-              theme="legacy"
-              rowData={detailRows}
-              columnDefs={detailColDefs}
-              defaultColDef={{ sortable: true, resizable: true, filter: false }}
-              animateRows={false}
-              loading={detailLoading}
-              getRowId={(params) => String(params.data.id)}
-              localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">항목 상세 데이터가 없습니다.</span>'
-              headerHeight={36}
-              rowHeight={34}
-            />
-          </div>
+          {/* 스냅샷 탭 */}
+          {activeDetailTab === "snapshot" && (
+            <SnapshotPanel snapshot={snapshotData?.snapshot ?? null} loading={snapshotLoading} />
+          )}
+
+          {/* 이벤트 탭 */}
+          {activeDetailTab === "events" && (
+            <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-lg border border-gray-200">
+              <AgGridReact<PayRunTargetEventItem>
+                theme="legacy"
+                rowData={snapshotData?.events ?? []}
+                columnDefs={eventColDefs}
+                defaultColDef={{ sortable: true, resizable: true, filter: false }}
+                animateRows={false}
+                loading={snapshotLoading}
+                getRowId={(params) => String(params.data.id)}
+                localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
+                overlayNoRowsTemplate='<span class="text-sm text-slate-400">이벤트 데이터가 없습니다.</span>'
+                headerHeight={36}
+                rowHeight={34}
+              />
+            </div>
+          )}
         </div>
       </ManagerGridSection>
     </ManagerPageShell>
+  );
+}
+
+// ─── Snapshot panel helper ──────────────────────────────────────────────────
+
+function SnapshotPanel({ snapshot, loading }: { snapshot: PayRunTargetSnapshotItem | null; loading: boolean }) {
+  if (loading) {
+    return <div className="py-6 text-center text-sm text-slate-400">스냅샷 데이터를 불러오는 중...</div>;
+  }
+  if (!snapshot) {
+    return <div className="py-6 text-center text-sm text-slate-400">대상자를 선택하면 스냅샷 데이터가 표시됩니다.</div>;
+  }
+
+  const rows: { label: string; value: string | number | null | undefined }[] = [
+    { label: "사원번호", value: snapshot.employee_no },
+    { label: "성명", value: snapshot.employee_name },
+    { label: "부서", value: snapshot.department_name },
+    { label: "직위", value: snapshot.position_title },
+    { label: "재직상태", value: snapshot.employment_status },
+    { label: "입사일", value: snapshot.hire_date },
+    { label: "퇴사일", value: snapshot.retire_date },
+    { label: "급여유형", value: snapshot.pay_type_code },
+    { label: "기본급", value: snapshot.base_salary != null ? Number(snapshot.base_salary).toLocaleString() : null },
+    { label: "급여프로필 ID", value: snapshot.profile_id },
+    { label: "지급항목그룹 ID", value: snapshot.item_group_id },
+    { label: "지급일 유형", value: snapshot.payment_day_type },
+    { label: "지급일 값", value: snapshot.payment_day_value },
+    { label: "공휴일 조정", value: snapshot.holiday_adjustment },
+    { label: "프로필 적용시작", value: snapshot.effective_from },
+    { label: "프로필 적용종료", value: snapshot.effective_to },
+    { label: "급여기간 시작", value: snapshot.period_start },
+    { label: "급여기간 종료", value: snapshot.period_end },
+    { label: "이벤트 수", value: snapshot.event_count },
+    { label: "검토 필요", value: snapshot.review_required ? "예" : "아니오" },
+  ];
+
+  return (
+    <div className="overflow-auto rounded-lg border border-slate-200">
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((row, idx) => (
+            <tr key={row.label} className={idx % 2 === 0 ? "bg-slate-50" : "bg-white"}>
+              <td className="w-40 px-3 py-1.5 text-xs font-medium text-slate-500">{row.label}</td>
+              <td className="px-3 py-1.5 text-slate-800">{row.value ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -174,3 +174,53 @@ class PayPayrollRunEmployeeDetailItem(BaseModel):
 class PayPayrollRunEmployeeDetailResponse(BaseModel):
     employee: PayPayrollRunEmployeeItem
     items: list[PayPayrollRunEmployeeDetailItem]
+
+
+class PayRunTargetSnapshotItem(BaseModel):
+    """스냅샷: Run 생성 시점에 고정된 사원/프로필 데이터."""
+
+    employee_id: int
+    employee_no: str | None
+    employee_name: str | None
+    department_id: int | None
+    department_name: str | None
+    position_title: str | None
+    hire_date: str | None
+    employment_status: str | None
+    retire_date: str | None
+    profile_id: int | None
+    payroll_code_id: int | None
+    item_group_id: int | None
+    base_salary: float | None
+    pay_type_code: str | None
+    payment_day_type: str | None
+    payment_day_value: int | None
+    holiday_adjustment: str | None
+    effective_from: str | None
+    effective_to: str | None
+    period_start: str | None
+    period_end: str | None
+    event_count: int
+    review_required: bool
+
+
+class PayRunTargetEventItem(BaseModel):
+    """대상자 이벤트: 스냅샷 수집 시 기록된 인사/발령/급여 이벤트."""
+
+    id: int
+    event_code: str
+    event_name: str
+    source_type: str
+    source_table: str
+    source_id: int | None
+    effective_date: date
+    decision_code: str
+    payload_json: dict[str, object]
+    created_at: datetime
+
+
+class PayRunTargetDetailResponse(BaseModel):
+    """사원 스냅샷 + 이벤트 목록."""
+
+    snapshot: PayRunTargetSnapshotItem
+    events: list[PayRunTargetEventItem]

@@ -14,6 +14,7 @@ from app.schemas.payroll_phase2 import (
     PayPayrollRunEmployeeDetailResponse,
     PayPayrollRunEmployeeListResponse,
     PayPayrollRunListResponse,
+    PayRunTargetDetailResponse,
     PayVariableInputBatchRequest,
     PayVariableInputBatchResponse,
     PayVariableInputListResponse,
@@ -25,6 +26,7 @@ from app.services.payroll_phase2_service import (
     close_payroll_run,
     create_payroll_run,
     get_payroll_run_employee_detail,
+    get_run_target_detail,
     list_employee_profiles,
     list_payroll_run_employees,
     list_payroll_runs,
@@ -191,3 +193,16 @@ def get_payroll_run_employee_detail_api(
     session: Session = Depends(get_session),
 ) -> PayPayrollRunEmployeeDetailResponse:
     return get_payroll_run_employee_detail(session, run_id, run_employee_id)
+
+
+@router.get(
+    "/runs/{run_id}/targets/{employee_id}",
+    response_model=PayRunTargetDetailResponse,
+    dependencies=[Depends(require_roles("payroll_mgr", "admin"))],
+)
+def get_run_target_detail_api(
+    run_id: int,
+    employee_id: int,
+    session: Session = Depends(get_session),
+) -> PayRunTargetDetailResponse:
+    return get_run_target_detail(session, run_id, employee_id)
