@@ -17,6 +17,15 @@ class TimAttendanceDailyItem(BaseModel):
     check_out_at: datetime | None = None
     worked_minutes: int | None = None
     attendance_status: str
+    # ── 근무시간 자동계산 결과 ──
+    actual_minutes: int = 0
+    regular_minutes: int = 0
+    overtime_minutes: int = 0
+    night_minutes: int = 0
+    holiday_work_minutes: int = 0
+    holiday_overtime_minutes: int = 0
+    holiday_night_minutes: int = 0
+    is_holiday_work: bool = False
 
 
 class TimAttendanceDailyListResponse(BaseModel):

@@ -839,12 +839,12 @@ def apply_cyber_results(session: Session, upload_ym: str | None = None) -> int:
     return processed
 
 
-# ─── Write-flow helpers ───────────────────────────────────────────────────────
+# ─── Write-flow service ───────────────────────────────────────────────────────
 
 
 def _build_application_item(session: Session, req: TraApplication) -> TraApplicationItem:
-    emp = session.exec(select(HrEmployee).where(HrEmployee.id == req.employee_id)).first()
-    user = session.exec(select(AuthUser).where(AuthUser.id == emp.user_id)).first() if emp else None
+    emp = session.get(HrEmployee, req.employee_id)
+    user = session.get(AuthUser, emp.user_id) if emp and emp.user_id else None
     dept = session.get(OrgDepartment, emp.department_id) if emp and emp.department_id else None
     course = session.get(TraCourse, req.course_id)
     event = session.get(TraEvent, req.event_id) if req.event_id else None
@@ -854,7 +854,7 @@ def _build_application_item(session: Session, req: TraApplication) -> TraApplica
         employee_id=req.employee_id,
         employee_no=emp.employee_no if emp else None,
         employee_name=user.display_name if user else None,
-        department_name=dept.name if dept else None,
+        department_name=dept.department_name if dept else None,
         course_id=req.course_id,
         course_name=course.course_name if course else None,
         event_id=req.event_id,
@@ -870,26 +870,21 @@ def _build_application_item(session: Session, req: TraApplication) -> TraApplica
     )
 
 
-def get_my_tra_applications(
-    session: Session,
-    current_user: AuthUser,
-) -> TraApplicationListResponse:
+def get_my_tra_applications(session: Session, current_user: AuthUser) -> TraApplicationListResponse:
     emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
     if emp is None:
         return TraApplicationListResponse(items=[], total_count=0)
     rows = session.exec(
         select(TraApplication)
         .where(TraApplication.employee_id == emp.id)
-        .order_by(TraApplication.created_at.desc())
+        .order_by(TraApplication.id.desc())
     ).all()
     items = [_build_application_item(session, r) for r in rows]
     return TraApplicationListResponse(items=items, total_count=len(items))
 
 
 def list_tra_applications_detail(session: Session) -> TraApplicationListResponse:
-    rows = session.exec(
-        select(TraApplication).order_by(TraApplication.created_at.desc())
-    ).all()
+    rows = session.exec(select(TraApplication).order_by(TraApplication.id.desc())).all()
     items = [_build_application_item(session, r) for r in rows]
     return TraApplicationListResponse(items=items, total_count=len(items))
 
@@ -899,13 +894,17 @@ def create_tra_application(
     payload: TraApplicationCreateRequest,
     current_user: AuthUser,
 ) -> TraApplicationActionResponse:
-    course = session.get(TraCourse, payload.course_id)
-    if course is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="과정을 찾을 수 없습니다.")
     emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
     if emp is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="사원 프로필을 찾을 수 없습니다.")
-    app_no = _next_application_no(session)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee record not found.")
+    course = session.get(TraCourse, payload.course_id)
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found.")
+
+    now = _utc_now()
+    count = session.exec(select(func.count()).select_from(TraApplication)).one()
+    app_no = f"APP{now.strftime('%Y%m%d')}{count + 1:04d}"
+
     req = TraApplication(
         application_no=app_no,
         employee_id=emp.id,
@@ -916,8 +915,8 @@ def create_tra_application(
         edu_memo=payload.edu_memo,
         note=payload.note,
         status="submitted",
-        created_at=_utc_now(),
-        updated_at=_utc_now(),
+        created_at=now,
+        updated_at=now,
     )
     session.add(req)
     session.commit()
@@ -928,12 +927,9 @@ def create_tra_application(
 def approve_tra_application(session: Session, app_id: int) -> TraApplicationActionResponse:
     req = session.get(TraApplication, app_id)
     if req is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
     if req.status != "submitted":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"승인 대기(submitted) 상태가 아닙니다. 현재 상태: {req.status}",
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only submitted applications can be approved.")
     req.status = "approved"
     req.updated_at = _utc_now()
     session.add(req)
@@ -949,15 +945,15 @@ def reject_tra_application(
 ) -> TraApplicationActionResponse:
     req = session.get(TraApplication, app_id)
     if req is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
     if req.status not in ("submitted", "draft"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"반려할 수 없는 상태입니다. 현재 상태: {req.status}",
+            detail="Only submitted or draft applications can be rejected.",
         )
     req.status = "rejected"
     if payload.reason:
-        req.note = (req.note or "") + f"\n[반려사유] {payload.reason}"
+        req.note = (f"{req.note}\n반려사유: {payload.reason}" if req.note else f"반려사유: {payload.reason}")
     req.updated_at = _utc_now()
     session.add(req)
     session.commit()
@@ -972,14 +968,14 @@ def withdraw_tra_application(
 ) -> TraApplicationActionResponse:
     req = session.get(TraApplication, app_id)
     if req is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found.")
     emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
     if emp is None or req.employee_id != emp.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="본인의 신청만 회수할 수 있습니다.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot withdraw another employee's application.")
     if req.status not in ("submitted", "draft"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"회수할 수 없는 상태입니다. 현재 상태: {req.status}",
+            detail="Only submitted or draft applications can be withdrawn.",
         )
     req.status = "canceled"
     req.updated_at = _utc_now()
@@ -987,4 +983,3 @@ def withdraw_tra_application(
     session.commit()
     session.refresh(req)
     return TraApplicationActionResponse(item=_build_application_item(session, req))
-

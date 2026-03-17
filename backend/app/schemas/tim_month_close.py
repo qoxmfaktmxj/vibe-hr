@@ -2,19 +2,25 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class TimMonthCloseItem(BaseModel):
-    id: int
+    id: int | None
     year: int
     month: int
-    close_status: str          # open | closed
+    close_status: str  # 'open' | 'closed'
     employee_count: int
     present_days: int
     absent_days: int
     late_days: int
     leave_days: int
+    # ── 근무시간 집계 (분 단위) ──
+    total_overtime_minutes: int = 0
+    total_night_minutes: int = 0
+    total_holiday_work_minutes: int = 0
+    total_holiday_overtime_minutes: int = 0
+    total_holiday_night_minutes: int = 0
     closed_by: int | None
     closed_by_name: str | None
     closed_at: datetime | None
@@ -22,20 +28,22 @@ class TimMonthCloseItem(BaseModel):
     reopened_by_name: str | None
     reopened_at: datetime | None
     note: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None
+    updated_at: datetime | None
 
 
 class TimMonthCloseListResponse(BaseModel):
     items: list[TimMonthCloseItem]
+    year: int
     total_count: int
 
 
 class TimMonthCloseRequest(BaseModel):
-    year: int = Field(ge=2000, le=2100)
-    month: int = Field(ge=1, le=12)
-    note: str | None = Field(default=None, max_length=500)
+    """마감 요청 본문: year, month, note"""
+    year: int
+    month: int
+    note: str | None = None
 
 
-class TimMonthReopenRequest(BaseModel):
-    note: str | None = Field(default=None, max_length=500)
+class TimMonthCloseActionResponse(BaseModel):
+    item: TimMonthCloseItem

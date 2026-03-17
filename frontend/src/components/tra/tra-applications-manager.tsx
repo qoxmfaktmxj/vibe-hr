@@ -1,6 +1,5 @@
-import { TraResourceManager } from "@/components/tra/tra-resource-manager";
-import { TRA_SCREEN_CONFIGS } from "@/components/tra/tra-screen-configs";
+import { TraApplicationsApprovalManager } from "@/components/tra/tra-applications-approval-manager";
 
 export function TraApplicationsManager() {
-  return <TraResourceManager config={TRA_SCREEN_CONFIGS.applications} />;
+  return <TraApplicationsApprovalManager />;
 }

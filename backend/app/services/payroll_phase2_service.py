@@ -1823,3 +1823,92 @@ def get_payroll_run_employee_detail(session: Session, run_id: int, run_employee_
     ]
 
     return PayPayrollRunEmployeeDetailResponse(employee=employee_item, items=detail_items)
+
+
+# ── 셀프서비스 급여 조회 ──────────────────────────────────────────────────────
+
+def list_my_payslips(session: Session, employee_id: int) -> "PayMyPayslipListResponse":
+    """본인 급여 이력 목록 (closed/paid Run만)"""
+    from app.schemas.payroll_phase2 import PayMyPayslipListResponse, PayMyPayslipSummary
+
+    rows = session.exec(
+        select(PayPayrollRunEmployee, PayPayrollRun)
+        .join(PayPayrollRun, PayPayrollRunEmployee.run_id == PayPayrollRun.id)
+        .where(
+            PayPayrollRunEmployee.employee_id == employee_id,
+            PayPayrollRun.status.in_(["closed", "paid"]),
+        )
+        .order_by(PayPayrollRun.year_month.desc())
+    ).all()
+
+    items = [
+        PayMyPayslipSummary(
+            run_id=run.id,
+            run_employee_id=re.id,
+            year_month=run.year_month,
+            run_name=run.run_name,
+            run_status=run.status,
+            gross_pay=re.gross_pay,
+            taxable_income=re.taxable_income,
+            non_taxable_income=re.non_taxable_income,
+            total_deductions=re.total_deductions,
+            net_pay=re.net_pay,
+            paid_at=run.paid_at,
+        )
+        for re, run in rows
+    ]
+    return PayMyPayslipListResponse(items=items, total_count=len(items))
+
+
+def get_my_payslip_detail(session: Session, employee_id: int, run_id: int) -> "PayMyPayslipDetailResponse":
+    """본인 급여 상세 (항목별)"""
+    from app.schemas.payroll_phase2 import PayMyPayslipDetailResponse, PayMyPayslipSummary, PayPayrollRunEmployeeDetailItem
+
+    run = session.get(PayPayrollRun, run_id)
+    if run is None or run.status not in ("closed", "paid"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="급여 정보를 찾을 수 없습니다.")
+
+    re = session.exec(
+        select(PayPayrollRunEmployee).where(
+            PayPayrollRunEmployee.run_id == run_id,
+            PayPayrollRunEmployee.employee_id == employee_id,
+        )
+    ).first()
+    if re is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="급여 정보를 찾을 수 없습니다.")
+
+    summary = PayMyPayslipSummary(
+        run_id=run.id,
+        run_employee_id=re.id,
+        year_month=run.year_month,
+        run_name=run.run_name,
+        run_status=run.status,
+        gross_pay=re.gross_pay,
+        taxable_income=re.taxable_income,
+        non_taxable_income=re.non_taxable_income,
+        total_deductions=re.total_deductions,
+        net_pay=re.net_pay,
+        paid_at=run.paid_at,
+    )
+
+    run_items = session.exec(
+        select(PayPayrollRunItem).where(PayPayrollRunItem.run_employee_id == re.id).order_by(PayPayrollRunItem.id)
+    ).all()
+
+    detail_items = [
+        PayPayrollRunEmployeeDetailItem(
+            id=item.id,
+            run_employee_id=item.run_employee_id,
+            item_code=item.item_code,
+            item_name=item.item_name,
+            direction=item.direction,
+            amount=item.amount,
+            tax_type=item.tax_type,
+            calculation_type=item.calculation_type,
+            source_type=item.source_type,
+            created_at=item.created_at,
+        )
+        for item in run_items
+    ]
+
+    return PayMyPayslipDetailResponse(summary=summary, items=detail_items)

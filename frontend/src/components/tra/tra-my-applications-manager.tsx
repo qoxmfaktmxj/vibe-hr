@@ -1,59 +1,50 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
-import { Plus, RefreshCcw, Search, XCircle } from "lucide-react";
-import { toast } from "sonner";
-import type { ColDef } from "ag-grid-community";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { type ColDef, type GridApi, type GridReadyEvent } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
+import { Plus, RotateCcw, Search } from "lucide-react";
+import { toast } from "sonner";
 import useSWR from "swr";
 
-import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
-import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
-import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { Label } from "@/components/ui/label";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
-import type {
-  TraApplicationActionResponse,
-  TraApplicationCreateRequest,
-  TraApplicationItem,
-  TraApplicationListResponse,
-} from "@/types/tra";
+import type { TraApplicationItem, TraApplicationListResponse } from "@/types/tra";
 import type { TraResourceListResponse } from "@/types/tra";
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: "작성중",
-  submitted: "승인 대기",
-  approved: "승인 완료",
+  draft: "임시저장",
+  submitted: "접수",
+  approved: "승인",
   rejected: "반려",
   canceled: "취소",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  submitted: "text-amber-600 font-medium",
-  approved: "text-emerald-600 font-medium",
-  rejected: "text-red-600 font-medium",
+  draft: "text-slate-500",
+  submitted: "text-blue-600 font-medium",
+  approved: "text-green-600 font-medium",
+  rejected: "text-red-500",
   canceled: "text-slate-400",
 };
+
+type CourseRow = { id: number; course_name: string; in_out_type?: string };
 
 export function TraMyApplicationsManager() {
   useMenuActions("/tra/my-applications");
 
-  const [page, setPage] = useState(1);
-  const [working, setWorking] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<TraApplicationItem | null>(null);
-
-  // Create dialog state
+  const gridRef = useRef<AgGridReact<TraApplicationItem>>(null);
+  const [gridApi, setGridApi] = useState<GridApi<TraApplicationItem> | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [createCourseId, setCreateCourseId] = useState("");
-  const [createNote, setCreateNote] = useState("");
-
-  // Withdraw confirm dialog
-  const [withdrawTarget, setWithdrawTarget] = useState<TraApplicationItem | null>(null);
-
-  const pageSize = 50;
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | string>("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const { data, isLoading, mutate } = useSWR<TraApplicationListResponse>(
     "/api/tra/my-applications",
@@ -67,239 +58,211 @@ export function TraMyApplicationsManager() {
     { revalidateOnFocus: false },
   );
 
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
-  const totalCount = data?.total_count ?? 0;
-  const courses = useMemo(
-    () => (coursesData?.items ?? []) as Array<{ id: number; course_code: string; course_name: string }>,
-    [coursesData?.items],
-  );
+  const rowData = data?.items ?? [];
+  const courses = (coursesData?.items ?? []) as CourseRow[];
 
-  const pagedItems = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
-  }, [items, page]);
+  const selectedRows = useMemo(() => {
+    return gridApi?.getSelectedRows() ?? [];
+  }, [gridApi]);
 
-  const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
-
-  const canWithdraw =
-    selectedRow?.status === "submitted" || selectedRow?.status === "draft";
+  const canWithdraw = useMemo(() => {
+    const rows = gridApi?.getSelectedRows() ?? [];
+    return rows.length === 1 && ["submitted", "draft"].includes(rows[0]?.status ?? "");
+  }, [gridApi]);
 
   const columnDefs = useMemo<ColDef<TraApplicationItem>[]>(
     () => [
-      { headerName: "신청번호", field: "application_no", width: 180 },
+      { headerName: "신청번호", field: "application_no", width: 140 },
       { headerName: "과정명", field: "course_name", flex: 1, minWidth: 180 },
-      { headerName: "차수", field: "event_name", width: 150 },
+      { headerName: "차수/이벤트", field: "event_name", width: 140 },
       {
         headerName: "상태",
         field: "status",
-        width: 110,
-        cellRenderer: (params: { value: string }) => {
-          const label = STATUS_LABELS[params.value] ?? params.value;
-          const cls = STATUS_COLORS[params.value] ?? "";
-          return `<span class="${cls}">${label}</span>`;
-        },
+        width: 90,
+        valueFormatter: (p) => STATUS_LABELS[String(p.value ?? "")] ?? String(p.value ?? ""),
+        cellClass: (p) => STATUS_COLORS[p.data?.status ?? ""] ?? "",
       },
       {
         headerName: "신청일",
         field: "created_at",
-        width: 120,
-        valueFormatter: (p) => String(p.value ?? "").slice(0, 10),
+        width: 160,
+        valueFormatter: (p) => (p.value ? new Date(String(p.value)).toLocaleDateString("ko-KR") : ""),
       },
-      { headerName: "비고", field: "note", flex: 1, minWidth: 150 },
+      { headerName: "비고", field: "note", flex: 1, minWidth: 120 },
     ],
     [],
   );
 
+  const onGridReady = useCallback((e: GridReadyEvent<TraApplicationItem>) => {
+    setGridApi(e.api);
+  }, []);
+
   const handleCreate = useCallback(async () => {
-    const courseId = parseInt(createCourseId, 10);
-    if (isNaN(courseId) || courseId <= 0) {
+    if (!selectedCourseId) {
       toast.error("과정을 선택해주세요.");
       return;
     }
-    setWorking(true);
+    setSubmitting(true);
     try {
-      const payload: TraApplicationCreateRequest = {
-        course_id: courseId,
-        note: createNote.trim() || null,
-      };
       const res = await fetch("/api/tra/my-applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ course_id: Number(selectedCourseId), note: note || null }),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { detail?: string };
         toast.error(err.detail ?? "신청에 실패했습니다.");
         return;
       }
-      const json = (await res.json()) as TraApplicationActionResponse;
-      toast.success(`${json.item.application_no} 신청 접수 완료.`);
+      toast.success("교육 신청이 완료되었습니다.");
       setCreateOpen(false);
-      setCreateCourseId("");
-      setCreateNote("");
+      setSelectedCourseId("");
+      setNote("");
       void mutate();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "신청에 실패했습니다.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "신청에 실패했습니다.");
     } finally {
-      setWorking(false);
+      setSubmitting(false);
     }
-  }, [createCourseId, createNote, mutate]);
+  }, [selectedCourseId, note, mutate]);
 
   const handleWithdraw = useCallback(async () => {
-    if (!withdrawTarget) return;
-    setWorking(true);
+    const rows = gridApi?.getSelectedRows() ?? [];
+    if (rows.length !== 1) return;
+    const appId = rows[0]?.id;
+    setSubmitting(true);
     try {
-      const res = await fetch(`/api/tra/applications/${withdrawTarget.id}/withdraw`, {
-        method: "PUT",
-      });
+      const res = await fetch(`/api/tra/applications/${appId}/withdraw`, { method: "PUT" });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { detail?: string };
         toast.error(err.detail ?? "회수에 실패했습니다.");
         return;
       }
-      toast.success(`${withdrawTarget.application_no} 회수 완료.`);
-      setWithdrawTarget(null);
-      setSelectedRow(null);
+      toast.success("신청이 회수되었습니다.");
+      setWithdrawOpen(false);
       void mutate();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "회수에 실패했습니다.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "회수에 실패했습니다.");
     } finally {
-      setWorking(false);
+      setSubmitting(false);
     }
-  }, [withdrawTarget, mutate]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">교육신청 내역을 불러오는 중입니다.</p>
-      </div>
-    );
-  }
+  }, [gridApi, mutate]);
 
   return (
-    <>
-      <ManagerPageShell>
-        <ManagerSearchSection title="내 교육신청" onQuery={() => void mutate()}>
-          <p className="text-sm text-slate-500">교육신청 내역을 조회하고 신규 신청할 수 있습니다.</p>
-        </ManagerSearchSection>
+    <ManagerPageShell>
+      <ManagerSearchSection title="나의 교육 신청" onQuery={() => void mutate()}>
+        <p className="text-sm text-slate-500">신청한 교육 목록을 확인하고 새로 신청할 수 있습니다.</p>
+      </ManagerSearchSection>
 
-        <ManagerGridSection
-          headerLeft={
-            <>
-              <GridPaginationControls
-                page={page}
-                totalPages={pagination.totalPages}
-                pageInput={pagination.pageInput}
-                setPageInput={pagination.setPageInput}
-                goPrev={pagination.goPrev}
-                goNext={pagination.goNext}
-                goToPage={pagination.goToPage}
-              />
-              <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
-            </>
-          }
-          headerRight={
-            <GridToolbarActions
-              actions={[
-                { key: "query", label: "조회", icon: Search, onClick: () => void mutate(), disabled: working },
-                {
-                  key: "create",
-                  label: "신청",
-                  icon: Plus,
-                  onClick: () => setCreateOpen(true),
-                  disabled: working,
-                },
-                {
-                  key: "withdraw",
-                  label: "회수",
-                  icon: XCircle,
-                  onClick: () => selectedRow && setWithdrawTarget(selectedRow),
-                  disabled: working || !canWithdraw,
-                },
-              ]}
-              saveAction={{
-                key: "refresh",
-                label: "새로고침",
-                icon: RefreshCcw,
+      <ManagerGridSection
+        headerLeft={
+          <span className="text-xs text-slate-400">총 {rowData.length.toLocaleString()}건</span>
+        }
+        headerRight={
+          <GridToolbarActions
+            actions={[
+              {
+                key: "query",
+                label: "조회",
+                icon: Search,
                 onClick: () => void mutate(),
-                disabled: working,
-              }}
-            />
-          }
-          contentClassName="min-h-0 flex-1 px-6 pb-6"
-        >
-          <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+                disabled: submitting,
+              },
+              {
+                key: "apply",
+                label: "신청",
+                icon: Plus,
+                onClick: () => setCreateOpen(true),
+                disabled: submitting,
+              },
+              {
+                key: "withdraw",
+                label: "회수",
+                icon: RotateCcw,
+                onClick: () => setWithdrawOpen(true),
+                disabled: submitting || !canWithdraw,
+              },
+            ]}
+          />
+        }
+        contentClassName="min-h-0 flex-1 px-6 pb-6"
+      >
+        <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-slate-500">불러오는 중...</p>
+            </div>
+          ) : (
             <AgGridReact<TraApplicationItem>
+              ref={gridRef}
               theme="legacy"
-              rowData={pagedItems}
+              rowData={rowData}
               columnDefs={columnDefs}
               defaultColDef={{ sortable: true, resizable: true, filter: false }}
-              rowSelection={{ mode: "singleRow", checkboxes: false, enableClickSelection: true }}
+              rowSelection={{ mode: "singleRow", checkboxes: true }}
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
-              onRowClicked={(event) => setSelectedRow(event.data ?? null)}
-              localeText={{ noRowsToShow: "교육신청 내역이 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">교육신청 내역이 없습니다.</span>'
+              onGridReady={onGridReady}
+              onSelectionChanged={() => setGridApi((prev) => prev)}
+              localeText={{ noRowsToShow: "신청 내역이 없습니다." }}
               headerHeight={36}
               rowHeight={34}
             />
-          </div>
-        </ManagerGridSection>
-      </ManagerPageShell>
+          )}
+        </div>
+      </ManagerGridSection>
 
       {/* 신청 다이얼로그 */}
       <ConfirmDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        title="교육신청"
+        title="교육 신청"
+        description="신청할 과정을 선택하고 비고를 입력하세요."
         confirmLabel="신청"
         cancelLabel="취소"
-        confirmVariant="save"
-        busy={working}
-        onConfirm={handleCreate}
-        description={
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">과정 *</label>
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={createCourseId}
-                onChange={(e) => setCreateCourseId(e.target.value)}
-              >
-                <option value="">과정 선택</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.course_name} ({c.course_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">비고 (선택)</label>
-              <Input
-                type="text"
-                placeholder="신청 사유 또는 메모를 입력하세요"
-                value={createNote}
-                onChange={(e) => setCreateNote(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
+        onConfirm={() => void handleCreate()}
+      >
+        <div className="space-y-3 py-2">
+          <div>
+            <Label htmlFor="course-select">과정 선택 *</Label>
+            <select
+              id="course-select"
+              className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+              value={selectedCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+            >
+              <option value="">과정을 선택하세요</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.course_name}
+                </option>
+              ))}
+            </select>
           </div>
-        }
-      />
+          <div>
+            <Label htmlFor="note-input">비고</Label>
+            <Input
+              id="note-input"
+              className="mt-1"
+              placeholder="비고 입력 (선택)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
 
-      {/* 회수 확인 다이얼로그 */}
+      {/* 회수 다이얼로그 */}
       <ConfirmDialog
-        open={withdrawTarget !== null}
-        onOpenChange={(open) => !open && setWithdrawTarget(null)}
-        title="교육신청 회수"
-        description={`${withdrawTarget?.application_no ?? ""} 신청을 회수하시겠습니까?`}
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        title="신청 회수"
+        description="선택한 교육 신청을 회수하시겠습니까? 회수 후에는 취소 상태로 변경됩니다."
         confirmLabel="회수"
         cancelLabel="취소"
         confirmVariant="destructive"
-        busy={working}
-        onConfirm={handleWithdraw}
+        onConfirm={() => void handleWithdraw()}
       />
-    </>
+    </ManagerPageShell>
   );
 }

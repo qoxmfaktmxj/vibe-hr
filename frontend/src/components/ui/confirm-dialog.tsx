@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,12 +18,13 @@ type ConfirmDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  description?: React.ReactNode;
+  description?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   confirmVariant?: ConfirmVariant;
   busy?: boolean;
   onConfirm: () => void | Promise<void>;
+  children?: ReactNode;
 };
 
 export function ConfirmDialog({
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   confirmVariant = "destructive",
   busy = false,
   onConfirm,
+  children,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
@@ -43,6 +46,7 @@ export function ConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
+        {children}
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
             {cancelLabel}

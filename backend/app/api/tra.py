@@ -171,6 +171,80 @@ def withdraw_application_api(
 
 
 @router.get(
+    "/my-applications",
+    response_model=TraApplicationListResponse,
+    dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
+)
+def my_applications_api(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TraApplicationListResponse:
+    return get_my_tra_applications(session, current_user)
+
+
+@router.post(
+    "/my-applications",
+    response_model=TraApplicationActionResponse,
+    dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
+)
+def create_application_api(
+    payload: TraApplicationCreateRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TraApplicationActionResponse:
+    return create_tra_application(session, payload, current_user)
+
+
+@router.get(
+    "/applications-detail",
+    response_model=TraApplicationListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def applications_detail_api(
+    session: Session = Depends(get_session),
+) -> TraApplicationListResponse:
+    return list_tra_applications_detail(session)
+
+
+@router.post(
+    "/applications/{app_id}/approve",
+    response_model=TraApplicationActionResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def approve_application_api(
+    app_id: int,
+    session: Session = Depends(get_session),
+) -> TraApplicationActionResponse:
+    return approve_tra_application(session, app_id)
+
+
+@router.post(
+    "/applications/{app_id}/reject",
+    response_model=TraApplicationActionResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def reject_application_api(
+    app_id: int,
+    payload: TraApplicationRejectRequest,
+    session: Session = Depends(get_session),
+) -> TraApplicationActionResponse:
+    return reject_tra_application(session, app_id, payload)
+
+
+@router.put(
+    "/applications/{app_id}/withdraw",
+    response_model=TraApplicationActionResponse,
+    dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],
+)
+def withdraw_application_api(
+    app_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> TraApplicationActionResponse:
+    return withdraw_tra_application(session, app_id, current_user)
+
+
+@router.get(
     "/{resource}",
     response_model=TraResourceListResponse,
     dependencies=[Depends(require_roles("employee", "hr_manager", "admin"))],

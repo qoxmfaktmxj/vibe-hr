@@ -27,10 +27,9 @@ export type PapAppraisalDetailResponse = {
   item: PapAppraisalItem;
 };
 
-// ─── Appraisal Target types ───────────────────────────────────────────────────
+// ── Appraisal Target types ────────────────────────────────────────────────────
 
 export type PapAppraisalTargetItem = {
-  [key: string]: unknown;
   id: number;
   appraisal_id: number;
   appraisal_name: string | null;
@@ -54,10 +53,4 @@ export type PapAppraisalTargetListResponse = {
 
 export type PapAppraisalTargetBatchRequest = {
   items: Array<Partial<PapAppraisalTargetItem> & { _status?: string }>;
-};
-
-export type PapAppraisalTargetBatchResponse = {
-  created: number;
-  updated: number;
-  deleted: number;
 };

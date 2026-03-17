@@ -211,23 +211,24 @@ def delete_appraisal(session: Session, appraisal_id: int) -> None:
     session.commit()
 
 
-# ─── Appraisal Target ─────────────────────────────────────────────────────────
+# ─── Appraisal Target service ──────────────────────────────────────────────────
 
 
 def _to_target_item(
-    session: Session,
     row: PapAppraisalTarget,
-    appraisal: PapAppraisalMaster | None = None,
+    appraisal: PapAppraisalMaster | None,
+    employee: HrEmployee | None,
+    user: AuthUser | None,
+    dept: OrgDepartment | None,
 ) -> PapAppraisalTargetItem:
-    master = appraisal or session.get(PapAppraisalMaster, row.appraisal_id)
     return PapAppraisalTargetItem(
         id=row.id or 0,
         appraisal_id=row.appraisal_id,
-        appraisal_name=master.appraisal_name if master else None,
+        appraisal_name=appraisal.appraisal_name if appraisal else None,
         employee_id=row.employee_id,
-        employee_no=row.employee_no,
-        employee_name=row.employee_name,
-        department_name=row.department_name,
+        employee_no=employee.employee_no if employee else None,
+        employee_name=user.display_name if user else None,
+        department_name=dept.department_name if dept else None,
         score=row.score,
         grade_code=row.grade_code,
         evaluator_note=row.evaluator_note,
@@ -242,11 +243,51 @@ def list_appraisal_targets(
     session: Session,
     appraisal_id: int | None = None,
 ) -> PapAppraisalTargetListResponse:
-    stmt = select(PapAppraisalTarget).order_by(PapAppraisalTarget.employee_no)
+    stmt = select(PapAppraisalTarget)
     if appraisal_id is not None:
         stmt = stmt.where(PapAppraisalTarget.appraisal_id == appraisal_id)
-    rows = session.exec(stmt).all()
-    items = [_to_target_item(session, r) for r in rows]
+    rows = session.exec(stmt.order_by(PapAppraisalTarget.id)).all()
+
+    # Batch-load related records
+    appraisal_ids = {r.appraisal_id for r in rows}
+    employee_ids = {r.employee_id for r in rows}
+
+    appraisals: dict[int, PapAppraisalMaster] = {}
+    if appraisal_ids:
+        appraisals = {
+            a.id: a
+            for a in session.exec(select(PapAppraisalMaster).where(PapAppraisalMaster.id.in_(appraisal_ids))).all()
+            if a.id is not None
+        }
+
+    employees: dict[int, HrEmployee] = {}
+    users: dict[int, AuthUser] = {}
+    depts: dict[int, OrgDepartment] = {}
+    if employee_ids:
+        emps = session.exec(select(HrEmployee).where(HrEmployee.id.in_(employee_ids))).all()
+        employees = {e.id: e for e in emps if e.id is not None}
+        user_ids = {e.user_id for e in emps if e.user_id is not None}
+        if user_ids:
+            users = {
+                u.id: u
+                for u in session.exec(select(AuthUser).where(AuthUser.id.in_(user_ids))).all()
+                if u.id is not None
+            }
+        dept_ids = {e.department_id for e in emps if e.department_id is not None}
+        if dept_ids:
+            depts = {
+                d.id: d
+                for d in session.exec(select(OrgDepartment).where(OrgDepartment.id.in_(dept_ids))).all()
+                if d.id is not None
+            }
+
+    items = []
+    for row in rows:
+        emp = employees.get(row.employee_id)
+        user = users.get(emp.user_id) if emp and emp.user_id else None
+        dept = depts.get(emp.department_id) if emp and emp.department_id else None
+        items.append(_to_target_item(row, appraisals.get(row.appraisal_id), emp, user, dept))
+
     return PapAppraisalTargetListResponse(items=items, total_count=len(items))
 
 
@@ -255,56 +296,53 @@ def batch_save_appraisal_targets(
     payload: PapAppraisalTargetBatchRequest,
 ) -> PapAppraisalTargetBatchResponse:
     created = updated = deleted = 0
-    for row_in in payload.items:
-        row_status = getattr(row_in, "_status", None) or "clean"
+    now = _utc_now()
+
+    for item in payload.items:
+        row_status = item._status  # noqa: SLF001
 
         if row_status == "deleted":
-            if row_in.id is not None:
-                existing = session.get(PapAppraisalTarget, row_in.id)
-                if existing:
-                    session.delete(existing)
+            if item.id is not None:
+                row = session.get(PapAppraisalTarget, item.id)
+                if row:
+                    session.delete(row)
                     deleted += 1
             continue
 
-        if row_status == "added":
-            if row_in.appraisal_id is None or row_in.employee_id is None:
+        if row_status == "added" or item.id is None:
+            if not item.appraisal_id or not item.employee_id:
                 continue
-            emp = session.exec(select(HrEmployee).where(HrEmployee.id == row_in.employee_id)).first()
-            user = session.exec(select(AuthUser).where(AuthUser.id == emp.user_id)).first() if emp else None
-            dept = session.get(OrgDepartment, emp.department_id) if emp and emp.department_id else None
-            new_row = PapAppraisalTarget(
-                appraisal_id=row_in.appraisal_id,
-                employee_id=row_in.employee_id,
-                employee_no=emp.employee_no if emp else None,
-                employee_name=user.display_name if user else None,
-                department_name=dept.name if dept else None,
-                score=row_in.score,
-                grade_code=row_in.grade_code,
-                evaluator_note=row_in.evaluator_note,
-                status=row_in.status or "pending",
-                created_at=_utc_now(),
-                updated_at=_utc_now(),
+            row = PapAppraisalTarget(
+                appraisal_id=item.appraisal_id,
+                employee_id=item.employee_id,
+                score=item.score,
+                grade_code=item.grade_code,
+                evaluator_note=item.evaluator_note,
+                status=item.status or "pending",
+                evaluated_at=now if item.status in ("evaluated", "finalized") else None,
+                created_at=now,
+                updated_at=now,
             )
-            session.add(new_row)
+            session.add(row)
             created += 1
-            continue
-
-        if row_status == "updated" and row_in.id is not None:
-            existing = session.get(PapAppraisalTarget, row_in.id)
-            if existing is None:
+        elif row_status in ("updated", "clean"):
+            if item.id is None:
                 continue
-            if row_in.score is not None:
-                existing.score = row_in.score
-            if row_in.grade_code is not None:
-                existing.grade_code = row_in.grade_code
-            if row_in.evaluator_note is not None:
-                existing.evaluator_note = row_in.evaluator_note
-            if row_in.status is not None:
-                existing.status = row_in.status
-                if row_in.status == "evaluated":
-                    existing.evaluated_at = _utc_now()
-            existing.updated_at = _utc_now()
-            session.add(existing)
+            row = session.get(PapAppraisalTarget, item.id)
+            if row is None:
+                continue
+            if item.score is not None:
+                row.score = item.score
+            if item.grade_code is not None:
+                row.grade_code = item.grade_code
+            if item.evaluator_note is not None:
+                row.evaluator_note = item.evaluator_note
+            if item.status is not None:
+                if item.status != row.status and item.status in ("evaluated", "finalized"):
+                    row.evaluated_at = now
+                row.status = item.status
+            row.updated_at = now
+            session.add(row)
             updated += 1
 
     session.commit()

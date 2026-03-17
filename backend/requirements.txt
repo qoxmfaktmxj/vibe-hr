@@ -5,3 +5,4 @@ PyJWT==2.10.1
 sqlmodel==0.0.22
 uvicorn[standard]==0.34.0
 psycopg[binary]==3.2.9
+fpdf2==2.8.3

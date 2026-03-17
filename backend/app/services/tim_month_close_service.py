@@ -1,213 +1,347 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from calendar import monthrange
+from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, func, select
 
+from app.core.time_utils import utc_now
 from app.models import AuthUser, HrAttendanceDaily, HrEmployee, TimMonthClose
+from app.models.entities import PayEmployeeProfile, PayVariableInput
 from app.schemas.tim_month_close import (
+    TimMonthCloseActionResponse,
     TimMonthCloseItem,
     TimMonthCloseListResponse,
-    TimMonthCloseRequest,
 )
 
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+logger = logging.getLogger(__name__)
 
 
-def _build_item(close: TimMonthClose, user_map: dict[int, str]) -> TimMonthCloseItem:
+def _get_display_name(session: Session, user_id: int | None) -> str | None:
+    if user_id is None:
+        return None
+    user = session.exec(select(AuthUser).where(AuthUser.id == user_id)).first()
+    return user.display_name if user else None
+
+
+def _to_item(session: Session, row: TimMonthClose) -> TimMonthCloseItem:
     return TimMonthCloseItem(
-        id=close.id or 0,
-        year=close.year,
-        month=close.month,
-        close_status=close.close_status,
-        employee_count=close.employee_count,
-        present_days=close.present_days,
-        absent_days=close.absent_days,
-        late_days=close.late_days,
-        leave_days=close.leave_days,
-        closed_by=close.closed_by,
-        closed_by_name=user_map.get(close.closed_by) if close.closed_by else None,
-        closed_at=close.closed_at,
-        reopened_by=close.reopened_by,
-        reopened_by_name=user_map.get(close.reopened_by) if close.reopened_by else None,
-        reopened_at=close.reopened_at,
-        note=close.note,
-        created_at=close.created_at,
-        updated_at=close.updated_at,
+        id=row.id,
+        year=row.year,
+        month=row.month,
+        close_status=row.close_status,
+        employee_count=row.employee_count,
+        present_days=row.present_days,
+        absent_days=row.absent_days,
+        late_days=row.late_days,
+        leave_days=row.leave_days,
+        total_overtime_minutes=row.total_overtime_minutes,
+        total_night_minutes=row.total_night_minutes,
+        total_holiday_work_minutes=row.total_holiday_work_minutes,
+        total_holiday_overtime_minutes=row.total_holiday_overtime_minutes,
+        total_holiday_night_minutes=row.total_holiday_night_minutes,
+        closed_by=row.closed_by,
+        closed_by_name=_get_display_name(session, row.closed_by),
+        closed_at=row.closed_at,
+        reopened_by=row.reopened_by,
+        reopened_by_name=_get_display_name(session, row.reopened_by),
+        reopened_at=row.reopened_at,
+        note=row.note,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
     )
 
 
-def _load_user_map(session: Session, closes: list[TimMonthClose]) -> dict[int, str]:
-    user_ids: set[int] = set()
-    for c in closes:
-        if c.closed_by:
-            user_ids.add(c.closed_by)
-        if c.reopened_by:
-            user_ids.add(c.reopened_by)
-    if not user_ids:
-        return {}
+def _virtual_open(year: int, month: int) -> TimMonthCloseItem:
+    """DB 레코드가 없는 월에 대한 가상 'open' 항목을 반환한다."""
+    return TimMonthCloseItem(
+        id=None,
+        year=year,
+        month=month,
+        close_status="open",
+        employee_count=0,
+        present_days=0,
+        absent_days=0,
+        late_days=0,
+        leave_days=0,
+        total_overtime_minutes=0,
+        total_night_minutes=0,
+        total_holiday_work_minutes=0,
+        total_holiday_overtime_minutes=0,
+        total_holiday_night_minutes=0,
+        closed_by=None,
+        closed_by_name=None,
+        closed_at=None,
+        reopened_by=None,
+        reopened_by_name=None,
+        reopened_at=None,
+        note=None,
+        created_at=None,
+        updated_at=None,
+    )
+
+
+def list_month_closes(session: Session, year: int) -> TimMonthCloseListResponse:
     rows = session.exec(
-        select(AuthUser.id, AuthUser.display_name).where(AuthUser.id.in_(list(user_ids)))
+        select(TimMonthClose).where(TimMonthClose.year == year).order_by(TimMonthClose.month)
     ).all()
-    return {uid: name for uid, name in rows}
+    row_map = {r.month: r for r in rows}
+
+    items = [
+        _to_item(session, row_map[m]) if m in row_map else _virtual_open(year, m)
+        for m in range(1, 13)
+    ]
+    return TimMonthCloseListResponse(items=items, year=year, total_count=12)
 
 
-def _calc_stats(session: Session, year: int, month: int) -> dict[str, int]:
-    """해당 년/월 근태 통계 집계"""
-    from calendar import monthrange
+def assert_month_not_closed(session: Session, year: int, month: int) -> None:
+    """해당 년월이 마감 상태이면 HTTP 423(Locked)을 발생시킨다."""
+    row = session.exec(
+        select(TimMonthClose).where(
+            TimMonthClose.year == year,
+            TimMonthClose.month == month,
+        )
+    ).first()
+    if row and row.close_status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=f"{year}년 {month}월은 마감된 기간입니다. 수정이 제한됩니다.",
+        )
 
-    first_day = f"{year:04d}-{month:02d}-01"
-    last_day_num = monthrange(year, month)[1]
-    last_day = f"{year:04d}-{month:02d}-{last_day_num:02d}"
 
-    # 활성 직원 수
-    emp_count = session.exec(
-        select(func.count(HrEmployee.id)).where(HrEmployee.employment_status == "active")
-    ).one() or 0
+def _calc_aggregates(session: Session, year: int, month: int) -> dict[str, int]:
+    """해당 년월의 HrAttendanceDaily 집계를 반환한다."""
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
 
-    # 근태 상태별 집계
     rows = session.exec(
-        select(HrAttendanceDaily.attendance_status, func.count(HrAttendanceDaily.id))
+        select(HrAttendanceDaily).where(
+            HrAttendanceDaily.work_date >= first_day,
+            HrAttendanceDaily.work_date <= last_day,
+        )
+    ).all()
+
+    employee_ids: set[int] = set()
+    present = late = absent = leave = 0
+    tot_overtime = tot_night = tot_holiday_work = tot_holiday_overtime = tot_holiday_night = 0
+
+    for r in rows:
+        employee_ids.add(r.employee_id)
+        s = r.attendance_status or ""
+        if s == "present":
+            present += 1
+        elif s == "late":
+            late += 1
+        elif s == "absent":
+            absent += 1
+        elif s in ("leave", "half_day"):
+            leave += 1
+
+        tot_overtime += r.overtime_minutes or 0
+        tot_night += r.night_minutes or 0
+        tot_holiday_work += r.holiday_work_minutes or 0
+        tot_holiday_overtime += r.holiday_overtime_minutes or 0
+        tot_holiday_night += r.holiday_night_minutes or 0
+
+    return {
+        "employee_count": len(employee_ids),
+        "present_days": present,
+        "late_days": late,
+        "absent_days": absent,
+        "leave_days": leave,
+        "total_overtime_minutes": tot_overtime,
+        "total_night_minutes": tot_night,
+        "total_holiday_work_minutes": tot_holiday_work,
+        "total_holiday_overtime_minutes": tot_holiday_overtime,
+        "total_holiday_night_minutes": tot_holiday_night,
+    }
+
+
+_MONTHLY_STATUTORY_HOURS = 209  # 월 소정근로시간
+
+
+def _generate_pay_variable_inputs(session: Session, year: int, month: int) -> int:
+    """개인별 연장/야간/휴일 근무시간을 집계하여 PayVariableInput을 upsert한다.
+
+    Returns:
+        생성/갱신된 PayVariableInput 수
+    """
+    year_month = f"{year:04d}-{month:02d}"
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
+
+    # 개인별 연장/야간/휴일 합산
+    stmt = (
+        select(
+            HrAttendanceDaily.employee_id,
+            func.coalesce(func.sum(col(HrAttendanceDaily.overtime_minutes)), 0).label("overtime"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.night_minutes)), 0).label("night"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_work_minutes)), 0).label("holiday_work"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_overtime_minutes)), 0).label("holiday_overtime"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_night_minutes)), 0).label("holiday_night"),
+        )
         .where(
             HrAttendanceDaily.work_date >= first_day,
             HrAttendanceDaily.work_date <= last_day,
         )
-        .group_by(HrAttendanceDaily.attendance_status)
-    ).all()
+        .group_by(HrAttendanceDaily.employee_id)
+    )
+    per_employee = session.exec(stmt).all()
 
-    counts: dict[str, int] = {status_: int(cnt) for status_, cnt in rows}
+    count = 0
+    for row in per_employee:
+        emp_id = row[0]
+        overtime_min = int(row[1])
+        night_min = int(row[2])
+        holiday_work_min = int(row[3])
+        holiday_overtime_min = int(row[4])
+        holiday_night_min = int(row[5])
 
-    return {
-        "employee_count": int(emp_count),
-        "present_days": counts.get("present", 0),
-        "absent_days": counts.get("absent", 0),
-        "late_days": counts.get("late", 0),
-        "leave_days": counts.get("leave", 0),
-    }
+        # base_hourly 계산: base_salary / 209
+        profile = session.exec(
+            select(PayEmployeeProfile)
+            .where(
+                PayEmployeeProfile.employee_id == emp_id,
+                PayEmployeeProfile.is_active == True,  # noqa: E712
+                PayEmployeeProfile.effective_from <= last_day,
+            )
+            .order_by(PayEmployeeProfile.effective_from.desc())
+            .limit(1)
+        ).first()
 
+        if profile is None or profile.base_salary <= 0:
+            continue
 
-def list_month_closes(
-    session: Session,
-    *,
-    year: int | None = None,
-) -> TimMonthCloseListResponse:
-    stmt = select(TimMonthClose).order_by(TimMonthClose.year.desc(), TimMonthClose.month.desc())
-    if year is not None:
-        stmt = stmt.where(TimMonthClose.year == year)
-    closes = session.exec(stmt).all()
-    user_map = _load_user_map(session, list(closes))
-    items = [_build_item(c, user_map) for c in closes]
-    return TimMonthCloseListResponse(items=items, total_count=len(items))
+        base_hourly = profile.base_salary / _MONTHLY_STATUTORY_HOURS
+
+        # (item_code, direction, minutes, multiplier)
+        items = [
+            ("OTX", "earning", overtime_min, 1.5),
+            ("NGT", "earning", night_min, 0.5),
+            ("HDW", "earning", holiday_work_min, 1.5),
+            ("HDO", "earning", holiday_overtime_min, 2.0),
+            ("HDN", "earning", holiday_night_min, 2.0),
+        ]
+
+        for item_code, direction, minutes, multiplier in items:
+            amount = round(base_hourly * multiplier * (minutes / 60), 0) if minutes > 0 else 0
+
+            existing = session.exec(
+                select(PayVariableInput).where(
+                    PayVariableInput.year_month == year_month,
+                    PayVariableInput.employee_id == emp_id,
+                    PayVariableInput.item_code == item_code,
+                )
+            ).first()
+
+            if existing:
+                existing.amount = amount
+                existing.direction = direction
+                existing.memo = f"월마감 자동생성 ({minutes}분)"
+            else:
+                if amount <= 0:
+                    continue
+                session.add(
+                    PayVariableInput(
+                        year_month=year_month,
+                        employee_id=emp_id,
+                        item_code=item_code,
+                        direction=direction,
+                        amount=amount,
+                        memo=f"월마감 자동생성 ({minutes}분)",
+                    )
+                )
+            count += 1
+
+    return count
 
 
 def close_month(
     session: Session,
-    payload: TimMonthCloseRequest,
-    user_id: int,
-) -> TimMonthCloseItem:
-    """월 마감 처리 — 이미 closed이면 409"""
-    existing = session.exec(
+    year: int,
+    month: int,
+    closed_by_user_id: int,
+    note: str | None,
+) -> TimMonthCloseActionResponse:
+    row = session.exec(
         select(TimMonthClose).where(
-            TimMonthClose.year == payload.year,
-            TimMonthClose.month == payload.month,
+            TimMonthClose.year == year,
+            TimMonthClose.month == month,
         )
     ).first()
 
-    if existing and existing.close_status == "closed":
+    if row and row.close_status == "closed":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"{payload.year}년 {payload.month}월은 이미 마감되었습니다.",
+            detail=f"{year}년 {month}월은 이미 마감 상태입니다.",
         )
 
-    stats = _calc_stats(session, payload.year, payload.month)
-    now = _utc_now()
+    # 마감 전 미계산 레코드 보정
+    from app.services.tim_work_hours_calc_service import recalculate_month
+    recalc_count = recalculate_month(session, year, month)
+    if recalc_count > 0:
+        logger.info("월마감 전 근무시간 재계산: %d건", recalc_count)
 
-    if existing:
-        # reclose (was open, close again)
-        existing.close_status = "closed"
-        existing.employee_count = stats["employee_count"]
-        existing.present_days = stats["present_days"]
-        existing.absent_days = stats["absent_days"]
-        existing.late_days = stats["late_days"]
-        existing.leave_days = stats["leave_days"]
-        existing.closed_by = user_id
-        existing.closed_at = now
-        existing.note = payload.note
-        existing.updated_at = now
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        close = existing
-    else:
-        close = TimMonthClose(
-            year=payload.year,
-            month=payload.month,
+    agg = _calc_aggregates(session, year, month)
+    now = utc_now()
+
+    if row is None:
+        row = TimMonthClose(
+            year=year,
+            month=month,
             close_status="closed",
-            employee_count=stats["employee_count"],
-            present_days=stats["present_days"],
-            absent_days=stats["absent_days"],
-            late_days=stats["late_days"],
-            leave_days=stats["leave_days"],
-            closed_by=user_id,
+            closed_by=closed_by_user_id,
             closed_at=now,
-            note=payload.note,
+            note=note,
             created_at=now,
             updated_at=now,
+            **agg,
         )
-        session.add(close)
-        session.commit()
-        session.refresh(close)
+        session.add(row)
+    else:
+        row.close_status = "closed"
+        row.closed_by = closed_by_user_id
+        row.closed_at = now
+        row.note = note
+        row.updated_at = now
+        for k, v in agg.items():
+            setattr(row, k, v)
 
-    user_map = _load_user_map(session, [close])
-    return _build_item(close, user_map)
+    # 개인별 연장/야간/휴일 → PayVariableInput 자동 생성
+    vi_count = _generate_pay_variable_inputs(session, year, month)
+    if vi_count > 0:
+        logger.info("PayVariableInput 자동생성: %d건", vi_count)
+
+    session.commit()
+    session.refresh(row)
+    return TimMonthCloseActionResponse(item=_to_item(session, row))
 
 
 def reopen_month(
     session: Session,
     year: int,
     month: int,
-    user_id: int,
-    note: str | None = None,
-) -> TimMonthCloseItem:
-    """월 마감 취소 — closed가 아니면 409"""
-    close = session.exec(
+    reopened_by_user_id: int,
+) -> TimMonthCloseActionResponse:
+    row = session.exec(
         select(TimMonthClose).where(
             TimMonthClose.year == year,
             TimMonthClose.month == month,
         )
     ).first()
 
-    if not close or close.close_status != "closed":
+    if row is None or row.close_status == "open":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"{year}년 {month}월은 마감 상태가 아닙니다.",
         )
 
-    now = _utc_now()
-    close.close_status = "open"
-    close.reopened_by = user_id
-    close.reopened_at = now
-    if note is not None:
-        close.note = note
-    close.updated_at = now
-    session.add(close)
+    row.close_status = "open"
+    row.reopened_by = reopened_by_user_id
+    row.reopened_at = utc_now()
+    row.updated_at = utc_now()
     session.commit()
-    session.refresh(close)
-
-    user_map = _load_user_map(session, [close])
-    return _build_item(close, user_map)
-
-
-def is_month_closed(session: Session, year: int, month: int) -> bool:
-    """근태 수정 API 등에서 마감 여부 확인용"""
-    row = session.exec(
-        select(TimMonthClose.close_status).where(
-            TimMonthClose.year == year,
-            TimMonthClose.month == month,
-        )
-    ).first()
-    return row == "closed"
+    session.refresh(row)
+    return TimMonthCloseActionResponse(item=_to_item(session, row))
