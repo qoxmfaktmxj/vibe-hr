@@ -570,6 +570,15 @@
       ],
       "ownerModule": "TIM"
     },
+    "tim.month-closing": {
+      "path": "/tim/month-closing",
+      "pageFile": "frontend/src/app/tim/month-closing/page.tsx",
+      "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": ["query"],
+      "ownerModule": "TIM"
+    },
     "hri.tasks.approvals": {
       "path": "/hri/tasks/approvals",
       "pageFile": "frontend/src/app/hri/tasks/approvals/page.tsx",

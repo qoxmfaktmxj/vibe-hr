@@ -617,6 +617,15 @@ MENU_TREE: list[dict] = [
                 "roles": ["hr_manager", "admin"],
                 "children": [],
             },
+            {
+                "code": "tim.month-closing",
+                "name": "월마감",
+                "path": "/tim/month-closing",
+                "icon": "CalendarX",
+                "sort_order": 431,
+                "roles": ["hr_manager", "admin"],
+                "children": [],
+            },
         ],
     },
     {

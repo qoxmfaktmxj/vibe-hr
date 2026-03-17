@@ -397,3 +397,32 @@ export type TimEmployeeScheduleExceptionListResponse = {
   items: TimEmployeeScheduleExceptionItem[];
   total_count: number;
 };
+
+// ─── Month Close ──────────────────────────────────────────────────────────────
+
+export type TimMonthCloseItem = {
+  id: number | null;
+  year: number;
+  month: number;
+  close_status: "open" | "closed";
+  employee_count: number;
+  present_days: number;
+  absent_days: number;
+  late_days: number;
+  leave_days: number;
+  closed_by: number | null;
+  closed_by_name: string | null;
+  closed_at: string | null;
+  reopened_by: number | null;
+  reopened_by_name: string | null;
+  reopened_at: string | null;
+  note: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type TimMonthCloseListResponse = {
+  items: TimMonthCloseItem[];
+  year: number;
+  total_count: number;
+};

@@ -24,6 +24,7 @@ from app.api.tim_schedule import router as tim_schedule_router
 from app.api.tim_attendance_daily import router as tim_attendance_daily_router
 from app.api.tim_leave import router as tim_leave_router
 from app.api.tim_report import router as tim_report_router
+from app.api.tim_month_close import router as tim_month_close_router
 from app.api.hri_form_type import router as hri_form_type_router
 from app.api.hri_approval_template import router as hri_approval_template_router
 from app.api.hri_request import router as hri_request_router
@@ -86,6 +87,7 @@ app.include_router(tim_schedule_router, prefix="/api/v1")
 app.include_router(tim_attendance_daily_router, prefix="/api/v1")
 app.include_router(tim_leave_router, prefix="/api/v1")
 app.include_router(tim_report_router, prefix="/api/v1")
+app.include_router(tim_month_close_router, prefix="/api/v1")
 app.include_router(hri_form_type_router, prefix="/api/v1")
 app.include_router(hri_approval_template_router, prefix="/api/v1")
 app.include_router(hri_request_router, prefix="/api/v1")
