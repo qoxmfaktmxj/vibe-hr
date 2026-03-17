@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlmodel import Session, SQLModel, select
 
-from app.models import HrEmployee
+from app.models import AuthUser, HrEmployee, OrgDepartment
 from app.models.tra import (
     TraApplication,
     TraCourse,
@@ -20,7 +20,14 @@ from app.models.tra import (
     TraRequiredRule,
     TraRequiredTarget,
 )
-from app.schemas.tra import TraResourceBatchRequest
+from app.schemas.tra import (
+    TraApplicationActionResponse,
+    TraApplicationCreateRequest,
+    TraApplicationItem,
+    TraApplicationListResponse,
+    TraApplicationRejectRequest,
+    TraResourceBatchRequest,
+)
 
 
 def _utc_now() -> datetime:
@@ -830,3 +837,154 @@ def apply_cyber_results(session: Session, upload_ym: str | None = None) -> int:
 
     session.commit()
     return processed
+
+
+# ─── Write-flow helpers ───────────────────────────────────────────────────────
+
+
+def _build_application_item(session: Session, req: TraApplication) -> TraApplicationItem:
+    emp = session.exec(select(HrEmployee).where(HrEmployee.id == req.employee_id)).first()
+    user = session.exec(select(AuthUser).where(AuthUser.id == emp.user_id)).first() if emp else None
+    dept = session.get(OrgDepartment, emp.department_id) if emp and emp.department_id else None
+    course = session.get(TraCourse, req.course_id)
+    event = session.get(TraEvent, req.event_id) if req.event_id else None
+    return TraApplicationItem(
+        id=req.id or 0,
+        application_no=req.application_no,
+        employee_id=req.employee_id,
+        employee_no=emp.employee_no if emp else None,
+        employee_name=user.display_name if user else None,
+        department_name=dept.name if dept else None,
+        course_id=req.course_id,
+        course_name=course.course_name if course else None,
+        event_id=req.event_id,
+        event_name=event.event_name if event else None,
+        in_out_type=req.in_out_type,
+        status=req.status,
+        year_plan_yn=req.year_plan_yn,
+        survey_yn=req.survey_yn,
+        edu_memo=req.edu_memo,
+        note=req.note,
+        created_at=req.created_at,
+        updated_at=req.updated_at,
+    )
+
+
+def get_my_tra_applications(
+    session: Session,
+    current_user: AuthUser,
+) -> TraApplicationListResponse:
+    emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
+    if emp is None:
+        return TraApplicationListResponse(items=[], total_count=0)
+    rows = session.exec(
+        select(TraApplication)
+        .where(TraApplication.employee_id == emp.id)
+        .order_by(TraApplication.created_at.desc())
+    ).all()
+    items = [_build_application_item(session, r) for r in rows]
+    return TraApplicationListResponse(items=items, total_count=len(items))
+
+
+def list_tra_applications_detail(session: Session) -> TraApplicationListResponse:
+    rows = session.exec(
+        select(TraApplication).order_by(TraApplication.created_at.desc())
+    ).all()
+    items = [_build_application_item(session, r) for r in rows]
+    return TraApplicationListResponse(items=items, total_count=len(items))
+
+
+def create_tra_application(
+    session: Session,
+    payload: TraApplicationCreateRequest,
+    current_user: AuthUser,
+) -> TraApplicationActionResponse:
+    course = session.get(TraCourse, payload.course_id)
+    if course is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="과정을 찾을 수 없습니다.")
+    emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
+    if emp is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="사원 프로필을 찾을 수 없습니다.")
+    app_no = _next_application_no(session)
+    req = TraApplication(
+        application_no=app_no,
+        employee_id=emp.id,
+        course_id=payload.course_id,
+        event_id=payload.event_id,
+        in_out_type=payload.in_out_type or course.in_out_type,
+        year_plan_yn=payload.year_plan_yn,
+        edu_memo=payload.edu_memo,
+        note=payload.note,
+        status="submitted",
+        created_at=_utc_now(),
+        updated_at=_utc_now(),
+    )
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+    return TraApplicationActionResponse(item=_build_application_item(session, req))
+
+
+def approve_tra_application(session: Session, app_id: int) -> TraApplicationActionResponse:
+    req = session.get(TraApplication, app_id)
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+    if req.status != "submitted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"승인 대기(submitted) 상태가 아닙니다. 현재 상태: {req.status}",
+        )
+    req.status = "approved"
+    req.updated_at = _utc_now()
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+    return TraApplicationActionResponse(item=_build_application_item(session, req))
+
+
+def reject_tra_application(
+    session: Session,
+    app_id: int,
+    payload: TraApplicationRejectRequest,
+) -> TraApplicationActionResponse:
+    req = session.get(TraApplication, app_id)
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+    if req.status not in ("submitted", "draft"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"반려할 수 없는 상태입니다. 현재 상태: {req.status}",
+        )
+    req.status = "rejected"
+    if payload.reason:
+        req.note = (req.note or "") + f"\n[반려사유] {payload.reason}"
+    req.updated_at = _utc_now()
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+    return TraApplicationActionResponse(item=_build_application_item(session, req))
+
+
+def withdraw_tra_application(
+    session: Session,
+    app_id: int,
+    current_user: AuthUser,
+) -> TraApplicationActionResponse:
+    req = session.get(TraApplication, app_id)
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신청 건을 찾을 수 없습니다.")
+    emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == current_user.id)).first()
+    if emp is None or req.employee_id != emp.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="본인의 신청만 회수할 수 있습니다.")
+    if req.status not in ("submitted", "draft"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"회수할 수 없는 상태입니다. 현재 상태: {req.status}",
+        )
+    req.status = "canceled"
+    req.updated_at = _utc_now()
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+    return TraApplicationActionResponse(item=_build_application_item(session, req))
+

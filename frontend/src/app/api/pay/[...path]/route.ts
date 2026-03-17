@@ -45,8 +45,21 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
     try {
         const upstreamResponse = await fetch(targetUrl.toString(), fetchOptions);
 
-        let data;
         const resContentType = upstreamResponse.headers.get("content-type");
+
+        // Binary responses (PDF 등) — 그대로 전달
+        if (resContentType && (resContentType.includes("application/pdf") || resContentType.includes("application/octet-stream"))) {
+            const buf = await upstreamResponse.arrayBuffer();
+            return new NextResponse(buf, {
+                status: upstreamResponse.status,
+                headers: {
+                    "Content-Type": resContentType,
+                    "Content-Disposition": upstreamResponse.headers.get("content-disposition") ?? "",
+                },
+            });
+        }
+
+        let data;
         if (resContentType && resContentType.includes("application/json")) {
             data = await upstreamResponse.json();
         } else {

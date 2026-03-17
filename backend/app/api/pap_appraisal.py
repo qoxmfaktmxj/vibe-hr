@@ -10,11 +10,16 @@ from app.schemas.pap_appraisal import (
     PapAppraisalCreateRequest,
     PapAppraisalDetailResponse,
     PapAppraisalListResponse,
+    PapAppraisalTargetBatchRequest,
+    PapAppraisalTargetBatchResponse,
+    PapAppraisalTargetListResponse,
     PapAppraisalUpdateRequest,
 )
 from app.services.pap_appraisal_service import (
+    batch_save_appraisal_targets,
     create_appraisal,
     delete_appraisal,
+    list_appraisal_targets,
     list_appraisals,
     update_appraisal,
 )
@@ -115,3 +120,32 @@ def pap_appraisal_delete(
     _require_menu_action(session, current_user, "save")
     delete_appraisal(session, appraisal_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ─── Appraisal Target endpoints ───────────────────────────────────────────────
+
+targets_router = APIRouter(prefix="/pap/targets", tags=["pap-targets"])
+
+
+@targets_router.get(
+    "",
+    response_model=PapAppraisalTargetListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def list_targets_api(
+    appraisal_id: int | None = Query(default=None),
+    session: Session = Depends(get_session),
+) -> PapAppraisalTargetListResponse:
+    return list_appraisal_targets(session, appraisal_id=appraisal_id)
+
+
+@targets_router.post(
+    "/batch",
+    response_model=PapAppraisalTargetBatchResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def batch_save_targets_api(
+    payload: PapAppraisalTargetBatchRequest,
+    session: Session = Depends(get_session),
+) -> PapAppraisalTargetBatchResponse:
+    return batch_save_appraisal_targets(session, payload)

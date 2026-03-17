@@ -762,6 +762,32 @@ class PapAppraisalMaster(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class PapAppraisalTarget(SQLModel, table=True):
+    __tablename__ = "pap_appraisal_targets"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'evaluated', 'finalized')",
+            name="ck_pap_appraisal_targets_status",
+        ),
+        Index("ix_pap_appraisal_targets_appraisal_id", "appraisal_id"),
+        Index("ix_pap_appraisal_targets_employee_id", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    appraisal_id: int = Field(foreign_key="PAP_APPRAISAL_MASTERS.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    employee_no: Optional[str] = Field(default=None, max_length=30)
+    employee_name: Optional[str] = Field(default=None, max_length=100)
+    department_name: Optional[str] = Field(default=None, max_length=100)
+    score: Optional[float] = None
+    grade_code: Optional[str] = Field(default=None, max_length=30)
+    evaluator_note: Optional[str] = Field(default=None, max_length=2000)
+    status: str = Field(default="pending", max_length=20)
+    evaluated_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "tim_leave_requests"
     __table_args__ = (
