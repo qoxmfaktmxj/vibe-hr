@@ -15,6 +15,12 @@ class TimMonthCloseItem(BaseModel):
     absent_days: int
     late_days: int
     leave_days: int
+    # ── 근무시간 집계 (분 단위) ──
+    total_overtime_minutes: int = 0
+    total_night_minutes: int = 0
+    total_holiday_work_minutes: int = 0
+    total_holiday_overtime_minutes: int = 0
+    total_holiday_night_minutes: int = 0
     closed_by: int | None
     closed_by_name: str | None
     closed_at: datetime | None

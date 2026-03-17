@@ -160,6 +160,15 @@ export type TimAttendanceDailyItem = {
   check_out_at: string | null;
   worked_minutes: number | null;
   attendance_status: "present" | "late" | "absent" | "leave" | "remote";
+  // ── 근무시간 자동계산 결과 ──
+  actual_minutes: number;
+  regular_minutes: number;
+  overtime_minutes: number;
+  night_minutes: number;
+  holiday_work_minutes: number;
+  holiday_overtime_minutes: number;
+  holiday_night_minutes: number;
+  is_holiday_work: boolean;
 };
 
 export type TimAttendanceDailyListResponse = {
@@ -410,6 +419,12 @@ export type TimMonthCloseItem = {
   absent_days: number;
   late_days: number;
   leave_days: number;
+  // ── 근무시간 집계 (분 단위) ──
+  total_overtime_minutes: number;
+  total_night_minutes: number;
+  total_holiday_work_minutes: number;
+  total_holiday_overtime_minutes: number;
+  total_holiday_night_minutes: number;
   closed_by: number | null;
   closed_by_name: string | null;
   closed_at: string | null;

@@ -40,6 +40,14 @@ def _to_item(row: HrAttendanceDaily, employee: HrEmployee, user: AuthUser, depar
         check_out_at=row.check_out_at,
         worked_minutes=_worked_minutes(row.check_in_at, row.check_out_at),
         attendance_status=row.attendance_status,
+        actual_minutes=row.actual_minutes,
+        regular_minutes=row.regular_minutes,
+        overtime_minutes=row.overtime_minutes,
+        night_minutes=row.night_minutes,
+        holiday_work_minutes=row.holiday_work_minutes,
+        holiday_overtime_minutes=row.holiday_overtime_minutes,
+        holiday_night_minutes=row.holiday_night_minutes,
+        is_holiday_work=row.is_holiday_work,
     )
 
 
@@ -204,7 +212,11 @@ def check_out(session: Session, employee_id: int) -> TimAttendanceDailyItem:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="오늘 이미 퇴근 처리되었습니다.")
 
     row.check_out_at = now
-    session.add(row)
+
+    # 근무시간 자동계산
+    from app.services.tim_work_hours_calc_service import calculate_and_save
+    calculate_and_save(session, row)
+
     session.commit()
     session.refresh(row)
 
@@ -255,6 +267,11 @@ def correct_attendance(
         row.check_in_at = new_check_in_at
     if new_check_out_at is not None:
         row.check_out_at = new_check_out_at
+
+    # 근무시간 재계산
+    if row.check_in_at and row.check_out_at:
+        from app.services.tim_work_hours_calc_service import calculate_and_save
+        calculate_and_save(session, row)
 
     session.add(row)
     session.add(correction)

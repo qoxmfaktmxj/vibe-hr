@@ -649,6 +649,7 @@ MENU_TREE: list[dict] = [
                     {"code": "hri.tasks.receives", "name": "수신함", "path": "/hri/tasks/receives", "icon": "ListOrdered", "sort_order": 454, "roles": ["employee", "hr_manager", "admin"]},
                 ],
             },
+            {"code": "hri.my-payslip", "name": "내 급여조회", "path": "/hri/my-payslip", "icon": "Receipt", "sort_order": 455, "roles": ["employee", "hr_manager", "admin"]},
             {
                 "code": "hri.admin",
                 "name": "신청서관리",
@@ -2540,6 +2541,9 @@ PAY_ALLOWANCE_DEDUCTION_SEEDS = [
     ("MLA", "식대", "allowance", "non-taxable", "fixed", 20),
     ("OTX", "연장수당", "allowance", "taxable", "fixed", 30),
     ("NGT", "야간수당", "allowance", "taxable", "fixed", 40),
+    ("HDW", "휴일근무수당", "allowance", "taxable", "fixed", 35),
+    ("HDO", "휴일연장수당", "allowance", "taxable", "fixed", 36),
+    ("HDN", "휴일야간수당", "allowance", "taxable", "fixed", 37),
     ("POS", "직책수당", "allowance", "taxable", "fixed", 50),
     ("PEN", "국민연금", "deduction", "insurance", "formula", 110),
     ("HIN", "건강보험", "deduction", "insurance", "formula", 120),

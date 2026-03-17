@@ -122,6 +122,18 @@ class HrAttendanceDaily(SQLModel, table=True):
     check_in_at: Optional[datetime] = None
     check_out_at: Optional[datetime] = None
     attendance_status: str = Field(max_length=20)
+
+    # ── 근무시간 자동계산 결과 (분 단위) ──
+    actual_minutes: int = Field(default=0)
+    regular_minutes: int = Field(default=0)
+    overtime_minutes: int = Field(default=0)
+    night_minutes: int = Field(default=0)
+    holiday_work_minutes: int = Field(default=0)
+    holiday_overtime_minutes: int = Field(default=0)
+    holiday_night_minutes: int = Field(default=0)
+    is_holiday_work: bool = Field(default=False)
+    calculated_at: Optional[datetime] = None
+
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -1548,6 +1560,12 @@ class TimMonthClose(SQLModel, table=True):
     absent_days: int = Field(default=0)          # 결근 건수 합계
     late_days: int = Field(default=0)            # 지각 건수 합계
     leave_days: int = Field(default=0)           # 휴가 건수 합계
+    # ── 근무시간 집계 (분 단위) ──
+    total_overtime_minutes: int = Field(default=0)
+    total_night_minutes: int = Field(default=0)
+    total_holiday_work_minutes: int = Field(default=0)
+    total_holiday_overtime_minutes: int = Field(default=0)
+    total_holiday_night_minutes: int = Field(default=0)
     closed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
     closed_at: Optional[datetime] = None
     reopened_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")

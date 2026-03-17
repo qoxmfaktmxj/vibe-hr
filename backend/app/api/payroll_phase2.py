@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
+from sqlmodel import Session, select
 
-from app.core.auth import require_roles
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.models import AuthUser, HrEmployee
 from app.schemas.payroll_phase2 import (
     PayEmployeeProfileBatchRequest,
     PayEmployeeProfileBatchResponse,
     PayEmployeeProfileListResponse,
+    PayMyPayslipDetailResponse,
+    PayMyPayslipListResponse,
     PayPayrollRunActionResponse,
     PayPayrollRunCreateRequest,
     PayPayrollRunEmployeeDetailResponse,
@@ -24,8 +28,10 @@ from app.services.payroll_phase2_service import (
     calculate_payroll_run,
     close_payroll_run,
     create_payroll_run,
+    get_my_payslip_detail,
     get_payroll_run_employee_detail,
     list_employee_profiles,
+    list_my_payslips,
     list_payroll_run_employees,
     list_payroll_runs,
     list_variable_inputs,
@@ -178,3 +184,68 @@ def get_payroll_run_employee_detail_api(
     session: Session = Depends(get_session),
 ) -> PayPayrollRunEmployeeDetailResponse:
     return get_payroll_run_employee_detail(session, run_id, run_employee_id)
+
+
+# ── 셀프서비스: 본인 급여 조회 ──────────────────────────────────────────────────
+
+
+def _resolve_my_employee_id(session: Session, user: AuthUser) -> int:
+    emp = session.exec(select(HrEmployee).where(HrEmployee.user_id == user.id)).first()
+    if emp is None:
+        raise HTTPException(status_code=404, detail="직원 정보를 찾을 수 없습니다.")
+    return emp.id
+
+
+@router.get("/my/payslips", response_model=PayMyPayslipListResponse)
+def get_my_payslips(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> PayMyPayslipListResponse:
+    employee_id = _resolve_my_employee_id(session, current_user)
+    return list_my_payslips(session, employee_id)
+
+
+@router.get("/my/payslips/{run_id}", response_model=PayMyPayslipDetailResponse)
+def get_my_payslip_detail_api(
+    run_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> PayMyPayslipDetailResponse:
+    employee_id = _resolve_my_employee_id(session, current_user)
+    return get_my_payslip_detail(session, employee_id, run_id)
+
+
+@router.get("/my/payslips/{run_id}/pdf")
+def get_my_payslip_pdf(
+    run_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    from app.services.payslip_pdf_service import generate_payslip_pdf
+
+    employee_id = _resolve_my_employee_id(session, current_user)
+    pdf_bytes = generate_payslip_pdf(session, run_id, employee_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=payslip-{run_id}.pdf"},
+    )
+
+
+@router.get(
+    "/runs/{run_id}/employees/{employee_id}/pdf",
+    dependencies=[Depends(require_roles("payroll_mgr", "admin"))],
+)
+def get_admin_payslip_pdf(
+    run_id: int,
+    employee_id: int,
+    session: Session = Depends(get_session),
+) -> Response:
+    from app.services.payslip_pdf_service import generate_payslip_pdf
+
+    pdf_bytes = generate_payslip_pdf(session, run_id, employee_id)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=payslip-{run_id}-{employee_id}.pdf"},
+    )

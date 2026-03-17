@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import logging
 from calendar import monthrange
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlmodel import Session, select
+from sqlmodel import Session, col, func, select
 
 from app.core.time_utils import utc_now
-from app.models import AuthUser, HrAttendanceDaily, TimMonthClose
+from app.models import AuthUser, HrAttendanceDaily, HrEmployee, TimMonthClose
+from app.models.entities import PayEmployeeProfile, PayVariableInput
 from app.schemas.tim_month_close import (
     TimMonthCloseActionResponse,
     TimMonthCloseItem,
     TimMonthCloseListResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _get_display_name(session: Session, user_id: int | None) -> str | None:
@@ -33,6 +37,11 @@ def _to_item(session: Session, row: TimMonthClose) -> TimMonthCloseItem:
         absent_days=row.absent_days,
         late_days=row.late_days,
         leave_days=row.leave_days,
+        total_overtime_minutes=row.total_overtime_minutes,
+        total_night_minutes=row.total_night_minutes,
+        total_holiday_work_minutes=row.total_holiday_work_minutes,
+        total_holiday_overtime_minutes=row.total_holiday_overtime_minutes,
+        total_holiday_night_minutes=row.total_holiday_night_minutes,
         closed_by=row.closed_by,
         closed_by_name=_get_display_name(session, row.closed_by),
         closed_at=row.closed_at,
@@ -57,6 +66,11 @@ def _virtual_open(year: int, month: int) -> TimMonthCloseItem:
         absent_days=0,
         late_days=0,
         leave_days=0,
+        total_overtime_minutes=0,
+        total_night_minutes=0,
+        total_holiday_work_minutes=0,
+        total_holiday_overtime_minutes=0,
+        total_holiday_night_minutes=0,
         closed_by=None,
         closed_by_name=None,
         closed_at=None,
@@ -111,6 +125,7 @@ def _calc_aggregates(session: Session, year: int, month: int) -> dict[str, int]:
 
     employee_ids: set[int] = set()
     present = late = absent = leave = 0
+    tot_overtime = tot_night = tot_holiday_work = tot_holiday_overtime = tot_holiday_night = 0
 
     for r in rows:
         employee_ids.add(r.employee_id)
@@ -124,13 +139,123 @@ def _calc_aggregates(session: Session, year: int, month: int) -> dict[str, int]:
         elif s in ("leave", "half_day"):
             leave += 1
 
+        tot_overtime += r.overtime_minutes or 0
+        tot_night += r.night_minutes or 0
+        tot_holiday_work += r.holiday_work_minutes or 0
+        tot_holiday_overtime += r.holiday_overtime_minutes or 0
+        tot_holiday_night += r.holiday_night_minutes or 0
+
     return {
         "employee_count": len(employee_ids),
         "present_days": present,
         "late_days": late,
         "absent_days": absent,
         "leave_days": leave,
+        "total_overtime_minutes": tot_overtime,
+        "total_night_minutes": tot_night,
+        "total_holiday_work_minutes": tot_holiday_work,
+        "total_holiday_overtime_minutes": tot_holiday_overtime,
+        "total_holiday_night_minutes": tot_holiday_night,
     }
+
+
+_MONTHLY_STATUTORY_HOURS = 209  # 월 소정근로시간
+
+
+def _generate_pay_variable_inputs(session: Session, year: int, month: int) -> int:
+    """개인별 연장/야간/휴일 근무시간을 집계하여 PayVariableInput을 upsert한다.
+
+    Returns:
+        생성/갱신된 PayVariableInput 수
+    """
+    year_month = f"{year:04d}-{month:02d}"
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
+
+    # 개인별 연장/야간/휴일 합산
+    stmt = (
+        select(
+            HrAttendanceDaily.employee_id,
+            func.coalesce(func.sum(col(HrAttendanceDaily.overtime_minutes)), 0).label("overtime"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.night_minutes)), 0).label("night"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_work_minutes)), 0).label("holiday_work"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_overtime_minutes)), 0).label("holiday_overtime"),
+            func.coalesce(func.sum(col(HrAttendanceDaily.holiday_night_minutes)), 0).label("holiday_night"),
+        )
+        .where(
+            HrAttendanceDaily.work_date >= first_day,
+            HrAttendanceDaily.work_date <= last_day,
+        )
+        .group_by(HrAttendanceDaily.employee_id)
+    )
+    per_employee = session.exec(stmt).all()
+
+    count = 0
+    for row in per_employee:
+        emp_id = row[0]
+        overtime_min = int(row[1])
+        night_min = int(row[2])
+        holiday_work_min = int(row[3])
+        holiday_overtime_min = int(row[4])
+        holiday_night_min = int(row[5])
+
+        # base_hourly 계산: base_salary / 209
+        profile = session.exec(
+            select(PayEmployeeProfile)
+            .where(
+                PayEmployeeProfile.employee_id == emp_id,
+                PayEmployeeProfile.is_active == True,  # noqa: E712
+                PayEmployeeProfile.effective_from <= last_day,
+            )
+            .order_by(PayEmployeeProfile.effective_from.desc())
+            .limit(1)
+        ).first()
+
+        if profile is None or profile.base_salary <= 0:
+            continue
+
+        base_hourly = profile.base_salary / _MONTHLY_STATUTORY_HOURS
+
+        # (item_code, direction, minutes, multiplier)
+        items = [
+            ("OTX", "earning", overtime_min, 1.5),
+            ("NGT", "earning", night_min, 0.5),
+            ("HDW", "earning", holiday_work_min, 1.5),
+            ("HDO", "earning", holiday_overtime_min, 2.0),
+            ("HDN", "earning", holiday_night_min, 2.0),
+        ]
+
+        for item_code, direction, minutes, multiplier in items:
+            amount = round(base_hourly * multiplier * (minutes / 60), 0) if minutes > 0 else 0
+
+            existing = session.exec(
+                select(PayVariableInput).where(
+                    PayVariableInput.year_month == year_month,
+                    PayVariableInput.employee_id == emp_id,
+                    PayVariableInput.item_code == item_code,
+                )
+            ).first()
+
+            if existing:
+                existing.amount = amount
+                existing.direction = direction
+                existing.memo = f"월마감 자동생성 ({minutes}분)"
+            else:
+                if amount <= 0:
+                    continue
+                session.add(
+                    PayVariableInput(
+                        year_month=year_month,
+                        employee_id=emp_id,
+                        item_code=item_code,
+                        direction=direction,
+                        amount=amount,
+                        memo=f"월마감 자동생성 ({minutes}분)",
+                    )
+                )
+            count += 1
+
+    return count
 
 
 def close_month(
@@ -152,6 +277,12 @@ def close_month(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"{year}년 {month}월은 이미 마감 상태입니다.",
         )
+
+    # 마감 전 미계산 레코드 보정
+    from app.services.tim_work_hours_calc_service import recalculate_month
+    recalc_count = recalculate_month(session, year, month)
+    if recalc_count > 0:
+        logger.info("월마감 전 근무시간 재계산: %d건", recalc_count)
 
     agg = _calc_aggregates(session, year, month)
     now = utc_now()
@@ -177,6 +308,11 @@ def close_month(
         row.updated_at = now
         for k, v in agg.items():
             setattr(row, k, v)
+
+    # 개인별 연장/야간/휴일 → PayVariableInput 자동 생성
+    vi_count = _generate_pay_variable_inputs(session, year, month)
+    if vi_count > 0:
+        logger.info("PayVariableInput 자동생성: %d건", vi_count)
 
     session.commit()
     session.refresh(row)

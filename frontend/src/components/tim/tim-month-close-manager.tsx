@@ -178,6 +178,9 @@ export function TimMonthCloseManager() {
                   <th className="py-2.5 pr-4 text-right font-medium text-slate-600">결근</th>
                   <th className="py-2.5 pr-4 text-right font-medium text-slate-600">지각</th>
                   <th className="py-2.5 pr-4 text-right font-medium text-slate-600">휴가</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">연장(h)</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">야간(h)</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">휴일(h)</th>
                   <th className="py-2.5 pl-4 text-left font-medium text-slate-600">마감자 / 일시</th>
                   <th className="py-2.5 pl-4 text-left font-medium text-slate-600">메모</th>
                   <th className="py-2.5 pr-4 text-right font-medium text-slate-600">처리</th>
@@ -228,6 +231,16 @@ export function TimMonthCloseManager() {
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums text-blue-600">
                         {item ? (item.leave_days > 0 ? item.leave_days.toLocaleString() : "-") : "-"}
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-violet-600">
+                        {item ? (item.total_overtime_minutes > 0 ? (item.total_overtime_minutes / 60).toFixed(1) : "-") : "-"}
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-indigo-600">
+                        {item ? (item.total_night_minutes > 0 ? (item.total_night_minutes / 60).toFixed(1) : "-") : "-"}
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-orange-600">
+                        {item ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) > 0
+                          ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) / 60).toFixed(1) : "-") : "-"}
                       </td>
                       <td className="py-3 pl-4 text-xs text-slate-500">
                         {isClosed && item ? (

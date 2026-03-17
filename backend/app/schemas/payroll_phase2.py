@@ -174,3 +174,30 @@ class PayPayrollRunEmployeeDetailItem(BaseModel):
 class PayPayrollRunEmployeeDetailResponse(BaseModel):
     employee: PayPayrollRunEmployeeItem
     items: list[PayPayrollRunEmployeeDetailItem]
+
+
+# ── 셀프서비스 급여 조회 ──
+
+class PayMyPayslipSummary(BaseModel):
+    """본인 급여 이력 목록 아이템"""
+    run_id: int
+    run_employee_id: int
+    year_month: str
+    run_name: str | None = None
+    run_status: str
+    gross_pay: float
+    taxable_income: float
+    non_taxable_income: float
+    total_deductions: float
+    net_pay: float
+    paid_at: datetime | None = None
+
+
+class PayMyPayslipListResponse(BaseModel):
+    items: list[PayMyPayslipSummary]
+    total_count: int
+
+
+class PayMyPayslipDetailResponse(BaseModel):
+    summary: PayMyPayslipSummary
+    items: list[PayPayrollRunEmployeeDetailItem]
