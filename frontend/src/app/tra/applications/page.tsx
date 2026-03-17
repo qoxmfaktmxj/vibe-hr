@@ -3,7 +3,7 @@ import { requireMenuAccess } from "@/lib/guard";
 
 export const GRID_SCREEN = {
   engine: "ag-grid",
-  profile: "standard-v2",
+  profile: "standard-v1",
   registryKey: "tra.applications",
 } as const;
 

@@ -15,7 +15,7 @@ from app.api.hr_retire import router as hr_retire_router
 from app.api.hr_appointment_code import router as hr_appointment_code_router
 from app.api.hr_appointment_record import router as hr_appointment_record_router
 from app.api.hr_recruit import router as hr_recruit_router
-from app.api.pap_appraisal import router as pap_appraisal_router
+from app.api.pap_appraisal import router as pap_appraisal_router, targets_router as pap_targets_router
 from app.api.pap_final_result import router as pap_final_result_router
 from app.api.tim_attendance_code import router as tim_attendance_code_router
 from app.api.tim_work_schedule import router as tim_work_schedule_router
@@ -77,6 +77,7 @@ app.include_router(hr_appointment_code_router, prefix="/api/v1")
 app.include_router(hr_appointment_record_router, prefix="/api/v1")
 app.include_router(hr_recruit_router, prefix="/api/v1")
 app.include_router(pap_appraisal_router, prefix="/api/v1")
+app.include_router(pap_targets_router, prefix="/api/v1")
 app.include_router(pap_final_result_router, prefix="/api/v1")
 app.include_router(tim_attendance_code_router, prefix="/api/v1")
 app.include_router(tim_work_schedule_router, prefix="/api/v1")

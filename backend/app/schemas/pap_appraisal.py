@@ -58,3 +58,49 @@ class PapAppraisalUpdateRequest(BaseModel):
     is_active: bool | None = None
     sort_order: int | None = None
     description: str | None = Field(default=None, max_length=500)
+
+
+# ─── Appraisal Target schemas ─────────────────────────────────────────────────
+
+
+class PapAppraisalTargetItem(BaseModel):
+    id: int
+    appraisal_id: int
+    appraisal_name: str | None
+    employee_id: int
+    employee_no: str | None
+    employee_name: str | None
+    department_name: str | None
+    score: float | None
+    grade_code: str | None
+    evaluator_note: str | None
+    status: str
+    evaluated_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PapAppraisalTargetListResponse(BaseModel):
+    items: list[PapAppraisalTargetItem]
+    total_count: int
+
+
+class PapAppraisalTargetBatchRow(BaseModel):
+    id: int | None = None
+    appraisal_id: int | None = None
+    employee_id: int | None = None
+    score: float | None = None
+    grade_code: str | None = Field(default=None, max_length=30)
+    evaluator_note: str | None = Field(default=None, max_length=2000)
+    status: str | None = Field(default=None, max_length=20)
+    _status: str = "clean"
+
+
+class PapAppraisalTargetBatchRequest(BaseModel):
+    items: list[PapAppraisalTargetBatchRow]
+
+
+class PapAppraisalTargetBatchResponse(BaseModel):
+    created: int
+    updated: int
+    deleted: int

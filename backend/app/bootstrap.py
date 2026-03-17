@@ -522,6 +522,14 @@ MENU_TREE: list[dict] = [
                 "sort_order": 252,
                 "roles": ["hr_manager", "admin"],
             },
+            {
+                "code": "pap.targets",
+                "name": "\uD3C9\uAC00 \uB300\uC0C1\uC790 \uAD00\uB9AC",
+                "path": "/pap/targets",
+                "icon": "Users",
+                "sort_order": 253,
+                "roles": ["hr_manager", "admin"],
+            },
         ],
     },
     {
@@ -546,7 +554,9 @@ MENU_TREE: list[dict] = [
                     {"code": "org.types", "name": "조직구분", "path": "/org/types", "icon": "FolderTree", "sort_order": 305, "roles": ["hr_manager", "admin"]},
                     {"code": "org.type-items", "name": "조직구분항목", "path": "/org/type-items", "icon": "FolderTree", "sort_order": 306, "roles": ["hr_manager", "admin"]},
                     {"code": "org.type-upload", "name": "조직구분업로드", "path": "/org/type-upload", "icon": "FolderTree", "sort_order": 307, "roles": ["hr_manager", "admin"]},
-                    {"code": "org.type-personal-status", "name": "조직구분개인별현황", "path": "/org/type-personal-status", "icon": "FolderTree", "sort_order": 308, "roles": ["hr_manager", "admin"]}
+                    {"code": "org.type-personal-status", "name": "조직구분개인별현황", "path": "/org/type-personal-status", "icon": "FolderTree", "sort_order": 308, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.restructure", "name": "조직개편안관리", "path": "/org/restructure", "icon": "GitMerge", "sort_order": 309, "roles": ["hr_manager", "admin"]},
+                    {"code": "org.dept-history", "name": "부서변경이력", "path": "/org/dept-history", "icon": "History", "sort_order": 310, "roles": ["hr_manager", "admin"]}
                 ],
             },
         ],
@@ -690,8 +700,9 @@ MENU_TREE: list[dict] = [
         "sort_order": 600,
         "roles": ["employee", "hr_manager", "admin"],
         "children": [
+            {"code": "tra.my-applications", "name": "나의 교육 신청", "path": "/tra/my-applications", "icon": "BookOpen", "sort_order": 600, "roles": ["employee", "hr_manager", "admin"]},
             {"code": "tra.course-events", "name": "과정/차수 관리", "path": "/tra/course-events", "icon": "ListOrdered", "sort_order": 601, "roles": ["employee", "hr_manager", "admin"]},
-            {"code": "tra.applications", "name": "교육신청 관리", "path": "/tra/applications", "icon": "ListOrdered", "sort_order": 602, "roles": ["employee", "hr_manager", "admin"]},
+            {"code": "tra.applications", "name": "교육신청 승인 관리", "path": "/tra/applications", "icon": "ListOrdered", "sort_order": 602, "roles": ["hr_manager", "admin"]},
             {"code": "tra.required-standards", "name": "필수교육 기준", "path": "/tra/required-standards", "icon": "ListOrdered", "sort_order": 603, "roles": ["employee", "hr_manager", "admin"]},
             {"code": "tra.required-targets", "name": "필수교육 대상", "path": "/tra/required-targets", "icon": "ListOrdered", "sort_order": 604, "roles": ["employee", "hr_manager", "admin"]},
             {"code": "tra.elearning-windows", "name": "이러닝 기간", "path": "/tra/elearning-windows", "icon": "ListOrdered", "sort_order": 605, "roles": ["employee", "hr_manager", "admin"]},

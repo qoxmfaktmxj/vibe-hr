@@ -687,6 +687,31 @@ class PapAppraisalMaster(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class PapAppraisalTarget(SQLModel, table=True):
+    """평가 대상자 — PAP_APPRAISAL_MASTERS 1:N hr_employees"""
+
+    __tablename__ = "pap_appraisal_targets"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'evaluated', 'finalized')",
+            name="ck_pap_appraisal_targets_status",
+        ),
+        Index("ix_pap_appraisal_targets_appraisal_id", "appraisal_id"),
+        Index("ix_pap_appraisal_targets_employee_id", "employee_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    appraisal_id: int = Field(foreign_key="PAP_APPRAISAL_MASTERS.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    score: Optional[float] = None
+    grade_code: Optional[str] = Field(default=None, max_length=30)
+    evaluator_note: Optional[str] = Field(default=None, max_length=2000)
+    status: str = Field(default="pending", max_length=20)
+    evaluated_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class HrLeaveRequest(SQLModel, table=True):
     __tablename__ = "tim_leave_requests"
     __table_args__ = (
@@ -1502,6 +1527,34 @@ class TimEmployeeDailySchedule(SQLModel, table=True):
     is_overnight: bool = Field(default=False)
     generated_at: datetime = Field(default_factory=utc_now)
     version_tag: Optional[str] = Field(default=None, max_length=50)
+
+
+class TimMonthClose(SQLModel, table=True):
+    """근태 월마감 — 특정 년/월을 확정(잠금) 처리"""
+
+    __tablename__ = "tim_month_closes"
+    __table_args__ = (
+        UniqueConstraint("year", "month", name="uq_tim_month_closes_ym"),
+        CheckConstraint("month BETWEEN 1 AND 12", name="ck_tim_month_closes_month"),
+        CheckConstraint("close_status IN ('open','closed')", name="ck_tim_month_closes_status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int = Field(index=True)
+    month: int  # 1-12
+    close_status: str = Field(default="open", max_length=10)  # open | closed
+    employee_count: int = Field(default=0)       # 마감 시점 집계 인원
+    present_days: int = Field(default=0)         # 출근 건수 합계
+    absent_days: int = Field(default=0)          # 결근 건수 합계
+    late_days: int = Field(default=0)            # 지각 건수 합계
+    leave_days: int = Field(default=0)           # 휴가 건수 합계
+    closed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    closed_at: Optional[datetime] = None
+    reopened_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    reopened_at: Optional[datetime] = None
+    note: Optional[str] = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 # ──────────────────────────────────────────────────────────────────────
