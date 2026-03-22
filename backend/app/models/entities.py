@@ -783,8 +783,6 @@ class PapAppraisalTarget(SQLModel, table=True):
             "status IN ('pending', 'evaluated', 'finalized')",
             name="ck_pap_appraisal_targets_status",
         ),
-        Index("ix_pap_appraisal_targets_appraisal_id", "appraisal_id"),
-        Index("ix_pap_appraisal_targets_employee_id", "employee_id"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
