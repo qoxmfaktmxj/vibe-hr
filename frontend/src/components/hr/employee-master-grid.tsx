@@ -217,9 +217,15 @@ export function buildEmployeeMasterColumnDefs({
       width: 80,
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: "agSelectCellEditor",
-      cellEditorParams: { values: ["Y", "N"] },
+      cellEditorParams: {
+        values: [true, false],
+        formatValue: (value: boolean) => (value ? "Y" : "N"),
+      },
       valueFormatter: (params) => (params.value ? "Y" : "N"),
-      valueParser: (params) => params.newValue === "Y",
+      valueParser: (params) => {
+        if (typeof params.newValue === "boolean") return params.newValue;
+        return String(params.newValue ?? "Y") === "Y";
+      },
     },
     {
       headerName: labels.colPassword,
