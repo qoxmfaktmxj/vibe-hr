@@ -54,3 +54,41 @@
 1) 사원/공통코드/조직코드 3화면에 액션 권한 적용
 2) 메뉴권한관리 UI에 액션 매트릭스 탭 추가
 3) 나머지 AG Grid 화면 순차 편입
+
+## 7. Pilot 확정 범위 (2026-03-22)
+### 대상 화면
+1. `hr.employee` (`/hr/employee`)
+2. `org.departments` (`/org/departments`)
+3. `settings.common-codes` (`/settings/common-codes`)
+
+### 적용 순서
+1. `hr.employee`
+2. `org.departments`
+3. `settings.common-codes`
+
+### 이유
+- 세 화면 모두 frontend에 `useMenuActions(path)` 기반 gating 구조가 이미 존재한다. [Observed]
+- 표준 단일 CRUD / 조직 도메인 표준형 / 복합형 마스터-디테일의 3가지 패턴을 커버한다. [Derived]
+- 이후 다수의 AG Grid 화면에 확장 가능한 rollout 기준점이 된다. [Derived]
+
+## 8. Pilot 구현 결과
+### 완료된 것
+- backend 메뉴 액션 권한 helper 추가
+- `employee`, `organization(departments)`, `common_code` API에 `query`/`save` action gate 연결
+- pilot 범위 단위 테스트 추가 (`backend/tests/test_menu_action_permission_unit.py`)
+
+### 검증 결과
+- targeted backend permission pytest: passed (dockerized python test run) [Observed]
+- `scripts/check-risk-paths.py` 실행: passed, permission-related R2 signal 확인 [Observed]
+- `guardrails.yml` actionlint: passed [Observed]
+- frontend `validate:grid`: failed, but pilot 변경과 무관한 기존 baseline 이슈 확인 [Observed]
+
+## 9. Rollout Checklist
+다음 화면에 액션 권한을 붙일 때 아래를 확인한다.
+- 메뉴 path / menu code가 실제 registry 및 route와 일치하는가
+- frontend에서 `useMenuActions(path)`를 사용하고 있는가
+- toolbar action key와 표준 action code(`query/create/copy/template_download/upload/save/download`) 매핑이 일치하는가
+- 권한 없는 action이 hide / disable / click block 중 어떤 방식으로 처리되는지 일관적인가
+- 저장/업로드/다운로드 관련 backend endpoint에 action-level enforcement가 있는가
+- `validate:grid` / lint / build / backend tests / 수동 검증 중 어떤 검증을 적용했는가
+- 결과를 `docs/TASK_LEDGER.md`에 기록했는가

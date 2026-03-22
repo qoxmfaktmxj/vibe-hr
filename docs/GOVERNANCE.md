@@ -44,7 +44,19 @@ Confidence: Medium
 ### Projection 원칙
 - 정책 원문은 canonical 문서에만 상세히 적는다. [Proposal]
 - tool-specific 규칙은 Layer 4에서 projection으로 만든다. [Proposal]
-- `AGENTS.md`는 실행 surface이며, 세부 정책은 본 문서를 참조한다. [Proposal]
+- `AGENTS.md`는 Codex/OMX 실행 surface이며, 세부 정책은 본 문서를 참조한다. [Proposal]
+- `CLAUDE.md`는 Claude 계열 도구용 projection이다. [Observed][Proposal]
+
+### Layer 4 현재 결정
+- Codex/OMX projection: `AGENTS.md`를 primary execution surface로 유지한다. [Observed][Proposal]
+- Claude projection: `CLAUDE.md`를 유지한다. [Observed]
+- Risk-path enforcement: `scripts/check-risk-paths.py`를 사용한다. [Observed]
+- CI adapter: `.github/workflows/guardrails.yml`를 사용한다. [Observed]
+- 현재 guardrails 모드: **warning-only** [Observed][Proposal]
+- warning-only 유지 이유:
+  - 현재는 solo 개발 + `main` 운영 구조다. [User-stated]
+  - repo baseline의 `validate:grid`가 unrelated 기존 이슈로 실패하고 있어 hard gate 전환 시 개발 흐름을 과도하게 막을 수 있다. [Observed][Derived]
+  - baseline grid 이슈가 정리되기 전까지는 경고/요약 중심이 더 적절하다. [Proposal]
 
 ## 운영 모드와 전이 규칙
 ### 1) Discovery Mode

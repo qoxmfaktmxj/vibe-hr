@@ -20,6 +20,21 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _create_permission_tables(engine) -> None:
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            AuthUser.__table__,
+            AuthRole.__table__,
+            AuthUserRole.__table__,
+            AppMenu.__table__,
+            AppMenuRole.__table__,
+            AppMenuAction.__table__,
+            AppRoleMenuAction.__table__,
+        ],
+    )
+
+
 def _seed_permission_context(
     session: Session,
     *,
@@ -99,7 +114,7 @@ def _seed_permission_context(
 
 def test_get_allowed_menu_actions_for_user_applies_role_overrides() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -124,7 +139,7 @@ def test_get_allowed_menu_actions_for_user_applies_role_overrides() -> None:
 
 def test_employee_list_denies_when_query_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -155,7 +170,7 @@ def test_employee_list_denies_when_query_permission_is_missing() -> None:
 
 def test_employee_batch_save_denies_when_save_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -176,7 +191,7 @@ def test_employee_batch_save_denies_when_save_permission_is_missing() -> None:
 
 def test_organization_departments_denies_when_query_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -207,7 +222,7 @@ def test_organization_departments_denies_when_query_permission_is_missing() -> N
 
 def test_organization_department_create_denies_when_save_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -232,7 +247,7 @@ def test_organization_department_create_denies_when_save_permission_is_missing()
 
 def test_code_groups_denies_when_query_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
@@ -260,7 +275,7 @@ def test_code_groups_denies_when_query_permission_is_missing() -> None:
 
 def test_code_group_create_denies_when_save_permission_is_missing() -> None:
     engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
+    _create_permission_tables(engine)
 
     with Session(engine) as session:
         user = _seed_permission_context(
