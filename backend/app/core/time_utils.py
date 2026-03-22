@@ -18,6 +18,11 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def utc_now() -> datetime:
+    """Backward-compatible alias for legacy imports expecting `utc_now`."""
+    return now_utc()
+
+
 def now_local() -> datetime:
     """업무 기준 타임존(KST) 현재 시각."""
     return now_utc().astimezone(APP_TZ)
