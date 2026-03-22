@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete as sa_delete
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.core.security import hash_password
