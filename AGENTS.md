@@ -42,6 +42,11 @@ This `AGENTS.md` is the primary execution surface for Codex/OMX in this repo. It
 - Architecture / domains / hotspots: `docs/ARCHITECTURE.md`
 - Testing / validation requirements: `docs/TEST_STRATEGY.md`
 - Execution loop / batch / failure handling: `docs/EXECUTION_PROTOCOL.md`
+- Quality score / readiness: `docs/QUALITY_SCORE.md`
+- Security / protected changes: `docs/SECURITY.md`
+- Observability / runtime signals: `docs/OBSERVABILITY.md`
+- Sub-agent structure: `docs/SUB_AGENTS.md`
+- Skill index / automation hints: `docs/SKILLS_INDEX.md`
 - Work evidence / task trace: `docs/TASK_LEDGER.md`
 - AG Grid standard: `docs/GRID_SCREEN_STANDARD.md`
 - Menu / action permission plan: `docs/MENU_ACTION_PERMISSION_PLAN.md`

@@ -39,6 +39,13 @@ Confidence: Medium
 - to: TBD
 - task_count: TBD
 
+## 현재 시드 관측 (2026-03-22)
+아래는 초깃값 관측이며 strong signal로 간주하지 않는다.
+- permission pilot 관련 ledger entry가 생성됨
+- backend boot blocker 복구 작업이 누적됨
+- manual deploy 전환이 완료됨
+- browser/manual 검증 항목이 쌓이기 시작함
+
 ## Segmentation
 반드시 아래 기준으로 분리해 본다.
 - by_risk: R0 / R1 / R2 / R3

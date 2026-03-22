@@ -170,6 +170,14 @@ Confidence: Medium
 - 의미 없는 대량 수정은 피한다.
 - 각 배치의 의도를 남긴다.
 - 민감 구역은 검증 없이 연속 수정하지 않는다.
+- multi-step 또는 multi-agent 작업은 각 배치의 owner와 expected output을 남긴다.
+
+### Step 3.5 — Fan-in Rules
+멀티에이전트 또는 다단계 작업은 최종 병합 전에 아래를 확인한다.
+- 어떤 변경이 merge 대상인지
+- 충돌 파일이 무엇인지
+- 최종 verifier가 무엇을 확인해야 하는지
+- human review가 필요한 조건이 남았는지
 
 ### Step 4 — Verification Checkpoint
 각 배치 후 가능한 한 확인한다.
