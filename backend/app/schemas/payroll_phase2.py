@@ -176,6 +176,50 @@ class PayPayrollRunEmployeeDetailResponse(BaseModel):
     items: list[PayPayrollRunEmployeeDetailItem]
 
 
+class PayRunTargetSnapshotItem(BaseModel):
+    employee_id: int
+    employee_no: str | None = None
+    employee_name: str | None = None
+    department_id: int | None = None
+    department_name: str | None = None
+    position_title: str | None = None
+    hire_date: str | None = None
+    employment_status: str | None = None
+    retire_date: str | None = None
+    profile_id: int | None = None
+    payroll_code_id: int | None = None
+    item_group_id: int | None = None
+    base_salary: float | None = None
+    pay_type_code: str | None = None
+    payment_day_type: str | None = None
+    payment_day_value: int | None = None
+    holiday_adjustment: str | None = None
+    effective_from: str | None = None
+    effective_to: str | None = None
+    period_start: str | None = None
+    period_end: str | None = None
+    event_count: int = 0
+    review_required: bool = False
+
+
+class PayRunTargetEventItem(BaseModel):
+    id: int
+    event_code: str | None = None
+    event_name: str | None = None
+    source_type: str | None = None
+    source_table: str | None = None
+    source_id: int | None = None
+    effective_date: date | None = None
+    decision_code: str | None = None
+    payload_json: dict | list | str | int | float | bool | None = None
+    created_at: datetime
+
+
+class PayRunTargetDetailResponse(BaseModel):
+    snapshot: PayRunTargetSnapshotItem
+    events: list[PayRunTargetEventItem]
+
+
 # ── 셀프서비스 급여 조회 ──
 
 class PayMyPayslipSummary(BaseModel):
