@@ -1,0 +1,102 @@
+name: Guardrails (Draft Warning Mode)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  classify-risk-paths:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve diff base/head
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
+            echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Classify changed paths
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check-risk-paths.py \
+            --base "${{ steps.refs.outputs.base }}" \
+            --head "${{ steps.refs.outputs.head }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Warn on shared grid change
+        if: steps.classify.outputs.grid_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Shared Grid or registry change detected. Why protected: it can affect multiple screens. How to fix: run 'cd frontend && npm run validate:grid && npm run lint && npm run build' and keep regression evidence. Docs: docs/GRID_SCREEN_STANDARD.md, docs/TEST_STRATEGY.md, docs/GOVERNANCE.md"
+
+      - name: Warn on menu / permission change
+        if: steps.classify.outputs.permission_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Menu/permission path change detected. Why protected: UI hiding is not enough; server-side enforcement must also hold. How to fix: verify both UI behavior and server checks. Docs: docs/MENU_ACTION_PERMISSION_PLAN.md, docs/GOVERNANCE.md, docs/TEST_STRATEGY.md"
+
+      - name: Warn on auth change
+        if: steps.classify.outputs.auth_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Auth path change detected. Why protected: auth/authz is an R3 area. How to fix: require explicit approval and attach auth regression evidence. Docs: docs/GOVERNANCE.md, docs/TEST_STRATEGY.md, docs/TASK_LEDGER.md"
+
+      - name: Warn on payroll change
+        if: steps.classify.outputs.payroll_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Payroll path change detected. Why protected: financial semantics may change. How to fix: require explicit approval, verify representative seed cases, and document rollback/stop conditions. Docs: docs/GOVERNANCE.md, docs/TEST_STRATEGY.md, docs/TASK_LEDGER.md"
+
+      - name: Warn on deploy / infra change
+        if: steps.classify.outputs.deploy_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Deploy/infra path change detected. Why protected: current main-based deployment flow can be affected directly. How to fix: require explicit approval and describe main impact, health check, and rollback note. Docs: docs/GOVERNANCE.md, docs/TASK_LEDGER.md"
+
+      - name: Recommend backend verification
+        if: steps.classify.outputs.backend_changed == 'true'
+        shell: bash
+        run: |
+          echo "::notice::Backend changes detected. Recommended validation: 'cd backend && pytest'. Docs: docs/TEST_STRATEGY.md"
+
+      - name: Draft summary
+        shell: bash
+        run: |
+          {
+            echo "## Guardrails Draft Summary"
+            echo ""
+            echo "- This workflow is currently warning-only and does not block merges by itself."
+            echo "- Canonical policy lives in docs/GOVERNANCE.md, docs/ARCHITECTURE.md, docs/TEST_STRATEGY.md, docs/TASK_LEDGER.md."
+            echo "- If R3 paths changed, treat this as a human review signal even if the workflow passes."
+            echo ""
+            echo "### Changed Path Signals"
+            echo "- grid_changed: ${{ steps.classify.outputs.grid_changed }}"
+            echo "- permission_changed: ${{ steps.classify.outputs.permission_changed }}"
+            echo "- auth_changed: ${{ steps.classify.outputs.auth_changed }}"
+            echo "- payroll_changed: ${{ steps.classify.outputs.payroll_changed }}"
+            echo "- deploy_changed: ${{ steps.classify.outputs.deploy_changed }}"
+            echo "- backend_changed: ${{ steps.classify.outputs.backend_changed }}"
+            echo "- r3_changed: ${{ steps.classify.outputs.r3_changed }}"
+          } >> "$GITHUB_STEP_SUMMARY"

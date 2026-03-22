@@ -50,6 +50,7 @@ from app.services.organization_service import (
     update_corporation,
     update_department,
 )
+from app.services.menu_service import require_menu_action_for_user
 
 router = APIRouter(prefix="/org", tags=["organization"])
 
@@ -152,7 +153,9 @@ def organization_departments(
     cost_center_code: str | None = Query(default=None),
     reference_date: date | None = Query(default=None),
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> OrganizationDepartmentListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/departments", action_code="query")
     if all:
         departments, total_count = list_departments(
             session,
@@ -194,7 +197,9 @@ def organization_departments(
 def organization_department_create(
     payload: OrganizationDepartmentCreateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> OrganizationDepartmentDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/departments", action_code="save")
     department = create_department(session, payload)
     return OrganizationDepartmentDetailResponse(department=department)
 
@@ -210,6 +215,7 @@ def organization_department_update(
     session: Session = Depends(get_session),
     current_user: AuthUser = Depends(get_current_user),
 ) -> OrganizationDepartmentDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/departments", action_code="save")
     department = update_department(session, department_id, payload, changed_by=current_user.id)
     return OrganizationDepartmentDetailResponse(department=department)
 
@@ -222,7 +228,9 @@ def organization_department_update(
 def organization_department_delete(
     department_id: int,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/departments", action_code="save")
     delete_department(session, department_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

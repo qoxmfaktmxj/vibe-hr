@@ -35,6 +35,52 @@ Keep runtime marker contracts stable and non-destructive when overlays are appli
 <!-- OMX:GUIDANCE:OPERATING:END -->
 </operating_principles>
 
+## Canonical source map
+This `AGENTS.md` is the primary execution surface for Codex/OMX in this repo. It is not the only policy document. Canonical detail lives in the docs below; avoid duplicating long policy text here.
+
+- Governance / approvals / risk classes: `docs/GOVERNANCE.md`
+- Architecture / domains / hotspots: `docs/ARCHITECTURE.md`
+- Testing / validation requirements: `docs/TEST_STRATEGY.md`
+- Execution loop / batch / failure handling: `docs/EXECUTION_PROTOCOL.md`
+- Work evidence / task trace: `docs/TASK_LEDGER.md`
+- AG Grid standard: `docs/GRID_SCREEN_STANDARD.md`
+- Menu / action permission plan: `docs/MENU_ACTION_PERMISSION_PLAN.md`
+- Discovery / harness bootstrap context: `docs/harness/DISCOVERY_PACKET.md`
+
+## Execution summary
+Before changes:
+1. Read the relevant canonical docs.
+2. Determine risk class (`R0` / `R1` / `R2` / `R3`).
+3. If the work is `R2` or `R3`, stop and require explicit approval before changing code.
+4. Make the smallest viable change.
+5. Run required validation.
+6. Keep completion evidence consistent with `docs/TASK_LEDGER.md`.
+
+## Risk summary
+- `R0`: docs / low-risk non-executable changes
+- `R1`: local low-risk code changes with validation
+- `R2`: shared contracts / CI / permission flow / shared grid rules → approval required
+- `R3`: auth, payroll semantics, DB schema/migration, deploy/infra, secrets → explicit approval required
+
+## Sensitive paths (quick view)
+- `frontend/src/components/grid/**`
+- `frontend/src/lib/grid/**`
+- `config/grid-screens.json`
+- `backend/app/api/auth.py`
+- `backend/app/core/auth.py`
+- `backend/app/schemas/auth.py`
+- `backend/app/services/auth_service.py`
+- `backend/app/api/payroll_phase2.py`
+- `backend/app/services/payroll_phase2_service.py`
+- `backend/app/schemas/payroll_phase2.py`
+- `backend/app/api/menu.py`
+- `backend/app/services/menu_service.py`
+- `backend/app/schemas/menu.py`
+- `.github/workflows/**`
+- `docker-compose.deploy.yml`
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
+
 ## Working agreements
 
 ### VIBE-HR mandatory AG Grid rules

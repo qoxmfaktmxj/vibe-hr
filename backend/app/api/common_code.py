@@ -3,8 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlmodel import Session
 
-from app.core.auth import require_roles
+from app.core.auth import get_current_user, require_roles
 from app.core.database import get_session
+from app.models import AuthUser
 from app.schemas.common_code import (
     ActiveCodeListResponse,
     CodeCreateRequest,
@@ -27,6 +28,7 @@ from app.services.common_code_service import (
     update_code,
     update_code_group,
 )
+from app.services.menu_service import require_menu_action_for_user
 
 router = APIRouter(prefix="/codes", tags=["common-codes"])
 
@@ -43,7 +45,9 @@ def code_groups(
     code: str | None = Query(default=None),
     name: str | None = Query(default=None),
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeGroupListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="query")
     groups, total_count = list_code_groups(
         session,
         page=None if all else page,
@@ -68,7 +72,9 @@ def code_groups(
 def code_group_create(
     payload: CodeGroupCreateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeGroupDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     return CodeGroupDetailResponse(group=create_code_group(session, payload))
 
 
@@ -81,7 +87,9 @@ def code_group_update(
     group_id: int,
     payload: CodeGroupUpdateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeGroupDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     return CodeGroupDetailResponse(group=update_code_group(session, group_id, payload))
 
 
@@ -90,7 +98,12 @@ def code_group_update(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles("admin"))],
 )
-def code_group_delete(group_id: int, session: Session = Depends(get_session)) -> Response:
+def code_group_delete(
+    group_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     delete_code_group(session, group_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -108,7 +121,9 @@ def code_list(
     code: str | None = Query(default=None),
     name: str | None = Query(default=None),
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="query")
     codes, total_count = list_codes(
         session,
         group_id,
@@ -135,7 +150,9 @@ def code_create(
     group_id: int,
     payload: CodeCreateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     return CodeDetailResponse(code=create_code(session, group_id, payload))
 
 
@@ -149,7 +166,9 @@ def code_update(
     code_id: int,
     payload: CodeUpdateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> CodeDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     return CodeDetailResponse(code=update_code(session, group_id, code_id, payload))
 
 
@@ -158,7 +177,13 @@ def code_update(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles("admin"))],
 )
-def code_delete(group_id: int, code_id: int, session: Session = Depends(get_session)) -> Response:
+def code_delete(
+    group_id: int,
+    code_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/settings/common-codes", action_code="save")
     delete_code(session, group_id, code_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

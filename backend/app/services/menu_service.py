@@ -314,6 +314,24 @@ def get_allowed_menu_actions_for_user(
     return {action_code: bool(allowed_by_code.get(action_code, False)) for action_code in STANDARD_MENU_ACTION_CODES}
 
 
+def require_menu_action_for_user(
+    session: Session,
+    *,
+    user_id: int,
+    action_code: str,
+    menu_code: str | None = None,
+    path: str | None = None,
+) -> None:
+    allowed = get_allowed_menu_actions_for_user(
+        session,
+        user_id=user_id,
+        menu_code=menu_code,
+        path=path,
+    )
+    if not allowed.get(action_code, False):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Action not allowed.")
+
+
 def _get_role_or_404(session: Session, role_id: int) -> AuthRole:
     role = session.get(AuthRole, role_id)
     if role is None:

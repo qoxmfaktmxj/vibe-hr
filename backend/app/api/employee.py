@@ -22,6 +22,7 @@ from app.services.employee_service import (
     list_employees,
     update_employee,
 )
+from app.services.menu_service import require_menu_action_for_user
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 
@@ -41,7 +42,9 @@ def employee_list(
     employment_status: str | None = Query(default=None),
     active: bool | None = Query(default=None),
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> EmployeeListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="query")
     if all:
         employees, total_count = list_employees(
             session,
@@ -71,7 +74,11 @@ def employee_list(
     response_model=DepartmentListResponse,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
-def employee_departments(session: Session = Depends(get_session)) -> DepartmentListResponse:
+def employee_departments(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> DepartmentListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="query")
     return DepartmentListResponse(departments=list_departments(session))
 
 
@@ -84,7 +91,9 @@ def employee_departments(session: Session = Depends(get_session)) -> DepartmentL
 def employee_create(
     payload: EmployeeCreateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> EmployeeDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="save")
     employee = create_employee(session, payload)
     return EmployeeDetailResponse(employee=employee)
 
@@ -97,7 +106,9 @@ def employee_create(
 def employee_batch_save(
     payload: EmployeeBatchRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> EmployeeBatchResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="save")
     return batch_save_employees(session, payload)
 
 
@@ -119,7 +130,9 @@ def employee_update(
     employee_id: int,
     payload: EmployeeUpdateRequest,
     session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
 ) -> EmployeeDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="save")
     employee = update_employee(session, employee_id, payload)
     return EmployeeDetailResponse(employee=employee)
 
@@ -129,6 +142,11 @@ def employee_update(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
-def employee_delete(employee_id: int, session: Session = Depends(get_session)) -> Response:
+def employee_delete(
+    employee_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/hr/employee", action_code="save")
     delete_employee(session, employee_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
