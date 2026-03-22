@@ -43,8 +43,15 @@ def update_employee(session: Session, employee_id: int, payload: EmployeeUpdateR
 
 
 def delete_employee(session: Session, employee_id: int) -> None:
-    delete_employees_no_commit(session, [employee_id])
-    session.commit()
+    try:
+        delete_employees_no_commit(session, [employee_id])
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete employee linked to existing attendance/leave/schedule/payroll or related records.",
+        ) from exc
 
 
 def create_employee_no_commit(session: Session, payload: EmployeeCreateRequest) -> EmployeeItem:
