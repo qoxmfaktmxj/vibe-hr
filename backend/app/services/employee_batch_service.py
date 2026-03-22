@@ -54,6 +54,12 @@ def batch_save_employees(session: Session, payload: EmployeeBatchRequest) -> Emp
     except RuntimeError as exc:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete employee linked to existing attendance/leave/payroll or related records.",
+        ) from exc
     except Exception as exc:
         session.rollback()
         raise HTTPException(

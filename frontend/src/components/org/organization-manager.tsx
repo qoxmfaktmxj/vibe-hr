@@ -25,6 +25,7 @@ import {
   snapshotFields,
   type GridRowStatus,
 } from "@/lib/hr/grid-change-tracker";
+import { parseErrorDetail } from "@/lib/hr/employee-master-helpers";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import {
@@ -641,7 +642,7 @@ export function OrganizationManager() {
         "삭제",
         toDelete.map((row) => async () => {
           const response = await fetch(`/api/org/departments/${row.id}`, { method: "DELETE" });
-          if (!response.ok) throw new Error(`삭제 실패: ${row.code}`);
+          if (!response.ok) throw new Error(await parseErrorDetail(response, `삭제 실패: ${row.code}`));
         }),
         6,
       );

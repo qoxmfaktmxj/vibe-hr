@@ -12,6 +12,7 @@ from app.models import (
     AuthUserRole,
     HrAppointmentOrder,
     HrAppointmentOrderItem,
+    HrAnnualLeave,
     HrAttendanceDaily,
     HrEmployee,
     HrEmployeeBasicProfile,
@@ -186,6 +187,7 @@ def delete_employees_no_commit(session: Session, employee_ids: list[int]) -> int
         session.add(row)
 
     session.exec(sa_delete(HrLeaveRequest).where(HrLeaveRequest.employee_id.in_(target_ids)))
+    session.exec(sa_delete(HrAnnualLeave).where(HrAnnualLeave.employee_id.in_(target_ids)))
     session.exec(sa_delete(HrAttendanceDaily).where(HrAttendanceDaily.employee_id.in_(target_ids)))
     session.exec(sa_delete(HrPersonnelHistory).where(HrPersonnelHistory.employee_id.in_(target_ids)))
     session.exec(sa_delete(HrEmployeeInfoRecord).where(HrEmployeeInfoRecord.employee_id.in_(target_ids)))
@@ -209,3 +211,9 @@ def delete_employees_no_commit(session: Session, employee_ids: list[int]) -> int
     session.exec(sa_delete(AuthUser).where(AuthUser.id.in_(user_ids)))
     session.flush()
     return len(target_ids)
+return len(target_ids)
+e(HrEmployee).where(HrEmployee.id.in_(target_ids)))
+    session.exec(sa_delete(AuthUser).where(AuthUser.id.in_(user_ids)))
+    session.flush()
+    return len(target_ids)
+return len(target_ids)
