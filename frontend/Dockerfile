@@ -8,7 +8,7 @@ WORKDIR /app/frontend
 COPY --from=deps /app/frontend/node_modules ./node_modules
 COPY frontend ./
 COPY config ../config
-RUN npm run build
+RUN npm run build:deploy
 
 FROM node:22-alpine AS runner
 WORKDIR /app/frontend

@@ -1377,7 +1377,7 @@ export function CommonCodeManager() {
               executeAction({ type: "selectGroup", groupId: event.data.id });
             }}
             onCellValueChanged={handleGroupCellValueChanged}
-            singleClickEdit={true}
+            singleClickEdit={false}
             loading={groupLoading}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noGroupRows}</span>`}

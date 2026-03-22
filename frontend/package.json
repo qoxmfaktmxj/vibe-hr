@@ -6,6 +6,7 @@
     "dev": "next dev",
     "prebuild": "npm run validate:grid",
     "build": "next build",
+    "build:deploy": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
