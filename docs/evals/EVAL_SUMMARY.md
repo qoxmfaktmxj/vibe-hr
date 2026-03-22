@@ -45,6 +45,11 @@ Confidence: Medium
 - backend boot blocker 복구 작업이 누적됨
 - manual deploy 전환이 완료됨
 - browser/manual 검증 항목이 쌓이기 시작함
+- host Python 환경의 `pytest` 부재로 dockerized test fallback이 반복됨
+- workflow steward 루프가 TIM 월마감처럼 workflow 연결점에 대한 characterization/unit test를 추가하기 시작함
+- TIM 월마감 검증이 service 단위에서 실제 수정 API lock(423)까지 확장되기 시작함
+- workflow 9(월급여 대상자 선정)도 ‘재직 인원 기준’ 회귀 테스트로 점진 고정 중
+- 대상자 선정 경계조건(전월 퇴사자 + 미래 입사 예정자 제외)을 테스트로 누적 고정하는 패턴이 자리잡기 시작함
 
 ## Segmentation
 반드시 아래 기준으로 분리해 본다.

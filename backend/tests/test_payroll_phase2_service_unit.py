@@ -7,6 +7,7 @@ from app.models import (
     HrAppointmentOrder,
     HrAppointmentOrderItem,
     HrEmployee,
+    HrEmployeeBasicProfile,
     HrLeaveRequest,
     OrgDepartment,
     PayAllowanceDeduction,
@@ -882,6 +883,172 @@ def test_refresh_payroll_run_snapshot_recalculates_calculated_run() -> None:
         assert run_target.snapshot_json["base_salary"] == 4_200_000
         assert run_employee.gross_pay == 4_200_000
         assert refresh_events
+
+
+def test_create_payroll_run_excludes_employees_retired_before_period_start() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        department, _, payroll_code, active_employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900570",
+            display_name="재직대상자",
+            base_salary=3_000_000,
+            effective_from=date(2026, 1, 1),
+        )
+
+        retired_user = AuthUser(
+            login_id="user-emp-900571",
+            email="emp-900571@vibe-hr.local",
+            password_hash="hash",
+            display_name="전월퇴사자",
+            is_active=True,
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(retired_user)
+        session.commit()
+        session.refresh(retired_user)
+
+        retired_employee = HrEmployee(
+            user_id=int(retired_user.id),
+            employee_no="EMP-900571",
+            department_id=int(department.id),
+            position_title="사원",
+            hire_date=date(2025, 1, 1),
+            employment_status="resigned",
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(retired_employee)
+        session.commit()
+        session.refresh(retired_employee)
+
+        session.add(
+            PayEmployeeProfile(
+                employee_id=int(retired_employee.id),
+                payroll_code_id=int(payroll_code.id),
+                item_group_id=None,
+                base_salary=2_800_000,
+                pay_type_code="regular",
+                payment_day_type="fixed_day",
+                payment_day_value=25,
+                holiday_adjustment="previous_business_day",
+                effective_from=date(2025, 1, 1),
+                effective_to=None,
+                is_active=True,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.add(
+            HrEmployeeBasicProfile(
+                employee_id=int(retired_employee.id),
+                retire_date=date(2026, 2, 28),
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="active employees only",
+            ),
+        )
+
+        run_targets = session.exec(
+            select(PayPayrollRunTarget)
+            .where(PayPayrollRunTarget.run_id == created.run.id)
+            .order_by(PayPayrollRunTarget.employee_id)
+        ).all()
+
+        assert [target.employee_id for target in run_targets] == [int(active_employee.id)]
+        assert run_targets[0].snapshot_json["employee_no"] == "EMP-900570"
+        assert run_targets[0].snapshot_json["retire_date"] is None
+
+
+
+def test_create_payroll_run_excludes_employees_hired_after_period_end() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        department, _, payroll_code, active_employee = _seed_payroll_context(
+            session,
+            employee_no="EMP-900580",
+            display_name="기준월 재직자",
+            base_salary=3_200_000,
+            effective_from=date(2026, 1, 1),
+        )
+
+        future_user = AuthUser(
+            login_id="user-emp-900581",
+            email="emp-900581@vibe-hr.local",
+            password_hash="hash",
+            display_name="차월 입사예정",
+            is_active=True,
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(future_user)
+        session.commit()
+        session.refresh(future_user)
+
+        future_employee = HrEmployee(
+            user_id=int(future_user.id),
+            employee_no="EMP-900581",
+            department_id=int(department.id),
+            position_title="입사예정",
+            hire_date=date(2026, 4, 1),
+            employment_status="active",
+            created_at=_utc_now(),
+            updated_at=_utc_now(),
+        )
+        session.add(future_employee)
+        session.commit()
+        session.refresh(future_employee)
+
+        session.add(
+            PayEmployeeProfile(
+                employee_id=int(future_employee.id),
+                payroll_code_id=int(payroll_code.id),
+                item_group_id=None,
+                base_salary=2_900_000,
+                pay_type_code="regular",
+                payment_day_type="fixed_day",
+                payment_day_value=25,
+                holiday_adjustment="previous_business_day",
+                effective_from=date(2026, 3, 1),
+                effective_to=None,
+                is_active=True,
+                created_at=_utc_now(),
+                updated_at=_utc_now(),
+            )
+        )
+        session.commit()
+
+        created = create_payroll_run(
+            session,
+            PayPayrollRunCreateRequest(
+                year_month="2026-03",
+                payroll_code_id=int(payroll_code.id),
+                run_name="exclude future hires",
+            ),
+        )
+
+        run_targets = session.exec(
+            select(PayPayrollRunTarget)
+            .where(PayPayrollRunTarget.run_id == created.run.id)
+            .order_by(PayPayrollRunTarget.employee_id)
+        ).all()
+
+        assert [target.employee_id for target in run_targets] == [int(active_employee.id)]
+        assert run_targets[0].snapshot_json["employee_no"] == "EMP-900580"
 
 
 def test_calculate_payroll_run_uses_income_tax_bracket_master() -> None:
