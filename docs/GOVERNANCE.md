@@ -13,7 +13,7 @@ Confidence: Medium
 ## 운영 범위
 - Governance Scope: **High-Control** [Proposal]
 - 개발 단계: solo 개발 / 점진 전환 [User-stated][Observed]
-- 배포 정책: 현재는 환경 분리 없이 `main` 단일 기준으로 운영 [User-stated]
+- 배포 정책: 현재는 환경 분리 없이 `main` 단일 기준으로 운영하며, **자동 배포는 사용하지 않고 항상 수동 검토 후 `workflow_dispatch` 기반으로 배포**한다. [User-stated]
 - 외부 연동 정책: SAP I/F 등 외부 연동은 현재 범위 밖이며 프로젝트 본체 완료 후 검토 [User-stated]
 
 ## 권한 우선순위
