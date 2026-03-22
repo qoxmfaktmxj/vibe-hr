@@ -119,6 +119,7 @@ const I18N = {
   statusAdded: "입력",
   statusUpdated: "수정",
   statusDeleted: "삭제",
+  colSelect: "선택",
   colDelete: "삭제",
   colStatus: "상태",
   colGroupCode: "그룹코드",
@@ -377,6 +378,7 @@ export function CommonCodeManager() {
   const detailRowsRef = useRef<DetailRow[]>([]);
   const selectedGroupIdRef = useRef<number | null>(null);
   const selectedDetailIdRef = useRef<number | null>(null);
+  const executeActionRef = useRef<(action: PendingAction, force?: boolean) => void>(() => undefined);
   const groupFetchIdRef = useRef(0);
   const detailFetchIdRef = useRef(0);
 
@@ -488,6 +490,40 @@ export function CommonCodeManager() {
   const groupColumnDefs = useMemo<ColDef<GroupRow>[]>(
     () => [
       {
+        headerName: I18N.colSelect,
+        width: 72,
+        pinned: "left",
+        sortable: false,
+        filter: false,
+        editable: false,
+        resizable: false,
+        suppressHeaderMenuButton: true,
+        cellRenderer: (params: ICellRendererParams<GroupRow>) => {
+          const row = params.data;
+          if (!row) return null;
+          const isSelected = row.id === selectedGroupId;
+          return (
+            <div className="flex h-full items-center justify-center">
+              <button
+                type="button"
+                className={`rounded border px-2 py-0.5 text-[11px] font-medium ${
+                  isSelected
+                    ? "border-blue-600 bg-blue-50 text-blue-700"
+                    : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+                }`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  executeAction({ type: "selectGroup", groupId: row.id });
+                }}
+              >
+                {isSelected ? "선택됨" : "선택"}
+              </button>
+            </div>
+          );
+        },
+      },
+      {
         headerName: I18N.colDelete,
         width: 56,
         pinned: "left",
@@ -570,7 +606,7 @@ export function CommonCodeManager() {
           params.value ? new Date(String(params.value)).toLocaleString() : "",
       },
     ],
-    [toggleGroupDelete],
+    [selectedGroupId, toggleGroupDelete],
   );
 
   const detailColumnDefs = useMemo<ColDef<DetailRow>[]>(
@@ -928,6 +964,10 @@ export function CommonCodeManager() {
     },
     [hasDirtyDetailRows, hasDirtyGroupRows],
   );
+
+  useEffect(() => {
+    executeActionRef.current = executeAction;
+  }, [executeAction]);
 
   const handleDiscardAndContinue = useCallback(() => {
     if (!pendingAction) return;
@@ -1372,12 +1412,8 @@ export function CommonCodeManager() {
             onGridReady={(event: GridReadyEvent<GroupRow>) => {
               groupGridApiRef.current = event.api;
             }}
-            onRowClicked={(event) => {
-              if (!event.data) return;
-              executeAction({ type: "selectGroup", groupId: event.data.id });
-            }}
             onCellValueChanged={handleGroupCellValueChanged}
-            singleClickEdit={false}
+            singleClickEdit={true}
             loading={groupLoading}
             localeText={AG_GRID_LOCALE_KO}
             overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noGroupRows}</span>`}
