@@ -49,7 +49,7 @@ class EmployeeCreateRequest(BaseModel):
     hire_date: date | None = None
     employment_status: str = Field(default="active", pattern="^(active|leave|resigned)$")
     login_id: str | None = Field(default=None, min_length=4, max_length=50)
-    email: EmailStr | None = None
+    email: str | None = Field(default=None, max_length=255)
     password: str = Field(default="admin", min_length=4, max_length=128)
 
 
