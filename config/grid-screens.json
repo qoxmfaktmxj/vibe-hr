@@ -1,10 +1,10 @@
 {
   "version": "standard-v1",
   "screens": {
-    "hr.employee": {
-      "path": "/hr/employee",
-      "pageFile": "frontend/src/app/hr/employee/page.tsx",
-      "componentFile": "frontend/src/components/hr/employee-master-manager.tsx",
+    "hr.admin.careers": {
+      "path": "/hr/admin/careers",
+      "pageFile": "frontend/src/app/hr/admin/careers/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -18,187 +18,9 @@
       ],
       "ownerModule": "HR"
     },
-    "hr.recruit.finalists": {
-      "path": "/hr/recruit/finalists",
-      "pageFile": "frontend/src/app/hr/recruit/finalists/page.tsx",
-      "componentFile": "frontend/src/components/hr/hr-recruit-finalist-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "HR"
-    },
-    "settings.common-codes": {
-      "path": "/settings/common-codes",
-      "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
-      "componentFile": "frontend/src/components/settings/common-code-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "SETTINGS"
-    },
-    "org.corporations": {
-      "path": "/org/corporations",
-      "pageFile": "frontend/src/app/org/corporations/page.tsx",
-      "componentFile": "frontend/src/components/org/corporation-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "ORG"
-    },
-    "org.departments": {
-      "path": "/org/departments",
-      "pageFile": "frontend/src/app/org/departments/page.tsx",
-      "componentFile": "frontend/src/components/org/organization-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "ORG"
-    },
-    "org.dept-history": {
-      "path": "/org/dept-history",
-      "pageFile": "frontend/src/app/org/dept-history/page.tsx",
-      "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v1",
-      "toolbar": [
-        "query",
-        "download"
-      ],
-      "ownerModule": "ORG"
-    },
-    "org.restructure": {
-      "path": "/org/restructure",
-      "pageFile": "frontend/src/app/org/restructure/page.tsx",
-      "componentFile": "frontend/src/components/org/org-restructure-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v1",
-      "toolbar": [
-        "query",
-        "create",
-        "save"
-      ],
-      "ownerModule": "ORG"
-    },
-    "mng.companies": {
-      "path": "/mng/companies",
-      "pageFile": "frontend/src/app/mng/companies/page.tsx",
-      "componentFile": "frontend/src/components/mng/company-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "MNG"
-    },
-    "hr.appointment.codes": {
-      "path": "/hr/appointment/codes",
-      "pageFile": "frontend/src/app/hr/appointment/codes/page.tsx",
-      "componentFile": "frontend/src/components/hr/hr-appointment-code-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "HR"
-    },
-    "hr.appointment.records": {
-      "path": "/hr/appointment/records",
-      "pageFile": "frontend/src/app/hr/appointment/records/page.tsx",
-      "componentFile": "frontend/src/components/hr/hr-appointment-record-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "HR"
-    },
-    "pap.appraisals": {
-      "path": "/pap/appraisals",
-      "pageFile": "frontend/src/app/pap/appraisals/page.tsx",
-      "componentFile": "frontend/src/components/pap/pap-appraisal-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "PAP"
-    },
-    "pap.final-results": {
-      "path": "/pap/final-results",
-      "pageFile": "frontend/src/app/pap/final-results/page.tsx",
-      "componentFile": "frontend/src/components/pap/pap-final-result-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "PAP"
-    },
-    "hr.admin.rewards": {
-      "path": "/hr/admin/rewards",
-      "pageFile": "frontend/src/app/hr/admin/rewards/page.tsx",
+    "hr.admin.certificates": {
+      "path": "/hr/admin/certificates",
+      "pageFile": "frontend/src/app/hr/admin/certificates/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
@@ -247,26 +69,9 @@
       ],
       "ownerModule": "HR"
     },
-    "hr.admin.careers": {
-      "path": "/hr/admin/careers",
-      "pageFile": "frontend/src/app/hr/admin/careers/page.tsx",
-      "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "HR"
-    },
-    "hr.admin.certificates": {
-      "path": "/hr/admin/certificates",
-      "pageFile": "frontend/src/app/hr/admin/certificates/page.tsx",
+    "hr.admin.evaluations": {
+      "path": "/hr/admin/evaluations",
+      "pageFile": "frontend/src/app/hr/admin/evaluations/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
@@ -298,9 +103,9 @@
       ],
       "ownerModule": "HR"
     },
-    "hr.admin.evaluations": {
-      "path": "/hr/admin/evaluations",
-      "pageFile": "frontend/src/app/hr/admin/evaluations/page.tsx",
+    "hr.admin.rewards": {
+      "path": "/hr/admin/rewards",
+      "pageFile": "frontend/src/app/hr/admin/rewards/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-admin-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
@@ -315,10 +120,10 @@
       ],
       "ownerModule": "HR"
     },
-    "tra.course-events": {
-      "path": "/tra/course-events",
-      "pageFile": "frontend/src/app/tra/course-events/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+    "hr.appointment.codes": {
+      "path": "/hr/appointment/codes",
+      "pageFile": "frontend/src/app/hr/appointment/codes/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-appointment-code-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -330,29 +135,12 @@
         "save",
         "download"
       ],
-      "ownerModule": "TRA"
+      "ownerModule": "HR"
     },
-    "tra.applications": {
-      "path": "/tra/applications",
-      "pageFile": "frontend/src/app/tra/applications/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-applications-approval-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v1",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TRA"
-    },
-    "tra.required-standards": {
-      "path": "/tra/required-standards",
-      "pageFile": "frontend/src/app/tra/required-standards/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+    "hr.appointment.records": {
+      "path": "/hr/appointment/records",
+      "pageFile": "frontend/src/app/hr/appointment/records/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-appointment-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -364,12 +152,12 @@
         "save",
         "download"
       ],
-      "ownerModule": "TRA"
+      "ownerModule": "HR"
     },
-    "tra.required-targets": {
-      "path": "/tra/required-targets",
-      "pageFile": "frontend/src/app/tra/required-targets/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+    "hr.employee": {
+      "path": "/hr/employee",
+      "pageFile": "frontend/src/app/hr/employee/page.tsx",
+      "componentFile": "frontend/src/components/hr/employee-master-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -381,12 +169,12 @@
         "save",
         "download"
       ],
-      "ownerModule": "TRA"
+      "ownerModule": "HR"
     },
-    "tra.elearning-windows": {
-      "path": "/tra/elearning-windows",
-      "pageFile": "frontend/src/app/tra/elearning-windows/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+    "hr.recruit.finalists": {
+      "path": "/hr/recruit/finalists",
+      "pageFile": "frontend/src/app/hr/recruit/finalists/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-recruit-finalist-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -398,92 +186,7 @@
         "save",
         "download"
       ],
-      "ownerModule": "TRA"
-    },
-    "tra.histories": {
-      "path": "/tra/histories",
-      "pageFile": "frontend/src/app/tra/histories/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TRA"
-    },
-    "tra.cyber-upload": {
-      "path": "/tra/cyber-upload",
-      "pageFile": "frontend/src/app/tra/cyber-upload/page.tsx",
-      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TRA"
-    },
-    "tim.attendance-codes": {
-      "path": "/tim/codes",
-      "pageFile": "frontend/src/app/tim/codes/page.tsx",
-      "componentFile": "frontend/src/components/tim/attendance-code-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.holidays": {
-      "path": "/tim/holidays",
-      "pageFile": "frontend/src/app/tim/holidays/page.tsx",
-      "componentFile": "frontend/src/components/tim/holiday-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.work-schedules": {
-      "path": "/tim/work-codes",
-      "pageFile": "frontend/src/app/tim/work-codes/page.tsx",
-      "componentFile": "frontend/src/components/tim/work-schedule-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
+      "ownerModule": "HR"
     },
     "hr.retire.checklist": {
       "path": "/hr/retire/checklist",
@@ -502,82 +205,22 @@
       ],
       "ownerModule": "HR"
     },
-    "tim.attendance-status": {
-      "path": "/tim/status",
-      "pageFile": "frontend/src/app/tim/status/page.tsx",
-      "componentFile": "frontend/src/components/tim/attendance-status-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.annual-leave": {
-      "path": "/tim/annual-leave",
-      "pageFile": "frontend/src/app/tim/annual-leave/page.tsx",
-      "componentFile": "frontend/src/components/tim/annual-leave-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.leave-approval": {
-      "path": "/tim/leave-approval",
-      "pageFile": "frontend/src/app/tim/leave-approval/page.tsx",
-      "componentFile": "frontend/src/components/tim/leave-approval-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.reports": {
-      "path": "/tim/reports",
-      "pageFile": "frontend/src/app/tim/reports/page.tsx",
-      "componentFile": "frontend/src/components/tim/tim-report-dashboard.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.month-closing": {
-      "path": "/tim/month-closing",
-      "pageFile": "frontend/src/app/tim/month-closing/page.tsx",
-      "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
+    "hri.requests.mine": {
+      "path": "/hri/requests/mine",
+      "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
+      "componentFile": "frontend/src/components/hri/hri-application-hub.tsx",
       "engine": "ag-grid",
       "profile": "standard-v1",
-      "toolbar": ["query"],
-      "ownerModule": "TIM"
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "HRI"
     },
     "hri.tasks.approvals": {
       "path": "/hri/tasks/approvals",
@@ -613,10 +256,10 @@
       ],
       "ownerModule": "HRI"
     },
-    "wel.requests": {
-      "path": "/wel/requests",
-      "pageFile": "frontend/src/app/wel/requests/page.tsx",
-      "componentFile": "frontend/src/components/wel/wel-benefit-request-overview.tsx",
+    "mng.companies": {
+      "path": "/mng/companies",
+      "pageFile": "frontend/src/app/mng/companies/page.tsx",
+      "componentFile": "frontend/src/components/mng/company-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -628,29 +271,12 @@
         "save",
         "download"
       ],
-      "ownerModule": "WEL"
+      "ownerModule": "MNG"
     },
-    "wel.benefit-types": {
-      "path": "/wel/benefit-types",
-      "pageFile": "frontend/src/app/wel/benefit-types/page.tsx",
-      "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "WEL"
-    },
-    "mng.dev-requests": {
-      "path": "/mng/dev-requests",
-      "pageFile": "frontend/src/app/mng/dev-requests/page.tsx",
-      "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
+    "mng.dev-inquiries": {
+      "path": "/mng/dev-inquiries",
+      "pageFile": "frontend/src/app/mng/dev-inquiries/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -681,10 +307,10 @@
       ],
       "ownerModule": "MNG"
     },
-    "mng.dev-inquiries": {
-      "path": "/mng/dev-inquiries",
-      "pageFile": "frontend/src/app/mng/dev-inquiries/page.tsx",
-      "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
+    "mng.dev-requests": {
+      "path": "/mng/dev-requests",
+      "pageFile": "frontend/src/app/mng/dev-requests/page.tsx",
+      "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -749,23 +375,6 @@
       ],
       "ownerModule": "MNG"
     },
-    "mng.outsource-contracts": {
-      "path": "/mng/outsource-contracts",
-      "pageFile": "frontend/src/app/mng/outsource-contracts/page.tsx",
-      "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "MNG"
-    },
     "mng.outsource-attendance": {
       "path": "/mng/outsource-attendance",
       "pageFile": "frontend/src/app/mng/outsource-attendance/page.tsx",
@@ -783,10 +392,10 @@
       ],
       "ownerModule": "MNG"
     },
-    "payroll.codes": {
-      "path": "/payroll/codes",
-      "pageFile": "frontend/src/app/payroll/codes/page.tsx",
-      "componentFile": "frontend/src/components/payroll/payroll-code-manager.tsx",
+    "mng.outsource-contracts": {
+      "path": "/mng/outsource-contracts",
+      "pageFile": "frontend/src/app/mng/outsource-contracts/page.tsx",
+      "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -798,12 +407,12 @@
         "save",
         "download"
       ],
-      "ownerModule": "PAYROLL"
+      "ownerModule": "MNG"
     },
-    "payroll.item-groups": {
-      "path": "/payroll/item-groups",
-      "pageFile": "frontend/src/app/payroll/item-groups/page.tsx",
-      "componentFile": "frontend/src/components/payroll/pay-item-group-manager.tsx",
+    "org.corporations": {
+      "path": "/org/corporations",
+      "pageFile": "frontend/src/app/org/corporations/page.tsx",
+      "componentFile": "frontend/src/components/org/corporation-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -815,7 +424,97 @@
         "save",
         "download"
       ],
-      "ownerModule": "PAYROLL"
+      "ownerModule": "ORG"
+    },
+    "org.departments": {
+      "path": "/org/departments",
+      "pageFile": "frontend/src/app/org/departments/page.tsx",
+      "componentFile": "frontend/src/components/org/organization-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
+    "org.dept-history": {
+      "path": "/org/dept-history",
+      "pageFile": "frontend/src/app/org/dept-history/page.tsx",
+      "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
+    "org.restructure": {
+      "path": "/org/restructure",
+      "pageFile": "frontend/src/app/org/restructure/page.tsx",
+      "componentFile": "frontend/src/components/org/org-restructure-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "create",
+        "save"
+      ],
+      "ownerModule": "ORG"
+    },
+    "pap.appraisals": {
+      "path": "/pap/appraisals",
+      "pageFile": "frontend/src/app/pap/appraisals/page.tsx",
+      "componentFile": "frontend/src/components/pap/pap-appraisal-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAP"
+    },
+    "pap.final-results": {
+      "path": "/pap/final-results",
+      "pageFile": "frontend/src/app/pap/final-results/page.tsx",
+      "componentFile": "frontend/src/components/pap/pap-final-result-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAP"
+    },
+    "pap.targets": {
+      "path": "/pap/targets",
+      "pageFile": "frontend/src/app/pap/targets/page.tsx",
+      "componentFile": "frontend/src/components/pap/pap-appraisal-targets-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query",
+        "add",
+        "delete",
+        "save"
+      ],
+      "ownerModule": "PAP"
     },
     "payroll.allowance-deduction-items": {
       "path": "/payroll/allowance-deduction-items",
@@ -834,42 +533,10 @@
       ],
       "ownerModule": "PAYROLL"
     },
-    "payroll.tax-rates": {
-      "path": "/payroll/tax-rates",
-      "pageFile": "frontend/src/app/payroll/tax-rates/page.tsx",
-      "componentFile": "frontend/src/components/payroll/payroll-tax-rate-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
-      "ownerModule": "PAYROLL"
-    },
-    "payroll.income-tax-brackets": {
-      "path": "/payroll/income-tax-brackets",
-      "pageFile": "frontend/src/app/payroll/income-tax-brackets/page.tsx",
-      "componentFile": "frontend/src/components/payroll/payroll-income-tax-bracket-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v2",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "save",
-        "download"
-      ],
-      "ownerModule": "PAYROLL"
-    },
-    "payroll.payment-schedules": {
-      "path": "/payroll/payment-schedules",
-      "pageFile": "frontend/src/app/payroll/payment-schedules/page.tsx",
-      "componentFile": "frontend/src/components/payroll/pay-payment-schedule-manager.tsx",
+    "payroll.codes": {
+      "path": "/payroll/codes",
+      "pageFile": "frontend/src/app/payroll/codes/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-code-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -900,10 +567,42 @@
       ],
       "ownerModule": "PAYROLL"
     },
-    "payroll.variable-inputs": {
-      "path": "/payroll/variable-inputs",
-      "pageFile": "frontend/src/app/payroll/variable-inputs/page.tsx",
-      "componentFile": "frontend/src/components/payroll/pay-variable-input-manager.tsx",
+    "payroll.income-tax-brackets": {
+      "path": "/payroll/income-tax-brackets",
+      "pageFile": "frontend/src/app/payroll/income-tax-brackets/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-income-tax-bracket-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.item-groups": {
+      "path": "/payroll/item-groups",
+      "pageFile": "frontend/src/app/payroll/item-groups/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-item-group-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.payment-schedules": {
+      "path": "/payroll/payment-schedules",
+      "pageFile": "frontend/src/app/payroll/payment-schedules/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-payment-schedule-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "toolbar": [
@@ -934,10 +633,202 @@
       ],
       "ownerModule": "PAYROLL"
     },
-    "hri.requests.mine": {
-      "path": "/hri/requests/mine",
-      "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
-      "componentFile": "frontend/src/components/hri/hri-application-hub.tsx",
+    "payroll.tax-rates": {
+      "path": "/payroll/tax-rates",
+      "pageFile": "frontend/src/app/payroll/tax-rates/page.tsx",
+      "componentFile": "frontend/src/components/payroll/payroll-tax-rate-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.variable-inputs": {
+      "path": "/payroll/variable-inputs",
+      "pageFile": "frontend/src/app/payroll/variable-inputs/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-variable-input-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "settings.common-codes": {
+      "path": "/settings/common-codes",
+      "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
+      "componentFile": "frontend/src/components/settings/common-code-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "SETTINGS"
+    },
+    "tim.annual-leave": {
+      "path": "/tim/annual-leave",
+      "pageFile": "frontend/src/app/tim/annual-leave/page.tsx",
+      "componentFile": "frontend/src/components/tim/annual-leave-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.attendance-codes": {
+      "path": "/tim/codes",
+      "pageFile": "frontend/src/app/tim/codes/page.tsx",
+      "componentFile": "frontend/src/components/tim/attendance-code-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.attendance-status": {
+      "path": "/tim/status",
+      "pageFile": "frontend/src/app/tim/status/page.tsx",
+      "componentFile": "frontend/src/components/tim/attendance-status-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.holidays": {
+      "path": "/tim/holidays",
+      "pageFile": "frontend/src/app/tim/holidays/page.tsx",
+      "componentFile": "frontend/src/components/tim/holiday-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.leave-approval": {
+      "path": "/tim/leave-approval",
+      "pageFile": "frontend/src/app/tim/leave-approval/page.tsx",
+      "componentFile": "frontend/src/components/tim/leave-approval-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.month-close": {
+      "path": "/tim/month-close",
+      "pageFile": "frontend/src/app/tim/month-close/page.tsx",
+      "componentFile": "frontend/src/components/tim/month-close-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.month-closing": {
+      "path": "/tim/month-closing",
+      "pageFile": "frontend/src/app/tim/month-closing/page.tsx",
+      "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v1",
+      "toolbar": [
+        "query"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.reports": {
+      "path": "/tim/reports",
+      "pageFile": "frontend/src/app/tim/reports/page.tsx",
+      "componentFile": "frontend/src/components/tim/tim-report-dashboard.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.work-schedules": {
+      "path": "/tim/work-codes",
+      "pageFile": "frontend/src/app/tim/work-codes/page.tsx",
+      "componentFile": "frontend/src/components/tim/work-schedule-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tra.applications": {
+      "path": "/tra/applications",
+      "pageFile": "frontend/src/app/tra/applications/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-applications-approval-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v1",
       "toolbar": [
@@ -949,21 +840,75 @@
         "save",
         "download"
       ],
-      "ownerModule": "HRI"
+      "ownerModule": "TRA"
     },
-    "pap.targets": {
-      "path": "/pap/targets",
-      "pageFile": "frontend/src/app/pap/targets/page.tsx",
-      "componentFile": "frontend/src/components/pap/pap-appraisal-targets-manager.tsx",
+    "tra.course-events": {
+      "path": "/tra/course-events",
+      "pageFile": "frontend/src/app/tra/course-events/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
-        "add",
-        "delete",
-        "save"
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
       ],
-      "ownerModule": "PAP"
+      "ownerModule": "TRA"
+    },
+    "tra.cyber-upload": {
+      "path": "/tra/cyber-upload",
+      "pageFile": "frontend/src/app/tra/cyber-upload/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.elearning-windows": {
+      "path": "/tra/elearning-windows",
+      "pageFile": "frontend/src/app/tra/elearning-windows/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.histories": {
+      "path": "/tra/histories",
+      "pageFile": "frontend/src/app/tra/histories/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
     },
     "tra.my-applications": {
       "path": "/tra/my-applications",
@@ -977,6 +922,81 @@
         "delete"
       ],
       "ownerModule": "TRA"
+    },
+    "tra.required-standards": {
+      "path": "/tra/required-standards",
+      "pageFile": "frontend/src/app/tra/required-standards/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "tra.required-targets": {
+      "path": "/tra/required-targets",
+      "pageFile": "frontend/src/app/tra/required-targets/page.tsx",
+      "componentFile": "frontend/src/components/tra/tra-resource-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "TRA"
+    },
+    "wel.benefit-types": {
+      "path": "/wel/benefit-types",
+      "pageFile": "frontend/src/app/wel/benefit-types/page.tsx",
+      "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "WEL"
+    },
+    "wel.my-requests": {
+      "title": "내 복리후생 신청",
+      "path": "/wel/my-requests",
+      "pageFile": "frontend/src/app/wel/my-requests/page.tsx",
+      "componentFile": "frontend/src/components/wel/wel-my-requests-manager.tsx",
+      "gridType": "standard-v2"
+    },
+    "wel.requests": {
+      "path": "/wel/requests",
+      "pageFile": "frontend/src/app/wel/requests/page.tsx",
+      "componentFile": "frontend/src/components/wel/wel-benefit-request-overview.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "WEL"
     }
   }
 }
