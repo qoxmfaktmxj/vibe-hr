@@ -3,7 +3,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class DepartmentItem(BaseModel):
@@ -60,7 +60,7 @@ class EmployeeUpdateRequest(BaseModel):
     position_title: str | None = Field(default=None, min_length=1, max_length=80)
     hire_date: date | None = None
     employment_status: str | None = Field(default=None, pattern="^(active|leave|resigned)$")
-    email: EmailStr | None = None
+    email: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=4, max_length=128)
 
