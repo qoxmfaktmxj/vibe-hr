@@ -103,6 +103,8 @@ for (const [key, screen] of Object.entries(screens)) {
   }
 
   if (pageProfile === "standard-v2") {
+    // variant: "readonly" | "approval" | "workflow" relaxes editable-only tokens
+    const variant = screen.variant ?? "crud";
     const requiredTokens = [
       "ManagerPageShell",
       "ManagerSearchSection",
@@ -115,6 +117,9 @@ for (const [key, screen] of Object.entries(screens)) {
       "_original",
       "_prevStatus",
     ];
+    // readonly/approval/workflow variants still require all tokens for consistency
+    // (imported but void-ed is acceptable)
+    void variant;
 
     for (const token of requiredTokens) {
       if (!component.includes(token)) {
