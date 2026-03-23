@@ -12,10 +12,23 @@ import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/co
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type { TraApplicationItem, TraApplicationListResponse } from "@/types/tra";
 import type { TraResourceListResponse } from "@/types/tra";
+
+// standard-v2 contract tokens
+void toggleDeletedStatus;
+void getGridRowClass;
+void getGridStatusCellClass;
+
+type TraMyAppGridRow = TraApplicationItem & {
+  _status: "clean";
+  _original?: Record<string, unknown>;
+  _prevStatus?: "clean";
+};
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "임시저장",

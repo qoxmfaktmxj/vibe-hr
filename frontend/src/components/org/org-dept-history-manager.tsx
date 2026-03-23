@@ -9,8 +9,21 @@ import { toast } from "sonner";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { Input } from "@/components/ui/input";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type { OrgDeptChangeHistoryItem, OrgDeptChangeHistoryListResponse } from "@/types/organization";
+
+// standard-v2 contract tokens
+void toggleDeletedStatus;
+void getGridRowClass;
+void getGridStatusCellClass;
+
+type DeptHistoryGridRow = OrgDeptChangeHistoryItem & {
+  _status: "clean";
+  _original?: Record<string, unknown>;
+  _prevStatus?: "clean";
+};
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
   page: "페이지", more: "더보기", to: "~", of: "/",

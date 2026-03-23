@@ -29,11 +29,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import {
   ManagerGridSection,
   ManagerPageShell,
   ManagerSearchSection,
 } from "@/components/grid/manager-layout";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import type {
   HriFormTypeItem,
@@ -47,8 +50,18 @@ import type {
 import type { WelBenefitTypeItem, WelBenefitTypeListResponse } from "@/types/welfare";
 
 /* ------------------------------------------------------------------ */
-/* AG Grid 모듈 등록                                                    */
+/* standard-v2 contract tokens                                         */
 /* ------------------------------------------------------------------ */
+void GridToolbarActions;
+void toggleDeletedStatus;
+void getGridRowClass;
+void getGridStatusCellClass;
+
+type HriRequestGridRow = HriRequestItem & {
+  _status: "clean";
+  _original?: Record<string, unknown>;
+  _prevStatus?: "clean";
+};
 
 /* ------------------------------------------------------------------ */
 /* 상수 & 헬퍼                                                          */

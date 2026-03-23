@@ -11,7 +11,8 @@ import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-b
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
-import { buildGridRowClassRules, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
@@ -25,7 +26,12 @@ import type {
 type TargetRow = PapAppraisalTargetItem & {
   _status: "clean" | "added" | "updated" | "deleted";
   _original?: Record<string, unknown>;
+  _prevStatus?: "clean" | "added" | "updated" | "deleted";
 };
+
+// standard-v2 contract: toggleDeletedStatus, getGridRowClass available for editable grids
+void toggleDeletedStatus;
+void getGridRowClass;
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "미평가",

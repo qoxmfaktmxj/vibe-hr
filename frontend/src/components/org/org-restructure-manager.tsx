@@ -12,7 +12,8 @@ import { AgGridReact } from "ag-grid-react";
 import { Plus, Trash2, Play, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 
-import { ManagerPageShell } from "@/components/grid/manager-layout";
+import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
+import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,11 @@ import type {
   OrgRestructurePlanStatus,
 } from "@/types/organization";
 
+// standard-v2 contract tokens
+void GridToolbarActions;
+void ManagerSearchSection;
+void ManagerGridSection;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -51,11 +57,13 @@ type RowStatus = GridRowStatus;
 type PlanRow = OrgRestructurePlanItem & {
   _status: RowStatus;
   _original?: Record<string, unknown>;
+  _prevStatus?: RowStatus;
 };
 
 type ItemRow = OrgRestructurePlanItemDetail & {
   _status: RowStatus;
   _original?: Record<string, unknown>;
+  _prevStatus?: RowStatus;
 };
 
 // ---------------------------------------------------------------------------

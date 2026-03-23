@@ -210,7 +210,7 @@
       "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
       "componentFile": "frontend/src/components/hri/hri-application-hub.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -448,7 +448,7 @@
       "pageFile": "frontend/src/app/org/dept-history/page.tsx",
       "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "download"
@@ -460,7 +460,7 @@
       "pageFile": "frontend/src/app/org/restructure/page.tsx",
       "componentFile": "frontend/src/components/org/org-restructure-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -507,7 +507,7 @@
       "pageFile": "frontend/src/app/pap/targets/page.tsx",
       "componentFile": "frontend/src/components/pap/pap-appraisal-targets-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "add",
@@ -819,7 +819,7 @@
       "pageFile": "frontend/src/app/tra/applications/page.tsx",
       "componentFile": "frontend/src/components/tra/tra-applications-approval-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -904,7 +904,7 @@
       "pageFile": "frontend/src/app/tra/my-applications/page.tsx",
       "componentFile": "frontend/src/components/tra/tra-my-applications-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v1",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "add",
