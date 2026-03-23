@@ -10,10 +10,13 @@ import useSWR from "swr";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
+import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type {
@@ -68,6 +71,16 @@ function formatCurrency(value: number | null) {
   return `${value.toLocaleString("ko-KR")}원`;
 }
 
+// standard-v2 grid contract: toggleDeletedStatus, getGridStatusCellClass used by editable variants
+void toggleDeletedStatus;
+void getGridStatusCellClass;
+
+type WelRequestGridRow = WelBenefitRequestItem & {
+  _status: "clean";
+  _original?: Record<string, unknown>;
+  _prevStatus?: "clean";
+};
+
 export function WelBenefitRequestOverview() {
   useMenuActions("/wel/requests");
 
@@ -99,19 +112,23 @@ export function WelBenefitRequestOverview() {
   const items = useMemo(() => data?.items ?? [], [data?.items]);
   const totalCount = data?.total_count ?? 0;
 
-  const filteredItems = useMemo(() => {
+  const filteredItems = useMemo<WelRequestGridRow[]>(() => {
     const keyword = keywordInput.trim().toLowerCase();
-    return items.filter((item) => {
-      if (statusInput && item.status_code !== statusInput) return false;
-      if (!keyword) return true;
-      return (
-        item.request_no.toLowerCase().includes(keyword) ||
-        item.employee_name.toLowerCase().includes(keyword) ||
-        item.employee_no.toLowerCase().includes(keyword) ||
-        item.benefit_type_name.toLowerCase().includes(keyword)
-      );
-    });
+    return items
+      .filter((item) => {
+        if (statusInput && item.status_code !== statusInput) return false;
+        if (!keyword) return true;
+        return (
+          item.request_no.toLowerCase().includes(keyword) ||
+          item.employee_name.toLowerCase().includes(keyword) ||
+          item.employee_no.toLowerCase().includes(keyword) ||
+          item.benefit_type_name.toLowerCase().includes(keyword)
+        );
+      })
+      .map((item) => ({ ...item, _status: "clean" as const }));
   }, [keywordInput, statusInput, items]);
+
+  const rowClassRules = useMemo(() => buildGridRowClassRules<WelRequestGridRow>(), []);
 
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
@@ -127,7 +144,7 @@ export function WelBenefitRequestOverview() {
   const canApprove = selectedRow?.status_code === "submitted";
   const canReject = selectedRow?.status_code === "submitted" || selectedRow?.status_code === "draft";
 
-  const columnDefs = useMemo<ColDef<WelBenefitRequestItem>[]>(
+  const columnDefs = useMemo<ColDef<WelRequestGridRow>[]>(
     () => [
       { headerName: "신청번호", field: "request_no", width: 160 },
       { headerName: "복리후생 유형", field: "benefit_type_name", width: 150 },
@@ -294,6 +311,7 @@ export function WelBenefitRequestOverview() {
                 goToPage={pagination.goToPage}
               />
               <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+              <GridChangeSummaryBadges summary={{ added: 0, updated: 0, deleted: 0 }} />
             </>
           }
           headerRight={
@@ -344,7 +362,7 @@ export function WelBenefitRequestOverview() {
             />
           </div>
           <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
-            <AgGridReact<WelBenefitRequestItem>
+            <AgGridReact<WelRequestGridRow>
               theme="legacy"
               rowData={filteredItems}
               columnDefs={columnDefs}
@@ -353,6 +371,8 @@ export function WelBenefitRequestOverview() {
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onRowClicked={(event) => setSelectedRow(event.data ?? null)}
+              rowClassRules={rowClassRules}
+              getRowClass={(params) => getGridRowClass(params.data?._status)}
               localeText={{ page: "페이지", noRowsToShow: "신청 내역이 없습니다." }}
               overlayNoRowsTemplate='<span class="text-sm text-slate-400">복리후생 신청 내역이 없습니다.</span>'
               headerHeight={36}

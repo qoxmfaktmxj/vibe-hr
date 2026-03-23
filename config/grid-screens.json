@@ -772,19 +772,8 @@
     "tim.month-close": {
       "path": "/tim/month-close",
       "pageFile": "frontend/src/app/tim/month-close/page.tsx",
-      "componentFile": "frontend/src/components/tim/month-close-manager.tsx",
-      "engine": "ag-grid",
-      "profile": "standard-v1",
-      "toolbar": [
-        "query"
-      ],
-      "ownerModule": "TIM"
-    },
-    "tim.month-closing": {
-      "path": "/tim/month-closing",
-      "pageFile": "frontend/src/app/tim/month-closing/page.tsx",
       "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
-      "engine": "ag-grid",
+      "engine": "custom",
       "profile": "standard-v1",
       "toolbar": [
         "query"
@@ -975,11 +964,17 @@
       "ownerModule": "WEL"
     },
     "wel.my-requests": {
-      "title": "내 복리후생 신청",
       "path": "/wel/my-requests",
       "pageFile": "frontend/src/app/wel/my-requests/page.tsx",
       "componentFile": "frontend/src/components/wel/wel-my-requests-manager.tsx",
-      "gridType": "standard-v2"
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "download"
+      ],
+      "ownerModule": "WEL"
     },
     "wel.requests": {
       "path": "/wel/requests",

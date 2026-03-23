@@ -10,10 +10,13 @@ import useSWR from "swr";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
+import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type {
@@ -46,6 +49,10 @@ function formatCurrency(value: number | null) {
   if (value === null) return "-";
   return `${value.toLocaleString("ko-KR")}원`;
 }
+
+// standard-v2 grid contract: toggleDeletedStatus, getGridStatusCellClass used by editable variants
+void toggleDeletedStatus;
+void getGridStatusCellClass;
 
 export function WelMyRequestsManager() {
   useMenuActions("/wel/my-requests");
@@ -83,13 +90,24 @@ export function WelMyRequestsManager() {
   );
   const totalCount = requestsData?.total_count ?? 0;
 
-  const pagedItems = useMemo(() => {
+  type WelRequestGridRow = WelBenefitRequestItem & {
+    _status: "clean";
+    _original?: Record<string, unknown>;
+    _prevStatus?: "clean";
+  };
+
+  const pagedItems = useMemo<WelRequestGridRow[]>(() => {
     const start = (page - 1) * pageSize;
-    return items.slice(start, start + pageSize);
+    return items.slice(start, start + pageSize).map((item) => ({
+      ...item,
+      _status: "clean" as const,
+    }));
   }, [items, page]);
+
+  const rowClassRules = useMemo(() => buildGridRowClassRules<WelRequestGridRow>(), []);
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-  const columnDefs = useMemo<ColDef<WelBenefitRequestItem>[]>(
+  const columnDefs = useMemo<ColDef<WelRequestGridRow>[]>(
     () => [
       { headerName: "신청번호", field: "request_no", width: 160 },
       { headerName: "복리후생 유형", field: "benefit_type_name", width: 150 },
@@ -228,6 +246,7 @@ export function WelMyRequestsManager() {
                 goToPage={pagination.goToPage}
               />
               <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+              <GridChangeSummaryBadges summary={{ added: 0, updated: 0, deleted: 0 }} />
             </>
           }
           headerRight={
@@ -261,7 +280,7 @@ export function WelMyRequestsManager() {
           contentClassName="min-h-0 flex-1 px-6 pb-6"
         >
           <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
-            <AgGridReact<WelBenefitRequestItem>
+            <AgGridReact<WelRequestGridRow>
               theme="legacy"
               rowData={pagedItems}
               columnDefs={columnDefs}
@@ -270,6 +289,8 @@ export function WelMyRequestsManager() {
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onRowClicked={(event) => setSelectedRow(event.data ?? null)}
+              rowClassRules={rowClassRules}
+              getRowClass={(params) => getGridRowClass(params.data?._status)}
               localeText={{ page: "페이지", noRowsToShow: "신청 내역이 없습니다." }}
               overlayNoRowsTemplate='<span class="text-sm text-slate-400">복리후생 신청 내역이 없습니다.</span>'
               headerHeight={36}

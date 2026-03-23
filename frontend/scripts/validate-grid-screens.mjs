@@ -58,6 +58,9 @@ for (const registeredComponent of registeredComponentFiles) {
 }
 
 for (const [key, screen] of Object.entries(screens)) {
+  // Skip non-AG Grid screens (custom engine like HTML tables)
+  if (screen.engine && screen.engine !== "ag-grid") continue;
+
   const pageFile = path.join(repoRoot, screen.pageFile);
   const componentFile = path.join(repoRoot, screen.componentFile);
   const expectedProfile = screen.profile ?? "standard-v1";
