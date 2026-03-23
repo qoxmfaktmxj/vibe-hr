@@ -16,10 +16,21 @@ frontend/out/
 .vscode/
 .idea/
 
-# OMX local/project runtime artifacts
-.codex/
-.agents/
-.omx/
+# OMX/Codex - commit configuration, ignore runtime
+# Codex CLI config (committed: prompts, skills, agents, config.toml)
+# After pull, run: npm install -g oh-my-codex && omx setup --scope project
+# omx setup will regenerate MCP server paths for your machine
+.codex/skills/*/node_modules/
+
+# OMX runtime artifacts (not committed)
+.omx/state/
+.omx/logs/
+.omx/backups/
+.omx/notepad.md
+.omx/project-memory.json
+.omx/plans/
+
+# Legacy backup artifacts
 .backup/
 
 # Playwright CLI artifacts
