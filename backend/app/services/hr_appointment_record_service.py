@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
@@ -15,6 +16,7 @@ from app.models import (
     HrEmployee,
     HrEmployeeInfoRecord,
     HrPersonnelHistory,
+    HrRecruitFinalist,
     OrgDepartment,
 )
 from app.schemas.hr_appointment_record import (
@@ -215,6 +217,38 @@ def _ensure_appointment_no_unique(session: Session, appointment_no: str, exclude
             status_code=status.HTTP_409_CONFLICT,
             detail="Appointment number already exists.",
         )
+
+
+def _sync_related_finalists_appointed(session: Session, employee: HrEmployee, now: datetime) -> int:
+    """Mark the recruit finalist linked to an appointed employee as appointed.
+
+    Finalists are linked during employee creation by employee_no and sometimes login_id.
+    Confirmation is the lifecycle point where the hiring pipeline should close.
+    """
+    conditions = []
+    if employee.employee_no:
+        conditions.append(HrRecruitFinalist.employee_no == employee.employee_no)
+
+    user = session.get(AuthUser, employee.user_id)
+    if user is not None and user.login_id:
+        conditions.append(HrRecruitFinalist.login_id == user.login_id)
+
+    if not conditions:
+        return 0
+
+    finalists = session.exec(
+        select(HrRecruitFinalist).where(
+            or_(*conditions),
+            HrRecruitFinalist.status_code != "appointed",
+        )
+    ).all()
+
+    for finalist in finalists:
+        finalist.status_code = "appointed"
+        finalist.updated_at = now
+        session.add(finalist)
+
+    return len(finalists)
 
 
 def _employee_context_or_404(session: Session, employee_id: int):
@@ -617,6 +651,8 @@ def confirm_appointment_order(
                 created_at=now,
             )
         )
+
+        _sync_related_finalists_appointed(session, employee, now)
 
         item.apply_status = "applied"
         item.applied_at = now
