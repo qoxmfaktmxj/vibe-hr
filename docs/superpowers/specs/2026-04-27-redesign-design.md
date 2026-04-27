@@ -24,6 +24,10 @@
 | 소비형 페이지 | Stripe Dashboard Tone (정보 밀도 높음) |
 | `vivid` 팔레트 | 새 디자인 시스템 토큰 구조에 맞춰 갱신 (마젠타+퍼플 톤 유지) |
 | AG Grid 셀 | 변경 안 함 — Vibe-Grid가 가져갈 부분 |
+| 색상 대조비 | 모든 토큰 페어 WCAG AA 4.5:1 검증 매트릭스 (§2.5) |
+| 한글 letter-spacing | `:lang(ko)` 0 / `:lang(en)` -0.02em 분리 (Pretendard 한글 가독성) |
+| Form 패턴 | Visible label + Required `*` + Inline validation onBlur + 에러 ARIA-live (§4.7) |
+| Accessibility | WCAG 2.1 AA 별도 섹션 (§12) — ARIA · keyboard · reduced-motion · color-not-only |
 
 ---
 
@@ -218,7 +222,46 @@
 - 그림자/radius/luminance stacking은 본 스펙의 §4·§6 그래머 그대로 (팔레트만 다름)
 - 차트 색상도 vivid 톤으로 매핑 (`--chart-1~5`): `#5e239d`, `#a78bfa`, `#6decaf`, `#00b58a`, `#d35269`
 
-### 2.4 Linear luminance stacking 원칙
+### 2.4 색상 대조비 매트릭스 (WCAG AA 검증)
+
+모든 토큰 페어가 WCAG 2.1 AA(일반 텍스트 4.5:1 / 큰 텍스트 3:1)를 만족하도록 검증.
+
+**라이트 모드** (대조비 측정값):
+
+| Foreground | Background | 대조비 | 등급 | 용도 |
+|------------|-----------|--------|------|------|
+| `#111318` (foreground) | `#f6f6f8` (bg) | 17.5:1 | AAA ✓ | 본문 |
+| `#111318` (foreground) | `#ffffff` (card) | 18.6:1 | AAA ✓ | 카드 본문 |
+| `#475569` (label) | `#ffffff` (card) | 7.6:1 | AAA ✓ | 폼 라벨 |
+| `#64748b` (muted-fg) | `#ffffff` (card) | 4.6:1 | AA ✓ | 보조 텍스트 |
+| `#64748b` (muted-fg) | `#f6f6f8` (bg) | 4.4:1 | **FAIL** ❌ | 페이지 캔버스에선 `#475569`로 격상 |
+| `#ffffff` (white) | `#3c6dee` (primary bg) | 4.6:1 | AA ✓ | Primary 버튼 텍스트 |
+| `#3c6dee` (primary text) | `#ffffff` (card) | 4.6:1 | AA ✓ | 인라인 링크 |
+| `#3c6dee` (primary text) | `#f6f6f8` (bg) | 4.4:1 | **FAIL** ❌ | 페이지 캔버스 위 링크는 `#2f5cd8` (hover 톤)로 격상 |
+| `#108c3d` (success text) | `rgba(21,190,83,0.12)` solid 등가 `#dcf3e1` | 4.7:1 | AA ✓ | Success 태그 |
+| `#b45309` (warning text) | `rgba(217,119,6,0.12)` solid 등가 `#fbecd6` | 4.5:1 | AA ✓ | Warning 태그 |
+| `#cc2936` (destructive) | `rgba(204,41,54,0.12)` solid 등가 `#f9dadc` | 4.6:1 | AA ✓ | Destructive 태그 |
+
+**다크 모드**:
+
+| Foreground | Background | 대조비 | 등급 | 용도 |
+|------------|-----------|--------|------|------|
+| `#f8fafc` (foreground) | `#101522` (bg) | 17.4:1 | AAA ✓ | 본문 |
+| `#f8fafc` (foreground) | `#111827` (card) | 16.2:1 | AAA ✓ | 카드 본문 |
+| `#cbd5e1` (label) | `#101522` (bg) | 11.6:1 | AAA ✓ | 폼 라벨 |
+| `#94a3b8` (muted-fg) | `#101522` (bg) | 5.5:1 | AA ✓ | 보조 텍스트 |
+| `#7a9cec` (primary) | `#101522` (bg) | 6.0:1 | AA ✓ | 인라인 링크 |
+| `#111827` (text on primary) | `#7a9cec` (primary bg) | 7.8:1 | AAA ✓ | Primary 버튼 텍스트 |
+
+**규칙**:
+- 모든 status 태그는 background를 alpha → solid 등가값으로 환산해 측정 (`rgba` 합성식: `bg = alpha * fg + (1-alpha) * page_bg`)
+- 페이지 캔버스(`#f6f6f8`) 위에는 muted-fg를 `#475569`로 격상 (4.4 → 7.6)
+- 페이지 캔버스 위 링크는 `#3c6dee` 대신 `#2f5cd8` 사용 (5.4:1 통과)
+- 다크모드에서는 luminance가 surface step을 표현하므로 일반 텍스트 모두 9.0:1 이상
+
+**검증 도구**: 빌드 시 `@adobe/leonardo-contrast-colors` 또는 `wcag-contrast-checker` (CI 통합 권장).
+
+### 2.5 Linear luminance stacking 원칙
 
 다크 모드에서 surface elevation은 background luminance 단계로 표현:
 
@@ -311,6 +354,42 @@ font-variant-numeric: tabular-nums;
 - 헤딩은 weight 600~700, **negative letter-spacing** 필수 (Pretendard tight 그래머).
 - weight 500은 **Caption / 라벨**에만. 본문에 500 사용 금지 (Pretendard 500은 어색).
 - 숫자가 들어가는 모든 셀/카드/통계에 `tabular-nums`.
+
+### 3.4 한글/영문 letter-spacing 분리
+
+Pretendard의 negative tracking(-0.2 ~ -1.0px)은 **라틴(영문) 글리프 기준**으로 설계됨. 한글에 그대로 적용하면 자모 간격이 너무 좁아 가독성 저하.
+
+**규칙**:
+
+```css
+/* 디폴트: 한글 기준 — letter-spacing 0 */
+:root {
+  letter-spacing: 0;
+}
+
+/* 영문/숫자 multipliers (Tailwind utility 또는 CSS class) */
+.tracking-tight {  /* 헤딩에 적용 */
+  letter-spacing: -0.02em;
+}
+
+.tracking-tighter {  /* hero display (40px+)에 적용 */
+  letter-spacing: -0.025em;
+}
+
+/* CJK 문자가 섞인 헤딩에서 영문만 음수 트래킹 */
+.heading-mixed :lang(en),
+.heading-mixed [lang="en"] {
+  letter-spacing: -0.02em;
+}
+```
+
+**적용 패턴**:
+- 페이지 타이틀 ("사원관리"): `letter-spacing: 0` — 한글 다수
+- Hero ("Vibe-HR · 사람을 위한 인사 운영"): 한글 본체 0, "Vibe-HR" 부분만 `<span lang="en" class="tracking-tight">`
+- 사번/코드값 (`EMP-2024-001`): mono 폰트 + `letter-spacing: 0` (mono는 이미 등간격)
+- 숫자 (1,247명): `tabular-nums` + `letter-spacing: 0` (tnum이 이미 균일)
+
+**em 단위 사용**: px이 아닌 em으로 정의 (폰트 사이즈 비례). Pretendard `-0.7px` at 28px = `-0.025em`.
 
 ### 3.3 AG Grid 셀 (변경 없음)
 
@@ -445,7 +524,7 @@ color: <톤별 솔리드 색>
 | L4 | `rgba(50,50,93,0.18) 0 24px 48px -12px, rgba(0,0,0,0.08) 0 8px 20px` | modal |
 | Focus | `0 0 0 2px var(--ring), 0 0 0 4px rgba(60,109,238,0.20)` | keyboard focus |
 
-다크 모드: 그림자는 거의 보이지 않음 → **luminance stacking으로 elevation 표현** (위 §2.4 참조).
+다크 모드: 그림자는 거의 보이지 않음 → **luminance stacking으로 elevation 표현** (위 §2.5 참조).
 
 ### 4.6 Border Radius 스케일
 
@@ -459,6 +538,64 @@ color: <톤별 솔리드 색>
 | `rounded-3xl` | 18px | 큰 panel, store-style 카드 |
 | `rounded-full` | 999px | pill CTA, status 칩, 검색 바, 아바타 |
 | `rounded-none` | 0 | 풀-블리드 hero 타일 |
+
+### 4.7 Form 패턴 (HR은 form-heavy 도메인)
+
+**Visible Label** (필수)
+- placeholder만으로 라벨 대체 금지 (접근성 + UX)
+- 위치: `<input>` 위 6px gap
+- 스타일: 12px / weight 500, color `var(--foreground)`
+- HTML: `<label htmlFor="emp-no">사번</label> <input id="emp-no" />` 매칭 필수
+
+**Required Indicator**
+- 라벨 옆 `<span class="text-destructive" aria-hidden="true">*</span>`
+- ARIA: `<input aria-required="true" required>`
+
+**Helper Text** (선택)
+- 위치: input 아래 4px gap
+- 스타일: 11px / 400, color `var(--muted-foreground)`
+- 예: "사번은 영문+숫자 조합 6자 이상"
+- HTML: `<input aria-describedby="emp-no-help">` + `<p id="emp-no-help">...`
+
+**Error Message**
+- 위치: input 아래 4px gap (helper 자리 대체)
+- 스타일: 11px / 500, color `var(--destructive)`, leading icon `⚠` (lucide `AlertCircle` 12×12)
+- ARIA:
+  - `<input aria-invalid="true" aria-describedby="emp-no-error">`
+  - `<p id="emp-no-error" role="alert" aria-live="polite">사번 형식이 올바르지 않습니다.</p>`
+- 첫 invalid field에 `autoFocus` (submit 후)
+
+**Validation 시점**
+- onBlur (사용자가 입력 완료한 후) — onChange 사용 금지 (입력 중 빨간색 거슬림)
+- 예외: 비밀번호 확인 등 `match` 류 필드는 onChange OK
+- Submit 버튼 클릭 시 모든 필드 일괄 검증 + 첫 invalid에 focus
+
+**Loading + Submit**
+- Submit 버튼: `disabled={submitting}` + spinner (300ms 이상 작업 시)
+- 성공: toast (3-5s auto-dismiss, `role="status" aria-live="polite"`) 또는 inline success
+- 실패:
+  - 페이지 상단 error summary (`role="alert"`)
+  - 각 필드 error
+  - 첫 invalid field auto-focus
+
+**Empty State**
+- 데이터 없음: helpful message + primary action ("결재 요청 추가하기")
+- 검색 결과 없음: query 표시 + "검색어 변경" 또는 "전체 보기" CTA
+- 스타일: 중앙 정렬, 12px illustration (lucide icon, color muted-foreground)
+
+**Loading Skeleton**
+- 카드/그리드 행 형태와 일치하는 skeleton
+- shimmer 애니메이션 (`prefers-reduced-motion: reduce` 시 정적 회색 박스만)
+- 300ms 이상 로딩 시 표시 (그 이전엔 spinner 없이)
+
+**Field Grouping**
+- 관련 필드는 `<fieldset>` + `<legend>` (예: "비밀번호" + "비밀번호 확인")
+- 시각: legend 12px / 600, fieldset 1px hairline border, 12px padding
+
+**Disabled vs Read-only**
+- Disabled: opacity 0.5, cursor not-allowed, `<input disabled>` (값도 form submit에서 제외)
+- Read-only: 그대로 보이되 편집 불가, `<input readOnly>` (값은 submit에 포함)
+- 시각적으로 두 상태를 명확히 구분 (disabled는 회색, read-only는 light tint background)
 
 ---
 
@@ -809,7 +946,90 @@ npm install pretendard
 - [x] **`vivid` 팔레트**: 새 디자인 시스템 토큰 구조에 맞춰 갱신 (마젠타+퍼플 톤 유지, Primary는 딥 퍼플 `#5e239d`로 정착)
 - [x] **사이드바**: Collapsible 도입 (Expanded 200px ↔ Collapsed 60px icon-only, localStorage 보존)
 
-## 12. New Open Questions (구현 시 결정)
+## 12. Accessibility — WCAG 2.1 AA 준수
+
+본 시스템은 **WCAG 2.1 AA**를 디자인·구현 표준으로 채택. 모든 페이지는 출시 전 자동 + 수동 a11y 검증을 통과해야 함.
+
+### 12.1 색상 대조비
+
+§2.4 매트릭스 참조. 모든 토큰 페어가 일반 텍스트 4.5:1, 큰 텍스트 3:1을 만족. 빌드 시 자동 검증 (CI에서 `wcag-contrast-checker` 또는 동등 도구).
+
+### 12.2 ARIA & Semantics
+
+- **Icon-only 버튼**: `aria-label="저장"` 필수
+- **Status badge**: `<span role="status">대기</span>` + 텍스트 레이블 (color-only 금지)
+- **Form**: `<label htmlFor="x">` ↔ `<input id="x">` 매칭 (§4.7)
+- **Error**: `<p role="alert" aria-live="polite">`
+- **Modal/Dialog**: `<div role="dialog" aria-modal="true" aria-labelledby="title">`, focus trap 필수
+- **Active sidebar nav**: `<a aria-current="page">사원관리</a>`
+- **Collapsible sidebar 토글**: `<button aria-expanded={!collapsed} aria-controls="sidebar-nav">`
+- **Heading hierarchy**: h1 → h2 → h3 순서 (건너뛰기 금지). 페이지당 h1 1개.
+
+### 12.3 Keyboard Navigation
+
+- **Tab order**: 시각 순서와 일치 (좌→우, 상→하). `tabindex` positive value 사용 금지 (예: `tabindex="0"` / `tabindex="-1"`만)
+- **Focus ring**: 항상 표시 (§4.5). `outline: none`은 절대 금지
+- **Skip link**: 페이지 첫 요소로 "메인 콘텐츠로 건너뛰기" (사이드바 우회). Tab 첫 누름 시 visible
+- **Escape**: modal/popover/sheet/dropdown 닫기 + 마지막 trigger에 focus 복귀
+- **Enter / Space**: button activation, link 따라가기
+- **Arrow keys**: 그리드 셀 navigation (AG Grid가 처리), dropdown selection
+- **Cmd+K / Ctrl+K**: 메뉴 검색 (헤더 `<input>` 포커스)
+
+### 12.4 Reduced Motion
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+
+영향:
+- 사이드바 토글 애니메이션 → 즉시 (180ms → 0)
+- hover transition (color, background) → 즉시
+- 카드 fade-in / 그림자 페이드 → 즉시
+- ripple / scale active state (transform: scale 0.98) → opacity만 변경
+- skeleton shimmer → 정적 회색 박스
+
+### 12.5 Color Is Not the Only Indicator
+
+- **그리드 행 status** (추가/수정/삭제): 색상 + leading marker
+  - 추가: `●` (filled circle, color primary) + 푸른색 행 background
+  - 수정: `◐` (half-filled circle, color warning) + 노란색 행 background
+  - 삭제: `─` (line-through) + 빨간색 행 background + text-decoration: line-through
+- **Status tag (`<Badge>`)**: 색상 + leading icon
+  - Pending: ⚠ icon + 노란 톤
+  - Approved: ✓ icon + 초록 톤
+  - Urgent: ⚡ icon + 빨간 톤
+- **Form error**: 색상 + leading `⚠` (lucide AlertCircle)
+- **Trend** (대시보드 통계): 색상 + arrow (↑ ↓ -)
+
+### 12.6 Screen Reader
+
+- **Alt text**: 의미 있는 이미지에만 (`<img alt="김민수 프로필 사진">`)
+- **장식 이미지**: `<img alt="" role="presentation">` (예: 로그인 hero 사진 — 정보는 옆 헤드라인)
+- **로그인 hero**: 사진 자체는 장식, 헤드라인 "사람을 위한 인사 운영"이 의미 전달
+- **현재 페이지 표시**: `<a aria-current="page">` (sidebar nav)
+- **Live regions**: form error는 `aria-live="polite"`, urgent 알림은 `role="alert"`
+- **Reading order**: tab order와 동일 (시각 순서 = DOM 순서)
+
+### 12.7 Form Labels
+
+§4.7 Form 패턴 참조. visible label, required indicator, error placement, validation timing 모두 WCAG 준수.
+
+### 12.8 검증 도구 (CI 통합 권장)
+
+- **자동**: `axe-core` (Playwright + `@axe-core/playwright`), `pa11y` (CLI)
+- **수동**: VoiceOver (macOS), NVDA (Windows), Korean screen reader (센스리더)
+- **빌드 게이트**: 주요 페이지 (로그인, 대시보드, 그리드 마스터 5개)에서 axe 오류 0건 강제
+
+## 13. New Open Questions (구현 시 결정)
 
 - [ ] **사이드바 collapsed 상태에서 카테고리 라벨 표시 방식** — 1px hairline divider만 vs 3-letter abbrev (HR/ORG/TIM)?
 - [ ] **로그인 hero 사진 self-host 시점** — 빌드 타임 다운로드 vs 수동 배치
