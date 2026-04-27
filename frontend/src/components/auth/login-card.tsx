@@ -50,6 +50,19 @@ function AuthCardIntro() {
   );
 }
 
+function LoginProgressIndicator() {
+  return (
+    <div className="space-y-2" role="status" aria-live="polite">
+      <div className="h-1.5 overflow-hidden rounded-full bg-primary/15">
+        <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
+      </div>
+      <p className="text-center text-xs font-medium text-slate-500">
+        로그인 처리 후 대시보드로 이동 중입니다.
+      </p>
+    </div>
+  );
+}
+
 function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | null }) {
   const router = useRouter();
   const { login } = useAuth();
@@ -127,7 +140,6 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
       router.replace("/dashboard");
     } catch {
       setErrorMessage("로그인에 실패했습니다. 아이디와 비밀번호를 확인해 주세요.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -221,6 +233,8 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         <Button className="h-12 w-full text-base font-bold" disabled={isSubmitting} type="submit">
           {isSubmitting ? "로그인 중..." : "로그인"}
         </Button>
+
+        {isSubmitting ? <LoginProgressIndicator /> : null}
       </form>
 
       <Separator />
@@ -273,4 +287,3 @@ export function LoginCard({ initialErrorMessage = null }: { initialErrorMessage?
     </AuthCard>
   );
 }
-
