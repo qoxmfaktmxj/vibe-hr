@@ -158,9 +158,9 @@ export function HrRetireChecklistManager() {
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">체크리스트 항목 등록</CardTitle>
+            <CardTitle className="text-sm text-foreground">체크리스트 항목 등록</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">

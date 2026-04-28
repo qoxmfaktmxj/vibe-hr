@@ -279,7 +279,7 @@ export function HriFormTypeManager() {
         <CardContent className="space-y-4">
           <div className="max-h-[280px] overflow-auto rounded-md border">
             <table className="w-full min-w-[980px] border-collapse text-sm">
-              <thead className="sticky top-0 bg-slate-100">
+              <thead className="sticky top-0 bg-accent">
                 <tr>
                   <th className="border px-2 py-2 text-center">No</th>
                   <th className="border px-2 py-2 text-left">신청서코드</th>
@@ -294,7 +294,7 @@ export function HriFormTypeManager() {
                 {filteredRows.map((row, index) => (
                   <tr
                     key={row.id}
-                    className={`cursor-pointer ${!createMode && selectedId === row.id ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
+                    className={`cursor-pointer ${!createMode && selectedId === row.id ? "bg-primary/10" : "odd:bg-card even:bg-muted"}`}
                     onClick={() => {
                       setCreateMode(false);
                       setSelectedId(row.id);
@@ -313,7 +313,7 @@ export function HriFormTypeManager() {
               </tbody>
             </table>
           </div>
-          <div className="text-right text-xs text-slate-500">
+          <div className="text-right text-xs text-muted-foreground">
             [{filteredRows.length} / {rows.length}]
           </div>
 
@@ -387,7 +387,7 @@ export function HriFormTypeManager() {
               수신 처리 필요
             </label>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             참고: {Array.from(EDITABLE_STATUSES).join(", ")} 상태에서는 동일 신청서 재기안이 가능합니다.
           </p>
         </CardContent>

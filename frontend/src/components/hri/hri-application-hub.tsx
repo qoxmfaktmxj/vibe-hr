@@ -1279,7 +1279,7 @@ export function HriApplicationHub() {
         }
       >
         <div className="min-h-0 flex-1 px-6 pb-4">
-          <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
             <AgGridReact<HriRequestItem>
               theme="legacy"
               rowData={filteredRows}

@@ -345,7 +345,7 @@ export function HriApprovalTemplateManager() {
         <CardContent className="space-y-4">
           <div className="max-h-[280px] overflow-auto rounded-md border">
             <table className="w-full min-w-[980px] border-collapse text-sm">
-              <thead className="sticky top-0 bg-slate-100">
+              <thead className="sticky top-0 bg-accent">
                 <tr>
                   <th className="border px-2 py-2 text-center">No</th>
                   <th className="border px-2 py-2 text-left">템플릿코드</th>
@@ -361,7 +361,7 @@ export function HriApprovalTemplateManager() {
                 {filteredRows.map((row, index) => (
                   <tr
                     key={row.id}
-                    className={`cursor-pointer ${!createMode && selectedId === row.id ? "bg-primary/10" : "odd:bg-white even:bg-slate-50"}`}
+                    className={`cursor-pointer ${!createMode && selectedId === row.id ? "bg-primary/10" : "odd:bg-card even:bg-muted"}`}
                     onClick={() => {
                       setCreateMode(false);
                       setSelectedId(row.id);
@@ -381,7 +381,7 @@ export function HriApprovalTemplateManager() {
               </tbody>
             </table>
           </div>
-          <div className="text-right text-xs text-slate-500">
+          <div className="text-right text-xs text-muted-foreground">
             [{filteredRows.length} / {rows.length}]
           </div>
 

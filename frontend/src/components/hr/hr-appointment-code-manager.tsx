@@ -656,7 +656,7 @@ export function HrAppointmentCodeManager() {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
-          <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-border">
             <AgGridReact<AppointmentCodeRow>
               theme="legacy"
               rowData={filteredRows}

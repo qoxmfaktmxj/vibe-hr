@@ -25,7 +25,7 @@ export function LogoutButton() {
   return (
     <Button
       variant="outline"
-      className="border-gray-200 text-gray-600"
+      className="border-border text-muted-foreground"
       disabled={isSubmitting}
       onClick={handleLogout}
       type="button"
