@@ -204,29 +204,36 @@
 .dark {
   --background: #101522;
   --foreground: #f8fafc;
-  --card: #111827;
+  --card: rgba(255, 255, 255, 0.03);
   --card-foreground: #f8fafc;
   --popover: #111827;
   --popover-foreground: #f8fafc;
   --primary: #7a9cec;
   --primary-foreground: #111827;
-  --secondary: #1f2937;
+  --primary-hover: #9fb8ff;
+  --primary-soft: rgba(60, 109, 238, 0.18);
+  --secondary: rgba(255, 255, 255, 0.04);
   --secondary-foreground: #f8fafc;
-  --muted: #1f2937;
+  --muted: rgba(255, 255, 255, 0.04);
   --muted-foreground: #94a3b8;
-  --accent: #1e293b;
+  --accent: rgba(255, 255, 255, 0.05);
   --accent-foreground: #f8fafc;
   --destructive: #e04551;
-  --border: #1e293b;
-  --input: #1e293b;
+  --success: #10b981;
+  --success-foreground: #34d399;
+  --warning: #fbbf24;
+  --warning-foreground: #fde68a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.05);
+  --input: rgba(255, 255, 255, 0.08);
   --ring: #7a9cec;
   --sidebar: #0f172a;
   --sidebar-foreground: #f8fafc;
   --sidebar-primary: #7a9cec;
   --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #1e293b;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #1e293b;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #7a9cec;
 
   --vibe-primary-login: #7a9cec;
@@ -245,6 +252,10 @@
   --vibe-nav-text: #cbd5e1;
   --vibe-nav-text-strong: #f8fafc;
   --vibe-nav-text-muted: #94a3b8;
+
+  /* WCAG 격상 — 다크 모드는 모든 토큰이 5:1+ 통과 */
+  --muted-foreground-on-bg: #94a3b8;
+  --primary-on-bg: #7a9cec;
 }
 
 @layer base {
