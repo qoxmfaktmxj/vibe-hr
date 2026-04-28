@@ -534,3 +534,36 @@
   box-shadow: none !important;
 }
 
+/* ============================================================ */
+/* Typography — Pretendard OpenType + lang-aware tracking         */
+/* ============================================================ */
+:root {
+  font-feature-settings: "ss03", "ss01";
+}
+
+body {
+  font-family: var(--font-sans);
+  letter-spacing: 0; /* 한글 기준 디폴트 */
+}
+
+/* 영문/숫자가 다수인 헤딩에 negative tracking */
+.tracking-tight {
+  letter-spacing: -0.02em;
+}
+.tracking-tighter {
+  letter-spacing: -0.025em;
+}
+
+/* CJK 섞인 헤딩에서 영문 부분만 negative tracking */
+.heading-mixed :lang(en),
+.heading-mixed [lang="en"] {
+  letter-spacing: -0.02em;
+}
+
+/* 숫자는 tabular + tracking 0 */
+.tnum, .tabular-nums {
+  font-feature-settings: "tnum", "ss03", "ss01";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
