@@ -24,7 +24,10 @@ export function ManagerPageShell({
   return (
     <AgGridModulesProvider>
       <div
-        className={cn("flex h-[calc(100vh-73px)] flex-col gap-3 px-3 py-3 md:px-6 md:py-4", className)}
+        className={cn(
+          "flex h-[calc(100vh-113px)] flex-col gap-3 px-3 py-3 md:px-6 md:py-4 bg-background",
+          className,
+        )}
         ref={containerRef}
         onPasteCapture={onPasteCapture}
       >
@@ -54,11 +57,17 @@ export function ManagerSearchSection({
   className,
 }: ManagerSearchSectionProps) {
   return (
-    <Card className={cn("gap-0 py-0", className)}>
-      <CardHeader className="px-3 pb-0 pt-4 md:px-6 md:pt-3">
-        <CardTitle className="text-xl font-semibold text-foreground">{title}</CardTitle>
+    <Card
+      className={cn(
+        "gap-0 py-0 rounded-xl border-border bg-card",
+        "shadow-[rgba(50,50,93,0.06)_0_4px_12px_-4px,rgba(0,0,0,0.04)_0_2px_6px]",
+        className,
+      )}
+    >
+      <CardHeader className="px-3 pb-2 pt-4 md:px-6 md:pt-3">
+        <CardTitle className="text-xl font-semibold tracking-tight text-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="px-4 pb-4 md:px-6 md:pb-4">
+      <CardContent className="px-3 pb-3 md:px-6 md:pb-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex-1">{children}</div>
           <div className="flex justify-end">
@@ -97,7 +106,7 @@ export function ManagerGridSection({
   contentClassName,
 }: ManagerGridSectionProps) {
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col rounded-xl border bg-white", className)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-card", className)}>
       <div
         className={cn(
           "flex flex-col gap-2 px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6",
