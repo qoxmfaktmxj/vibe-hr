@@ -743,7 +743,7 @@ export function EmployeeMasterManager() {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">{I18N.loading}</p>
+        <p className="text-sm text-muted-foreground">{I18N.loading}</p>
       </div>
     );
   }
@@ -782,7 +782,7 @@ export function EmployeeMasterManager() {
               disabled={loading || saving}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         )}
@@ -806,7 +806,7 @@ export function EmployeeMasterManager() {
       >
 
       <div className="min-h-0 flex flex-1 flex-col px-6 pb-4">
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<EmployeeGridRow>
             theme="legacy"
             rowData={rows}

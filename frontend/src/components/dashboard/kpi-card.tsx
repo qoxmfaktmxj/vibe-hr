@@ -22,7 +22,7 @@ export function KpiCard({
   iconColor,
 }: KpiCardProps) {
   return (
-    <Card className="border-gray-100 shadow-sm">
+    <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <span className="text-sm font-medium text-[var(--vibe-accent-muted)]">{title}</span>
         <span className={`rounded-lg p-2 ${iconBg} ${iconColor}`}>
@@ -31,7 +31,7 @@ export function KpiCard({
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex items-end gap-2">
-          <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+          <h3 className="text-2xl font-bold text-foreground">{value}</h3>
           <span className={`mb-1 text-sm font-medium ${trendColor}`}>{trend}</span>
         </div>
       </CardContent>
