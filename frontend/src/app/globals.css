@@ -298,55 +298,6 @@
   background: #475569;
 }
 
-.dark .bg-white,
-.dark .bg-slate-50,
-.dark .bg-slate-100,
-.dark .bg-gray-50,
-.dark .bg-gray-100 {
-  background-color: var(--card) !important;
-}
-.dark .text-black,
-.dark .text-gray-900,
-.dark .text-gray-800,
-.dark .text-gray-700,
-.dark .text-slate-900,
-.dark .text-slate-800,
-.dark .text-slate-700 {
-  color: #f1f5f9 !important;
-}
-.dark .text-gray-600,
-.dark .text-gray-500,
-.dark .text-slate-600,
-.dark .text-slate-500 {
-  color: #cbd5e1 !important;
-}
-.dark .border-gray-200,
-.dark .border-gray-100,
-.dark .border-slate-200,
-.dark .border-slate-100 {
-  border-color: var(--border) !important;
-}
-.dark input,
-.dark select,
-.dark textarea {
-  background-color: var(--muted);
-  color: var(--foreground);
-  border-color: var(--border);
-}
-.dark input::placeholder,
-.dark textarea::placeholder {
-  color: #94a3b8;
-}
-.dark .hover\:bg-white:hover,
-.dark .hover\:bg-slate-50:hover,
-.dark .hover\:bg-slate-100:hover {
-  background-color: var(--accent) !important;
-}
-.dark .odd\:bg-white:nth-child(odd),
-.dark .even\:bg-slate-50:nth-child(even) {
-  background-color: color-mix(in oklab, var(--card) 90%, black 10%) !important;
-}
-
 /* ============================================================ */
 /* VIBE-HR AG Grid 커스텀 토큰 (테마 연동)                        */
 /* ============================================================ */
