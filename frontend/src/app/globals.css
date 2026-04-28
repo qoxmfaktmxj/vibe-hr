@@ -9,7 +9,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-pretendard), system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,6 +65,13 @@
   --accent: #eff4ff;
   --accent-foreground: #1f2937;
   --destructive: #cc2936;
+  --primary-hover: #2f5cd8;
+  --primary-soft: #eef4ff;
+  --success: #15be53;
+  --success-foreground: #108c3d;
+  --warning: #d97706;
+  --warning-foreground: #b45309;
+  --border-soft: #f1f5f9;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #3c6dee;
@@ -98,6 +105,10 @@
   --vibe-nav-text: #334155;
   --vibe-nav-text-strong: #0f172a;
   --vibe-nav-text-muted: #64748b;
+
+  /* WCAG 격상 — 페이지 캔버스(#f6f6f8) 위에서 사용 */
+  --muted-foreground-on-bg: #475569;
+  --primary-on-bg: #2f5cd8;
 }
 
 :root[data-palette="vivid"] {
