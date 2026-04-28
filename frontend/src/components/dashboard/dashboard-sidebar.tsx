@@ -456,10 +456,10 @@ export function DashboardSidebar() {
     void loadMyProfile();
   }, [loadMyProfile]);
 
-  const sidebarContent = (
+  const renderSidebarContent = (effectiveCollapsed: boolean, showToggle: boolean) => (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className={cn("flex items-center gap-3 p-6", collapsed && "justify-center px-3")}>
+        <div className={cn("flex items-center gap-3 p-6", effectiveCollapsed && "justify-center px-3")}>
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <Image
               src="/vibehr_mark.svg"
@@ -470,7 +470,7 @@ export function DashboardSidebar() {
               priority
             />
           </div>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div>
               <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">VIBE-HR</p>
               <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
@@ -478,7 +478,7 @@ export function DashboardSidebar() {
           )}
         </div>
 
-        {!collapsed && (
+        {!effectiveCollapsed && (
           <div className="mt-3 flex items-center justify-end px-3">
             <Button
               type="button"
@@ -526,14 +526,14 @@ export function DashboardSidebar() {
                 currentPath={pathname}
                 openCodes={openCodes}
                 onToggle={toggleGroup}
-                collapsed={collapsed}
+                collapsed={effectiveCollapsed}
               />
             ) : (
               <MenuLeafItem
                 key={node.code}
                 node={node}
                 isActive={node.path ? pathname.startsWith(node.path) : false}
-                collapsed={collapsed}
+                collapsed={effectiveCollapsed}
               />
             ),
           )}
@@ -545,16 +545,16 @@ export function DashboardSidebar() {
           type="button"
           className={cn(
             "flex w-full items-center gap-2 rounded-lg p-2 transition-colors hover:bg-accent",
-            collapsed ? "justify-center" : "text-left",
+            effectiveCollapsed ? "justify-center" : "text-left",
           )}
           onClick={openProfile}
-          title={collapsed ? displayName : undefined}
-          aria-label={collapsed ? `${displayName} 내 정보 보기` : undefined}
+          title={effectiveCollapsed ? displayName : undefined}
+          aria-label={effectiveCollapsed ? `${displayName} 내 정보 보기` : undefined}
         >
           <Avatar className="h-9 w-9 flex-shrink-0">
             <AvatarFallback className="bg-primary/10 font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</span>
               <span className="text-xs text-[color:var(--vibe-nav-text-muted)]">내 정보 보기</span>
@@ -562,16 +562,18 @@ export function DashboardSidebar() {
           )}
         </button>
 
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
-          aria-expanded={!collapsed}
-          aria-controls="sidebar-nav"
-          className="mt-1 w-full h-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground"
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        {showToggle && (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+            aria-expanded={!collapsed}
+            aria-controls="sidebar-nav"
+            className="mt-1 w-full h-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground"
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        )}
       </div>
     </>
   );
@@ -602,7 +604,7 @@ export function DashboardSidebar() {
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-            {sidebarContent}
+            {renderSidebarContent(false, false)}
           </aside>
         </div>
       ) : null}
@@ -684,7 +686,7 @@ export function DashboardSidebar() {
           collapsed ? "w-[60px]" : "w-64",
         )}
       >
-        {sidebarContent}
+        {renderSidebarContent(collapsed, true)}
       </aside>
     </>
   );
