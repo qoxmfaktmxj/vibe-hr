@@ -23,7 +23,7 @@ export function Providers({
           closeButton
           duration={3000}
           toastOptions={{
-            style: { fontFamily: "var(--font-inter), sans-serif" },
+            style: { fontFamily: "var(--font-sans)" },
             classNames: {
               success:
                 "!bg-[#eef7ff] !text-[#0c6dce] !border-[#0ea5e9]/30",

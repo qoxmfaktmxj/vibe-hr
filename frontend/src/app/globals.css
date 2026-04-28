@@ -130,7 +130,9 @@
   --accent-foreground: #2a1542;
   --destructive: #d35269;
   --success: #00b58a;
+  --success-foreground: #047857;
   --warning: #d97706;
+  --warning-foreground: #b45309;
   --border: #e4ddee;
   --border-soft: #efe9f5;
   --input: #e4ddee;
@@ -272,7 +274,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-inter), sans-serif;
   }
 }
 
@@ -338,6 +339,10 @@
   --muted-foreground: #c4b5fd;
   --accent: rgba(109, 236, 175, 0.16);
   --accent-foreground: #f5f3ff;
+  --success: #34d399;
+  --success-foreground: #6ee7b7;
+  --warning: #fbbf24;
+  --warning-foreground: #fde68a;
   --border: rgba(255, 255, 255, 0.08);
   --border-soft: rgba(255, 255, 255, 0.05);
   --input: rgba(255, 255, 255, 0.08);
