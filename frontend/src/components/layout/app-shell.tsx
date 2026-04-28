@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, X } from "lucide-react";
+import { Bell, Home, Search, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -301,15 +301,12 @@ export function AppShell({ title: _title, description: _description, children }:
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-border bg-card text-card-foreground">
-          <div className="grid grid-cols-3 items-center border-b border-border px-4 py-2 lg:px-6">
-            <div className="flex items-center gap-2">
-              <span className="h-8 w-8" aria-hidden="true" />
-            </div>
-
-            <div className="flex justify-center">
+          <div className="flex h-[73px] items-center justify-between gap-4 border-b border-border px-4 lg:px-6">
+            {/* 좌측: 로고 + 검색 바 */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition hover:bg-accent"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold transition hover:bg-accent"
                 aria-label="대시보드로 이동"
                 title="대시보드로 이동"
               >
@@ -322,15 +319,48 @@ export function AppShell({ title: _title, description: _description, children }:
                 />
                 <span className="text-primary">VIBE-HR</span>
               </Link>
+
+              {/* 검색 바 (데스크톱만) */}
+              <div className="hidden md:flex items-center gap-2 flex-1 max-w-md px-3 py-1.5 rounded-full bg-muted border border-border text-muted-foreground">
+                <Search className="h-4 w-4 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="메뉴 검색"
+                  className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground"
+                  aria-label="메뉴 검색"
+                />
+                <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded bg-card border border-border text-muted-foreground">
+                  <span>⌘</span>K
+                </kbd>
+              </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            {/* 우측: 액션 cluster */}
+            <div className="flex items-center gap-2 shrink-0">
               <SessionCountdown />
               <ThemeSettingsPopoverNoSsr />
               {/* user 로드 전 자리 유지 (DOM 구조 고정) */}
               <span className={isAdmin ? undefined : "invisible pointer-events-none"}>
                 <ImpersonationPopoverNoSsr />
               </span>
+              {/* 알림 버튼 (placeholder) */}
+              <button
+                type="button"
+                aria-label="알림"
+                className="relative h-9 w-9 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground transition-colors"
+              >
+                <Bell className="h-4 w-4" />
+              </button>
+              {/* 사용자 아바타 */}
+              {user && (
+                <div
+                  className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold shrink-0"
+                  aria-label={`${user.display_name} 프로필`}
+                  title={user.display_name}
+                >
+                  {user.display_name[0].toUpperCase()}
+                </div>
+              )}
               <LogoutButton />
             </div>
           </div>

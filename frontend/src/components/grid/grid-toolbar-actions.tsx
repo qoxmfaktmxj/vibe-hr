@@ -38,7 +38,7 @@ export function GridToolbarActions({ actions, saveAction }: GridToolbarActionsPr
       })}
       {saveAction ? (
         <>
-          <div className="mx-1 h-6 w-px bg-gray-200" />
+          <div className="mx-1 h-6 w-px bg-border" />
           <Button
             size="sm"
             variant={saveAction.variant ?? "save"}
