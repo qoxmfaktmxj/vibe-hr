@@ -683,7 +683,7 @@ export function DashboardSidebar() {
         aria-label="메인 메뉴"
         className={cn(
           "hidden shrink-0 border-r border-border bg-[var(--vibe-sidebar-bg)] transition-[width] duration-180 ease-out overflow-hidden lg:flex lg:flex-col",
-          collapsed ? "w-[60px]" : "w-64",
+          collapsed ? "w-[60px]" : "w-[200px]",
         )}
       >
         {renderSidebarContent(collapsed, true)}
