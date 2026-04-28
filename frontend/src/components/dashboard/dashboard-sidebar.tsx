@@ -6,6 +6,8 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   IdCard,
   Clock,
   Minus,
@@ -26,7 +28,9 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
 import { renderMenuIcon } from "@/lib/menu-icon-render";
+import { cn } from "@/lib/utils";
 import type { EmployeeItem } from "@/types/employee";
 import type { MenuNode } from "@/types/menu";
 
@@ -108,7 +112,7 @@ function getProfileToneIconClass(tone: ProfileTone): string {
   return "bg-primary/15 text-primary dark:bg-primary/25";
 }
 
-function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean }) {
+function MenuLeafItem({ node, isActive, collapsed = false }: { node: MenuNode; isActive: boolean; collapsed?: boolean }) {
   const ref = useRef<HTMLAnchorElement>(null);
 
   useEffect(() => {
@@ -138,15 +142,18 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
       ref={ref}
       href={node.path}
       onClick={() => setCenterTargetPath(node.path)}
-      className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+      title={collapsed ? (node.name ?? undefined) : undefined}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
         isActive
           ? "bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
-          : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
-      }`}
+          : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]",
+        collapsed && "justify-center px-2",
+      )}
       aria-current={isActive ? "page" : undefined}
     >
-      {renderIcon(node.icon, "h-4 w-4")}
-      {node.name}
+      {renderIcon(node.icon, "h-4 w-4 flex-shrink-0")}
+      {!collapsed && node.name}
     </Link>
   );
 }
@@ -245,31 +252,40 @@ function MenuGroupItem({
   depth = 0,
   openCodes,
   onToggle,
+  collapsed = false,
 }: {
   node: MenuNode;
   currentPath: string;
   depth?: number;
   openCodes: Set<string>;
   onToggle: (code: string) => void;
+  collapsed?: boolean;
 }) {
   const active = hasActiveDescendant(node, currentPath);
-  const isOpen = openCodes.has(node.code);
+  const isOpen = openCodes.has(node.code) && !collapsed;
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => onToggle(node.code)}
-        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+        onClick={() => !collapsed && onToggle(node.code)}
+        title={collapsed ? (node.name ?? undefined) : undefined}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
           active
             ? "text-[color:var(--vibe-nav-text-strong)]"
-            : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
-        }`}
-        style={{ paddingLeft: `${16 + depth * 12}px` }}
+            : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]",
+          collapsed && "justify-center px-2",
+        )}
+        style={collapsed ? undefined : { paddingLeft: `${16 + depth * 12}px` }}
       >
-        {renderIcon(node.icon, "h-4 w-4")}
-        <span className="flex-1 text-left">{node.name}</span>
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        {renderIcon(node.icon, "h-4 w-4 flex-shrink-0")}
+        {!collapsed && (
+          <>
+            <span className="flex-1 text-left">{node.name}</span>
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </>
+        )}
       </button>
 
       {isOpen ? (
@@ -283,12 +299,14 @@ function MenuGroupItem({
                 depth={depth + 1}
                 openCodes={openCodes}
                 onToggle={onToggle}
+                collapsed={false}
               />
             ) : (
               <MenuLeafItem
                 key={child.code}
                 node={child}
                 isActive={child.path ? currentPath.startsWith(child.path) : false}
+                collapsed={false}
               />
             ),
           )}
@@ -302,6 +320,7 @@ export function DashboardSidebar() {
   const { user } = useAuth();
   const { menus } = useMenu();
   const pathname = usePathname();
+  const { collapsed, toggle } = useSidebarCollapsed();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -440,8 +459,8 @@ export function DashboardSidebar() {
   const sidebarContent = (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-3 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+        <div className={cn("flex items-center gap-3 p-6", collapsed && "justify-center px-3")}>
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <Image
               src="/vibehr_mark.svg"
               alt="VIBE-HR"
@@ -451,44 +470,48 @@ export function DashboardSidebar() {
               priority
             />
           </div>
-          <div>
-            <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">VIBE-HR</p>
-            <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
-          </div>
+          {!collapsed && (
+            <div>
+              <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">VIBE-HR</p>
+              <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
+            </div>
+          )}
         </div>
 
-        <div className="mt-3 flex items-center justify-end px-3">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-6 w-6"
-            onClick={() => {
-              if (menuExpanded) {
-                // 전체 접기: openCodes 비우기
-                setOpenCodes(new Set());
-              } else {
-                // 전체 펼치기: 모든 그룹 code 추가
-                const allCodes = new Set<string>();
-                function collectAll(nodes: MenuNode[]) {
-                  for (const n of nodes) {
-                    if (n.children.length > 0) {
-                      allCodes.add(n.code);
-                      collectAll(n.children);
+        {!collapsed && (
+          <div className="mt-3 flex items-center justify-end px-3">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-6 w-6"
+              onClick={() => {
+                if (menuExpanded) {
+                  // 전체 접기: openCodes 비우기
+                  setOpenCodes(new Set());
+                } else {
+                  // 전체 펼치기: 모든 그룹 code 추가
+                  const allCodes = new Set<string>();
+                  function collectAll(nodes: MenuNode[]) {
+                    for (const n of nodes) {
+                      if (n.children.length > 0) {
+                        allCodes.add(n.code);
+                        collectAll(n.children);
+                      }
                     }
                   }
+                  collectAll(menus);
+                  setOpenCodes(allCodes);
                 }
-                collectAll(menus);
-                setOpenCodes(allCodes);
-              }
-              setMenuExpanded((prev) => !prev);
-            }}
-            title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
-            aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
-          >
-            {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-          </Button>
-        </div>
+                setMenuExpanded((prev) => !prev);
+              }}
+              title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
+              aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
+            >
+              {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+            </Button>
+          </div>
+        )}
 
         <nav
           ref={restoreMenuScroll}
@@ -503,12 +526,14 @@ export function DashboardSidebar() {
                 currentPath={pathname}
                 openCodes={openCodes}
                 onToggle={toggleGroup}
+                collapsed={collapsed}
               />
             ) : (
               <MenuLeafItem
                 key={node.code}
                 node={node}
                 isActive={node.path ? pathname.startsWith(node.path) : false}
+                collapsed={collapsed}
               />
             ),
           )}
@@ -518,16 +543,34 @@ export function DashboardSidebar() {
       <div className="shrink-0 border-t border-border bg-[var(--vibe-sidebar-bg)] p-3">
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-accent"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-lg p-2 transition-colors hover:bg-accent",
+            collapsed ? "justify-center" : "text-left",
+          )}
           onClick={openProfile}
+          title={collapsed ? displayName : undefined}
+          aria-label={collapsed ? `${displayName} 내 정보 보기` : undefined}
         >
-          <Avatar className="h-9 w-9">
+          <Avatar className="h-9 w-9 flex-shrink-0">
             <AvatarFallback className="bg-primary/10 font-semibold text-primary">{initials}</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</span>
-            <span className="text-xs text-[color:var(--vibe-nav-text-muted)]">내 정보 보기</span>
-          </div>
+          {!collapsed && (
+            <div className="flex flex-col leading-tight">
+              <span className="text-sm font-semibold text-[color:var(--vibe-nav-text-strong)]">{displayName}</span>
+              <span className="text-xs text-[color:var(--vibe-nav-text-muted)]">내 정보 보기</span>
+            </div>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "사이드바 펼치기" : "사이드바 접기"}
+          aria-expanded={!collapsed}
+          aria-controls="sidebar-nav"
+          className="mt-1 w-full h-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground"
+        >
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
     </>
@@ -633,7 +676,14 @@ export function DashboardSidebar() {
         </div>
       ) : null}
 
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
+      <aside
+        id="sidebar-nav"
+        aria-label="메인 메뉴"
+        className={cn(
+          "hidden shrink-0 border-r border-border bg-[var(--vibe-sidebar-bg)] transition-[width] duration-180 ease-out overflow-hidden lg:flex lg:flex-col",
+          collapsed ? "w-[60px]" : "w-64",
+        )}
+      >
         {sidebarContent}
       </aside>
     </>
