@@ -418,6 +418,7 @@
       "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
         "download"
@@ -914,13 +915,9 @@
       "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "WEL"
