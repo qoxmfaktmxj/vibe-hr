@@ -820,6 +820,49 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - spec 에러페이지 판정 패턴 보강 + playwright workers 설정 (R1)
 - `/hr/retire/approvals` AG Grid 등록 vs 커스텀 예외 결정
 
+## TASK VH-GRID-VARIANT-20260708 — grid variant 필드 도입 + readonly toolbar 정합성 수정
+- Date: 2026-07-08
+- Status: completed
+- Mode: Execution
+- Risk Class: R2 (config/grid-screens.json, validator)
+- Approval Status: approved (사용자 승인: "전체 진행")
+- Owner: kms (계획 Fable, 구현 Sonnet 위임 → 세션 한도 중단분 메인 세션이 마무리)
+
+### Goal
+- `docs/exec-plans/grid-variant-readonly-toolbar-v0.1.md` 구현: variant 필드 + validator 규칙 + readonly 화면 toolbar 선언 축소
+
+### Changed Files
+- `frontend/scripts/validate-grid-screens.mjs` — variant 값 검증(crud/readonly/approval/workflow), readonly는 toolbar ⊆ [query,download], approval/workflow는 query 필수
+- `config/grid-screens.json` — 60화면 variant 분류(crud 34 생략기본/readonly 14/approval 5/workflow 7), readonly 14화면 toolbar를 [query,download]로 축소
+- `docs/exec-plans/grid-variant-readonly-toolbar-v0.1.md` — 구현 정정 주석(approval 통합 폐기, 최종 분류)
+
+### Commands Run
+- `frontend: npm run validate:grid && npm run lint && npm run build`
+- `frontend: npx playwright test tests/e2e/lifecycle-grid-qa.spec.ts --workers=1`
+
+### Verification Summary
+- validate:grid / lint / build: 통과
+- 라이프사이클 QA spec: 8/8 PASS (49.4s)
+- 핵심 확인: registry toolbar는 프론트 런타임에서 import되지 않음(`frontend/src`에 grid-screens.json 참조 0건) → 이번 축소는 UI 무변경의 선언 정합성 수정, 기능 상실 위험 없음
+
+### Result
+- 커밋 5건: fecb3a4(validator) → b902ebc(approval/workflow 분류) → 4a0af0a(tim/hr readonly) → 38357c8(mng readonly) → 0c8bad8(org/wel readonly)
+- 감사 문서(GRID_CRUD_AUDIT) 대비 편차: tim.leave-approval·hri.tasks.approvals·hri.tasks.receives를 approval로 분류(실화면 승인 액션 보유), wel.benefit-types는 onQuery만 구현된 조회 화면으로 확인되어 readonly 확정
+
+### Failure / Retry Notes
+- Failure taxonomy: `ENV_FAILURE`
+- Sonnet 실행자 세션 한도 중단(커밋 3까지 완료) → 메인 세션이 잔여분(mng 커밋, org/wel 처리, 최종 검증) 마무리
+- QA 재실행 시 `next build`가 dev 서버 `.next`를 건드려 frontend 크래시 + backend 프로세스 사망 → 재기동 후 8/8 통과. build와 dev 서버 동시 운용 주의
+
+### Remaining Risks
+- approval/workflow 화면 12개의 toolbar 선언은 여전히 과대(표준 7버튼) — 실지원 액션 조사 후 별도 정리 필요
+- validator의 readonly componentFile 토큰 검사가 주석 충족을 허용(예: wel-benefit-type-overview.tsx) — VibeGrid 전환 시 자연 해소 예정
+
+### Follow-ups
+- VibeGrid wrapper 구현 + readonly 파일럿 1화면 (Wave 1 진입)
+- /hr/retire/approvals VibeGrid 기반 표준 전환
+- approval/workflow 화면 toolbar 실지원 액션 조사
+
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]
 - R2/R3는 ledger 없이 완료 처리하지 않는다. [Proposal]

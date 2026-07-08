@@ -1,10 +1,12 @@
 # Exec Plan: grid-screens.json variant 필드 + readonly toolbar 축소 (v0.1)
 
 - Date: 2026-07-08
-- Status: draft (승인 대기)
+- Status: completed (2026-07-08 사용자 승인 후 당일 구현 — 커밋 fecb3a4, b902ebc, 4a0af0a, 38357c8, 0c8bad8)
 - Risk Class: R2 (`config/grid-screens.json`, `frontend/src/lib/grid/**` 보호 경로)
-- Approval Status: requested
+- Approval Status: approved
 - Owner: kms
+
+> **구현 시 정정**: 본 문서의 "approval→workflow 통합" 제안은 폐기함. validator(`validate-grid-screens.mjs`)가 이미 `readonly|approval|workflow` 값을 예약하고 있어 기존 코드 컨벤션을 따랐다. 최종 분류: crud 34(기본값, 필드 생략) / readonly 14 / approval 5 / workflow 7 = 60화면. tim.month-close는 engine:"custom"으로 기존 체계 유지. 감사 문서 대비 편차: tim.leave-approval, hri.tasks.approvals, hri.tasks.receives는 readonly가 아닌 approval로 분류(실화면에 승인 액션 존재). registry toolbar는 런타임에서 사용되지 않으므로(화면이 액션 하드코딩) 이번 축소는 UI 무변경의 선언 정합성 수정이며, registry→런타임 연결은 VibeGrid wrapper에서 구현 예정.
 - Inputs: `docs/GRID_CRUD_AUDIT.md`(2026-03-23, 63화면 전수), `docs/VIBE_GRID_LIFECYCLE_QA_PLAN.md`, `docs/GRID_SCREEN_STANDARD.md`
 
 ## Goal
