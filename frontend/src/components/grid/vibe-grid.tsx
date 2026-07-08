@@ -75,6 +75,10 @@ export type VibeGridProps<Row extends VibeGridRowBase> = {
    * Example: set appliedFilters state so fetchUrl reflects the latest values.
    */
   onQueryStart?: () => void;
+  /** Called when a grid row is clicked. Forwarded to ReadonlyGridManager's onRowClick. */
+  onRowClick?: (row: Row & ReadonlyGridRow) => void;
+  /** Highlights the row whose `id` matches this value (see ReadonlyGridManager). */
+  selectedRowId?: number | string | null;
 };
 
 function toXlsxSheetName(name: string): string {
@@ -129,6 +133,8 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
   gridHeight,
   downloadFileName,
   onQueryStart,
+  onRowClick,
+  selectedRowId,
 }: VibeGridProps<Row>) {
   const [page, setPage] = useState(1);
   const [appliedUrl, setAppliedUrl] = useState(fetchUrl);
@@ -173,6 +179,8 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
       gridHeight={gridHeight}
       emptyText={emptyText}
       loading={isLoading}
+      onRowClick={onRowClick}
+      selectedRowId={selectedRowId}
     />
   );
 }
