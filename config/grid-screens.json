@@ -143,6 +143,7 @@
       "componentFile": "frontend/src/components/hr/hr-appointment-record-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -177,6 +178,7 @@
       "componentFile": "frontend/src/components/hr/hr-recruit-finalist-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -193,7 +195,7 @@
       "pageFile": "frontend/src/app/hr/retire/checklist/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-retire-checklist-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -211,6 +213,7 @@
       "componentFile": "frontend/src/components/hri/hri-application-hub.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -228,6 +231,7 @@
       "componentFile": "frontend/src/components/hri/hri-approval-task-board.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "approval",
       "toolbar": [
         "query",
         "create",
@@ -245,6 +249,7 @@
       "componentFile": "frontend/src/components/hri/hri-receive-task-board.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "approval",
       "toolbar": [
         "query",
         "create",
@@ -278,7 +283,7 @@
       "pageFile": "frontend/src/app/mng/dev-inquiries/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -295,7 +300,7 @@
       "pageFile": "frontend/src/app/mng/dev-projects/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-project-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -312,7 +317,7 @@
       "pageFile": "frontend/src/app/mng/dev-requests/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -329,7 +334,7 @@
       "pageFile": "frontend/src/app/mng/dev-staff/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-staff-viewer.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -346,7 +351,7 @@
       "pageFile": "frontend/src/app/mng/infra/page.tsx",
       "componentFile": "frontend/src/components/mng/infra-config-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -363,7 +368,7 @@
       "pageFile": "frontend/src/app/mng/manager-status/page.tsx",
       "componentFile": "frontend/src/components/mng/manager-status-viewer.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -380,7 +385,7 @@
       "pageFile": "frontend/src/app/mng/outsource-attendance/page.tsx",
       "componentFile": "frontend/src/components/mng/outsource-attendance-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -397,7 +402,7 @@
       "pageFile": "frontend/src/app/mng/outsource-contracts/page.tsx",
       "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -448,7 +453,7 @@
       "pageFile": "frontend/src/app/org/dept-history/page.tsx",
       "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "download"
@@ -461,6 +466,7 @@
       "componentFile": "frontend/src/components/org/org-restructure-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -622,6 +628,7 @@
       "componentFile": "frontend/src/components/payroll/payroll-run-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -689,7 +696,7 @@
       "pageFile": "frontend/src/app/tim/annual-leave/page.tsx",
       "componentFile": "frontend/src/components/tim/annual-leave-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -723,7 +730,7 @@
       "pageFile": "frontend/src/app/tim/status/page.tsx",
       "componentFile": "frontend/src/components/tim/attendance-status-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -758,6 +765,7 @@
       "componentFile": "frontend/src/components/tim/leave-approval-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "approval",
       "toolbar": [
         "query",
         "create",
@@ -785,7 +793,7 @@
       "pageFile": "frontend/src/app/tim/reports/page.tsx",
       "componentFile": "frontend/src/components/tim/tim-report-dashboard.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -820,6 +828,7 @@
       "componentFile": "frontend/src/components/tra/tra-applications-approval-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "approval",
       "toolbar": [
         "query",
         "create",
@@ -905,6 +914,7 @@
       "componentFile": "frontend/src/components/tra/tra-my-applications-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "add",
@@ -951,7 +961,7 @@
       "pageFile": "frontend/src/app/wel/benefit-types/page.tsx",
       "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -969,6 +979,7 @@
       "componentFile": "frontend/src/components/wel/wel-my-requests-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "create",
@@ -982,6 +993,7 @@
       "componentFile": "frontend/src/components/wel/wel-benefit-request-overview.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "approval",
       "toolbar": [
         "query",
         "create",
