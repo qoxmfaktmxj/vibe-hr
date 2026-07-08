@@ -263,8 +263,8 @@ def test_calculate_payroll_run_projects_welfare_requests_into_pay_items() -> Non
             approved_amount=200_000,
             payroll_run_label=None,
             description="학자금 지급",
-            requested_at=_utc_now().replace(tzinfo=None),
-            approved_at=_utc_now().replace(tzinfo=None),
+            requested_at=datetime(2026, 3, 10, 9, 0, 0),
+            approved_at=datetime(2026, 3, 12, 9, 0, 0),
             created_at=_utc_now(),
             updated_at=_utc_now(),
         )
@@ -280,8 +280,8 @@ def test_calculate_payroll_run_projects_welfare_requests_into_pay_items() -> Non
             approved_amount=50_000,
             payroll_run_label=None,
             description="사내대출 상환",
-            requested_at=_utc_now().replace(tzinfo=None),
-            approved_at=_utc_now().replace(tzinfo=None),
+            requested_at=datetime(2026, 3, 10, 9, 0, 0),
+            approved_at=datetime(2026, 3, 12, 9, 0, 0),
             created_at=_utc_now(),
             updated_at=_utc_now(),
         )
