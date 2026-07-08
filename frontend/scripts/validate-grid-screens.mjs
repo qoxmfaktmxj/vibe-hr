@@ -105,6 +105,13 @@ for (const [key, screen] of Object.entries(screens)) {
   if (pageProfile === "standard-v2") {
     // variant: "readonly" | "approval" | "workflow" relaxes editable-only tokens
     const variant = screen.variant ?? "crud";
+    const validVariants = new Set(["crud", "readonly", "approval", "workflow"]);
+    if (!validVariants.has(variant)) {
+      fail(
+        `[${key}] invalid variant "${variant}"; must be one of crud/readonly/approval/workflow`,
+      );
+    }
+
     const requiredTokens = [
       "ManagerPageShell",
       "ManagerSearchSection",
@@ -119,11 +126,27 @@ for (const [key, screen] of Object.entries(screens)) {
     ];
     // readonly/approval/workflow variants still require all tokens for consistency
     // (imported but void-ed is acceptable)
-    void variant;
 
     for (const token of requiredTokens) {
       if (!component.includes(token)) {
         fail(`[${key}] standard-v2 requires "${token}" in ${screen.componentFile}`);
+      }
+    }
+
+    const toolbar = Array.isArray(screen.toolbar) ? screen.toolbar : [];
+    if (variant === "readonly") {
+      const allowed = new Set(["query", "download"]);
+      const disallowed = toolbar.filter((action) => !allowed.has(action));
+      if (disallowed.length > 0) {
+        fail(
+          `[${key}] readonly variant toolbar must be a subset of ["query","download"]; found extra: ${disallowed.join(", ")}`,
+        );
+      }
+    }
+
+    if (variant === "approval" || variant === "workflow") {
+      if (!toolbar.includes("query")) {
+        fail(`[${key}] ${variant} variant toolbar must include "query"`);
       }
     }
 
