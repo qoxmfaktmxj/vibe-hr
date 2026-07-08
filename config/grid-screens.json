@@ -280,13 +280,9 @@
       "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -297,13 +293,9 @@
       "componentFile": "frontend/src/components/mng/dev-project-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -314,13 +306,9 @@
       "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -331,13 +319,9 @@
       "componentFile": "frontend/src/components/mng/dev-staff-viewer.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -348,13 +332,9 @@
       "componentFile": "frontend/src/components/mng/infra-config-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -365,13 +345,9 @@
       "componentFile": "frontend/src/components/mng/manager-status-viewer.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -382,13 +358,9 @@
       "componentFile": "frontend/src/components/mng/outsource-attendance-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
@@ -399,13 +371,9 @@
       "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "MNG"
