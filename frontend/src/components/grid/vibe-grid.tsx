@@ -69,6 +69,12 @@ export type VibeGridProps<Row extends VibeGridRowBase> = {
   gridHeight?: number;
   /** Base file name (without extension) used for the xlsx download. */
   downloadFileName?: string;
+  /**
+   * Called just before the internal query/re-fetch runs.
+   * Use this to apply staged filter state before VibeGrid reads `fetchUrl`.
+   * Example: set appliedFilters state so fetchUrl reflects the latest values.
+   */
+  onQueryStart?: () => void;
 };
 
 function toXlsxSheetName(name: string): string {
@@ -122,6 +128,7 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
   queryLabel = "조회",
   gridHeight,
   downloadFileName,
+  onQueryStart,
 }: VibeGridProps<Row>) {
   const [page, setPage] = useState(1);
   const [appliedUrl, setAppliedUrl] = useState(fetchUrl);
@@ -153,6 +160,7 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}
       onQuery={() => {
+        onQueryStart?.();
         setPage(1);
         setAppliedUrl(fetchUrl);
         void mutate();
