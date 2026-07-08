@@ -83,7 +83,13 @@ for (const [key, screen] of Object.entries(screens)) {
   if (!page.includes(`registryKey: "${key}"`) && !page.includes(`registryKey: '${key}'`)) {
     fail(`[${key}] registryKey mismatch in ${screen.pageFile}`);
   }
-  if (!component.includes("AgGridReact")) {
+  // VibeGrid internally contains AgGridReact and all standard-v2 tokens,
+  // so screens that delegate to VibeGrid are exempt from token-level checks.
+  const usesVibeGrid =
+    /from\s+["']@\/components\/grid\/vibe-grid["']/.test(component) &&
+    /\bVibeGrid\b/.test(component);
+
+  if (!usesVibeGrid && !component.includes("AgGridReact")) {
     fail(`[${key}] AgGridReact missing in ${screen.componentFile}`);
   }
   if (component.includes("ModuleRegistry")) {
@@ -125,11 +131,14 @@ for (const [key, screen] of Object.entries(screens)) {
       "_prevStatus",
     ];
     // readonly/approval/workflow variants still require all tokens for consistency
-    // (imported but void-ed is acceptable)
-
-    for (const token of requiredTokens) {
-      if (!component.includes(token)) {
-        fail(`[${key}] standard-v2 requires "${token}" in ${screen.componentFile}`);
+    // (imported but void-ed is acceptable).
+    // Exception: VibeGrid-based screens satisfy all token requirements via
+    // VibeGrid's own imports (see components/grid/vibe-grid.tsx).
+    if (!usesVibeGrid) {
+      for (const token of requiredTokens) {
+        if (!component.includes(token)) {
+          fail(`[${key}] standard-v2 requires "${token}" in ${screen.componentFile}`);
+        }
       }
     }
 
@@ -150,13 +159,17 @@ for (const [key, screen] of Object.entries(screens)) {
       }
     }
 
-    const looksPaged = component.includes("totalCount") && component.includes("pageSize");
-    if (looksPaged) {
-      if (!component.includes("useGridPagination")) {
-        fail(`[${key}] paged standard-v2 screen must use useGridPagination`);
-      }
-      if (!component.includes("GridPaginationControls")) {
-        fail(`[${key}] paged standard-v2 screen must use GridPaginationControls`);
+    // VibeGrid internally wires useGridPagination and GridPaginationControls,
+    // so skip the pagination token check for VibeGrid-based screens.
+    if (!usesVibeGrid) {
+      const looksPaged = component.includes("totalCount") && component.includes("pageSize");
+      if (looksPaged) {
+        if (!component.includes("useGridPagination")) {
+          fail(`[${key}] paged standard-v2 screen must use useGridPagination`);
+        }
+        if (!component.includes("GridPaginationControls")) {
+          fail(`[${key}] paged standard-v2 screen must use GridPaginationControls`);
+        }
       }
     }
   }
