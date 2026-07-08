@@ -8,6 +8,7 @@ from app.api.auth import router as auth_router
 from app.api.common_code import router as common_code_router
 from app.api.dashboard import router as dashboard_router
 from app.api.employee import router as employee_router
+from app.api.health import router as health_router
 from app.api.menu import router as menu_router
 from app.api.organization import router as organization_router
 from app.api.hr_basic import router as hr_basic_router
@@ -66,6 +67,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
+app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(employee_router, prefix="/api/v1")
