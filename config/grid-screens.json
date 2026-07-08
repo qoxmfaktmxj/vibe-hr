@@ -195,14 +195,10 @@
       "pageFile": "frontend/src/app/hr/retire/checklist/page.tsx",
       "componentFile": "frontend/src/components/hr/hr-retire-checklist-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "HR"
@@ -283,7 +279,7 @@
       "pageFile": "frontend/src/app/mng/dev-inquiries/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-inquiry-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -300,7 +296,7 @@
       "pageFile": "frontend/src/app/mng/dev-projects/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-project-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -317,7 +313,7 @@
       "pageFile": "frontend/src/app/mng/dev-requests/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-request-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -334,7 +330,7 @@
       "pageFile": "frontend/src/app/mng/dev-staff/page.tsx",
       "componentFile": "frontend/src/components/mng/dev-staff-viewer.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -351,7 +347,7 @@
       "pageFile": "frontend/src/app/mng/infra/page.tsx",
       "componentFile": "frontend/src/components/mng/infra-config-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -368,7 +364,7 @@
       "pageFile": "frontend/src/app/mng/manager-status/page.tsx",
       "componentFile": "frontend/src/components/mng/manager-status-viewer.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -385,7 +381,7 @@
       "pageFile": "frontend/src/app/mng/outsource-attendance/page.tsx",
       "componentFile": "frontend/src/components/mng/outsource-attendance-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -402,7 +398,7 @@
       "pageFile": "frontend/src/app/mng/outsource-contracts/page.tsx",
       "componentFile": "frontend/src/components/mng/outsource-contract-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
@@ -453,7 +449,7 @@
       "pageFile": "frontend/src/app/org/dept-history/page.tsx",
       "componentFile": "frontend/src/components/org/org-dept-history-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "download"
@@ -696,14 +692,10 @@
       "pageFile": "frontend/src/app/tim/annual-leave/page.tsx",
       "componentFile": "frontend/src/components/tim/annual-leave-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "TIM"
@@ -730,14 +722,10 @@
       "pageFile": "frontend/src/app/tim/status/page.tsx",
       "componentFile": "frontend/src/components/tim/attendance-status-manager.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "TIM"
@@ -793,14 +781,10 @@
       "pageFile": "frontend/src/app/tim/reports/page.tsx",
       "componentFile": "frontend/src/components/tim/tim-report-dashboard.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
+      "variant": "readonly",
       "toolbar": [
         "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
         "download"
       ],
       "ownerModule": "TIM"
@@ -961,7 +945,7 @@
       "pageFile": "frontend/src/app/wel/benefit-types/page.tsx",
       "componentFile": "frontend/src/components/wel/wel-benefit-type-overview.tsx",
       "engine": "ag-grid",
-      "profile": "standard-v2",
+      "profile": "standard-v2",
       "toolbar": [
         "query",
         "create",
