@@ -551,6 +551,40 @@
       ],
       "ownerModule": "PAYROLL"
     },
+    "payroll.gl-accounts": {
+      "path": "/payroll/gl-accounts",
+      "pageFile": "frontend/src/app/payroll/gl-accounts/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-gl-account-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
+    "payroll.gl-mappings": {
+      "path": "/payroll/gl-mappings",
+      "pageFile": "frontend/src/app/payroll/gl-mappings/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-gl-mapping-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
     "payroll.income-tax-brackets": {
       "path": "/payroll/income-tax-brackets",
       "pageFile": "frontend/src/app/payroll/income-tax-brackets/page.tsx",
