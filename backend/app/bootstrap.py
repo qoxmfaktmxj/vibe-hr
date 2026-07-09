@@ -75,6 +75,8 @@ from app.models import (
     MngInfraConfig,
     WelBenefitRequest,
     WelBenefitType,
+    GlAccount,
+    PayGlMapping,
     TraOrganization,
     TraCourse,
     TraEvent,
@@ -2583,6 +2585,47 @@ PAY_ALLOWANCE_DEDUCTION_SEEDS = [
     ("LTX", "지방소득세", "deduction", "tax", "formula", 135),
 ]
 
+GL_ACCOUNT_SEEDS = [
+    # code, name, account_type, is_net_pay_account, sort_order
+    ("5100", "급여비용", "expense", False, 10),
+    ("5110", "상여비용", "expense", False, 20),
+    ("5120", "제수당비용", "expense", False, 30),
+    ("5130", "복리후생비", "expense", False, 40),
+    ("2100", "미지급급여", "liability", True, 110),
+    ("2210", "소득세예수금", "liability", False, 120),
+    ("2220", "지방소득세예수금", "liability", False, 130),
+    ("2230", "국민연금예수금", "liability", False, 140),
+    ("2240", "건강보험예수금", "liability", False, 150),
+    ("2250", "장기요양보험예수금", "liability", False, 160),
+    ("2260", "고용보험예수금", "liability", False, 170),
+    ("1400", "사내대출채권", "asset", False, 210),
+]
+
+# pay_allowance_deductions.code -> gl_accounts.code (Phase 1 고정 매핑, 설계문서 §8)
+PAY_GL_MAPPING_SEEDS = {
+    "BSC": "5100",
+    "MLA": "5130",
+    "OTX": "5120",
+    "NGT": "5120",
+    "HDW": "5120",
+    "HDO": "5120",
+    "HDN": "5120",
+    "POS": "5120",
+    "PEN": "2230",
+    "HIN": "2240",
+    "EMP": "2260",
+    "LTC": "2250",
+    "ITX": "2210",
+    "LTX": "2220",
+    # ensure_pay_welfare_allowance_definitions 시드 항목 (복지/사내대출 관련)
+    "SCHOLARSHIP_GRANT": "5130",
+    "CONDOLENCE_GRANT": "5130",
+    "MEDICAL_GRANT": "5130",
+    "LOAN_REPAY": "1400",
+    "PENSION_DEDUCT": "2230",
+    "CLUB_DEDUCT": "2260",
+}
+
 PAY_ITEM_GROUP_SEEDS = [
     # code, name, description
     ("GR-OFFICE", "사무직 그룹", "사무직 급여 항목 기본 그룹"),
@@ -2944,6 +2987,77 @@ def ensure_pay_item_groups(session: Session) -> None:
                 changed = True
             if existing.description != description:
                 existing.description = description
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_gl_seeds(session: Session) -> None:
+    """gl_accounts 기본 12종 + pay_allowance_deductions 전 코드 -> 계정 매핑 시드."""
+    for code, name, account_type, is_net_pay_account, sort_order in GL_ACCOUNT_SEEDS:
+        existing = session.exec(select(GlAccount).where(GlAccount.code == code)).first()
+        if existing is None:
+            session.add(
+                GlAccount(
+                    code=code,
+                    name=name,
+                    account_type=account_type,
+                    is_net_pay_account=is_net_pay_account,
+                    is_active=True,
+                    sort_order=sort_order,
+                )
+            )
+        else:
+            changed = False
+            if existing.name != name:
+                existing.name = name
+                changed = True
+            if existing.account_type != account_type:
+                existing.account_type = account_type
+                changed = True
+            if existing.is_net_pay_account != is_net_pay_account:
+                existing.is_net_pay_account = is_net_pay_account
+                changed = True
+            if existing.sort_order != sort_order:
+                existing.sort_order = sort_order
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+    allowance_codes = session.exec(select(PayAllowanceDeduction.code)).all()
+    for item_code in allowance_codes:
+        gl_account_code = PAY_GL_MAPPING_SEEDS.get(item_code)
+        if gl_account_code is None:
+            continue
+
+        existing = session.exec(
+            select(PayGlMapping).where(
+                PayGlMapping.pay_item_code == item_code,
+                PayGlMapping.effective_from == date(2020, 1, 1),
+            )
+        ).first()
+        if existing is None:
+            session.add(
+                PayGlMapping(
+                    pay_item_code=item_code,
+                    gl_account_code=gl_account_code,
+                    effective_from=date(2020, 1, 1),
+                    note="초기 시드 매핑",
+                    is_active=True,
+                )
+            )
+        else:
+            changed = False
+            if existing.gl_account_code != gl_account_code:
+                existing.gl_account_code = gl_account_code
                 changed = True
             if not existing.is_active:
                 existing.is_active = True
@@ -5869,6 +5983,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_pay_allowance_deductions(session)
     ensure_pay_welfare_allowance_definitions(session)
     ensure_pay_item_groups(session)
+    ensure_gl_seeds(session)
     ensure_pay_phase2_samples(session)
     ensure_payroll_detail_visual_samples(session)
     ensure_hri_form_types(session)
