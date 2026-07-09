@@ -77,6 +77,7 @@ from app.models import (
     WelBenefitType,
     GlAccount,
     PayGlMapping,
+    PaySeveranceItemRule,
     TraOrganization,
     TraCourse,
     TraEvent,
@@ -2601,6 +2602,14 @@ GL_ACCOUNT_SEEDS = [
     ("1400", "사내대출채권", "asset", False, 210),
 ]
 
+# 평균임금 산입 규칙 예시 (명시 3건, 나머지 활성 item_code는 ensure_severance_item_rule_seeds에서 full로 채움)
+# item_code -> (include_type, note)
+SEVERANCE_ITEM_RULE_EXAMPLE_SEEDS: dict[str, tuple[str, str]] = {
+    "POS": ("prorate_12", "직책수당 - 연간 총액의 3/12 비율로 안분 산입"),
+    "OTX": ("exclude", "연장수당 - 평균임금 산입 제외 예시"),
+    "BSC": ("full", "기본급 - 전액 산입"),
+}
+
 # pay_allowance_deductions.code -> gl_accounts.code (Phase 1 고정 매핑, 설계문서 §8)
 PAY_GL_MAPPING_SEEDS = {
     "BSC": "5100",
@@ -3059,6 +3068,34 @@ def ensure_gl_seeds(session: Session) -> None:
             if existing.gl_account_code != gl_account_code:
                 existing.gl_account_code = gl_account_code
                 changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if changed:
+                session.add(existing)
+    session.commit()
+
+
+def ensure_severance_item_rule_seeds(session: Session) -> None:
+    """평균임금 산입 규칙 시드: 명시 예시 3건 + 나머지 활성 pay_allowance_deductions 코드는 full."""
+    allowance_codes = session.exec(select(PayAllowanceDeduction.code)).all()
+    for item_code in allowance_codes:
+        include_type, note = SEVERANCE_ITEM_RULE_EXAMPLE_SEEDS.get(item_code, ("full", "기본값: 전액 산입"))
+
+        existing = session.exec(
+            select(PaySeveranceItemRule).where(PaySeveranceItemRule.pay_item_code == item_code)
+        ).first()
+        if existing is None:
+            session.add(
+                PaySeveranceItemRule(
+                    pay_item_code=item_code,
+                    include_type=include_type,
+                    note=note,
+                    is_active=True,
+                )
+            )
+        else:
+            changed = False
             if not existing.is_active:
                 existing.is_active = True
                 changed = True
@@ -5984,6 +6021,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_pay_welfare_allowance_definitions(session)
     ensure_pay_item_groups(session)
     ensure_gl_seeds(session)
+    ensure_severance_item_rule_seeds(session)
     ensure_pay_phase2_samples(session)
     ensure_payroll_detail_visual_samples(session)
     ensure_hri_form_types(session)

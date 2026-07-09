@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
@@ -30,6 +31,8 @@ from app.schemas.hr_retire import (
     HrRetireChecklistUpdateRequest,
     HrRetireAuditLogItemResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _utc_now() -> datetime:
@@ -449,7 +452,18 @@ def confirm_retire_case(
         detail=f"employment_status:{before_status}->resigned",
     )
     session.commit()
+    _try_create_severance_draft(session, retire_case_id=case_id)
     return get_retire_case_detail(session, case_id)
+
+
+def _try_create_severance_draft(session: Session, *, retire_case_id: int) -> None:
+    """퇴직 confirm 후 퇴직금 산정 draft를 생성한다. 훅 실패가 confirm을 깨지 않도록 격리."""
+    try:
+        from app.services.hr_severance_service import create_draft_from_retire_case
+
+        create_draft_from_retire_case(session, retire_case_id=retire_case_id)
+    except Exception:
+        logger.exception("Failed to create severance draft for retire_case_id=%s", retire_case_id)
 
 
 def cancel_retire_case(
