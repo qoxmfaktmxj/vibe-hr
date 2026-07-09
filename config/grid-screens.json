@@ -686,6 +686,23 @@
       ],
       "ownerModule": "PAYROLL"
     },
+    "payroll.severance-item-rules": {
+      "path": "/payroll/severance-item-rules",
+      "pageFile": "frontend/src/app/payroll/severance-item-rules/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-severance-item-rule-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "template",
+        "upload",
+        "save",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
     "settings.common-codes": {
       "path": "/settings/common-codes",
       "pageFile": "frontend/src/app/settings/common-codes/page.tsx",
