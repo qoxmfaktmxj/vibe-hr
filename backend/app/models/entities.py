@@ -1976,3 +1976,85 @@ class WelBenefitRequest(SQLModel, table=True):
     approved_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class GlAccount(SQLModel, table=True):
+    """계정과목 마스터"""
+
+    __tablename__ = "gl_accounts"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_gl_accounts_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code: str = Field(max_length=20, index=True)
+    name: str = Field(max_length=100)
+    account_type: str = Field(max_length=20)  # expense | liability | asset | equity | revenue
+    is_net_pay_account: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayGlMapping(SQLModel, table=True):
+    """급여항목 → 계정 매핑"""
+
+    __tablename__ = "pay_gl_mappings"
+    __table_args__ = (
+        UniqueConstraint("pay_item_code", "effective_from", name="uq_pay_gl_mappings_item_period"),
+        Index("ix_pay_gl_mappings_item_code", "pay_item_code"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pay_item_code: str = Field(max_length=30)
+    gl_account_code: str = Field(foreign_key="gl_accounts.code", max_length=20, index=True)
+    effective_from: date = Field(index=True)
+    note: Optional[str] = Field(default=None, max_length=200)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayVoucher(SQLModel, table=True):
+    """전표 헤더"""
+
+    __tablename__ = "pay_vouchers"
+    __table_args__ = (
+        UniqueConstraint("voucher_no", name="uq_pay_vouchers_voucher_no"),
+        UniqueConstraint("run_id", name="uq_pay_vouchers_run_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    voucher_no: str = Field(max_length=30, index=True)
+    run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    voucher_date: date = Field(index=True)
+    status: str = Field(default="draft", max_length=20)  # draft | confirmed | cancelled
+    total_debit: float = Field(default=0)
+    total_credit: float = Field(default=0)
+    summary: Optional[str] = Field(default=None, max_length=200)
+    created_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    confirmed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    confirmed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PayVoucherLine(SQLModel, table=True):
+    """전표 라인 (분개)"""
+
+    __tablename__ = "pay_voucher_lines"
+    __table_args__ = (
+        Index("ix_pay_voucher_lines_voucher", "voucher_id", "line_no"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    voucher_id: int = Field(foreign_key="pay_vouchers.id", index=True)
+    line_no: int
+    gl_account_code: str = Field(foreign_key="gl_accounts.code", max_length=20, index=True)
+    cost_center_code: Optional[str] = Field(default=None, max_length=30)
+    debit_amount: float = Field(default=0)
+    credit_amount: float = Field(default=0)
+    summary: Optional[str] = Field(default=None, max_length=200)
+    source_item_code: Optional[str] = Field(default=None, max_length=30)
+    created_at: datetime = Field(default_factory=utc_now)

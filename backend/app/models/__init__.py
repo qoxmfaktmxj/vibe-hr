@@ -88,6 +88,10 @@ from app.models.entities import (
     MngInfraConfig,
     WelBenefitType,
     WelBenefitRequest,
+    GlAccount,
+    PayGlMapping,
+    PayVoucher,
+    PayVoucherLine,
 )
 from app.models.tra import (
     TraApplication,
@@ -191,6 +195,10 @@ __all__ = [
     "MngInfraConfig",
     "WelBenefitType",
     "WelBenefitRequest",
+    "GlAccount",
+    "PayGlMapping",
+    "PayVoucher",
+    "PayVoucherLine",
     "TraOrganization",
     "TraCourse",
     "TraEvent",
