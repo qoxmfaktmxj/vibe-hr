@@ -17,6 +17,16 @@ import type {
   HrSeveranceCalcListResponse,
 } from "@/types/hr-severance";
 
+const TAX_ROW_LABELS: { key: keyof import("@/types/hr-severance").HrSeveranceTaxDetail; label: string }[] = [
+  { key: "service_year_deduction", label: "근속연수공제" },
+  { key: "conversion_income", label: "환산급여" },
+  { key: "conversion_income_deduction", label: "환산급여공제" },
+  { key: "taxable_base", label: "과세표준" },
+  { key: "income_tax", label: "산출세액" },
+  { key: "local_income_tax", label: "지방소득세" },
+  { key: "net_severance", label: "실수령액" },
+];
+
 type SeveranceCalcRow = HrSeveranceCalcItem & ReadonlyGridRow;
 
 const STATUS_LABELS: Record<string, string> = {
@@ -105,6 +115,20 @@ export function HrSeveranceCalcManager() {
       {
         field: "final_amount",
         headerName: "최종액",
+        width: 140,
+        cellStyle: { textAlign: "right" },
+        valueFormatter: (params) => formatAmount(Number(params.value ?? 0)),
+      },
+      {
+        field: "income_tax",
+        headerName: "소득세",
+        width: 130,
+        cellStyle: { textAlign: "right" },
+        valueFormatter: (params) => formatAmount(Number(params.value ?? 0)),
+      },
+      {
+        field: "net_severance",
+        headerName: "실수령액",
         width: 140,
         cellStyle: { textAlign: "right" },
         valueFormatter: (params) => formatAmount(Number(params.value ?? 0)),
@@ -270,6 +294,24 @@ export function HrSeveranceCalcManager() {
                   <div className="mt-1 text-amber-600">경고: {calcDetail.calc.warning}</div>
                 ) : null}
               </div>
+
+              {calcDetail.tax_detail ? (
+                <div className="rounded-md border p-3 text-sm">
+                  <div className="mb-2 font-medium">퇴직소득세 산출 내역</div>
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {TAX_ROW_LABELS.map(({ key, label }) => (
+                        <tr key={key} className="border-t first:border-t-0">
+                          <td className="px-3 py-1.5 text-slate-500">{label}</td>
+                          <td className="px-3 py-1.5 text-right font-medium">
+                            {formatAmount(Number(calcDetail.tax_detail?.[key] ?? 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
 
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-sm">

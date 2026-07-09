@@ -23,8 +23,29 @@ export type HrSeveranceCalcItem = {
   calculated_at?: string | null;
   confirmed_by?: number | null;
   confirmed_at?: string | null;
+  service_years: number;
+  income_tax: number;
+  local_income_tax: number;
+  net_severance: number;
   created_at: string;
   updated_at: string;
+};
+
+export type HrSeveranceTaxDetail = {
+  service_years: number;
+  service_year_deduction: number;
+  conversion_income: number;
+  conversion_income_deduction: number;
+  taxable_base: number;
+  base_tax_rate: number;
+  quick_deduction: number;
+  converted_calculated_tax: number;
+  income_tax: number;
+  local_income_tax: number;
+  net_severance: number;
+  tax_table_year?: number | null;
+  bracket_year?: number | null;
+  warning?: string | null;
 };
 
 export type HrSeveranceCalcListResponse = {
@@ -45,6 +66,7 @@ export type HrSeveranceWageDetailItem = {
 export type HrSeveranceCalcDetailResponse = {
   calc: HrSeveranceCalcItem;
   wage_details: HrSeveranceWageDetailItem[];
+  tax_detail?: HrSeveranceTaxDetail | null;
 };
 
 export type HrSeveranceAdjustmentUpdateRequest = {
