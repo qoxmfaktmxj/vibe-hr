@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
@@ -31,6 +30,7 @@ from app.api.hri_approval_template import router as hri_approval_template_router
 from app.api.hri_request import router as hri_request_router
 from app.api.pay_setup import router as pay_setup_router
 from app.api.payroll_phase2 import router as payroll_phase2_router
+from app.api.pay_voucher import router as pay_voucher_router
 from app.api.mng_company import router as mng_company_router
 from app.api.mng_dev import router as mng_dev_router
 from app.api.mng_outsource import router as mng_outsource_router
@@ -95,6 +95,7 @@ app.include_router(hri_approval_template_router, prefix="/api/v1")
 app.include_router(hri_request_router, prefix="/api/v1")
 app.include_router(pay_setup_router, prefix="/api/v1")
 app.include_router(payroll_phase2_router, prefix="/api/v1")
+app.include_router(pay_voucher_router, prefix="/api/v1")
 app.include_router(mng_company_router, prefix="/api/v1")
 app.include_router(mng_dev_router, prefix="/api/v1")
 app.include_router(mng_outsource_router, prefix="/api/v1")
