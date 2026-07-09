@@ -14,6 +14,7 @@ from app.models import (
     HrSeveranceCalc,
     OrgDepartment,
     PayAllowanceDeduction,
+    PayIncomeTaxBracket,
     PayPayrollRun,
     PayPayrollRunEmployee,
     PayPayrollRunItem,
@@ -22,10 +23,14 @@ from app.models import (
 )
 from app.services.hr_retire_service import confirm_retire_case
 from app.services.hr_severance_service import (
+    SEVERANCE_TAX_TABLE,
     calc_avg_wage_period,
     calc_base_days,
     calc_service_days,
+    calc_service_year_deduction,
+    calc_service_years,
     calc_severance_amount,
+    calc_severance_tax,
     confirm_severance_calc,
     create_draft_from_retire_case,
     recalculate_severance_calc,
@@ -526,3 +531,254 @@ def test_no_wage_history_sets_warning() -> None:
         assert calc.warning is not None
         assert "급여" in calc.warning
         assert calc.status == "draft"
+
+
+# ── Phase 2: 퇴직소득세 (§9-4) ──
+
+
+def _seed_income_tax_brackets(session: Session, *, year: int = 2026) -> None:
+    """국세청 2026년 종합소득세율표를 그대로 픽스처로 고정 시딩한다 (라이브 브래킷 의존 금지)."""
+    rows = [
+        (0, 14_000_000, 6.0, 0.0),
+        (14_000_000, 50_000_000, 15.0, 1_260_000.0),
+        (50_000_000, 88_000_000, 24.0, 5_760_000.0),
+        (88_000_000, 150_000_000, 35.0, 15_440_000.0),
+        (150_000_000, 300_000_000, 38.0, 19_940_000.0),
+        (300_000_000, 500_000_000, 40.0, 25_940_000.0),
+        (500_000_000, 1_000_000_000, 42.0, 35_940_000.0),
+        (1_000_000_000, None, 45.0, 65_940_000.0),
+    ]
+    for annual_from, annual_to, tax_rate, quick_deduction in rows:
+        session.add(
+            PayIncomeTaxBracket(
+                year=year,
+                annual_taxable_from=annual_from,
+                annual_taxable_to=annual_to,
+                tax_rate=tax_rate,
+                quick_deduction=quick_deduction,
+                created_at=_utc_now(),
+            )
+        )
+    session.commit()
+
+
+# ── 근속연수공제 구간 경계 (5/10/20년) ──
+
+
+def test_service_year_deduction_boundaries() -> None:
+    table = SEVERANCE_TAX_TABLE[2026]["service_year_deduction"]
+
+    assert calc_service_year_deduction(5, table) == 5_000_000.0  # 100만 * 5
+    assert calc_service_year_deduction(6, table) == 7_000_000.0  # 500만 + 200만*1
+    assert calc_service_year_deduction(10, table) == 15_000_000.0  # 500만 + 200만*5
+    assert calc_service_year_deduction(11, table) == 17_500_000.0  # 1,500만 + 250만*1
+    assert calc_service_year_deduction(20, table) == 40_000_000.0  # 1,500만 + 250만*10
+    assert calc_service_year_deduction(21, table) == 43_000_000.0  # 4,000만 + 300만*1
+
+
+def test_calc_service_years_ceils_and_has_minimum_one() -> None:
+    assert calc_service_years(365) == 1
+    assert calc_service_years(366) == 2  # 1년 초과분은 절상
+    assert calc_service_years(3650) == 10
+    assert calc_service_years(3651) == 11
+    assert calc_service_years(0) == 0
+
+
+# ── 환산급여공제 각 구간 ──
+
+
+def test_conversion_income_deduction_each_bracket() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+
+        # ~800만: 전액 산입 -> taxable_base = 0
+        r1 = calc_severance_tax(session, final_amount=8_000_000 * 10 / 12, service_days=3650, retire_date=date(2026, 7, 9))
+        assert r1["conversion_income_deduction"] == r1["conversion_income"]
+
+        # 환산급여가 5,000만이 되도록 final_amount 역산 (~7,000만 구간: 800만 + 60%초과)
+        r2 = calc_severance_tax(session, final_amount=50_000_000 * 10 / 12 + 15_000_000, service_days=3650, retire_date=date(2026, 7, 9))
+        assert abs(r2["conversion_income"] - 50_000_000.0) < 1e-3
+        expected_deduction_r2 = 8_000_000.0 + (50_000_000.0 - 8_000_000.0) * 0.6
+        assert abs(r2["conversion_income_deduction"] - expected_deduction_r2) < 1e-3
+
+        # 환산급여 1억200만 (~1억 구간: 4,520만+55%) — 수기 대조 케이스의 환산급여
+        r3 = calc_severance_tax(session, final_amount=100_000_000.0, service_days=3650, retire_date=date(2026, 7, 9))
+        assert abs(r3["conversion_income"] - 102_000_000.0) < 1e-3
+        expected_deduction_r3 = 61_700_000.0 + (102_000_000.0 - 100_000_000.0) * 0.45
+        assert abs(r3["conversion_income_deduction"] - expected_deduction_r3) < 1e-3
+
+        # 환산급여 3억5천 (초과 구간: 15,170만+35%)
+        service_year_ded_20 = calc_service_year_deduction(20, SEVERANCE_TAX_TABLE[2026]["service_year_deduction"])
+        final_for_350m = 350_000_000.0 * 20 / 12 + service_year_ded_20
+        r4 = calc_severance_tax(session, final_amount=final_for_350m, service_days=365 * 20, retire_date=date(2026, 7, 9))
+        assert abs(r4["conversion_income"] - 350_000_000.0) < 1e-3
+        expected_deduction_r4 = 151_700_000.0 + (350_000_000.0 - 300_000_000.0) * 0.35
+        assert abs(r4["conversion_income_deduction"] - expected_deduction_r4) < 1e-3
+
+
+# ── 1년 미만/0원 세액 0 ──
+
+
+def test_under_one_year_service_has_zero_tax() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+        result = calc_severance_tax(session, final_amount=5_000_000.0, service_days=200, retire_date=date(2026, 7, 9))
+
+        assert result["income_tax"] == 0.0
+        assert result["local_income_tax"] == 0.0
+        assert result["net_severance"] == 5_000_000.0
+
+
+def test_zero_final_amount_has_zero_tax() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+        result = calc_severance_tax(session, final_amount=0.0, service_days=3650, retire_date=date(2026, 7, 9))
+
+        assert result["income_tax"] == 0.0
+        assert result["local_income_tax"] == 0.0
+        assert result["net_severance"] == 0.0
+
+
+# ── 조정액 변경 시 세액 재계산 ──
+
+
+def test_adjustment_change_recalculates_tax() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+        dept = _seed_department(session)
+        employee = _seed_employee(session, employee_no="E012", department_id=int(dept.id), hire_date=date(2016, 7, 9))
+        retire_case = _seed_retire_case(session, employee_id=employee.id, retire_date=date(2026, 7, 9))
+
+        calc = create_draft_from_retire_case(session, retire_case_id=retire_case.id)
+        assert calc.income_tax == 0.0  # 급여이력 없음 -> severance_amount 0 -> 세액 0
+
+        detail = update_severance_adjustment(
+            session,
+            calc.id,
+            HrSeveranceAdjustmentUpdateRequest(adjustment_amount=100_000_000, adjustment_reason="특별공로금"),
+        )
+        assert detail.calc.final_amount == 100_000_000.0
+        assert detail.calc.income_tax > 0.0
+        assert detail.calc.net_severance == (
+            detail.calc.final_amount - detail.calc.income_tax - detail.calc.local_income_tax
+        )
+        assert detail.tax_detail is not None
+        assert detail.tax_detail.service_years == calc_service_years(calc.service_days)
+
+        # 조정액을 더 늘리면 세액도 늘어나야 한다 (재계산 확인)
+        detail2 = update_severance_adjustment(
+            session,
+            calc.id,
+            HrSeveranceAdjustmentUpdateRequest(adjustment_amount=200_000_000, adjustment_reason="추가 조정"),
+        )
+        assert detail2.calc.income_tax > detail.calc.income_tax
+
+
+# ── confirmed 후 세액 불변 ──
+
+
+def test_confirmed_calc_tax_fields_are_immutable() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+        dept = _seed_department(session)
+        employee = _seed_employee(session, employee_no="E013", department_id=int(dept.id), hire_date=date(2016, 7, 9))
+        retire_case = _seed_retire_case(session, employee_id=employee.id, retire_date=date(2026, 7, 9))
+
+        calc = create_draft_from_retire_case(session, retire_case_id=retire_case.id)
+        update_severance_adjustment(
+            session,
+            calc.id,
+            HrSeveranceAdjustmentUpdateRequest(adjustment_amount=100_000_000, adjustment_reason="특별공로금"),
+        )
+
+        confirmed = confirm_severance_calc(session, calc.id, confirmed_by=1)
+        income_tax_at_confirm = confirmed.calc.income_tax
+        net_severance_at_confirm = confirmed.calc.net_severance
+
+        try:
+            update_severance_adjustment(
+                session,
+                calc.id,
+                HrSeveranceAdjustmentUpdateRequest(adjustment_amount=999_000_000, adjustment_reason="사유"),
+            )
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 409
+
+        try:
+            recalculate_severance_calc(session, calc.id)
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 409
+
+        reloaded = session.get(HrSeveranceCalc, calc.id)
+        assert reloaded.income_tax == income_tax_at_confirm
+        assert reloaded.net_severance == net_severance_at_confirm
+
+
+# ── 수기 대조: 근속 10년, 퇴직금 1억 (국세청 예시 스타일) ──
+
+
+def test_manual_reconciliation_10_years_100m_won() -> None:
+    """근속 10년, 퇴직금 1억원 케이스를 국세청 방식으로 수기 계산해 대조한다.
+
+    근속연수공제 1,500만 (500만 + 200만*5)
+    환산급여 = (1억 - 1,500만) * 12 / 10 = 1억200만
+    환산급여공제 = 6,170만 + (1억200만 - 1억)*45% = 6,260만
+    과세표준 = 1억200만 - 6,260만 = 3,940만
+    2026년 기본세율표 15% 구간(1,400만~5,000만, 누진공제 126만):
+      환산산출세액 = 3,940만*15% - 126만 = 465만
+    산출세액(income_tax) = 465만 / 12 * 10 = 3,875,000
+    지방소득세 = 387,500
+    실수령 = 1억 - 3,875,000 - 387,500 = 95,737,500
+    """
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session)
+
+        result = calc_severance_tax(
+            session, final_amount=100_000_000.0, service_days=3650, retire_date=date(2026, 7, 9)
+        )
+
+        assert result["service_years"] == 10
+        assert result["service_year_deduction"] == 15_000_000.0
+        assert abs(result["conversion_income"] - 102_000_000.0) < 1e-3
+        assert abs(result["conversion_income_deduction"] - 62_600_000.0) < 1e-3
+        assert abs(result["taxable_base"] - 39_400_000.0) < 1e-3
+        assert result["base_tax_rate"] == 15.0
+        assert result["quick_deduction"] == 1_260_000.0
+        assert abs(result["converted_calculated_tax"] - 4_650_000.0) < 1e-3
+        assert abs(result["income_tax"] - 3_875_000.0) < 1e-3
+        assert abs(result["local_income_tax"] - 387_500.0) < 1e-3
+        assert abs(result["net_severance"] - 95_737_500.0) < 1e-3
+
+
+# ── 세율 연도 fallback ──
+
+
+def test_missing_year_bracket_falls_back_to_latest_and_warns() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_income_tax_brackets(session, year=2025)
+
+        result = calc_severance_tax(
+            session, final_amount=100_000_000.0, service_days=3650, retire_date=date(2026, 7, 9)
+        )
+
+        assert result["bracket_year"] == 2025
+        assert result["warning"] is not None
+        assert "2025" in result["warning"]
+        # 세율 자체는 정상적으로 적용되어야 한다
+        assert result["income_tax"] > 0.0
