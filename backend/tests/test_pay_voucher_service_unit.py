@@ -18,12 +18,15 @@ from app.models import (
     PayVoucherLine,
 )
 from app.services.pay_voucher_service import (
+    build_voucher_export_csv,
     cancel_voucher,
     confirm_voucher,
     find_mapping_gaps,
+    generate_disbursement_voucher,
     generate_voucher,
     get_voucher_detail,
 )
+from app.services.payroll_phase2_service import close_payroll_run
 
 FIXED_NOW = datetime(2026, 7, 9, 9, 0, 0, tzinfo=timezone.utc)
 
@@ -159,9 +162,10 @@ def _add_run_employee_with_items(
 
 
 def _seed_gl_accounts(session: Session) -> None:
-    session.add(GlAccount(code="5100", name="급여비용", account_type="expense", is_net_pay_account=False, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
-    session.add(GlAccount(code="2230", name="국민연금예수금", account_type="liability", is_net_pay_account=False, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
-    session.add(GlAccount(code="2100", name="미지급급여", account_type="liability", is_net_pay_account=True, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
+    session.add(GlAccount(code="5100", name="급여비용", account_type="expense", is_net_pay_account=False, is_cash_account=False, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
+    session.add(GlAccount(code="2230", name="국민연금예수금", account_type="liability", is_net_pay_account=False, is_cash_account=False, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
+    session.add(GlAccount(code="2100", name="미지급급여", account_type="liability", is_net_pay_account=True, is_cash_account=False, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
+    session.add(GlAccount(code="1100", name="보통예금", account_type="asset", is_net_pay_account=False, is_cash_account=True, is_active=True, created_at=_utc_now(), updated_at=_utc_now()))
     session.commit()
 
 
@@ -452,3 +456,246 @@ def test_generate_voucher_absorbs_one_won_rounding_diff() -> None:
         total_debit = sum(line.debit_amount for line in detail.lines)
         total_credit = sum(line.credit_amount for line in detail.lines)
         assert total_debit == total_credit
+
+
+# ── Phase 2 §11-1 disbursement voucher ──
+
+
+def _setup_confirmed_accrual_for_disbursement(session: Session) -> tuple[PayPayrollRun, PayVoucher]:
+    """paid run + confirmed accrual voucher (net pay 1,000,000 - 45,000 = 955,000)를 세팅한다."""
+    _seed_gl_accounts(session)
+    _seed_allowance(session, code="BSC", name="기본급", item_type="allowance")
+    _seed_allowance(session, code="PEN", name="국민연금", item_type="deduction")
+    _seed_mapping(session, pay_item_code="BSC", gl_account_code="5100")
+    _seed_mapping(session, pay_item_code="PEN", gl_account_code="2230")
+
+    dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+    emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+    run = _seed_payroll_run(session, status="closed")
+    _add_run_employee_with_items(
+        session, run_id=run.id, employee_id=emp.id,
+        items=[("BSC", "earning", 1_000_000), ("PEN", "deduction", 45_000)],
+    )
+
+    accrual = generate_voucher(session, run.id, created_by=1).voucher
+    confirm_voucher(session, accrual.id, confirmed_by=1)
+
+    run.status = "paid"
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+
+    return run, accrual
+
+
+def test_generate_disbursement_voucher_balances_and_matches_net_pay() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        run, _accrual = _setup_confirmed_accrual_for_disbursement(session)
+
+        result = generate_disbursement_voucher(session, run.id, created_by=1)
+        voucher = result.voucher
+        assert voucher.voucher_type == "disbursement"
+        assert voucher.status == "draft"
+        assert voucher.total_debit == voucher.total_credit == 955_000.0
+
+        detail = get_voucher_detail(session, voucher.id)
+        assert len(detail.lines) == 2
+        debit_line = next(line for line in detail.lines if line.debit_amount > 0)
+        credit_line = next(line for line in detail.lines if line.credit_amount > 0)
+        assert debit_line.gl_account_code == "2100"  # 미지급급여 (is_net_pay_account)
+        assert debit_line.debit_amount == 955_000.0
+        assert credit_line.gl_account_code == "1100"  # 보통예금 (is_cash_account)
+        assert credit_line.credit_amount == 955_000.0
+
+
+def test_pay_vouchers_unique_on_run_id_and_voucher_type() -> None:
+    """동일 run에 accrual과 disbursement 전표가 공존할 수 있어야 한다 (run_id 단독 유니크였다면 실패)."""
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        run, accrual = _setup_confirmed_accrual_for_disbursement(session)
+
+        disbursement = generate_disbursement_voucher(session, run.id, created_by=1).voucher
+
+        vouchers = session.exec(select(PayVoucher).where(PayVoucher.run_id == run.id)).all()
+        assert len(vouchers) == 2
+        assert {v.voucher_type for v in vouchers} == {"accrual", "disbursement"}
+        assert accrual.id != disbursement.id
+
+
+def test_generate_disbursement_voucher_rejects_unconfirmed_accrual() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_gl_accounts(session)
+        _seed_allowance(session, code="BSC", name="기본급", item_type="allowance")
+        _seed_mapping(session, pay_item_code="BSC", gl_account_code="5100")
+
+        dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+        emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+        run = _seed_payroll_run(session, status="closed")
+        _add_run_employee_with_items(
+            session, run_id=run.id, employee_id=emp.id,
+            items=[("BSC", "earning", 1_000_000)],
+        )
+
+        # accrual voucher generated but left in draft (not confirmed)
+        generate_voucher(session, run.id, created_by=1)
+
+        run.status = "paid"
+        session.add(run)
+        session.commit()
+
+        try:
+            generate_disbursement_voucher(session, run.id, created_by=1)
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 409
+
+        # No disbursement voucher should have been persisted
+        assert session.exec(
+            select(PayVoucher).where(PayVoucher.run_id == run.id, PayVoucher.voucher_type == "disbursement")
+        ).first() is None
+
+
+def test_generate_disbursement_voucher_rejects_run_not_paid() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        run, _accrual = _setup_confirmed_accrual_for_disbursement(session)
+        run.status = "closed"  # revert to non-paid
+        session.add(run)
+        session.commit()
+
+        try:
+            generate_disbursement_voucher(session, run.id, created_by=1)
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 409
+
+
+# ── Phase 2 §11-2 close 자동훅 ──
+
+
+def test_close_payroll_run_auto_creates_accrual_voucher_draft() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_gl_accounts(session)
+        _seed_allowance(session, code="BSC", name="기본급", item_type="allowance")
+        _seed_mapping(session, pay_item_code="BSC", gl_account_code="5100")
+
+        dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+        emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+        run = _seed_payroll_run(session, status="calculated")
+        _add_run_employee_with_items(
+            session, run_id=run.id, employee_id=emp.id,
+            items=[("BSC", "earning", 1_000_000)],
+        )
+
+        close_payroll_run(session, run.id)
+
+        voucher = session.exec(
+            select(PayVoucher).where(PayVoucher.run_id == run.id, PayVoucher.voucher_type == "accrual")
+        ).first()
+        assert voucher is not None
+        assert voucher.status == "draft"
+        assert voucher.total_debit == voucher.total_credit == 1_000_000.0
+
+
+def test_close_payroll_run_succeeds_even_when_mapping_missing() -> None:
+    """매핑 누락으로 전표 자동 생성이 실패해도 close 자체는 성공해야 한다 (예외 격리)."""
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_gl_accounts(session)
+        _seed_allowance(session, code="UNMAPPED", name="미매핑항목", item_type="allowance")
+        # Intentionally no mapping for UNMAPPED
+
+        dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+        emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+        run = _seed_payroll_run(session, status="calculated")
+        _add_run_employee_with_items(
+            session, run_id=run.id, employee_id=emp.id,
+            items=[("UNMAPPED", "earning", 500_000)],
+        )
+
+        response = close_payroll_run(session, run.id)
+        assert response.run.status == "closed"
+
+        # No voucher should have been created due to missing mapping, but close still succeeded
+        voucher = session.exec(select(PayVoucher).where(PayVoucher.run_id == run.id)).first()
+        assert voucher is None
+
+
+# ── Phase 2 §11-3 CSV export ──
+
+
+def test_export_voucher_csv_contains_expected_columns_and_rows() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_gl_accounts(session)
+        _seed_allowance(session, code="BSC", name="기본급", item_type="allowance")
+        _seed_mapping(session, pay_item_code="BSC", gl_account_code="5100")
+
+        dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+        emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+        run = _seed_payroll_run(session, status="closed")
+        _add_run_employee_with_items(
+            session, run_id=run.id, employee_id=emp.id,
+            items=[("BSC", "earning", 1_000_000)],
+        )
+
+        voucher = generate_voucher(session, run.id, created_by=1).voucher
+        confirm_voucher(session, voucher.id, confirmed_by=1)
+
+        filename, csv_bytes = build_voucher_export_csv(session, voucher.id)
+        assert filename == f"{voucher.voucher_no}.csv"
+        assert csv_bytes.startswith("﻿".encode("utf-8"))  # UTF-8 BOM
+
+        text = csv_bytes.decode("utf-8-sig")
+        rows = [line for line in text.splitlines() if line]
+        header = rows[0].split(",")
+        assert header == [
+            "voucher_no",
+            "voucher_date",
+            "line_no",
+            "gl_account_code",
+            "gl_account_name",
+            "cost_center_code",
+            "debit",
+            "credit",
+            "summary",
+        ]
+        # BSC earning line + net-pay line = 2 data rows
+        assert len(rows) == 3
+        assert voucher.voucher_no in rows[1]
+        assert "5100" in rows[1]
+
+
+def test_export_voucher_rejects_non_confirmed_voucher() -> None:
+    engine = _make_engine()
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed_gl_accounts(session)
+        _seed_allowance(session, code="BSC", name="기본급", item_type="allowance")
+        _seed_mapping(session, pay_item_code="BSC", gl_account_code="5100")
+
+        dept = _seed_department(session, code="DEPT-A", cost_center="CC-A")
+        emp = _seed_employee(session, employee_no="E001", department_id=int(dept.id))
+        run = _seed_payroll_run(session, status="closed")
+        _add_run_employee_with_items(
+            session, run_id=run.id, employee_id=emp.id,
+            items=[("BSC", "earning", 1_000_000)],
+        )
+
+        voucher = generate_voucher(session, run.id, created_by=1).voucher  # left as draft
+
+        try:
+            build_voucher_export_csv(session, voucher.id)
+            assert False, "expected HTTPException"
+        except HTTPException as exc:
+            assert exc.status_code == 409
