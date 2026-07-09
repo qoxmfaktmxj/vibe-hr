@@ -49,7 +49,7 @@ type GlAccountRow = GlAccountItem & {
 /* 상수                                                                */
 /* ------------------------------------------------------------------ */
 const TRACKED_FIELDS: (keyof GlAccountItem)[] = [
-  "code", "name", "account_type", "is_net_pay_account", "is_active", "sort_order",
+  "code", "name", "account_type", "is_net_pay_account", "is_cash_account", "is_active", "sort_order",
 ];
 
 const ACCOUNT_TYPE_OPTIONS = ["expense", "liability", "asset", "equity", "revenue"];
@@ -103,6 +103,7 @@ function createEmptyRow(tempId: number): GlAccountRow {
     name: "",
     account_type: "expense",
     is_net_pay_account: false,
+    is_cash_account: false,
     is_active: true,
     sort_order: 0,
     created_at: now,
@@ -291,6 +292,17 @@ export function PayGlAccountManager() {
         cellStyle: { textAlign: "center" },
       },
       {
+        headerName: "현금계정",
+        field: "is_cash_account",
+        width: 100,
+        editable: (p) => p.data?._status !== "deleted",
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: ["Y", "N"] },
+        valueFormatter: (p) => (p.value ? "Y" : "N"),
+        valueParser: (p) => p.newValue === "Y",
+        cellStyle: { textAlign: "center" },
+      },
+      {
         headerName: "순서",
         field: "sort_order",
         width: 72,
@@ -441,6 +453,7 @@ export function PayGlAccountManager() {
           name: r.name.trim(),
           account_type: r.account_type,
           is_net_pay_account: r.is_net_pay_account,
+          is_cash_account: r.is_cash_account,
           is_active: r.is_active,
           sort_order: r.sort_order,
         })),
