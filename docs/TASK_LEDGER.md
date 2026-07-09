@@ -976,6 +976,42 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 ### Follow-ups
 - QA spec storageState 개선, VibeGrid Wave 1 잔여 전환, 전표·퇴직금 Phase 2 설계
 
+## TASK VH-SEVERANCE-PHASE2-20260709 — 퇴직소득세 산출 (HR_SEVERANCE_DESIGN §9)
+- Date: 2026-07-09
+- Status: completed
+- Mode: Execution
+- Risk Class: R3 (스키마 리비전 + 급여 연계 세액 로직)
+- Approval Status: approved (§9 승인, 사용자 순차 진행 지시)
+- Owner: kms (구현 Sonnet 위임)
+
+### Goal
+- HR_SEVERANCE_DESIGN.md §9 그대로: 근속연수공제→환산급여→환산급여공제→과세표준→기본세율(pay_income_tax_brackets 읽기 재사용)→환산산출세액→산출세액/12×근속연수→지방소득세 10%→실수령 산출을 산정/재계산/조정(PUT) 시 자동 계산.
+
+### Changed Files (커밋 4건)
+- **스키마** (ab7a12f, 리비전 ea501237b804): `hr_severance_calcs`에 service_years/income_tax/local_income_tax/net_severance/tax_detail_json 추가. server_default로 기존 confirmed 2건 backfill 후 default 제거.
+- **세액 서비스** (0f90f1d): `backend/app/services/hr_severance_service.py`에 `SEVERANCE_TAX_TABLE[2026]` 상수, `calc_service_years/calc_service_year_deduction/calc_conversion_income/calc_conversion_income_deduction/calc_severance_tax` 추가. `_build_calc`(draft 생성+재계산)와 `update_severance_adjustment`(PUT)에서 자동 호출, `tax_detail_json`에 단계별 스냅샷 저장. `pay_income_tax_brackets`는 읽기만 재사용(연도 없으면 최신 연도 fallback+warning). 스키마(`HrSeveranceCalcItem`/`HrSeveranceCalcDetailResponse`)에 신규 필드 + `tax_detail` 노출.
+- **화면** (d19b73e): `frontend/src/types/hr-severance.ts` 타입 확장, `hr-severance-calc-manager.tsx` 그리드에 소득세/실수령액 컬럼, 상세 패널에 퇴직소득세 산출 내역 섹션(근속연수공제→환산급여→환산급여공제→과세표준→산출세액→지방소득세→실수령액) 추가.
+- **유닛 테스트** (ae25a2d): `backend/tests/test_hr_severance_service_unit.py`에 고정 2026 세율 브래킷 픽스처 + 9건 추가(구간 경계 5/10/20년, 환산급여공제 4개 구간, 1년미만/0원 세액 0, 조정액 변경 재계산, confirmed 불변, 수기 대조 1건, 연도 fallback).
+
+### Commands Run / Verification Summary
+- pytest: 75 passed(기존) → 84 passed(전체, 신규 9건)
+- alembic: autogenerate로 컬럼 5종만 감지 → upgrade head(ea501237b804) → check 클린 / drift 0
+- 수기 대조: 근속10년·퇴직금1억 → 근속연수공제 1,500만 / 환산급여 1억200만 / 환산급여공제 6,260만 / 과세표준 3,940만 / 2026 기본세율(15%, 누진공제126만) → 환산산출세액 465만 → income_tax 3,875,000 / local_income_tax 387,500 / net_severance 95,737,500 — 코드 결과와 정확히 일치
+- 라이브 스모크: 재직자(employee_id=4, KR-0002) 퇴직 케이스 16 생성→체크리스트 3건 체크→confirm→severance draft(id=3) 자동 생성, 세액 필드 채워짐 확인(초기 final_amount 1,877만은 환산급여<800만 구간이라 세액 0 — 정상)→조정액 +8,000만 PUT→income_tax 0→4,252,584 재계산 확인, tax_detail 단계값 역전/음수 없음→confirm 성공
+- 기존 confirmed 2건(id 1,2)은 스모크 전후 모두 신규 컬럼 0 유지 — 소급 재계산 없음 확인
+- 프론트: `npm run validate:grid` PASS, `npm run lint` 0 errors, `npx playwright test tests/e2e/lifecycle-grid-qa.spec.ts` 13/13 PASS, `npm run test`(vitest) 9 passed
+
+### Result
+- 퇴직금 확정 흐름에 퇴직소득세 산출이 완전히 연결됨 — draft 생성/재계산/조정 시 자동 계산, confirmed 후 불변 보장
+
+### Remaining Risks
+- `npm run build` 시 `pay-gl-account-manager.tsx`(GL계정 화면, 본 작업 범위 밖) 타입 오류로 프로덕션 빌드 실패 — Phase 2 변경 전후 동일하게 재현되어 pre-existing 이슈로 확인, 별도 task로 flag(task_d61a1977)
+- SEVERANCE_TAX_TABLE은 연도 키 상수 — 세법 개정 시 코드 수정 필요(설계상 의도된 트레이드오프, 개정 2회 이상 시 DB 테이블화 재평가 예정)
+
+### Follow-ups
+- pay-gl-account-manager.tsx `is_cash_account` 필드 누락 수정 (별도 세션)
+- 퇴직연금(DC/DB) 구분, IRP 이전 처리는 여전히 비목표 범위
+
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]
 - R2/R3는 ledger 없이 완료 처리하지 않는다. [Proposal]
