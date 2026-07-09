@@ -669,6 +669,19 @@
       ],
       "ownerModule": "PAYROLL"
     },
+    "payroll.vouchers": {
+      "path": "/payroll/vouchers",
+      "pageFile": "frontend/src/app/payroll/vouchers/page.tsx",
+      "componentFile": "frontend/src/components/payroll/pay-voucher-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "workflow",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "PAYROLL"
+    },
     "payroll.variable-inputs": {
       "path": "/payroll/variable-inputs",
       "pageFile": "frontend/src/app/payroll/variable-inputs/page.tsx",
