@@ -1741,6 +1741,7 @@ def close_payroll_run(session: Session, run_id: int) -> PayPayrollRunActionRespo
     session.commit()
     session.refresh(run)
 
+    _try_generate_accrual_voucher_draft(session, run_id=run.id)
     return _build_run_action_response(session, run)
 
 
@@ -1912,3 +1913,15 @@ def get_my_payslip_detail(session: Session, employee_id: int, run_id: int) -> "P
     ]
 
     return PayMyPayslipDetailResponse(summary=summary, items=detail_items)
+
+
+def _try_generate_accrual_voucher_draft(session: Session, *, run_id: int) -> None:
+    """run close 후 미지급(accrual) 전표 draft를 자동 생성한다. 실패해도 close를 깨지 않도록 격리."""
+    try:
+        from app.services.pay_voucher_service import generate_voucher
+
+        generate_voucher(session, run_id, created_by=None)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Failed to auto-generate accrual voucher draft for run_id=%s", run_id)
