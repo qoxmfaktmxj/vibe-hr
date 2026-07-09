@@ -5,6 +5,7 @@ export type GlAccountItem = {
   name: string;
   account_type: "expense" | "liability" | "asset" | "equity" | "revenue";
   is_net_pay_account: boolean;
+  is_cash_account: boolean;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -22,6 +23,7 @@ export type GlAccountBatchItem = {
   name: string;
   account_type: string;
   is_net_pay_account: boolean;
+  is_cash_account: boolean;
   is_active: boolean;
   sort_order: number;
 };
@@ -85,6 +87,7 @@ export type PayVoucherItem = {
   id: number;
   voucher_no: string;
   run_id: number;
+  voucher_type: "accrual" | "disbursement";
   year_month?: string | null;
   voucher_date: string;
   status: string;

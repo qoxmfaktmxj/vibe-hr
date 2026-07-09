@@ -14,6 +14,7 @@ class GlAccountItem(BaseModel):
     name: str
     account_type: str
     is_net_pay_account: bool
+    is_cash_account: bool
     is_active: bool
     sort_order: int
     created_at: datetime
@@ -31,6 +32,7 @@ class GlAccountBatchItem(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     account_type: str = Field(pattern="^(expense|liability|asset|equity|revenue)$")
     is_net_pay_account: bool = False
+    is_cash_account: bool = False
     is_active: bool = True
     sort_order: int = 0
 
@@ -111,6 +113,7 @@ class PayVoucherItem(BaseModel):
     id: int
     voucher_no: str
     run_id: int
+    voucher_type: str
     year_month: str | None = None
     voucher_date: date
     status: str
@@ -135,6 +138,10 @@ class PayVoucherDetailResponse(BaseModel):
 
 
 class PayVoucherGenerateRequest(BaseModel):
+    run_id: int
+
+
+class PayVoucherGenerateDisbursementRequest(BaseModel):
     run_id: int
 
 

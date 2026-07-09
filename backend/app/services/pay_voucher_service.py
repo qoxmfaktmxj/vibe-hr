@@ -59,6 +59,7 @@ def _to_gl_account_item(row: GlAccount) -> GlAccountItem:
         name=row.name,
         account_type=row.account_type,
         is_net_pay_account=row.is_net_pay_account,
+        is_cash_account=row.is_cash_account,
         is_active=row.is_active,
         sort_order=row.sort_order,
         created_at=row.created_at,
@@ -85,6 +86,7 @@ def batch_save_gl_accounts(session: Session, payload: GlAccountBatchRequest) -> 
                 row.name = item.name
                 row.account_type = item.account_type
                 row.is_net_pay_account = item.is_net_pay_account
+                row.is_cash_account = item.is_cash_account
                 row.is_active = item.is_active
                 row.sort_order = item.sort_order
                 row.updated_at = _utc_now()
@@ -105,6 +107,7 @@ def batch_save_gl_accounts(session: Session, payload: GlAccountBatchRequest) -> 
                 name=item.name,
                 account_type=item.account_type,
                 is_net_pay_account=item.is_net_pay_account,
+                is_cash_account=item.is_cash_account,
                 is_active=item.is_active,
                 sort_order=item.sort_order,
                 created_at=_utc_now(),
@@ -348,7 +351,9 @@ def generate_voucher(session: Session, run_id: int, created_by: int | None = Non
             detail=f"Run status must be one of {GENERATE_ALLOWED_STATUSES} to generate a voucher. Current: {run.status}",
         )
 
-    existing_voucher = session.exec(select(PayVoucher).where(PayVoucher.run_id == run_id)).first()
+    existing_voucher = session.exec(
+        select(PayVoucher).where(PayVoucher.run_id == run_id, PayVoucher.voucher_type == "accrual")
+    ).first()
     if existing_voucher is not None and existing_voucher.status != "draft":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -509,6 +514,7 @@ def generate_voucher(session: Session, run_id: int, created_by: int | None = Non
     voucher = PayVoucher(
         voucher_no=_next_voucher_no(session, run.year_month),
         run_id=run_id,
+        voucher_type="accrual",
         voucher_date=date.today(),
         status="draft",
         total_debit=round(total_debit, 2),
@@ -542,12 +548,126 @@ def generate_voucher(session: Session, run_id: int, created_by: int | None = Non
     return PayVoucherActionResponse(voucher=_to_voucher_item(session, voucher))
 
 
+# ── 지급 전표 (disbursement, §11-1) ──
+
+
+def generate_disbursement_voucher(
+    session: Session, run_id: int, created_by: int | None = None
+) -> PayVoucherActionResponse:
+    run = session.get(PayPayrollRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payroll run not found.")
+
+    if run.status != "paid":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Run status must be 'paid' to generate a disbursement voucher. Current: {run.status}",
+        )
+
+    accrual_voucher = session.exec(
+        select(PayVoucher).where(PayVoucher.run_id == run_id, PayVoucher.voucher_type == "accrual")
+    ).first()
+    if accrual_voucher is None or accrual_voucher.status != "confirmed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Accrual voucher for this run must be confirmed before generating a disbursement voucher.",
+        )
+
+    existing_disbursement = session.exec(
+        select(PayVoucher).where(PayVoucher.run_id == run_id, PayVoucher.voucher_type == "disbursement")
+    ).first()
+    if existing_disbursement is not None and existing_disbursement.status != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Disbursement voucher already confirmed or cancelled for this run; regeneration is only allowed before confirm.",
+        )
+
+    net_pay_account = session.exec(select(GlAccount).where(GlAccount.is_net_pay_account == True)).first()  # noqa: E712
+    if net_pay_account is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No GL account flagged as is_net_pay_account.")
+
+    cash_account = session.exec(select(GlAccount).where(GlAccount.is_cash_account == True)).first()  # noqa: E712
+    if cash_account is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No GL account flagged as is_cash_account.")
+
+    accrual_lines = session.exec(
+        select(PayVoucherLine).where(
+            PayVoucherLine.voucher_id == accrual_voucher.id,
+            PayVoucherLine.gl_account_code == net_pay_account.code,
+        )
+    ).all()
+    net_pay_amount = round(sum(line.credit_amount for line in accrual_lines), 2)
+    if net_pay_amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Accrual voucher has no net-pay amount to disburse.",
+        )
+
+    if existing_disbursement is not None:
+        old_lines = session.exec(
+            select(PayVoucherLine).where(PayVoucherLine.voucher_id == existing_disbursement.id)
+        ).all()
+        for old_line in old_lines:
+            session.delete(old_line)
+        session.delete(existing_disbursement)
+        session.flush()
+
+    voucher = PayVoucher(
+        voucher_no=_next_voucher_no(session, run.year_month),
+        run_id=run_id,
+        voucher_type="disbursement",
+        voucher_date=date.today(),
+        status="draft",
+        total_debit=net_pay_amount,
+        total_credit=net_pay_amount,
+        summary=f"{run.year_month} 급여 지급전표",
+        created_by=created_by,
+        created_at=_utc_now(),
+        updated_at=_utc_now(),
+    )
+    session.add(voucher)
+    session.flush()
+
+    session.add(
+        PayVoucherLine(
+            voucher_id=voucher.id,
+            line_no=1,
+            gl_account_code=net_pay_account.code,
+            cost_center_code=None,
+            debit_amount=net_pay_amount,
+            credit_amount=0.0,
+            summary=f"{run.year_month} 급여 지급 (미지급급여 상환)",
+            source_item_code=None,
+            created_at=_utc_now(),
+        )
+    )
+    session.add(
+        PayVoucherLine(
+            voucher_id=voucher.id,
+            line_no=2,
+            gl_account_code=cash_account.code,
+            cost_center_code=None,
+            debit_amount=0.0,
+            credit_amount=net_pay_amount,
+            summary=f"{run.year_month} 급여 지급 (보통예금 출금)",
+            source_item_code=None,
+            created_at=_utc_now(),
+        )
+    )
+
+    session.commit()
+    session.refresh(voucher)
+
+    return PayVoucherActionResponse(voucher=_to_voucher_item(session, voucher))
+
+
 def _to_voucher_item(session: Session, row: PayVoucher) -> PayVoucherItem:
     run = session.get(PayPayrollRun, row.run_id)
     return PayVoucherItem(
         id=row.id,
         voucher_no=row.voucher_no,
         run_id=row.run_id,
+        voucher_type=row.voucher_type,
         year_month=run.year_month if run else None,
         voucher_date=row.voucher_date,
         status=row.status,
@@ -640,3 +760,78 @@ def cancel_voucher(session: Session, voucher_id: int) -> PayVoucherActionRespons
     session.refresh(voucher)
 
     return PayVoucherActionResponse(voucher=_to_voucher_item(session, voucher))
+
+
+# ── 외부 IF export (§11-3) ──
+
+EXPORT_CSV_HEADER = [
+    "voucher_no",
+    "voucher_date",
+    "line_no",
+    "gl_account_code",
+    "gl_account_name",
+    "cost_center_code",
+    "debit",
+    "credit",
+    "summary",
+]
+
+
+def build_voucher_export_rows(session: Session, voucher_id: int) -> tuple[PayVoucher, list[dict[str, object]]]:
+    """confirmed 전표의 export용 라인 딕셔너리 목록을 반환한다. confirmed가 아니면 409."""
+    voucher = session.get(PayVoucher, voucher_id)
+    if voucher is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found.")
+    if voucher.status != "confirmed":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only confirmed voucher can be exported.")
+
+    lines = session.exec(
+        select(PayVoucherLine).where(PayVoucherLine.voucher_id == voucher_id).order_by(PayVoucherLine.line_no)
+    ).all()
+    account_name_map = _gl_account_name_map(session)
+
+    rows = [
+        {
+            "voucher_no": voucher.voucher_no,
+            "voucher_date": voucher.voucher_date.isoformat(),
+            "line_no": line.line_no,
+            "gl_account_code": line.gl_account_code,
+            "gl_account_name": account_name_map.get(line.gl_account_code, ""),
+            "cost_center_code": line.cost_center_code or "",
+            "debit": line.debit_amount,
+            "credit": line.credit_amount,
+            "summary": line.summary or "",
+        }
+        for line in lines
+    ]
+    return voucher, rows
+
+
+def build_voucher_export_csv(session: Session, voucher_id: int) -> tuple[str, bytes]:
+    """UTF-8 BOM CSV 바이트와 파일명을 반환한다."""
+    import csv
+    import io
+
+    voucher, rows = build_voucher_export_rows(session, voucher_id)
+
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=EXPORT_CSV_HEADER)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+
+    csv_bytes = buffer.getvalue().encode("utf-8-sig")
+    filename = f"{voucher.voucher_no}.csv"
+    return filename, csv_bytes
+
+
+def build_voucher_export_json(session: Session, voucher_id: int) -> tuple[str, dict[str, object]]:
+    voucher, rows = build_voucher_export_rows(session, voucher_id)
+    filename = f"{voucher.voucher_no}.json"
+    payload = {
+        "voucher_no": voucher.voucher_no,
+        "voucher_date": voucher.voucher_date.isoformat(),
+        "voucher_type": voucher.voucher_type,
+        "lines": rows,
+    }
+    return filename, payload
