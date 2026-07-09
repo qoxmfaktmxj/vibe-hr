@@ -498,6 +498,14 @@ MENU_TREE: list[dict] = [
                         "sort_order": 232,
                         "roles": ["hr_manager", "admin"],
                     },
+                    {
+                        "code": "hr.severance.calcs",
+                        "name": "\uD1F4\uC9C1\uAE08\uC0B0\uC815",
+                        "path": "/hr/severance/calcs",
+                        "icon": "Calculator",
+                        "sort_order": 233,
+                        "roles": ["hr_manager", "payroll_mgr", "admin"],
+                    },
                 ],
             },
         ],
@@ -691,7 +699,10 @@ MENU_TREE: list[dict] = [
                     {"code": "payroll.tax-rates", "name": "세율및사회보험관리", "path": "/payroll/tax-rates", "icon": "Calculator", "sort_order": 505, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.income-tax-brackets", "name": "소득세구간관리", "path": "/payroll/income-tax-brackets", "icon": "Calculator", "sort_order": 505.5, "roles": ["payroll_mgr", "admin"]},
                     {"code": "payroll.payment-schedules", "name": "월급여일자관리", "path": "/payroll/payment-schedules", "icon": "CalendarDays", "sort_order": 506, "roles": ["payroll_mgr", "admin"]},
-                    {"code": "payroll.employee-profiles", "name": "직원급여프로필관리", "path": "/payroll/employee-profiles", "icon": "Users", "sort_order": 507, "roles": ["payroll_mgr", "admin"]}
+                    {"code": "payroll.employee-profiles", "name": "직원급여프로필관리", "path": "/payroll/employee-profiles", "icon": "Users", "sort_order": 507, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.gl-accounts", "name": "계정과목관리", "path": "/payroll/gl-accounts", "icon": "Calculator", "sort_order": 508, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.gl-mappings", "name": "급여계정매핑관리", "path": "/payroll/gl-mappings", "icon": "Calculator", "sort_order": 508.5, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.severance-item-rules", "name": "퇴직금산입규칙관리", "path": "/payroll/severance-item-rules", "icon": "Calculator", "sort_order": 509, "roles": ["payroll_mgr", "admin"]}
                 ],
             },
             {
@@ -703,7 +714,8 @@ MENU_TREE: list[dict] = [
                 "roles": ["payroll_mgr", "admin"],
                 "children": [
                     {"code": "payroll.variable-inputs", "name": "월변동입력관리", "path": "/payroll/variable-inputs", "icon": "NotebookPen", "sort_order": 511, "roles": ["payroll_mgr", "admin"]},
-                    {"code": "payroll.runs", "name": "월급여Run관리", "path": "/payroll/runs", "icon": "PlayCircle", "sort_order": 512, "roles": ["payroll_mgr", "admin"]}
+                    {"code": "payroll.runs", "name": "월급여Run관리", "path": "/payroll/runs", "icon": "PlayCircle", "sort_order": 512, "roles": ["payroll_mgr", "admin"]},
+                    {"code": "payroll.vouchers", "name": "급여전표관리", "path": "/payroll/vouchers", "icon": "FileText", "sort_order": 513, "roles": ["payroll_mgr", "admin"]}
                 ],
             },
         ],
