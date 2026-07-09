@@ -142,12 +142,12 @@ VibeGrid<T>
 
 ## Step 3: 마이그레이션 순서
 
-### Wave 1: 읽기전용 화면 (19개, 가장 쉬움)
-- ReadonlyGridManager를 VibeGrid variant="readonly"로 교체
-- 화면당 작업: ~15분
-- 예상 총 소요: ~5시간
-
-**대상**: hr.retire.checklist, tim.annual-leave, tim.attendance-status, tim.leave-approval, tim.reports, hri.tasks.*, mng.* (8개), org.dept-history, wel.benefit-types
+### Wave 1: 읽기전용 화면 — **2026-07-09 재산정: 파일럿 1건 완료 후 잔여 13건 전환 보류**
+- ~~ReadonlyGridManager를 VibeGrid variant="readonly"로 교체~~ (원래 산정: 화면당 ~15분)
+- **보류 사유**: 원래 목록은 registry `variant=readonly` 라벨(그리드 툴바 계약) 기준으로 산정됐으나, 실제 컴포넌트 13개 전수 검증 결과 전부 그리드 밖 부가 구조를 보유 — mng 8종은 beforeGrid CRUD 폼·afterGrid 듀얼그리드(MngSimpleGrid), tim.annual-leave는 이중 fetch, tim.reports는 AgGridReact 2회 직접 사용, hr.retire.checklist는 등록 폼+클라이언트 필터, org.dept-history는 비페이지네이션 API, wel.benefit-types는 파생 요약 카드. VibeGrid v1(단일 fetchUrl, 슬롯 없음)으로 수용 불가.
+- **완료분**: tim.attendance-status 파일럿 1건 (e50b0e9)
+- **재개 조건 (VibeGrid v2 요구사항)**: beforeGrid/afterGrid 슬롯 passthrough, 멀티 fetch 소스, 클라이언트 필터 훅, 비표준 응답 어댑터. v2 랜딩 후 Wave 1 재산정.
+- registry variant는 그리드 계약 기준으로 정확하므로 재분류 불요.
 
 ### Wave 2: 단순 CRUD (17개, 패턴 동일)
 - HR admin 7개, TIM 코드 3개, TRA 5개, payroll.codes, payroll.tax-rates

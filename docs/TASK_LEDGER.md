@@ -1009,8 +1009,31 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - SEVERANCE_TAX_TABLE은 연도 키 상수 — 세법 개정 시 코드 수정 필요(설계상 의도된 트레이드오프, 개정 2회 이상 시 DB 테이블화 재평가 예정)
 
 ### Follow-ups
-- pay-gl-account-manager.tsx `is_cash_account` 필드 누락 수정 (별도 세션)
+- ~~pay-gl-account-manager.tsx `is_cash_account` 필드 누락 수정~~ → 당일 메인 세션 리뷰 픽스업으로 해결 (VH-SEQ123-20260709)
 - 퇴직연금(DC/DB) 구분, IRP 이전 처리는 여전히 비목표 범위
+
+## TASK VH-SEQ123-20260709 — 백로그 1·2·3 순차 실행 (storageState / Wave 1 판정 / Phase 2 완결)
+- Date: 2026-07-09
+- Status: completed
+- Mode: Execution
+- Risk Class: R3 최고 (전표 P2 보호경로 훅 포함)
+- Approval Status: approved (사용자: "1,2,3 순차대로 — 계획·리뷰 Fable, 소스 Sonnet")
+- Owner: kms
+
+### Result (스테이지별)
+1. **QA storageState** (ebbb51d, 리뷰 PASS): 로그인 13→1회, rate limiter 해소. 풀스위트 13/13 + 전체 3spec 15/15
+2. **VibeGrid Wave 1** (커밋 0건 — **전환 보류 판정, 리뷰 승인**): 13화면 전수 검증 결과 전부 그리드 밖 CRUD폼/듀얼그리드/비표준 계약 보유. 로드맵이 registry 라벨만으로 오산정했던 것. VIBE_GRID_ROADMAP에 재산정+v2 요구사항(beforeGrid/afterGrid 슬롯, 멀티 fetch, 응답 어댑터) 기록
+3. **전표 Phase 2** (5커밋 5610f1b~42f53b5, 리비전 ffc17a622333, 리뷰 PASS): voucher_type(accrual|disbursement)+(run,type) 유니크, is_cash_account, close 자동훅(**보호경로 diff +13줄 실측 검증** — commit 후 격리 호출), 지급전표(PV-202609-0002, 순지급액 206.1억 정확 일치), CSV(BOM)/JSON export + BFF text/csv passthrough 실결함 수리
+4. **퇴직금 Phase 2** (5커밋 ab7a12f~95e3b20, 리비전 ea501237b804, 리뷰 PASS): 퇴직소득세 산출(근속연수공제→환산급여→환산급여공제→과세표준→기본세율→역산→지방소득세→실수령), 수기 대조 케이스(근속10년·1억: 세액 3,875,000) 완전 일치, 조정 시 재계산 등식 성립, confirmed 불변 409, 기존 확정분 소급 금지 준수
+- 리뷰 픽스업 1건(메인 세션 직접): GL계정 화면 is_cash_account 미반영 타입 에러 → 필드+현금계정 Y/N 컬럼 배선 (빌드 차단 해소)
+
+### Verification Summary
+- pytest **84 passed** / validate:grid 66 / lint 0 errors / tsc 0 errors / **build 통과** / QA 13/13 / alembic check 클린·drift 0 (head=ea501237b804)
+
+### Remaining Risks / Follow-ups
+- vouchers 화면 생성 직후 상세 패널 선택 레이스 (기존 퀴크, 기능 영향 미미)
+- VibeGrid v2 (슬롯/멀티fetch/어댑터) 설계 후 Wave 1 재개
+- 퇴직소득세 상수(2026)는 세법 개정 시 SEVERANCE_TAX_TABLE 연도 키 추가 필요
 
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]

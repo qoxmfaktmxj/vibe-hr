@@ -112,3 +112,32 @@ GET                /api/v1/pay/vouchers/mapping-gaps ?run_id=   # 매핑 누락 
 2. 분개 규칙 §4 (earning→비용, deduction→예수금, 순액→미지급급여) 승인
 3. 집계 단위: 전사 vs cost_center별 — **cost_center별 기본** 제안
 4. 테이블 4종 신규 생성 (DB 스키마 = R3)
+
+---
+
+## 11. Phase 2 설계 (v0.2 — 2026-07-09 사용자 순차 진행 지시분)
+
+### 11-1. 지급 전표 (disbursement voucher)
+
+- `pay_vouchers.voucher_type` 컬럼 추가: `accrual`(기존 미지급 전표, 기본값) | `disbursement` — Alembic 리비전
+- run당 전표 유니크 제약을 (run_id) → **(run_id, voucher_type)** 로 변경 (기존 uq 대체)
+- `gl_accounts.is_cash_account` bool 추가 — 지급 계정(보통예금) 지정 (is_net_pay_account와 동일 패턴, 정확히 1개 활성)
+- 분개: 차변 **미지급급여**(is_net_pay_account) / 대변 **보통예금**(is_cash_account), 금액 = accrual 전표의 순지급액 라인 합계
+- 생성 조건: run status=paid + accrual 전표 confirmed. 트리거: `POST /pay/vouchers/generate-disbursement {run_id}` (수동) — mark-paid 자동훅은 두지 않음(지급 시점≠회계 지급일 케이스)
+
+### 11-2. close 자동훅 (accrual draft 자동 생성)
+
+- 위치: `payroll_phase2_service.close_payroll_run()` 끝 — **보호 경로 1줄+import** (retire confirm 훅과 동일한 try/except 격리 패턴, 실패해도 close 안 깨짐, logger.exception)
+- 매핑 누락 시: draft 미생성 + 경고 로그 (close는 정상 진행) — mapping-gaps API로 사전 점검 가능하므로 차단하지 않음
+- R3 근거: 사용자 2026-07-09 "1,2,3 순차 진행" 지시로 승인 갈음. 보호 경로 diff는 훅 1줄+import여야 하며 그 외 수정 금지
+
+### 11-3. 외부 IF export
+
+- `GET /pay/vouchers/{id}/export?format=csv|json` — 확정(confirmed) 전표만. CSV 컬럼: voucher_no, voucher_date, line_no, gl_account_code, gl_account_name, cost_center_code, debit, credit, summary. UTF-8 BOM(엑셀 호환)
+- 화면: payroll.vouchers 상세 패널에 "전표 다운로드" 버튼 (BFF는 pay catch-all이 커버, 바이너리 passthrough 이미 지원)
+- 실 ERP 연동은 대상 시스템 확정 시 별도 설계
+
+### 11-4. 검증
+
+- 유닛: disbursement 분개(차대·금액=순지급 합), 유니크(run, type), accrual 미확정 시 거부, close 훅 draft 생성/실패 격리, export CSV 라운드트립
+- E2E: 신규 월 run → close(자동 accrual draft 확인) → confirm → paid → disbursement 생성·확정 → export 다운로드

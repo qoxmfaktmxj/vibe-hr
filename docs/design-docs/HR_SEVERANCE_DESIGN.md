@@ -83,3 +83,42 @@ GET/POST /api/v1/pay/severance-item-rules  (+batch)
 2. retire confirm 시 draft 자동 생성 훅 (hr_retire_service 1줄) 승인
 3. 평균임금 산입 규칙을 item_code 단위 설정 테이블로 두는 방식 승인
 4. 테이블 2종 신규 (DB 스키마 = R3)
+
+---
+
+## 9. Phase 2 설계 (v0.2 — 2026-07-09 사용자 순차 진행 지시분): 퇴직소득세
+
+### 9-1. 산출 절차 (소득세법 §48, 2026년 기준)
+
+```
+근속연수 = ceil(service_days / 365)          # 1년 미만 절상
+근속연수공제:
+  ~5년:   100만 × 근속연수
+  6~10년: 500만 + 200만 × (근속연수-5)
+  11~20년: 1,500만 + 250만 × (근속연수-10)
+  20년~:  4,000만 + 300만 × (근속연수-20)
+환산급여 = (final_amount - 근속연수공제) × 12 / 근속연수
+환산급여공제 (환산급여 구간별):
+  ~800만: 전액 / ~7,000만: 800만+60% 초과분 / ~1억: 4,520만+55% / ~3억: 6,170만+45% / 초과: 15,170만+35%
+과세표준 = 환산급여 - 환산급여공제
+환산산출세액 = 과세표준 × 기본세율(종합소득세율 구간)      # pay_income_tax_brackets(연도별) 재사용
+산출세액(income_tax) = 환산산출세액 / 12 × 근속연수
+지방소득세(local_income_tax) = income_tax × 10%
+실수령(net_severance) = final_amount - income_tax - local_income_tax
+```
+
+### 9-2. 데이터 변경 (Alembic 리비전)
+
+- `hr_severance_calcs`에 컬럼 추가: `service_years int`, `income_tax float default 0`, `local_income_tax float default 0`, `net_severance float default 0`, `tax_detail_json text nullable`(산출 단계별 근거 스냅샷)
+- 근속연수공제/환산급여공제 구간은 서비스 내 연도 키 상수 테이블(SEVERANCE_TAX_TABLE[2026]) — 세법 개정 시 상수 추가. DB 테이블화는 개정 2회 이상 발생 시 재평가
+
+### 9-3. 흐름/API
+
+- 세액은 산정(create/recalculate) 시 자동 계산되어 저장, 조정액 변경(PUT) 시 재계산
+- 기존 API 응답(HrSeveranceCalcItem)에 신규 필드 노출 + detail의 tax_detail 단계별 근거 포함
+- 화면(hr.severance.calcs): 상세 패널에 세액 섹션(근속연수공제→환산급여→과세표준→산출세액→지방소득세→실수령) 표시
+
+### 9-4. 검증
+
+- 유닛: 구간 경계(5/10/20년, 환산급여 각 구간), 1년 미만(세액 0), 국세청 예시 케이스 1건 이상 수기 대조, 조정액 변경 시 세액 재계산, confirmed 후 불변
+- 기존 confirmed calc 2건은 재계산하지 않음 (신규 컬럼 0 유지 — 확정분 소급 금지)
