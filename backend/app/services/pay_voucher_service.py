@@ -469,9 +469,9 @@ def generate_voucher(session: Session, run_id: int, created_by: int | None = Non
         total_credit += rounded
         line_no += 1
 
-    # 차대평형 검증 (1원 미만 반올림 차이는 조정 라인 허용)
+    # 차대평형 검증 (1원 이하 반올림 차이는 조정 라인 허용)
     diff = round(total_debit - total_credit, 2)
-    if abs(diff) > 0 and abs(diff) < ROUNDING_TOLERANCE:
+    if abs(diff) > 0 and abs(diff) <= ROUNDING_TOLERANCE:
         lines.append(
             {
                 "line_no": line_no,
@@ -490,7 +490,7 @@ def generate_voucher(session: Session, run_id: int, created_by: int | None = Non
         line_no += 1
 
     diff = round(total_debit - total_credit, 2)
-    if abs(diff) >= ROUNDING_TOLERANCE:
+    if abs(diff) > ROUNDING_TOLERANCE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Debit/credit imbalance too large to auto-adjust: debit={total_debit}, credit={total_credit}",
