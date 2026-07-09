@@ -27,6 +27,11 @@ const ROUTES = [
   "/payroll/runs",
   "/hr/retire/checklist",
   "/hr/retire/approvals",
+  "/payroll/gl-accounts",
+  "/payroll/gl-mappings",
+  "/payroll/vouchers",
+  "/hr/severance/calcs",
+  "/payroll/severance-item-rules",
 ];
 
 function routeSlug(route: string): string {
