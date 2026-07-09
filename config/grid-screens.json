@@ -190,6 +190,19 @@
       ],
       "ownerModule": "HR"
     },
+    "hr.retire.approvals": {
+      "path": "/hr/retire/approvals",
+      "pageFile": "frontend/src/app/hr/retire/approvals/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-retire-approval-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "approval",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
     "hr.retire.checklist": {
       "path": "/hr/retire/checklist",
       "pageFile": "frontend/src/app/hr/retire/checklist/page.tsx",

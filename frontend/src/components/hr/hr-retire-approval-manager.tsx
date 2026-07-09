@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
+import type { ColDef } from "ag-grid-community";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
+import { VibeGrid } from "@/components/grid/vibe-grid";
+import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import type { EmployeeListResponse } from "@/types/employee";
-import type { HrRetireCaseDetail, HrRetireCaseListResponse } from "@/types/hr-retire";
+import type { HrRetireCaseDetail, HrRetireCaseListItem, HrRetireCaseListResponse } from "@/types/hr-retire";
 import { parseError, statusLabel } from "./hr-retire-shared";
+
+type RetireCaseRow = HrRetireCaseListItem & ReadonlyGridRow;
 
 export function HrRetireApprovalManager() {
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
@@ -22,6 +27,7 @@ export function HrRetireApprovalManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
 
+  const { mutate: globalMutate } = useSWRConfig();
   const { data: employeeData } = useSWR<EmployeeListResponse>("/api/employees?all=true", fetcher, {
     revalidateOnFocus: false,
   });
@@ -30,6 +36,16 @@ export function HrRetireApprovalManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+
+  // VibeGrid fetches "/api/hr/retire/cases?page=...&limit=..." under its own
+  // SWR key, separate from the `caseData` key above (used for auto-select).
+  // Revalidate both whenever case data changes.
+  async function mutateAllCaseLists() {
+    await mutateCases();
+    await globalMutate(
+      (key) => typeof key === "string" && key.startsWith("/api/hr/retire/cases?"),
+    );
+  }
 
   const detailKey = selectedCaseId ? `/api/hr/retire/cases/${selectedCaseId}` : null;
   const { data: caseDetail, mutate: mutateCaseDetail } = useSWR<HrRetireCaseDetail>(detailKey, fetcher, {
@@ -42,6 +58,30 @@ export function HrRetireApprovalManager() {
   );
   const caseItems = useMemo(() => caseData?.items ?? [], [caseData?.items]);
   const firstCaseId = caseItems[0]?.id ?? null;
+
+  const retireColumns = useMemo<ColDef<RetireCaseRow>[]>(
+    () => [
+      { field: "employee_no", headerName: "사번", width: 120 },
+      { field: "employee_name", headerName: "성명", width: 120 },
+      { field: "department_name", headerName: "부서", minWidth: 160, flex: 1 },
+      { field: "position_title", headerName: "직위", width: 120 },
+      { field: "retire_date", headerName: "퇴직예정일", width: 130 },
+      { field: "reason", headerName: "사유", minWidth: 160, flex: 1 },
+      {
+        field: "status",
+        headerName: "상태",
+        width: 110,
+        valueFormatter: (params) => statusLabel(String(params.value ?? "")),
+      },
+      {
+        field: "created_at",
+        headerName: "생성일",
+        width: 130,
+        valueFormatter: (params) => String(params.value ?? "").slice(0, 10),
+      },
+    ],
+    [],
+  );
 
   useEffect(() => {
     if (caseItems.length === 0) {
@@ -88,7 +128,7 @@ export function HrRetireApprovalManager() {
       const created = (await response.json()) as HrRetireCaseDetail;
       setSelectedCaseId(created.id);
       setNewReason("");
-      await mutateCases();
+      await mutateAllCaseLists();
       toast.success("퇴직 처리 건이 생성되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "퇴직 건 생성에 실패했습니다.");
@@ -111,7 +151,7 @@ export function HrRetireApprovalManager() {
       }
       const updated = (await response.json()) as HrRetireCaseDetail;
       await mutateCaseDetail(updated, { revalidate: false });
-      await mutateCases();
+      await mutateAllCaseLists();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "체크리스트 업데이트에 실패했습니다.");
     } finally {
@@ -129,7 +169,7 @@ export function HrRetireApprovalManager() {
       }
       const updated = (await response.json()) as HrRetireCaseDetail;
       await mutateCaseDetail(updated, { revalidate: false });
-      await mutateCases();
+      await mutateAllCaseLists();
       toast.success("퇴직 처리가 확정되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "퇴직 확정에 실패했습니다.");
@@ -155,7 +195,7 @@ export function HrRetireApprovalManager() {
       }
       const updated = (await response.json()) as HrRetireCaseDetail;
       await mutateCaseDetail(updated, { revalidate: false });
-      await mutateCases();
+      await mutateAllCaseLists();
       toast.success("퇴직 처리가 취소되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "퇴직 취소에 실패했습니다.");
@@ -203,39 +243,22 @@ export function HrRetireApprovalManager() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>퇴직 케이스 목록</CardTitle>
-            <CardDescription>생성된 퇴직 처리 목록</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {caseItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">등록된 퇴직 케이스가 없습니다.</p>
-            ) : (
-              caseItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`w-full rounded-md border p-3 text-left text-sm ${
-                    selectedCaseId === item.id ? "border-primary bg-primary/5" : "border-border"
-                  }`}
-                  onClick={() => setSelectedCaseId(item.id)}
-                >
-                  <div className="font-medium">
-                    {item.employee_name} ({item.employee_no})
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {item.department_name} | {item.retire_date}
-                  </div>
-                  <div className="mt-1 text-xs">상태: {statusLabel(item.status)}</div>
-                </button>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      <VibeGrid<HrRetireCaseListItem>
+        registryKey="hr.retire.approvals"
+        title="퇴직 케이스 목록"
+        description="생성된 퇴직 처리 목록. 행을 클릭하면 아래에서 상세/승인 처리를 할 수 있습니다."
+        variant="readonly"
+        columns={retireColumns}
+        fetchUrl="/api/hr/retire/cases"
+        pageSize={50}
+        emptyText="등록된 퇴직 케이스가 없습니다."
+        downloadFileName="hr-retire-approvals"
+        onRowClick={(row) => setSelectedCaseId(row.id as number)}
+        selectedRowId={selectedCaseId}
+      />
 
-        <Card className="lg:col-span-2">
+      <div className="grid gap-4">
+        <Card>
           <CardHeader>
             <CardTitle>퇴직 승인 처리</CardTitle>
             <CardDescription>체크 완료 후 퇴직 확정 또는 취소를 수행합니다.</CardDescription>
