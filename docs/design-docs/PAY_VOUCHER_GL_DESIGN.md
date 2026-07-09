@@ -1,7 +1,7 @@
 # 급여 → 회계전표(Voucher/GL) 모듈 설계 (v0.1)
 
 - Date: 2026-07-08
-- Status: draft (R3 — 구현 전 명시적 승인 필요)
+- Status: approved (2026-07-09 사용자 전부 승인 — §10 승인 요청 4건 포함) → 구현 착수
 - Risk Class: R3 (급여 시맨틱 연결 + DB 신규 테이블)
 - Owner: kms
 - 근거: 2026-07-08 E2E 감사에서 HR 라이프사이클의 유일한 완전 단절점으로 확인 (급여 `paid` 이후 회계 연계 없음. voucher/journal/GL 관련 엔드포인트·테이블 0개)

@@ -936,6 +936,46 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - 공통코드 대문자 저장 vs 도메인 소문자 값 불일치는 다른 소비처에도 잠재 — 공통코드 소비 화면 전수 점검 후보
 - uvicorn --reload 워커 고착 현상 2회 관찰 (파일 변경 후 재시작 실패) — 재현 시 클린 재시작으로 해소, 원인 조사 후보
 
+## TASK VH-R3-WAVE-20260709 — Alembic 도입 + 전표(Voucher/GL) + 퇴직금 모듈 + 화면 5종 (전부 승인 완료분)
+- Date: 2026-07-09
+- Status: completed
+- Mode: Execution
+- Risk Class: R3 (DB 스키마 3리비전 + 급여 연계 신모듈 2종)
+- Approval Status: approved (2026-07-09 사용자: "전부 승인한다. 소스 작업은 모두 sonnet위임한다")
+- Owner: kms (계획·검수 Fable, 구현 Sonnet 위임 4건)
+
+### Goal
+- 승인된 설계 3종 구현: ALEMBIC_ADOPTION_PLAN(C안), PAY_VOUCHER_GL_DESIGN(Phase 1), HR_SEVERANCE_DESIGN(Phase 1) + 화면/메뉴 연결로 라이프사이클 완전 폐합
+
+### Changed Files (커밋 20건 요약)
+- **Alembic** (3fbf9fc, 0efd652, 6c1050e, 73cac85): migrations/ 스캐폴드, baseline 470095da5995 + myhr stamp, check_schema_drift.py, 워크플로 README
+- **정리 리비전** (75d1c0e7dd53): 레거시 users DROP(0행 확인)·중복 인덱스·PAP 인덱스 casing·calculated_at 타입 — 이후 myhr alembic check 클린/drift 0
+- **전표 백엔드** (13ebba7~9c01159, 리비전 7e248ebed919): gl_accounts/pay_gl_mappings/pay_vouchers/pay_voucher_lines, 분개 서비스(차대평형+1원 반올림 조정), API 8종, 시드(계정12/매핑17), 유닛 7
+- **퇴직금 백엔드** (716f147~e5fabf1, 리비전 46507f02680a): hr_severance_calcs/pay_severance_item_rules, 산정 서비스, retire confirm 훅(try/except 격리 1줄), API 6종, 유닛 13
+- **화면 5종** (1f30bd2~1c818c7): crud 3(gl-accounts/gl-mappings/severance-item-rules, attendance-code-manager 패턴) + workflow 2(vouchers/severance.calcs, VibeGrid readonly+상세패널 패턴), BFF hr/severance 라우트 4, registry 61→66, MENU_TREE 5항목 + 라이브 targeted insert(wel.requests 활성 보존 확인)
+
+### Commands Run / Verification Summary
+- pytest 67 passed (47→54→67), validate:grid 66 통과, lint 0 errors, build 통과
+- 풀체인 E2E 14/14 PASS: 채용→사원(6018)→발령확정→체크인/아웃→퇴직확정(case 15)→**퇴직금 자동 draft(1년 미만 0원+경고 정확)→조정→확정**→급여 2026-08 P100 생성→계산→마감→지급→**전표 PV-202608-0001 생성(401라인, 차대 27,336,035,000 균형)→확정**. 매핑 누락 0
+- 라이브 스모크(각 모듈별): 전표 PV-202607-0001(run 3), 퇴직금 calc(독립 재계산 일치 2,677,970.80)
+
+### Result
+- **급여→전표 단절 해소 — HR 라이프사이클 전 구간 연결 완료**
+- 스키마 변경 경로 Alembic 단일화(리비전 4개, drift 0), 모델↔DB 완전 정합
+
+### Failure / Retry Notes
+- `ENV_FAILURE` 3회: Sonnet 세션한도/API 오류 중단 → 트랜스크립트 재개로 전부 복구 (단계별 즉시 커밋 전략 유효)
+- uvicorn --reload 워커 고착 재발(2회) → 동일 커맨드 재기동으로 해소
+- 실버그 수리: 전표 1원 반올림 경계(d44a1c0 — 6000명 스케일에서만 발현)
+
+### Remaining Risks
+- QA spec 풀배치가 로그인 rate limiter(10회/5분)에 걸림 — spec을 storageState 재사용으로 개선 필요
+- 전표 Phase 2 미착수: 지급 시점 은행 전표, 자동 생성 훅, 외부 IF / 퇴직금 Phase 2: 퇴직소득세, 퇴직연금 구분
+- init_db의 DO $$ 패치 블록 제거 유예 중 (Alembic 정착 확인 후)
+
+### Follow-ups
+- QA spec storageState 개선, VibeGrid Wave 1 잔여 전환, 전표·퇴직금 Phase 2 설계
+
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]
 - R2/R3는 ledger 없이 완료 처리하지 않는다. [Proposal]

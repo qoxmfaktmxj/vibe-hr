@@ -1,7 +1,7 @@
 # 퇴직금 계산·정산 설계 (v0.1)
 
 - Date: 2026-07-08
-- Status: draft (R3 — 급여 시맨틱, 구현 전 명시적 승인 필요)
+- Status: approved (2026-07-09 사용자 전부 승인 — §8 승인 요청 4건 포함) → 구현 착수
 - Risk Class: R3
 - Owner: kms
 - 근거: 2026-07-08 E2E 감사 — 퇴직 확정(`hr_retire_service.confirm` → employment_status=resigned)은 동작하나 퇴직금 계산·기록·급여 연동이 전무

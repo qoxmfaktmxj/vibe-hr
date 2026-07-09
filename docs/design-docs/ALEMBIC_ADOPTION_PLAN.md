@@ -1,7 +1,7 @@
 # Alembic 마이그레이션 도입 검토 (v0.1)
 
 - Date: 2026-07-08
-- Status: 검토 완료 — 도입 권고 (실행은 R3 승인 필요)
+- Status: approved (2026-07-09 사용자 승인, 선행조건인 DB 단일화 완료) → 도입 착수
 - Risk Class: R3 (DB 스키마/마이그레이션 체계)
 - Owner: kms
 
