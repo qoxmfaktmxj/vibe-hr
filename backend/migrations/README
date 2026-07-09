@@ -1,1 +1,81 @@
-Generic single-database configuration.
+# Alembic Migrations
+
+Alembic manages all PostgreSQL schema changes for Vibe-HR backend.
+
+## Setup
+
+- Config: `backend/alembic.ini` (script_location = migrations)
+- env.py: reads DATABASE_URL from `app.core.config.settings` (never hardcoded)
+- Run all commands from the `backend/` directory
+
+## Development Workflow
+
+### Making a model change
+
+1. Edit `app/models/entities.py` (or `app/models/tra.py`) to add/modify a column or table.
+2. Generate a migration:
+   ```
+   cd backend
+   ./.venv/Scripts/python.exe -m alembic revision --autogenerate -m "describe what changed"
+   ```
+3. Review the generated file in `migrations/versions/`. Confirm the `upgrade()` and
+   `downgrade()` functions look correct. Never run an unreviewed migration in production.
+4. Apply to local DB:
+   ```
+   ./.venv/Scripts/python.exe -m alembic upgrade head
+   ```
+
+### Checking for pending migrations
+
+```
+./.venv/Scripts/python.exe -m alembic check
+```
+
+Exits 0 when the DB is up to date; exits 1 (and prints operations) when new changes
+are detected. Run this in CI to catch missing migrations.
+
+### Other useful commands
+
+```
+# Show current revision
+./.venv/Scripts/python.exe -m alembic current
+
+# Show migration history
+./.venv/Scripts/python.exe -m alembic history --verbose
+
+# Downgrade one step
+./.venv/Scripts/python.exe -m alembic downgrade -1
+
+# Generate SQL for offline review (no DB connection needed)
+./.venv/Scripts/python.exe -m alembic upgrade head --sql
+```
+
+## Tests
+
+Tests in `backend/tests/` use SQLite in-memory with `SQLModel.metadata.create_all`.
+They are intentionally decoupled from Alembic migrations, which target PostgreSQL only.
+Do not change test fixtures to use Alembic.
+
+## Drift detection
+
+`backend/scripts/check_schema_drift.py` compares model metadata table/column
+existence against `information_schema`. Run it to detect out-of-band schema changes:
+
+```
+./.venv/Scripts/python.exe -m scripts.check_schema_drift
+```
+
+Exits 0 when clean, 1 when structural drift is detected.
+
+## Baseline (470095da5995)
+
+The initial revision captures the full schema as of 2026-07-09.
+`alembic stamp head` was applied to the existing `myhr` DB without running DDL.
+Known myhr items that differ from the model (to be addressed in a follow-up revision):
+
+| Item | Detail |
+|---|---|
+| extra table `users` | Legacy artifact; 0 rows, no FK refs; safe to drop |
+| duplicate index `ux_auth_users_login_id` | Identical to `ix_auth_users_login_id`; safe to drop |
+| `PAP_APPRAISAL_MASTERS` index name casing | DB has lowercase prefix (`ix_pap_appraisal_masters_*`); model produces uppercase (`ix_PAP_APPRAISAL_MASTERS_*`) |
+| `tim_attendance_daily.calculated_at` type | DB has TIMESTAMPTZ; model declares timezone-naive datetime (init_db DO $$ bug) |
