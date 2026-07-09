@@ -18,6 +18,25 @@ class HrSeveranceWageDetailItem(BaseModel):
     included_amount: float
 
 
+class HrSeveranceTaxDetail(BaseModel):
+    """퇴직소득세 산출 단계별 근거 (§9-1)."""
+
+    service_years: int
+    service_year_deduction: float
+    conversion_income: float
+    conversion_income_deduction: float
+    taxable_base: float
+    base_tax_rate: float
+    quick_deduction: float
+    converted_calculated_tax: float
+    income_tax: float
+    local_income_tax: float
+    net_severance: float
+    tax_table_year: int | None = None
+    bracket_year: int | None = None
+    warning: str | None = None
+
+
 class HrSeveranceCalcItem(BaseModel):
     id: int
     retire_case_id: int
@@ -42,6 +61,10 @@ class HrSeveranceCalcItem(BaseModel):
     calculated_at: datetime | None = None
     confirmed_by: int | None = None
     confirmed_at: datetime | None = None
+    service_years: int
+    income_tax: float
+    local_income_tax: float
+    net_severance: float
     created_at: datetime
     updated_at: datetime
 
@@ -56,6 +79,7 @@ class HrSeveranceCalcListResponse(BaseModel):
 class HrSeveranceCalcDetailResponse(BaseModel):
     calc: HrSeveranceCalcItem
     wage_details: list[HrSeveranceWageDetailItem]
+    tax_detail: HrSeveranceTaxDetail | None = None
 
 
 class HrSeveranceAdjustmentUpdateRequest(BaseModel):
