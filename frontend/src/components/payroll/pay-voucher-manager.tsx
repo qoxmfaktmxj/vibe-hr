@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { VibeGrid } from "@/components/grid/vibe-grid";
 import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetcher } from "@/lib/fetcher";
@@ -25,8 +26,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "취소",
 };
 
+const VOUCHER_TYPE_LABELS: Record<string, string> = {
+  accrual: "미지급(accrual)",
+  disbursement: "지급(disbursement)",
+};
+
 function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;
+}
+
+function voucherTypeLabel(voucherType: string): string {
+  return VOUCHER_TYPE_LABELS[voucherType] ?? voucherType;
 }
 
 function formatAmount(value: number): string {
@@ -75,9 +85,25 @@ export function PayVoucherManager() {
   const voucherItems = useMemo(() => voucherData?.items ?? [], [voucherData?.items]);
   const firstVoucherId = voucherItems[0]?.id ?? null;
 
+  const selectedRun = useMemo(
+    () => runs.find((run) => run.id === voucherDetail?.voucher.run_id) ?? null,
+    [runs, voucherDetail?.voucher.run_id],
+  );
+  const canGenerateDisbursement =
+    !!voucherDetail &&
+    voucherDetail.voucher.voucher_type === "accrual" &&
+    voucherDetail.voucher.status === "confirmed" &&
+    selectedRun?.status === "paid";
+
   const voucherColumns = useMemo<ColDef<VoucherRow>[]>(
     () => [
       { field: "voucher_no", headerName: "전표번호", width: 160 },
+      {
+        field: "voucher_type",
+        headerName: "전표유형",
+        width: 150,
+        valueFormatter: (params) => voucherTypeLabel(String(params.value ?? "")),
+      },
       { field: "run_id", headerName: "Run ID", width: 90 },
       { field: "year_month", headerName: "귀속월", width: 100 },
       { field: "voucher_date", headerName: "전표일자", width: 120 },
@@ -145,6 +171,51 @@ export function PayVoucherManager() {
       toast.error(error instanceof Error ? error.message : "전표 생성에 실패했습니다.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleGenerateDisbursementVoucher() {
+    if (!voucherDetail) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/pay/vouchers/generate-disbursement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: voucherDetail.voucher.run_id }),
+      });
+      if (!response.ok) {
+        throw new Error(await parseError(response, "지급전표 생성에 실패했습니다."));
+      }
+
+      const created = (await response.json()) as { voucher: PayVoucherItem };
+      setSelectedVoucherId(created.voucher.id);
+      await mutateAllVoucherLists();
+      toast.success("지급전표가 생성되었습니다.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "지급전표 생성에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDownloadCsv() {
+    if (!voucherDetail) return;
+    try {
+      const response = await fetch(`/api/pay/vouchers/${voucherDetail.voucher.id}/export?format=csv`);
+      if (!response.ok) {
+        throw new Error(await parseError(response, "CSV 다운로드에 실패했습니다."));
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${voucherDetail.voucher.voucher_no}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "CSV 다운로드에 실패했습니다.");
     }
   }
 
@@ -240,7 +311,12 @@ export function PayVoucherManager() {
           ) : (
             <div className="space-y-4">
               <div className="rounded-md border p-3 text-sm">
-                <div className="font-medium">{voucherDetail.voucher.voucher_no}</div>
+                <div className="flex items-center gap-2 font-medium">
+                  {voucherDetail.voucher.voucher_no}
+                  <Badge variant={voucherDetail.voucher.voucher_type === "disbursement" ? "secondary" : "outline"}>
+                    {voucherTypeLabel(voucherDetail.voucher.voucher_type)}
+                  </Badge>
+                </div>
                 <div className="mt-1 text-muted-foreground">
                   Run #{voucherDetail.voucher.run_id} | {voucherDetail.voucher.year_month ?? "-"} | 전표일자{" "}
                   {voucherDetail.voucher.voucher_date}
@@ -309,6 +385,24 @@ export function PayVoucherManager() {
                 >
                   전표 취소
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadCsv}
+                  disabled={voucherDetail.voucher.status !== "confirmed"}
+                >
+                  CSV 다운로드
+                </Button>
+                {voucherDetail.voucher.voucher_type === "accrual" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleGenerateDisbursementVoucher}
+                    disabled={isSubmitting || !canGenerateDisbursement}
+                  >
+                    지급전표 생성
+                  </Button>
+                ) : null}
               </div>
             </div>
           )}

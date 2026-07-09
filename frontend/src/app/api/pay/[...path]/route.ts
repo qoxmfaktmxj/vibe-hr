@@ -47,8 +47,13 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
 
         const resContentType = upstreamResponse.headers.get("content-type");
 
-        // Binary responses (PDF 등) — 그대로 전달
-        if (resContentType && (resContentType.includes("application/pdf") || resContentType.includes("application/octet-stream"))) {
+        // Binary/파일 다운로드 응답 (PDF, CSV 등) — 그대로 전달
+        if (
+            resContentType &&
+            (resContentType.includes("application/pdf") ||
+                resContentType.includes("application/octet-stream") ||
+                resContentType.includes("text/csv"))
+        ) {
             const buf = await upstreamResponse.arrayBuffer();
             return new NextResponse(buf, {
                 status: upstreamResponse.status,
