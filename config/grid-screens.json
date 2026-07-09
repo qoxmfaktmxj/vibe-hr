@@ -216,6 +216,19 @@
       ],
       "ownerModule": "HR"
     },
+    "hr.severance.calcs": {
+      "path": "/hr/severance/calcs",
+      "pageFile": "frontend/src/app/hr/severance/calcs/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-severance-calc-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "workflow",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "HR"
+    },
     "hri.requests.mine": {
       "path": "/hri/requests/mine",
       "pageFile": "frontend/src/app/hri/requests/mine/page.tsx",
