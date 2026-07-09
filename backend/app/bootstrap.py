@@ -849,6 +849,7 @@ COMMON_CODE_GROUP_SEEDS = [
     ("JOB_GROUP", "직군", "직군 구분", 3),
     ("SALARY_TYPE", "연봉타입", "연봉 유형", 4),
     ("ORG_TYPE", "조직유형", "조직 유형 구분", 5),
+    ("EMPLOYMENT_STATUS", "재직상태", "재직/휴직/퇴직 구분", 6),
     # ── MNG 관리 모듈 공통코드 ──
     ("MNG_DEV_STATUS", "개발진행상태", "추가개발 진행상태 구분", 100),
     ("MNG_PART", "파트구분", "개발 파트 구분", 101),
@@ -869,6 +870,12 @@ COMMON_CODE_ITEM_SEEDS = {
         ("04", "차장", 4),
         ("05", "부장", 5),
         ("06", "이사", 6),
+    ],
+    # hr_employees.employment_status 값과 일치해야 함 (VALID_EMPLOYMENT_STATUSES)
+    "EMPLOYMENT_STATUS": [
+        ("active", "재직", 1),
+        ("leave", "휴직", 2),
+        ("resigned", "퇴직", 3),
     ],
     # ── MNG 관리 모듈 코드 항목 ──
     "MNG_DEV_STATUS": [

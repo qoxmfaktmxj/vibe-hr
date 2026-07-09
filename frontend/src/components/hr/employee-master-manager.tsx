@@ -310,10 +310,13 @@ export function EmployeeMasterManager() {
     [fetchedHolidayDateKeys],
   );
   const employmentOptions = useMemo(() => {
-    const normalized = employmentCodeOptions.filter(
-      (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
-        option.code === "active" || option.code === "leave" || option.code === "resigned",
-    );
+    // 공통코드 서비스는 code를 대문자로 저장하지만 hr_employees.employment_status 값은 소문자다
+    const normalized = employmentCodeOptions
+      .map((option) => ({ ...option, code: option.code.toLowerCase() }))
+      .filter(
+        (option): option is CommonCodeOption & { code: EmployeeItem["employment_status"] } =>
+          option.code === "active" || option.code === "leave" || option.code === "resigned",
+      );
 
     if (normalized.length > 0) {
       return normalized;
