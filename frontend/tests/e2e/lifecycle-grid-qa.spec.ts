@@ -3,7 +3,6 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-const LOGIN = { enterCd: "VIBE", loginId: "admin-local", password: "admin" };
 
 const OUTPUT_DIR = path.resolve(__dirname, "../../../output/playwright/lifecycle-grid-20260708");
 const REPORT_PATH = path.join(OUTPUT_DIR, "report.json");
@@ -64,15 +63,6 @@ function appendResult(result: ScreenResult): void {
   writeFileSync(REPORT_PATH, JSON.stringify(filtered, null, 2), "utf-8");
 }
 
-async function loginAsAdmin(page: Page): Promise<void> {
-  await page.goto(`${FRONTEND_URL}/login`);
-  await page.selectOption('select[name="enterCd"]', LOGIN.enterCd);
-  await page.fill('input[name="loginId"]', LOGIN.loginId);
-  await page.fill('input[name="password"]', LOGIN.password);
-  await page.getByRole("button", { name: "로그인" }).click();
-  await page.waitForURL("**/dashboard", { timeout: 20_000 });
-}
-
 async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
   const slug = routeSlug(route);
   const screenshotPath = path.join(OUTPUT_DIR, `${slug}.png`);
@@ -99,6 +89,15 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
 
     // Allow client-side render to settle.
     await page.waitForTimeout(1500);
+
+    // 인증 만료/실패 가드: storageState 재사용 세션이 끊기면 클라이언트 라우팅으로 /login에 떨어진다.
+    // 원인 진단이 쉽도록 이 경우 명확한 에러 메시지로 즉시 실패시킨다.
+    if (new URL(page.url()).pathname.startsWith("/login")) {
+      throw new Error(
+        `authentication expired: redirected to /login while navigating to ${route}. ` +
+          "storageState 세션이 만료되었거나 global-setup 로그인에 실패했을 수 있습니다.",
+      );
+    }
 
     const bodyText = await page.locator("body").innerText().catch(() => "");
     const isErrorPage =
@@ -165,8 +164,6 @@ test.describe("HR lifecycle grid QA", () => {
 
   for (const route of ROUTES) {
     test(`screen check: ${route}`, async ({ page }) => {
-      await loginAsAdmin(page);
-
       const result = await test.step(`inspect ${route}`, async () => inspectScreen(page, route));
 
       // Soft assertion: record the fact, but only fail the test on hard navigation/load failure.

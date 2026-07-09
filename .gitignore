@@ -38,6 +38,7 @@ frontend/out/
 
 # Playwright CLI artifacts
 .playwright-cli/
+frontend/test-results/
 
 # Environment files
 .env
