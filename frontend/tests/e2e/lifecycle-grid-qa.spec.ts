@@ -98,8 +98,13 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
     const bodyText = await page.locator("body").innerText().catch(() => "");
     const isErrorPage =
       bodyText.includes("Application error") ||
-      bodyText.includes("500") && bodyText.includes("Internal Server Error") ||
-      bodyText.includes("This page could not be found");
+      (bodyText.includes("500") && bodyText.includes("Internal Server Error")) ||
+      bodyText.includes("This page could not be found") ||
+      // 과거 오탐: 권한 차단/404/일반 오류 안내 페이지를 정상 로드로 잘못 판정한 사례 방지
+      bodyText.includes("접근 권한이 없습니다") ||
+      bodyText.includes("권한이 없") ||
+      bodyText.includes("찾을 수 없") ||
+      bodyText.includes("오류가 발생");
 
     loaded = status > 0 && status < 400 && !isErrorPage;
     if (!loaded) {
