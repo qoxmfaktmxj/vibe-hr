@@ -2095,6 +2095,11 @@ class HrSeveranceCalc(SQLModel, table=True):
     calculated_at: Optional[datetime] = None
     confirmed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
     confirmed_at: Optional[datetime] = None
+    service_years: int = Field(default=0)
+    income_tax: float = Field(default=0)
+    local_income_tax: float = Field(default=0)
+    net_severance: float = Field(default=0)
+    tax_detail_json: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
