@@ -863,6 +863,79 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - /hr/retire/approvals VibeGrid 기반 표준 전환
 - approval/workflow 화면 toolbar 실지원 액션 조사
 
+## TASK VH-VIBEGRID-V1-20260709 — VibeGrid wrapper v1 + readonly 파일럿 + 퇴직승인 화면 표준 전환
+- Date: 2026-07-09
+- Status: completed
+- Mode: Execution
+- Risk Class: R2 (frontend/src/components/grid/**, config/grid-screens.json)
+- Approval Status: approved (사용자: "#13~ 순차 진행")
+- Owner: kms (계획 Fable, 구현 Sonnet 위임 2건)
+
+### Goal
+- VIBE_GRID_ROADMAP Step 1 진입: VibeGrid v1(readonly) 구현, 파일럿 1화면 전환, 마지막 비등록 그리드성 화면(hr.retire.approvals) 표준 등록
+
+### Scope / Non-Scope
+- 포함: vibe-grid.tsx 신규, validator VibeGrid 인정, tim.attendance-status 전환, 퇴직승인 화면 전환+등록
+- 제외: crud/approval/workflow variant 핸들러 구현(throw), registry 런타임 연동(v2 codegen 예정), Wave 1 일괄 전환
+
+### Inputs / Sources
+- docs/VIBE_GRID_ROADMAP.md, docs/GRID_SCREEN_STANDARD.md, 파일럿 참조 패턴 e50b0e9
+- [Observed] config/grid-screens.json은 Next 프로젝트 경계 밖 → 런타임 import 불가(externalDir 기본 off) → **v1은 variant prop으로 toolbar 도출** 설계 결정
+
+### Changed Files
+- `frontend/src/components/grid/vibe-grid.tsx` (신규 + onRowClick/selectedRowId 확장)
+- `frontend/scripts/validate-grid-screens.mjs` (VibeGrid 화면 토큰 면제)
+- `frontend/src/components/tim/attendance-status-manager.tsx` (파일럿, LOC 166→154)
+- `frontend/src/components/hr/hr-retire-approval-manager.tsx` (카드 목록 → VibeGrid, 상세/승인 패널 유지, 전역 mutate로 목록 동기화)
+- `frontend/src/app/hr/retire/approvals/page.tsx` (GRID_SCREEN 메타)
+- `config/grid-screens.json` (hr.retire.approvals 등록: variant=approval, toolbar=[query,download]) — **registry 61화면**
+
+### Commands Run
+- `frontend: npm run validate:grid && npm run lint && npx tsc --noEmit`
+- `frontend: npx playwright test tests/e2e/lifecycle-grid-qa.spec.ts --workers=1 --grep "tim|retire"`
+- `frontend: npm run build` (VibeGrid 단계에서 1회)
+
+### Verification Summary
+- validate:grid(61) / lint(0 errors) / tsc / build: 통과
+- QA: tim 1/1, retire 2/2 PASS — /hr/retire/approvals hasGrid=true rowCount=12 consoleErrors=[]
+- 브라우저 수동: 행 클릭 → 상세 패널 갱신, 체크리스트/confirm/cancel 동작 보존 확인
+
+### Result
+- 커밋 5건: f65f785(VibeGrid v1) → 076aa41(validator) → e50b0e9(파일럿) → 46806d9(onRowClick) → 73b3a78(퇴직승인 전환+등록)
+- 비등록 그리드성 화면 0개 달성
+
+### Failure / Retry Notes
+- `ENV_FAILURE`: Sonnet 실행자 1차 API 연결 끊김 → 트랜스크립트 재개로 이어서 완료
+
+### Remaining Risks
+- VibeGrid v1은 readonly 전용 — crud variant 미구현 상태에서 Wave 2 진입 불가
+- registryKey는 식별용 (registry↔런타임 이중선언은 validator 정적 검증에 의존)
+
+### Follow-ups
+- Wave 1 잔여 readonly 화면 일괄 전환 (화면당 ~15분 예상)
+- VibeGrid v2: codegen으로 registry 런타임 연동, crud variant + xlsx/batch-save/dirty-dialog 공유 유틸
+
+## TASK VH-QA-HARDEN-20260709 — QA spec 보강 + employee 404 근본 수정 + 헬스체크
+- Date: 2026-07-09
+- Status: completed
+- Mode: Review / Hardening
+- Risk Class: R1
+- Approval Status: not_required
+- Owner: kms
+
+### Changed Files / Result
+- `frontend/tests/e2e/lifecycle-grid-qa.spec.ts` + `frontend/playwright.config.ts` (e9334ad): 한국어 에러페이지 판정 4패턴 추가, workers=1 고정 (병렬 로그인 폭주 사고 재발 방지)
+- `backend/app/api/health.py` + `main.py` (3509723): `/api/v1/health` DB 프로브 추가
+- `backend/app/bootstrap.py` + `frontend/src/components/hr/employee-master-manager.tsx`: /hr/employee 콘솔 404 근본 수정 — EMPLOYMENT_STATUS 공통코드 그룹 시드 부재였음. 시드 추가 + 라이브 DB API 주입 + 프론트 소문자 정규화(공통코드 서비스는 대문자 저장, employment_status 값은 소문자 — 기존엔 이 불일치로 서버 옵션이 영구 무시되고 폴백만 동작했음)
+
+### Verification Summary
+- QA spec 전체 8/8 PASS (workers=1 config), /hr/employee consoleErrors=[] 확인
+- pytest 47/47 (헬스체크 커밋 시점), lint 0 errors
+
+### Remaining Risks / Follow-ups
+- 공통코드 대문자 저장 vs 도메인 소문자 값 불일치는 다른 소비처에도 잠재 — 공통코드 소비 화면 전수 점검 후보
+- uvicorn --reload 워커 고착 현상 2회 관찰 (파일 변경 후 재시작 실패) — 재현 시 클린 재시작으로 해소, 원인 조사 후보
+
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]
 - R2/R3는 ledger 없이 완료 처리하지 않는다. [Proposal]

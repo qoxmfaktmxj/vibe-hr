@@ -174,11 +174,15 @@ VibeGrid<T>
 | useReadonlyGridStatus 훅 | `lib/grid/use-readonly-grid-status.ts` | ✅ 완료 |
 | 한국어 로케일 공유화 | `lib/grid/ag-grid-locale-ko.ts` | ✅ 완료 |
 | validator variant 지원 | `scripts/validate-grid-screens.mjs` | ✅ 완료 |
-| VibeGrid 컴포넌트 구현 | `components/grid/vibe-grid.tsx` | ⏳ 미착수 |
-| grid-screens.json variant 추가 | `config/grid-screens.json` | ⏳ 미착수 |
-| xlsx 공유 유틸리티 | `lib/grid/grid-xlsx-utils.ts` | ⏳ 미착수 |
-| batch save 공유 유틸리티 | `lib/grid/grid-batch-save.ts` | ⏳ 미착수 |
-| dirty-row dialog 공유화 | `components/grid/grid-dirty-dialog.tsx` | ⏳ 미착수 |
+| VibeGrid 컴포넌트 구현 (v1 readonly 전용) | `components/grid/vibe-grid.tsx` | ✅ 2026-07-09 (f65f785) — crud/approval/workflow 핸들러는 미구현(throw) |
+| validator VibeGrid 화면 인정 | `scripts/validate-grid-screens.mjs` | ✅ 2026-07-09 (076aa41) |
+| 파일럿: tim.attendance-status 전환 | `components/tim/attendance-status-manager.tsx` | ✅ 2026-07-09 (e50b0e9), LOC 166→154 |
+| grid-screens.json variant 추가 | `config/grid-screens.json` | ✅ 2026-07-08 — crud 34/readonly 14/approval 5/workflow 7 |
+| xlsx 공유 유틸리티 | `lib/grid/grid-xlsx-utils.ts` | ⏳ 미착수 (v1은 VibeGrid 내부 동적 import로 대체) |
+| batch save 공유 유틸리티 | `lib/grid/grid-batch-save.ts` | ⏳ 미착수 (crud variant 구현 시) |
+| dirty-row dialog 공유화 | `components/grid/grid-dirty-dialog.tsx` | ⏳ 미착수 (crud variant 구현 시) |
+
+> **v1 제약 (2026-07-09)**: `config/grid-screens.json`은 Next 프로젝트 경계 밖이라 런타임 import 불가(externalDir 기본 off). VibeGrid v1은 registryKey를 식별용으로만 받고 toolbar는 variant prop에서 도출한다. registry 런타임 연동은 v2에서 codegen(프리빌드 생성 파일)으로 해결 예정.
 
 ---
 
