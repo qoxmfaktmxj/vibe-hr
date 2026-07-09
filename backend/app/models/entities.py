@@ -1991,6 +1991,7 @@ class GlAccount(SQLModel, table=True):
     name: str = Field(max_length=100)
     account_type: str = Field(max_length=20)  # expense | liability | asset | equity | revenue
     is_net_pay_account: bool = Field(default=False)
+    is_cash_account: bool = Field(default=False)
     is_active: bool = Field(default=True)
     sort_order: int = Field(default=0)
     created_at: datetime = Field(default_factory=utc_now)
@@ -2022,12 +2023,13 @@ class PayVoucher(SQLModel, table=True):
     __tablename__ = "pay_vouchers"
     __table_args__ = (
         UniqueConstraint("voucher_no", name="uq_pay_vouchers_voucher_no"),
-        UniqueConstraint("run_id", name="uq_pay_vouchers_run_id"),
+        UniqueConstraint("run_id", "voucher_type", name="uq_pay_vouchers_run_id_voucher_type"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     voucher_no: str = Field(max_length=30, index=True)
     run_id: int = Field(foreign_key="pay_payroll_runs.id", index=True)
+    voucher_type: str = Field(default="accrual", max_length=20)  # accrual | disbursement
     voucher_date: date = Field(index=True)
     status: str = Field(default="draft", max_length=20)  # draft | confirmed | cancelled
     total_debit: float = Field(default=0)

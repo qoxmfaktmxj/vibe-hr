@@ -2599,19 +2599,20 @@ PAY_ALLOWANCE_DEDUCTION_SEEDS = [
 ]
 
 GL_ACCOUNT_SEEDS = [
-    # code, name, account_type, is_net_pay_account, sort_order
-    ("5100", "급여비용", "expense", False, 10),
-    ("5110", "상여비용", "expense", False, 20),
-    ("5120", "제수당비용", "expense", False, 30),
-    ("5130", "복리후생비", "expense", False, 40),
-    ("2100", "미지급급여", "liability", True, 110),
-    ("2210", "소득세예수금", "liability", False, 120),
-    ("2220", "지방소득세예수금", "liability", False, 130),
-    ("2230", "국민연금예수금", "liability", False, 140),
-    ("2240", "건강보험예수금", "liability", False, 150),
-    ("2250", "장기요양보험예수금", "liability", False, 160),
-    ("2260", "고용보험예수금", "liability", False, 170),
-    ("1400", "사내대출채권", "asset", False, 210),
+    # code, name, account_type, is_net_pay_account, sort_order, is_cash_account
+    ("5100", "급여비용", "expense", False, 10, False),
+    ("5110", "상여비용", "expense", False, 20, False),
+    ("5120", "제수당비용", "expense", False, 30, False),
+    ("5130", "복리후생비", "expense", False, 40, False),
+    ("2100", "미지급급여", "liability", True, 110, False),
+    ("2210", "소득세예수금", "liability", False, 120, False),
+    ("2220", "지방소득세예수금", "liability", False, 130, False),
+    ("2230", "국민연금예수금", "liability", False, 140, False),
+    ("2240", "건강보험예수금", "liability", False, 150, False),
+    ("2250", "장기요양보험예수금", "liability", False, 160, False),
+    ("2260", "고용보험예수금", "liability", False, 170, False),
+    ("1400", "사내대출채권", "asset", False, 210, False),
+    ("1100", "보통예금", "asset", False, 220, True),
 ]
 
 # 평균임금 산입 규칙 예시 (명시 3건, 나머지 활성 item_code는 ensure_severance_item_rule_seeds에서 full로 채움)
@@ -3018,8 +3019,8 @@ def ensure_pay_item_groups(session: Session) -> None:
 
 
 def ensure_gl_seeds(session: Session) -> None:
-    """gl_accounts 기본 12종 + pay_allowance_deductions 전 코드 -> 계정 매핑 시드."""
-    for code, name, account_type, is_net_pay_account, sort_order in GL_ACCOUNT_SEEDS:
+    """gl_accounts 기본 13종 + pay_allowance_deductions 전 코드 -> 계정 매핑 시드."""
+    for code, name, account_type, is_net_pay_account, sort_order, is_cash_account in GL_ACCOUNT_SEEDS:
         existing = session.exec(select(GlAccount).where(GlAccount.code == code)).first()
         if existing is None:
             session.add(
@@ -3028,6 +3029,7 @@ def ensure_gl_seeds(session: Session) -> None:
                     name=name,
                     account_type=account_type,
                     is_net_pay_account=is_net_pay_account,
+                    is_cash_account=is_cash_account,
                     is_active=True,
                     sort_order=sort_order,
                 )
@@ -3042,6 +3044,9 @@ def ensure_gl_seeds(session: Session) -> None:
                 changed = True
             if existing.is_net_pay_account != is_net_pay_account:
                 existing.is_net_pay_account = is_net_pay_account
+                changed = True
+            if existing.is_cash_account != is_cash_account:
+                existing.is_cash_account = is_cash_account
                 changed = True
             if existing.sort_order != sort_order:
                 existing.sort_order = sort_order
