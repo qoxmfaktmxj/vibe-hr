@@ -92,6 +92,8 @@ from app.models.entities import (
     PayGlMapping,
     PayVoucher,
     PayVoucherLine,
+    HrSeveranceCalc,
+    PaySeveranceItemRule,
 )
 from app.models.tra import (
     TraApplication,
@@ -199,6 +201,8 @@ __all__ = [
     "PayGlMapping",
     "PayVoucher",
     "PayVoucherLine",
+    "HrSeveranceCalc",
+    "PaySeveranceItemRule",
     "TraOrganization",
     "TraCourse",
     "TraEvent",

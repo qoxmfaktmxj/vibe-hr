@@ -2058,3 +2058,61 @@ class PayVoucherLine(SQLModel, table=True):
     summary: Optional[str] = Field(default=None, max_length=200)
     source_item_code: Optional[str] = Field(default=None, max_length=30)
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class HrSeveranceCalc(SQLModel, table=True):
+    """퇴직금 산정 기록"""
+
+    __tablename__ = "hr_severance_calcs"
+    __table_args__ = (
+        UniqueConstraint("retire_case_id", name="uq_hr_severance_calcs_retire_case_id"),
+        CheckConstraint(
+            "status IN ('draft', 'reviewed', 'confirmed')",
+            name="ck_hr_severance_calcs_status",
+        ),
+        Index("ix_hr_severance_calcs_employee_status", "employee_id", "status"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    retire_case_id: int = Field(foreign_key="hr_retire_cases.id", index=True)
+    employee_id: int = Field(foreign_key="hr_employees.id", index=True)
+    hire_date: date
+    retire_date: date = Field(index=True)
+    service_days: int = Field(default=0)
+    avg_wage_base_from: Optional[date] = None
+    avg_wage_base_to: Optional[date] = None
+    wage_total_3m: float = Field(default=0)
+    base_days_3m: int = Field(default=0)
+    avg_daily_wage: float = Field(default=0)
+    severance_amount: float = Field(default=0)
+    adjustment_amount: float = Field(default=0)
+    adjustment_reason: Optional[str] = Field(default=None, max_length=500)
+    final_amount: float = Field(default=0)
+    status: str = Field(default="draft", max_length=20)  # draft | reviewed | confirmed
+    warning: Optional[str] = Field(default=None, max_length=500)
+    calculated_at: Optional[datetime] = None
+    confirmed_by: Optional[int] = Field(default=None, foreign_key="auth_users.id")
+    confirmed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class PaySeveranceItemRule(SQLModel, table=True):
+    """평균임금 산입 규칙 (급여항목 코드 단위)"""
+
+    __tablename__ = "pay_severance_item_rules"
+    __table_args__ = (
+        UniqueConstraint("pay_item_code", name="uq_pay_severance_item_rules_item_code"),
+        CheckConstraint(
+            "include_type IN ('full', 'prorate_12', 'exclude')",
+            name="ck_pay_severance_item_rules_include_type",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pay_item_code: str = Field(max_length=30, index=True)
+    include_type: str = Field(default="full", max_length=20)  # full | prorate_12 | exclude
+    note: Optional[str] = Field(default=None, max_length=200)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
