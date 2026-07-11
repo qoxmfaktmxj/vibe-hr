@@ -2,14 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import {
-  ReadonlyGridManager,
-  createReadonlyGridRows,
-  type ReadonlyGridRow,
-} from "@/components/grid/readonly-grid-manager";
+import { VibeGrid } from "@/components/grid/vibe-grid";
+import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,11 +14,9 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
-import type {
-  MngCompanyDropdownResponse,
-  MngDevProjectItem,
-  MngDevProjectListResponse,
-} from "@/types/mng";
+import type { MngCompanyDropdownResponse, MngDevProjectItem } from "@/types/mng";
+
+const BASE_URL = "/api/mng/dev-projects";
 
 type ProjectForm = {
   id: number | null;
@@ -80,30 +75,25 @@ export function DevProjectManager() {
   const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<ProjectForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
 
-  const query = useMemo(() => {
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: String(pageSize),
-    });
-    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
-    return `/api/mng/dev-projects?${params.toString()}`;
-  }, [appliedCompanyFilter, page]);
-
-  const { data, mutate, isLoading } = useSWR<MngDevProjectListResponse>(query, fetcher, {
-    revalidateOnFocus: false,
-  });
+  const { mutate: globalMutate } = useSWRConfig();
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
-
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
-  const rowData = useMemo<ProjectGridRow[]>(() => createReadonlyGridRows(items), [items]);
 
-  const columnDefs = useMemo<ColDef<ProjectGridRow>[]>(
+  const fetchUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    const qs = params.toString();
+    return qs ? `${BASE_URL}?${qs}` : BASE_URL;
+  }, [appliedCompanyFilter]);
+
+  async function refreshList() {
+    await globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL));
+  }
+
+  const columns = useMemo<ColDef<ProjectGridRow>[]>(
     () => [
       { field: "project_name", headerName: "프로젝트명", minWidth: 180, flex: 1.2 },
       { field: "company_name", headerName: "고객사", width: 160 },
@@ -147,7 +137,7 @@ export function DevProjectManager() {
         has_tax_bill: form.has_tax_bill,
         note: form.note || null,
       };
-      const response = await fetch("/api/mng/dev-projects", {
+      const response = await fetch(BASE_URL, {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -156,7 +146,7 @@ export function DevProjectManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await mutate();
+      await refreshList();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -171,7 +161,7 @@ export function DevProjectManager() {
 
     setSaving(true);
     try {
-      const response = await fetch("/api/mng/dev-projects", {
+      const response = await fetch(BASE_URL, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [form.id] }),
@@ -180,7 +170,7 @@ export function DevProjectManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await mutate();
+      await refreshList();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -190,8 +180,18 @@ export function DevProjectManager() {
   }
 
   return (
-    <ReadonlyGridManager<ProjectGridRow>
+    <VibeGrid<MngDevProjectItem>
+      registryKey="mng.dev-projects"
       title="프로젝트 관리"
+      variant="readonly"
+      columns={columns}
+      fetchUrl={fetchUrl}
+      pageSize={50}
+      downloadFileName="mng-dev-projects"
+      emptyText="프로젝트 데이터가 없습니다."
+      onQueryStart={() => setAppliedCompanyFilter(companyFilterInput)}
+      onRowClick={(row) => setForm(toForm(row))}
+      selectedRowId={form.id}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
@@ -306,26 +306,6 @@ export function DevProjectManager() {
           </CardContent>
         </Card>
       }
-      rowData={rowData}
-      columnDefs={columnDefs}
-      totalCount={data?.total_count ?? 0}
-      page={data?.page ?? page}
-      pageSize={data?.limit ?? pageSize}
-      selectedRowId={form.id}
-      onRowClick={(row) => setForm(toForm(row))}
-      onPageChange={setPage}
-      onQuery={() => {
-        setPage(1);
-        setAppliedCompanyFilter(companyFilterInput);
-        void mutate();
-      }}
-      queryDisabled={saving || isLoading}
-      loading={isLoading}
-      emptyText="프로젝트 데이터가 없습니다."
     />
   );
 }
-
-// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
-// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
-// useGridPagination GridPaginationControls
