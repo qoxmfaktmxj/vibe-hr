@@ -5908,68 +5908,8 @@ def ensure_tra_seed_data(session: Session) -> None:
     session.commit()
 
 
-def ensure_tim_leave_schema(session: Session) -> None:
-    # SQLModel create_all은 기존 테이블 컬럼 추가를 보장하지 않으므로, 배포 시 스키마 보정
-    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decision_comment VARCHAR(1000)"))
-    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decided_by INTEGER"))
-    session.exec(text("ALTER TABLE tim_leave_requests ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ"))
-    session.commit()
-
-
-def ensure_hri_schema(session: Session) -> None:
-    session.exec(text("ALTER TABLE hri_approval_actor_rules ADD COLUMN IF NOT EXISTS position_keywords_json TEXT"))
-    session.commit()
-
-
-def ensure_hr_appointment_schema(session: Session) -> None:
-    # THRM191 + THRM221 통합 리팩터링:
-    # - hr_appointment_order_items에 임시발령 식별 컬럼 추가
-    # - legacy hr_temporary_appointments 데이터 병합 후 테이블 제거
-    session.exec(
-        text(
-            """
-            DO $$
-            BEGIN
-                IF to_regclass('hr_appointment_order_items') IS NOT NULL THEN
-                    ALTER TABLE hr_appointment_order_items ADD COLUMN IF NOT EXISTS appointment_kind VARCHAR(20);
-                    ALTER TABLE hr_appointment_order_items ADD COLUMN IF NOT EXISTS temporary_reason VARCHAR(500);
-                    UPDATE hr_appointment_order_items
-                    SET appointment_kind = 'permanent'
-                    WHERE appointment_kind IS NULL OR TRIM(appointment_kind) = '';
-                    CREATE INDEX IF NOT EXISTS ix_hr_appointment_order_items_kind
-                        ON hr_appointment_order_items (appointment_kind);
-                END IF;
-            END $$;
-            """
-        )
-    )
-    session.exec(
-        text(
-            """
-            DO $$
-            BEGIN
-                IF to_regclass('hr_temporary_appointments') IS NOT NULL
-                   AND to_regclass('hr_appointment_order_items') IS NOT NULL THEN
-                    UPDATE hr_appointment_order_items oi
-                    SET appointment_kind = 'temporary',
-                        end_date = COALESCE(ta.end_date, oi.end_date),
-                        temporary_reason = COALESCE(ta.reason, oi.temporary_reason)
-                    FROM hr_temporary_appointments ta
-                    WHERE ta.source_item_id = oi.id;
-                END IF;
-            END $$;
-            """
-        )
-    )
-    session.exec(text("DROP TABLE IF EXISTS hr_temporary_appointments"))
-    session.commit()
-
-
 def seed_initial_data(session: Session) -> None:
     ensure_auth_user_login_id_schema(session)
-    ensure_tim_leave_schema(session)
-    ensure_hri_schema(session)
-    ensure_hr_appointment_schema(session)
     ensure_roles(session)
     ensure_corporations(session)
     departments = ensure_departments(session)
