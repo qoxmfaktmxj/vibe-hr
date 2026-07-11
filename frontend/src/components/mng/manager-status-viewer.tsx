@@ -2,14 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import {
-  ReadonlyGridManager,
-  createReadonlyGridRows,
-  type ReadonlyGridRow,
-} from "@/components/grid/readonly-grid-manager";
+import { VibeGrid } from "@/components/grid/vibe-grid";
+import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +20,8 @@ import type {
   MngManagerCompanyItem,
   MngManagerCompanyListResponse,
 } from "@/types/mng";
+
+const BASE_URL = "/api/mng/manager-status";
 
 type MappingForm = {
   employee_id: string;
@@ -45,25 +44,34 @@ const EMPTY_FORM: MappingForm = {
 export function ManagerStatusViewer() {
   const [form, setForm] = useState<MappingForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(1);
-  const pageSize = 50;
 
-  const query = useMemo(() => `/api/mng/manager-status?page=${page}&limit=${pageSize}`, [page]);
-
-  const { data, mutate, isLoading } = useSWR<MngManagerCompanyListResponse>(query, fetcher, {
-    revalidateOnFocus: false,
-  });
+  const { mutate: globalMutate } = useSWRConfig();
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
   });
-
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
   const employees = employeeData?.employees ?? [];
-  const rowData = useMemo<ManagerStatusGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  // afterGrid renders a "일괄 삭제" button per mapping, which needs the full
+  // loaded set VibeGrid's internal paginated fetch does not expose here.
+  // A dedicated fetch at the API's max limit (200) keeps that list decoupled
+  // from VibeGrid's own pagination state.
+  const { data: allData, mutate: mutateAll } = useSWR<MngManagerCompanyListResponse>(
+    `${BASE_URL}?page=1&limit=200`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const items = allData?.items ?? [];
+
+  async function refreshList() {
+    await Promise.all([
+      globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL)),
+      mutateAll(),
+    ]);
+  }
 
   const columnDefs = useMemo<ColDef<ManagerStatusGridRow>[]>(
     () => [
@@ -84,7 +92,7 @@ export function ManagerStatusViewer() {
 
     setSaving(true);
     try {
-      const response = await fetch("/api/mng/manager-status", {
+      const response = await fetch(BASE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -100,7 +108,7 @@ export function ManagerStatusViewer() {
 
       toast.success("등록되었습니다.");
       setForm(EMPTY_FORM);
-      await mutate();
+      await refreshList();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -113,7 +121,7 @@ export function ManagerStatusViewer() {
 
     setSaving(true);
     try {
-      const response = await fetch("/api/mng/manager-status", {
+      const response = await fetch(BASE_URL, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [item.id] }),
@@ -122,7 +130,7 @@ export function ManagerStatusViewer() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await mutate();
+      await refreshList();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -131,8 +139,15 @@ export function ManagerStatusViewer() {
   }
 
   return (
-    <ReadonlyGridManager<ManagerStatusGridRow>
+    <VibeGrid<MngManagerCompanyItem>
+      registryKey="mng.manager-status"
       title="담당자 현황"
+      variant="readonly"
+      columns={columnDefs}
+      fetchUrl={BASE_URL}
+      pageSize={50}
+      downloadFileName="mng-manager-status"
+      emptyText="담당자 매핑 데이터가 없습니다."
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
           <div className="flex items-center text-sm text-slate-500">
@@ -218,23 +233,6 @@ export function ManagerStatusViewer() {
           </CardContent>
         </Card>
       }
-      rowData={rowData}
-      columnDefs={columnDefs}
-      totalCount={data?.total_count ?? 0}
-      page={data?.page ?? page}
-      pageSize={data?.limit ?? pageSize}
-      onPageChange={setPage}
-      onQuery={() => {
-        setPage(1);
-        void mutate();
-      }}
-      queryDisabled={saving || isLoading}
-      loading={isLoading}
-      emptyText="담당자 매핑 데이터가 없습니다."
     />
   );
 }
-
-// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
-// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
-// useGridPagination GridPaginationControls
