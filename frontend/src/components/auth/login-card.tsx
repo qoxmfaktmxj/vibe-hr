@@ -27,7 +27,7 @@ const FALLBACK_CORPORATIONS: LoginCorporationItem[] = [
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="overflow-hidden border-white/20 bg-white/95 shadow-2xl backdrop-blur dark:bg-slate-900/95">
+    <Card className="overflow-hidden border-white/20 bg-card/95 shadow-2xl backdrop-blur dark:bg-card/95">
       {children}
     </Card>
   );
@@ -56,7 +56,7 @@ function LoginProgressIndicator() {
       <div className="h-1.5 overflow-hidden rounded-full bg-primary/15">
         <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
       </div>
-      <p className="text-center text-xs font-medium text-slate-500">
+      <p className="text-center text-xs font-medium text-muted-foreground">
         로그인 처리 후 대시보드로 이동 중입니다.
       </p>
     </div>
@@ -148,13 +148,13 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
     <CardContent className="space-y-6 px-8 pb-8 pt-4">
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="space-y-2">
-          <Label htmlFor="enterCd" className="font-semibold text-slate-700">
+          <Label htmlFor="enterCd" className="font-semibold text-foreground">
             ENTER_CD
           </Label>
           <select
             id="enterCd"
             name="enterCd"
-            className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-base outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 w-full rounded-md border border-border bg-card px-3 text-base outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
             autoComplete="organization"
             value={selectedEnterCd}
             onChange={(event) => setSelectedEnterCd(event.target.value)}
@@ -167,7 +167,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
               </option>
             ))}
           </select>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {isLoadingEnterCd
               ? "활성 ENTER_CD 목록을 불러오는 중입니다."
               : "로그인할 회사의 ENTER_CD를 선택하세요."}
@@ -175,7 +175,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="loginId" className="font-semibold text-slate-700">
+          <Label htmlFor="loginId" className="font-semibold text-foreground">
             아이디
           </Label>
           <div className="relative">
@@ -187,7 +187,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
               id="loginId"
               name="loginId"
               type="text"
-              className="h-12 border-slate-200 pl-10 text-base"
+              className="h-12 border-border pl-10 text-base"
               placeholder="아이디를 입력하세요"
               autoComplete="username"
               spellCheck={false}
@@ -197,7 +197,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password" className="font-semibold text-slate-700">
+          <Label htmlFor="password" className="font-semibold text-foreground">
             비밀번호
           </Label>
           <div className="relative">
@@ -209,7 +209,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
               id="password"
               name="password"
               type="password"
-              className="h-12 border-slate-200 pl-10 text-base"
+              className="h-12 border-border pl-10 text-base"
               placeholder="비밀번호를 입력하세요"
               autoComplete="current-password"
               required
@@ -219,7 +219,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
 
         <div className="flex items-center gap-2">
           <Checkbox id="remember" name="remember" />
-          <Label htmlFor="remember" className="text-sm font-normal text-slate-600">
+          <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
             로그인 상태 유지 (30일)
           </Label>
         </div>

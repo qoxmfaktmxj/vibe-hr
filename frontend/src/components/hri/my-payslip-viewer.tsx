@@ -123,7 +123,7 @@ export function MyPayslipViewer() {
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 목록
               </Button>
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium text-foreground">
                 {parseYearMonth(summary.year_month)} 급여 상세
               </span>
               {summary.run_name && (
@@ -144,27 +144,27 @@ export function MyPayslipViewer() {
             <SummaryCard label="지급합계" amount={summary.gross_pay} color="text-green-700" />
             <SummaryCard label="공제합계" amount={summary.total_deductions} color="text-red-600" />
             <SummaryCard label="실수령액" amount={summary.net_pay} color="text-blue-700" highlight />
-            <SummaryCard label="과세소득" amount={summary.taxable_income} color="text-slate-600" />
+            <SummaryCard label="과세소득" amount={summary.taxable_income} color="text-muted-foreground" />
           </div>
 
           {/* 수당 테이블 */}
           <div className="mb-6">
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">수당 내역</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">수당 내역</h3>
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-2 pl-4 text-left font-medium text-slate-600">항목코드</th>
-                  <th className="py-2 text-left font-medium text-slate-600">항목명</th>
-                  <th className="py-2 text-left font-medium text-slate-600">과세구분</th>
-                  <th className="py-2 pr-4 text-right font-medium text-slate-600">금액</th>
+                <tr className="border-b border-border bg-muted">
+                  <th className="py-2 pl-4 text-left font-medium text-muted-foreground">항목코드</th>
+                  <th className="py-2 text-left font-medium text-muted-foreground">항목명</th>
+                  <th className="py-2 text-left font-medium text-muted-foreground">과세구분</th>
+                  <th className="py-2 pr-4 text-right font-medium text-muted-foreground">금액</th>
                 </tr>
               </thead>
               <tbody>
                 {earnings.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100">
-                    <td className="py-2 pl-4 text-slate-500">{item.item_code}</td>
-                    <td className="py-2 text-slate-700">{item.item_name}</td>
-                    <td className="py-2 text-xs text-slate-400">
+                  <tr key={item.id} className="border-b border-border">
+                    <td className="py-2 pl-4 text-muted-foreground">{item.item_code}</td>
+                    <td className="py-2 text-foreground">{item.item_name}</td>
+                    <td className="py-2 text-xs text-muted-foreground">
                       {item.tax_type === "taxable" ? "과세" : "비과세"}
                     </td>
                     <td className="py-2 pr-4 text-right tabular-nums font-medium text-green-700">
@@ -172,8 +172,8 @@ export function MyPayslipViewer() {
                     </td>
                   </tr>
                 ))}
-                <tr className="border-t-2 border-slate-300 bg-green-50">
-                  <td colSpan={3} className="py-2 pl-4 font-semibold text-slate-700">지급합계</td>
+                <tr className="border-t-2 border-border bg-green-50">
+                  <td colSpan={3} className="py-2 pl-4 font-semibold text-foreground">지급합계</td>
                   <td className="py-2 pr-4 text-right tabular-nums font-semibold text-green-700">
                     {formatCurrency(summary.gross_pay)}
                   </td>
@@ -184,22 +184,22 @@ export function MyPayslipViewer() {
 
           {/* 공제 테이블 */}
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">공제 내역</h3>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">공제 내역</h3>
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-2 pl-4 text-left font-medium text-slate-600">항목코드</th>
-                  <th className="py-2 text-left font-medium text-slate-600">항목명</th>
-                  <th className="py-2 text-left font-medium text-slate-600">공제구분</th>
-                  <th className="py-2 pr-4 text-right font-medium text-slate-600">금액</th>
+                <tr className="border-b border-border bg-muted">
+                  <th className="py-2 pl-4 text-left font-medium text-muted-foreground">항목코드</th>
+                  <th className="py-2 text-left font-medium text-muted-foreground">항목명</th>
+                  <th className="py-2 text-left font-medium text-muted-foreground">공제구분</th>
+                  <th className="py-2 pr-4 text-right font-medium text-muted-foreground">금액</th>
                 </tr>
               </thead>
               <tbody>
                 {deductions.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100">
-                    <td className="py-2 pl-4 text-slate-500">{item.item_code}</td>
-                    <td className="py-2 text-slate-700">{item.item_name}</td>
-                    <td className="py-2 text-xs text-slate-400">
+                  <tr key={item.id} className="border-b border-border">
+                    <td className="py-2 pl-4 text-muted-foreground">{item.item_code}</td>
+                    <td className="py-2 text-foreground">{item.item_name}</td>
+                    <td className="py-2 text-xs text-muted-foreground">
                       {item.tax_type === "insurance" ? "보험" : item.tax_type === "tax" ? "세금" : item.tax_type}
                     </td>
                     <td className="py-2 pr-4 text-right tabular-nums font-medium text-red-600">
@@ -207,8 +207,8 @@ export function MyPayslipViewer() {
                     </td>
                   </tr>
                 ))}
-                <tr className="border-t-2 border-slate-300 bg-red-50">
-                  <td colSpan={3} className="py-2 pl-4 font-semibold text-slate-700">공제합계</td>
+                <tr className="border-t-2 border-border bg-red-50">
+                  <td colSpan={3} className="py-2 pl-4 font-semibold text-foreground">공제합계</td>
                   <td className="py-2 pr-4 text-right tabular-nums font-semibold text-red-600">
                     {formatCurrency(summary.total_deductions)}
                   </td>

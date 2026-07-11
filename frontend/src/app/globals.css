@@ -9,7 +9,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-pretendard), system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -65,6 +65,13 @@
   --accent: #eff4ff;
   --accent-foreground: #1f2937;
   --destructive: #cc2936;
+  --primary-hover: #2f5cd8;
+  --primary-soft: #eef4ff;
+  --success: #15be53;
+  --success-foreground: #108c3d;
+  --warning: #d97706;
+  --warning-foreground: #b45309;
+  --border-soft: #f1f5f9;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #3c6dee;
@@ -98,6 +105,10 @@
   --vibe-nav-text: #334155;
   --vibe-nav-text-strong: #0f172a;
   --vibe-nav-text-muted: #64748b;
+
+  /* WCAG 격상 — 페이지 캔버스(#f6f6f8) 위에서 사용 */
+  --muted-foreground-on-bg: #475569;
+  --primary-on-bg: #2f5cd8;
 }
 
 :root[data-palette="vivid"] {
@@ -107,8 +118,10 @@
   --card-foreground: #2a1542;
   --popover: #ffffff;
   --popover-foreground: #2a1542;
-  --primary: #f61067;
+  --primary: #5e239d;
   --primary-foreground: #ffffff;
+  --primary-hover: #4a1c80;
+  --primary-soft: #f6e9ff;
   --secondary: #f6e9ff;
   --secondary-foreground: #2a1542;
   --muted: #eef9f4;
@@ -116,25 +129,30 @@
   --accent: #6decaf;
   --accent-foreground: #2a1542;
   --destructive: #d35269;
+  --success: #00b58a;
+  --success-foreground: #047857;
+  --warning: #d97706;
+  --warning-foreground: #b45309;
   --border: #e4ddee;
+  --border-soft: #efe9f5;
   --input: #e4ddee;
   --ring: #5e239d;
-  --chart-1: #f61067;
-  --chart-2: #5e239d;
-  --chart-3: #00f0b5;
-  --chart-4: #6decaf;
+  --chart-1: #5e239d;
+  --chart-2: #a78bfa;
+  --chart-3: #6decaf;
+  --chart-4: #00b58a;
   --chart-5: #d35269;
   --sidebar: #f9f8fb;
   --sidebar-foreground: #2a1542;
-  --sidebar-primary: #f61067;
+  --sidebar-primary: #5e239d;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f6e9ff;
   --sidebar-accent-foreground: #5e239d;
   --sidebar-border: #e4ddee;
   --sidebar-ring: #5e239d;
-  --vibe-primary: #f61067;
-  --vibe-primary-light: #6decaf;
-  --vibe-action: #00f0b5;
+  --vibe-primary: #5e239d;
+  --vibe-primary-light: #a78bfa;
+  --vibe-action: #00b58a;
   --vibe-save: #5e239d;
   --vibe-warning: #d35269;
   --vibe-sidebar-bg: #f9f8fb;
@@ -146,6 +164,9 @@
   --vibe-nav-text: #5e239d;
   --vibe-nav-text-strong: #2a1542;
   --vibe-nav-text-muted: #5e239d;
+
+  --muted-foreground-on-bg: #4a1c80;
+  --primary-on-bg: #4a1c80;
 }
 
 /* earth palette removed */
@@ -193,29 +214,36 @@
 .dark {
   --background: #101522;
   --foreground: #f8fafc;
-  --card: #111827;
+  --card: rgba(255, 255, 255, 0.03);
   --card-foreground: #f8fafc;
   --popover: #111827;
   --popover-foreground: #f8fafc;
   --primary: #7a9cec;
   --primary-foreground: #111827;
-  --secondary: #1f2937;
+  --primary-hover: #9fb8ff;
+  --primary-soft: rgba(60, 109, 238, 0.18);
+  --secondary: rgba(255, 255, 255, 0.04);
   --secondary-foreground: #f8fafc;
-  --muted: #1f2937;
+  --muted: rgba(255, 255, 255, 0.04);
   --muted-foreground: #94a3b8;
-  --accent: #1e293b;
+  --accent: rgba(255, 255, 255, 0.05);
   --accent-foreground: #f8fafc;
   --destructive: #e04551;
-  --border: #1e293b;
-  --input: #1e293b;
+  --success: #10b981;
+  --success-foreground: #34d399;
+  --warning: #fbbf24;
+  --warning-foreground: #fde68a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.05);
+  --input: rgba(255, 255, 255, 0.08);
   --ring: #7a9cec;
   --sidebar: #0f172a;
   --sidebar-foreground: #f8fafc;
   --sidebar-primary: #7a9cec;
   --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #1e293b;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #1e293b;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #7a9cec;
 
   --vibe-primary-login: #7a9cec;
@@ -234,6 +262,10 @@
   --vibe-nav-text: #cbd5e1;
   --vibe-nav-text-strong: #f8fafc;
   --vibe-nav-text-muted: #94a3b8;
+
+  /* WCAG 격상 — 다크 모드는 모든 토큰이 5:1+ 통과 */
+  --muted-foreground-on-bg: #94a3b8;
+  --primary-on-bg: #7a9cec;
 }
 
 @layer base {
@@ -242,7 +274,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-inter), sans-serif;
   }
 }
 
@@ -266,55 +297,6 @@
 }
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #475569;
-}
-
-.dark .bg-white,
-.dark .bg-slate-50,
-.dark .bg-slate-100,
-.dark .bg-gray-50,
-.dark .bg-gray-100 {
-  background-color: var(--card) !important;
-}
-.dark .text-black,
-.dark .text-gray-900,
-.dark .text-gray-800,
-.dark .text-gray-700,
-.dark .text-slate-900,
-.dark .text-slate-800,
-.dark .text-slate-700 {
-  color: #f1f5f9 !important;
-}
-.dark .text-gray-600,
-.dark .text-gray-500,
-.dark .text-slate-600,
-.dark .text-slate-500 {
-  color: #cbd5e1 !important;
-}
-.dark .border-gray-200,
-.dark .border-gray-100,
-.dark .border-slate-200,
-.dark .border-slate-100 {
-  border-color: var(--border) !important;
-}
-.dark input,
-.dark select,
-.dark textarea {
-  background-color: var(--muted);
-  color: var(--foreground);
-  border-color: var(--border);
-}
-.dark input::placeholder,
-.dark textarea::placeholder {
-  color: #94a3b8;
-}
-.dark .hover\:bg-white:hover,
-.dark .hover\:bg-slate-50:hover,
-.dark .hover\:bg-slate-100:hover {
-  background-color: var(--accent) !important;
-}
-.dark .odd\:bg-white:nth-child(odd),
-.dark .even\:bg-slate-50:nth-child(even) {
-  background-color: color-mix(in oklab, var(--card) 90%, black 10%) !important;
 }
 
 /* ============================================================ */
@@ -343,29 +325,44 @@
 .dark[data-palette="vivid"] {
   --background: #12101d;
   --foreground: #f5f3ff;
-  --card: #1b1530;
+  --card: rgba(255, 255, 255, 0.03);
   --card-foreground: #f5f3ff;
   --popover: #1b1530;
   --popover-foreground: #f5f3ff;
-  --secondary: #2a2145;
+  --primary: #a78bfa;
+  --primary-foreground: #12101d;
+  --primary-hover: #c4b5fd;
+  --primary-soft: rgba(94, 35, 157, 0.22);
+  --secondary: rgba(255, 255, 255, 0.04);
   --secondary-foreground: #f5f3ff;
-  --muted: #2a2145;
+  --muted: rgba(255, 255, 255, 0.04);
   --muted-foreground: #c4b5fd;
-  --accent: #2f234f;
+  --accent: rgba(109, 236, 175, 0.16);
   --accent-foreground: #f5f3ff;
-  --border: #3b2f5e;
-  --input: #3b2f5e;
+  --success: #34d399;
+  --success-foreground: #6ee7b7;
+  --warning: #fbbf24;
+  --warning-foreground: #fde68a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.05);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: #a78bfa;
   --sidebar: #140f24;
   --sidebar-foreground: #f5f3ff;
-  --sidebar-accent: #2f234f;
+  --sidebar-primary: #a78bfa;
+  --sidebar-primary-foreground: #12101d;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: #f5f3ff;
-  --sidebar-border: #3b2f5e;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
   --vibe-sidebar-bg: #140f24;
   --vibe-background-light: #12101d;
   --vibe-text-base: #f5f3ff;
   --vibe-nav-text: #ddd6fe;
   --vibe-nav-text-strong: #f5f3ff;
   --vibe-nav-text-muted: #c4b5fd;
+
+  --muted-foreground-on-bg: #c4b5fd;
+  --primary-on-bg: #a78bfa;
 }
 
 .dark {
@@ -386,70 +383,23 @@
 }
 
 /* ============================================================ */
-/* AG Grid dark fallback                                          */
+/* AG Grid dark fallback — variables only, no !important         */
 /* ============================================================ */
 .dark .ag-theme-quartz {
   --ag-background-color: #0f172a;
   --ag-foreground-color: #e2e8f0;
   --ag-header-background-color: #1e293b;
   --ag-header-foreground-color: #cbd5e1;
-  --ag-border-color: #334155;
-  --ag-row-border-color: #1e293b;
+  --ag-border-color: rgba(255, 255, 255, 0.08);
+  --ag-row-border-color: rgba(255, 255, 255, 0.05);
   --ag-odd-row-background-color: #0f172a;
   --ag-control-panel-background-color: #111827;
   --ag-selected-row-background-color: #1e3a5f;
-  --ag-range-selection-background-color: rgba(59, 130, 246, 0.2);
-}
-.dark .ag-theme-quartz .ag-root-wrapper,
-.dark .ag-theme-quartz .ag-root,
-.dark .ag-theme-quartz .ag-body,
-.dark .ag-theme-quartz .ag-body-viewport,
-.dark .ag-theme-quartz .ag-center-cols-viewport,
-.dark .ag-theme-quartz .ag-center-cols-container,
-.dark .ag-theme-quartz .ag-body-horizontal-scroll,
-.dark .ag-theme-quartz .ag-body-vertical-scroll,
-.dark .ag-theme-quartz .ag-floating-bottom,
-.dark .ag-theme-quartz .ag-pinned-left-cols-container,
-.dark .ag-theme-quartz .ag-pinned-right-cols-container {
-  background-color: #0f172a !important;
-  color: #e2e8f0 !important;
-}
-.dark .ag-theme-quartz .ag-header,
-.dark .ag-theme-quartz .ag-header-viewport,
-.dark .ag-theme-quartz .ag-header-container,
-.dark .ag-theme-quartz .ag-pinned-left-header,
-.dark .ag-theme-quartz .ag-pinned-right-header {
-  background-color: #1e293b !important;
-  color: #cbd5e1 !important;
-}
-.dark .ag-theme-quartz .ag-row,
-.dark .ag-theme-quartz .ag-row-odd,
-.dark .ag-theme-quartz .ag-row-even,
-.dark .ag-theme-quartz .ag-cell,
-.dark .ag-theme-quartz .ag-full-width-row {
-  background-color: #111b2e !important;
-  color: #e2e8f0 !important;
-}
-.dark .ag-theme-quartz .ag-row:hover,
-.dark .ag-theme-quartz .ag-row-hover {
-  background-color: #1b2a45 !important;
-}
-.dark .ag-theme-quartz .ag-row-selected,
-.dark .ag-theme-quartz .ag-row-selected:hover {
-  background-color: #24324e !important;
-}
-.dark .ag-theme-quartz .ag-cell-value,
-.dark .ag-theme-quartz .ag-group-value,
-.dark .ag-theme-quartz .ag-header-cell-text,
-.dark .ag-theme-quartz .ag-icon {
-  color: #e2e8f0 !important;
-}
-.dark .ag-theme-quartz .ag-input-field-input,
-.dark .ag-theme-quartz .ag-picker-field-wrapper,
-.dark .ag-theme-quartz .ag-text-field-input {
-  background-color: #0f172a !important;
-  color: #e2e8f0 !important;
-  border-color: #334155 !important;
+  --ag-row-hover-color: #1b2a45;
+  --ag-range-selection-background-color: rgba(60, 109, 238, 0.20);
+  --ag-input-background-color: #0f172a;
+  --ag-input-foreground-color: #e2e8f0;
+  --ag-input-border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ============================================================ */
@@ -540,5 +490,38 @@
 .vibe-grid-no-pinned-divider .ag-pinned-left-cols-container {
   border-right: none !important;
   box-shadow: none !important;
+}
+
+/* ============================================================ */
+/* Typography — Pretendard OpenType + lang-aware tracking         */
+/* ============================================================ */
+:root {
+  font-feature-settings: "ss03", "ss01";
+}
+
+body {
+  font-family: var(--font-sans);
+  letter-spacing: 0; /* 한글 기준 디폴트 */
+}
+
+/* 영문/숫자가 다수인 헤딩에 negative tracking */
+.tracking-tight {
+  letter-spacing: -0.02em;
+}
+.tracking-tighter {
+  letter-spacing: -0.025em;
+}
+
+/* CJK 섞인 헤딩에서 영문 부분만 negative tracking */
+.heading-mixed :lang(en),
+.heading-mixed [lang="en"] {
+  letter-spacing: -0.02em;
+}
+
+/* 숫자는 tabular + tracking 0 */
+.tnum, .tabular-nums {
+  font-feature-settings: "tnum", "ss03", "ss01";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 

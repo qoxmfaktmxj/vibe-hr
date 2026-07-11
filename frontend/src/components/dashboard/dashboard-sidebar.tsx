@@ -273,7 +273,7 @@ function MenuGroupItem({
       </button>
 
       {isOpen ? (
-        <div className="mt-0.5 space-y-0.5 ml-4 border-l border-gray-200 pl-3">
+        <div className="mt-0.5 space-y-0.5 ml-4 border-l border-border pl-3">
           {node.children.map((child) =>
             child.children.length > 0 ? (
               <MenuGroupItem
@@ -515,7 +515,7 @@ export function DashboardSidebar() {
         </nav>
       </div>
 
-      <div className="shrink-0 border-t border-gray-200 bg-[var(--vibe-sidebar-bg)] p-3">
+      <div className="shrink-0 border-t border-border bg-[var(--vibe-sidebar-bg)] p-3">
         <button
           type="button"
           className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-accent"
@@ -537,7 +537,7 @@ export function DashboardSidebar() {
     <>
       <button
         type="button"
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="메뉴 열기"
       >
@@ -548,11 +548,11 @@ export function DashboardSidebar() {
       {mobileOpen ? (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-gray-200 bg-[var(--vibe-sidebar-bg)]">
+          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]">
             <div className="flex justify-end p-3">
               <button
                 type="button"
-                className="rounded-md border bg-white p-2"
+                className="rounded-md border bg-card p-2"
                 onClick={() => setMobileOpen(false)}
                 aria-label="메뉴 닫기"
               >
@@ -633,7 +633,7 @@ export function DashboardSidebar() {
         </div>
       ) : null}
 
-      <aside className="hidden w-64 shrink-0 border-r border-gray-200 bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
+      <aside className="hidden w-64 shrink-0 border-r border-border bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
         {sidebarContent}
       </aside>
     </>

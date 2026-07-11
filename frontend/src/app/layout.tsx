@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 
 import { Providers } from "@/components/providers";
 
@@ -17,9 +17,11 @@ function resolveMetadataBase(): URL {
   }
 }
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
+const pretendard = localFont({
+  src: "../../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
+  display: "swap",
+  variable: "--font-pretendard",
+  weight: "100 900",
 });
 
 export const metadata: Metadata = {
@@ -62,8 +64,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className={`${inter.variable} antialiased`}>
+    <html lang="ko" className={pretendard.variable}>
+      <body className="antialiased">
         <Providers initialUser={null} initialMenus={[]}>
           {children}
         </Providers>

@@ -765,7 +765,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
               disabled={loading || saving}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-slate-500">총 {rows.length.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {rows.length.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         )}
@@ -788,7 +788,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
-          <div className="ag-theme-quartz vibe-grid vibe-grid-no-pinned-divider h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid vibe-grid-no-pinned-divider h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-border">
             <AgGridReact<AdminGridRow>
               theme="legacy"
               rowData={pagedRows}

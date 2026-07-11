@@ -54,7 +54,7 @@ export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmploy
               <Badge variant="outline">{selected?.department_name ?? "-"}</Badge>
               <Badge variant="secondary">{selected?.position_title ?? "-"}</Badge>
             </div>
-            <p className="mt-0.5 text-xs text-slate-600">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               사번 {selected?.employee_no ?? "-"} · 입사일 {selected?.hire_date ?? "-"} · 근속 {tenureText(selected?.hire_date)}
             </p>
           </div>
@@ -65,37 +65,37 @@ export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmploy
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="사번/이름 검색" className="h-9 pl-8" />
             </div>
             {query ? (
-              <div className="absolute left-0 right-0 z-20 mt-1 max-h-32 overflow-auto rounded-md border bg-white shadow-lg">
+              <div className="absolute left-0 right-0 z-20 mt-1 max-h-32 overflow-auto rounded-md border bg-card shadow-lg">
                 {filtered.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-slate-50"
+                    className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-muted"
                     onClick={() => {
                       onSelectEmployee(item.id);
                       setQuery("");
                     }}
                   >
                     <span>{item.display_name}</span>
-                    <span className="text-slate-500">{item.employee_no}</span>
+                    <span className="text-muted-foreground">{item.employee_no}</span>
                   </button>
                 ))}
               </div>
             ) : null}
           </div>
 
-          <button type="button" className="rounded-md border bg-white p-2 hover:bg-slate-100" onClick={() => setExpanded((v) => !v)}>
+          <button type="button" className="rounded-md border bg-card p-2 hover:bg-accent" onClick={() => setExpanded((v) => !v)}>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         </div>
 
         {expanded ? (
           <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 text-sm lg:grid-cols-5">
-            <div><p className="text-xs text-slate-500">성명</p><p className="font-semibold">{selected?.display_name ?? "-"}</p></div>
-            <div><p className="text-xs text-slate-500">부서</p><p className="font-semibold">{selected?.department_name ?? "-"}</p></div>
-            <div><p className="text-xs text-slate-500">직무</p><p className="font-semibold">{selected?.position_title ?? "-"}</p></div>
-            <div><p className="text-xs text-slate-500">입사일</p><p className="font-semibold">{selected?.hire_date ?? "-"}</p></div>
-            <div><p className="text-xs text-slate-500">근속기간</p><p className="font-semibold">{tenureText(selected?.hire_date)}</p></div>
+            <div><p className="text-xs text-muted-foreground">성명</p><p className="font-semibold">{selected?.display_name ?? "-"}</p></div>
+            <div><p className="text-xs text-muted-foreground">부서</p><p className="font-semibold">{selected?.department_name ?? "-"}</p></div>
+            <div><p className="text-xs text-muted-foreground">직무</p><p className="font-semibold">{selected?.position_title ?? "-"}</p></div>
+            <div><p className="text-xs text-muted-foreground">입사일</p><p className="font-semibold">{selected?.hire_date ?? "-"}</p></div>
+            <div><p className="text-xs text-muted-foreground">근속기간</p><p className="font-semibold">{tenureText(selected?.hire_date)}</p></div>
           </div>
         ) : null}
       </CardContent>

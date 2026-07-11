@@ -173,14 +173,14 @@ export function HriReceiveTaskBoard() {
             onChange={setKeywordInput}
             placeholder="문서번호, 제목, 신청서명"
           />
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             현재 페이지 기준으로 수신 처리 대기 문서를 빠르게 찾을 수 있습니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
         notice ? (
-          <Card className="border-slate-200">
+          <Card>
             <CardContent className="py-3">
               <p className={noticeTone === "error" ? "text-sm text-red-600" : "text-sm text-emerald-700"}>
                 {notice}
@@ -192,7 +192,7 @@ export function HriReceiveTaskBoard() {
       afterGrid={
         <Card className="border-slate-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">처리 의견</CardTitle>
+            <CardTitle className="text-sm text-foreground">처리 의견</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <Input

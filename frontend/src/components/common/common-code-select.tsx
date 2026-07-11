@@ -29,9 +29,9 @@ export function CommonCodeSelect({ groupCode, label, value, onChange, disabled }
 
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+      <label className="text-sm font-medium text-foreground">{label}</label>
       <select
-        className="h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm"
+        className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
         value={value ?? ""}
         onChange={(event) => onChange?.(event.target.value)}
         disabled={disabled}
