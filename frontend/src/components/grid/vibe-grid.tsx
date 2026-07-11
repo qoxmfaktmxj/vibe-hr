@@ -40,6 +40,25 @@ import { fetcher } from "@/lib/fetcher";
  * (toolbar subset of ["query", "download"]). `registryKey` is kept as a
  * prop for identification/documentation only; a v2 codegen step may wire it
  * up to the registry for real.
+ *
+ * v2 additive props (2026-07-11, see VIBE_GRID_ROADMAP.md "VibeGrid v2 설계"):
+ * four optional props were added on top of v1 so screens with grid-adjacent
+ * CRUD forms / dual summary grids / non-standard list responses / client-side
+ * derived rows can adopt VibeGrid without losing behavior. All four are
+ * optional and every existing v1 call site is unaffected.
+ *   - `beforeGrid?: ReactNode` — rendered above the search/grid section
+ *     (passthrough to ReadonlyGridManager, which already supports this slot).
+ *   - `afterGrid?: ReactNode` — rendered below the grid section (passthrough).
+ *   - `fetchAdapter?: (json: unknown) => VibeGridListResponse<Row>` —
+ *     normalizes a non-standard list response (e.g. missing `id` field, or a
+ *     bare `items[]` response) into the `{items, total_count, page, limit}`
+ *     shape VibeGrid expects, before rows are built.
+ *   - `transformRows?: (rows) => rows` — applied after fetch (and after
+ *     `createReadonlyGridRows`) for client-side filtering/derivation (e.g.
+ *     keyword search across already-fetched rows). When provided,
+ *     `total_count` shown/paginated is replaced by the transformed row
+ *     count, since the transform can shrink the visible set below what the
+ *     server reported.
  */
 
 export type VibeGridVariant = "crud" | "readonly" | "approval" | "workflow";
@@ -79,6 +98,26 @@ export type VibeGridProps<Row extends VibeGridRowBase> = {
   onRowClick?: (row: Row & ReadonlyGridRow) => void;
   /** Highlights the row whose `id` matches this value (see ReadonlyGridManager). */
   selectedRowId?: number | string | null;
+  /** Rendered above the search/grid section (ReadonlyGridManager `beforeGrid` passthrough). */
+  beforeGrid?: ReactNode;
+  /** Rendered below the grid section (ReadonlyGridManager `afterGrid` passthrough). */
+  afterGrid?: ReactNode;
+  /**
+   * Normalizes a non-standard list response into `VibeGridListResponse<Row>`
+   * before rows are built. Use this when the API returns a bare `items[]`
+   * (no total_count/page/limit) or when row items are missing the `id`
+   * field VibeGrid rows require (e.g. a `contract_id`/`project_id` primary
+   * key that needs to be mapped to `id`).
+   */
+  fetchAdapter?: (json: unknown) => VibeGridListResponse<Row>;
+  /**
+   * Applied to the fetched rows (after `createReadonlyGridRows`) for
+   * client-side filtering/derivation, e.g. a keyword search across the
+   * already-fetched page. When provided, the displayed/paginated total
+   * count is replaced by `transformRows(rows).length` instead of the
+   * server-reported `total_count`.
+   */
+  transformRows?: (rows: Array<Row & ReadonlyGridRow>) => Array<Row & ReadonlyGridRow>;
 };
 
 function toXlsxSheetName(name: string): string {
@@ -135,6 +174,10 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
   onQueryStart,
   onRowClick,
   selectedRowId,
+  beforeGrid,
+  afterGrid,
+  fetchAdapter,
+  transformRows,
 }: VibeGridProps<Row>) {
   const [page, setPage] = useState(1);
   const [appliedUrl, setAppliedUrl] = useState(fetchUrl);
@@ -144,11 +187,21 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
     return `${appliedUrl}${separator}page=${page}&limit=${pageSize}`;
   }, [appliedUrl, page, pageSize]);
 
-  const { data, isLoading, mutate } = useSWR<VibeGridListResponse<Row>>(query, fetcher, {
+  const { data: rawData, isLoading, mutate } = useSWR<unknown>(query, fetcher, {
     revalidateOnFocus: false,
   });
 
-  const rowData = useMemo(() => createReadonlyGridRows(data?.items ?? []), [data?.items]);
+  const data = useMemo<VibeGridListResponse<Row> | undefined>(() => {
+    if (rawData === undefined) return undefined;
+    return fetchAdapter ? fetchAdapter(rawData) : (rawData as VibeGridListResponse<Row>);
+  }, [rawData, fetchAdapter]);
+
+  const fetchedRowData = useMemo(() => createReadonlyGridRows(data?.items ?? []), [data?.items]);
+  const rowData = useMemo(
+    () => (transformRows ? transformRows(fetchedRowData) : fetchedRowData),
+    [fetchedRowData, transformRows],
+  );
+  const totalCount = transformRows ? rowData.length : (data?.total_count ?? 0);
 
   const columnDefs = useMemo<ColDef<Row & ReadonlyGridRow>[]>(
     () => columns.map((col) => ({ ...defaultColDef, ...col })),
@@ -159,9 +212,11 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
     <ReadonlyGridManager<Row & ReadonlyGridRow>
       title={title}
       searchFields={searchFields}
+      beforeGrid={beforeGrid}
+      afterGrid={afterGrid}
       rowData={rowData}
       columnDefs={columnDefs}
-      totalCount={data?.total_count ?? 0}
+      totalCount={totalCount}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}
