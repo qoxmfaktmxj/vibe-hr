@@ -180,12 +180,20 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
   transformRows,
 }: VibeGridProps<Row>) {
   const [page, setPage] = useState(1);
-  const [appliedUrl, setAppliedUrl] = useState(fetchUrl);
 
+  // `query` is derived directly from the `fetchUrl` prop (not a snapshot
+  // taken inside the onQuery handler) so that when `onQueryStart` applies
+  // staged filter state in the parent (e.g. setAppliedCompanyFilter), the
+  // resulting new `fetchUrl` prop is picked up on the very next render.
+  // Snapshotting `fetchUrl` into local state inside onQuery would read a
+  // stale closure value, since the parent's state update from
+  // `onQueryStart()` hasn't flushed yet when the rest of the handler runs
+  // (React only re-renders after the synchronous event handler returns) —
+  // that would require a second "조회" click before a filter took effect.
   const query = useMemo(() => {
-    const separator = appliedUrl.includes("?") ? "&" : "?";
-    return `${appliedUrl}${separator}page=${page}&limit=${pageSize}`;
-  }, [appliedUrl, page, pageSize]);
+    const separator = fetchUrl.includes("?") ? "&" : "?";
+    return `${fetchUrl}${separator}page=${page}&limit=${pageSize}`;
+  }, [fetchUrl, page, pageSize]);
 
   const { data: rawData, isLoading, mutate } = useSWR<unknown>(query, fetcher, {
     revalidateOnFocus: false,
@@ -223,7 +231,8 @@ function VibeGridReadonly<Row extends VibeGridRowBase>({
       onQuery={() => {
         onQueryStart?.();
         setPage(1);
-        setAppliedUrl(fetchUrl);
+        // If `fetchUrl` doesn't change (e.g. re-querying the same URL), the
+        // SWR key is identical and won't auto-refetch; force a revalidation.
         void mutate();
       }}
       onDownload={() =>
