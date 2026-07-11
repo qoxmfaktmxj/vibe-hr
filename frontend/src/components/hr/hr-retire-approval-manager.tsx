@@ -84,13 +84,17 @@ export function HrRetireApprovalManager() {
   );
 
   useEffect(() => {
+    // 생성 핸들러가 setSelectedCaseId(신규 id)를 호출하는 시점에는 케이스 목록
+    // SWR 캐시가 아직 재검증 전이라, 이 동기화가 선택을 첫 행으로 되돌린다.
+    // 뮤테이션 진행 중에는 건너뛰고 isSubmitting 해제 시 재평가한다.
+    if (isSubmitting) return;
     if (caseItems.length === 0) {
       if (selectedCaseId !== null) setSelectedCaseId(null);
       return;
     }
     if (selectedCaseId && caseItems.some((item) => item.id === selectedCaseId)) return;
     setSelectedCaseId(firstCaseId);
-  }, [caseItems, firstCaseId, selectedCaseId]);
+  }, [caseItems, firstCaseId, selectedCaseId, isSubmitting]);
 
   useEffect(() => {
     if (!caseDetail) {
