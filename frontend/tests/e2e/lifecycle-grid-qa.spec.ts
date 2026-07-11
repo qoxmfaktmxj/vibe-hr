@@ -31,6 +31,17 @@ const ROUTES = [
   "/payroll/vouchers",
   "/hr/severance/calcs",
   "/payroll/severance-item-rules",
+  // VibeGrid v2 Wave 1 re-conversion (docs/VIBE_GRID_ROADMAP.md)
+  "/mng/dev-inquiries",
+  "/mng/dev-projects",
+  "/mng/dev-requests",
+  "/mng/dev-staff",
+  "/mng/infra",
+  "/mng/manager-status",
+  "/mng/outsource-attendance",
+  "/mng/outsource-contracts",
+  "/wel/benefit-types",
+  "/tim/annual-leave",
 ];
 
 function routeSlug(route: string): string {
