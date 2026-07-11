@@ -149,6 +149,22 @@ VibeGrid<T>
 - **재개 조건 (VibeGrid v2 요구사항)**: beforeGrid/afterGrid 슬롯 passthrough, 멀티 fetch 소스, 클라이언트 필터 훅, 비표준 응답 어댑터. v2 랜딩 후 Wave 1 재산정.
 - registry variant는 그리드 계약 기준으로 정확하므로 재분류 불요.
 
+### VibeGrid v2 설계 (2026-07-11 승인 — Wave 1 재개)
+
+v1에 **additive props 4종**만 추가한다 (기존 사용처 무변경, readonly 전용 유지):
+
+| prop | 타입 | 용도 |
+|---|---|---|
+| `beforeGrid?` | ReactNode | 그리드 위 슬롯 — 화면 고유 CRUD 폼/요약 카드/선택 UI를 그대로 수용 (ReadonlyGridManager passthrough) |
+| `afterGrid?` | ReactNode | 그리드 아래 슬롯 — 듀얼 요약 그리드(MngSimpleGrid 등) 그대로 수용 |
+| `fetchAdapter?` | (json: unknown) ⇒ {items,total_count,page,limit} | 비표준 응답(예: org.dept-history의 items[] 단독) 정규화 |
+| `transformRows?` | (rows: Row[]) ⇒ Row[] | fetch 후 클라이언트 필터/파생 가공 (retire.checklist 키워드 필터 등). total_count는 변환 후 길이로 대체 |
+
+**Wave 1 재산정 (v2 기준)**:
+- 전환 대상 12: mng 8종(폼→beforeGrid, 요약 듀얼그리드→afterGrid), hr.retire.checklist(폼+transformRows), wel.benefit-types(요약 카드 beforeGrid+transformRows), org.dept-history(fetchAdapter), tim.annual-leave(내 연차 요약은 beforeGrid에서 화면 자체 SWR 유지, 목록만 VibeGrid)
+- 영구 예외 1: tim.reports — ReadonlyGridManager 미사용(AgGridReact 2회 직접, 페이지네이션 계약 없음). registry variant는 readonly 유지하되 로드맵상 커스텀 예외로 명시
+- 원칙: 화면 동작 100% 보존이 우선. v2 props로도 동작 보존이 어색해지는 화면은 억지 전환 금지, 보류 사유 기록
+
 ### Wave 2: 단순 CRUD (17개, 패턴 동일)
 - HR admin 7개, TIM 코드 3개, TRA 5개, payroll.codes, payroll.tax-rates
 - 화면당 작업: ~30분

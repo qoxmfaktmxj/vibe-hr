@@ -1031,9 +1031,35 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - pytest **84 passed** / validate:grid 66 / lint 0 errors / tsc 0 errors / **build 통과** / QA 13/13 / alembic check 클린·drift 0 (head=ea501237b804)
 
 ### Remaining Risks / Follow-ups
-- vouchers 화면 생성 직후 상세 패널 선택 레이스 (기존 퀴크, 기능 영향 미미)
-- VibeGrid v2 (슬롯/멀티fetch/어댑터) 설계 후 Wave 1 재개
+- ~~vouchers 화면 생성 직후 상세 패널 선택 레이스~~ → VH-CANDIDATES-20260711에서 해결
+- ~~VibeGrid v2 설계 후 Wave 1 재개~~ → VH-CANDIDATES-20260711에서 완료
 - 퇴직소득세 상수(2026)는 세법 개정 시 SEVERANCE_TAX_TABLE 연도 키 추가 필요
+
+## TASK VH-CANDIDATES-20260711 — 후보 4건 일괄 처리 (VibeGrid v2·Wave 1 / 정리 / 스테일 DB) + 원격 푸시
+- Date: 2026-07-11
+- Status: completed
+- Mode: Execution
+- Risk Class: R2 (공유 그리드 모듈 + 11화면)
+- Approval Status: approved (사용자: "다음 후보 작업 다 진행하고 오류 없는지 확인한 후에 푸시해")
+- Owner: kms (계획·리뷰 Fable, 구현 Sonnet 2건 병렬)
+
+### Result
+1. **VibeGrid v2 + Wave 1 재전환** (6커밋 348f0cd~213eaa9, 리뷰 PASS):
+   - v2 additive props 4종: beforeGrid/afterGrid(슬롯 passthrough), fetchAdapter(비표준 응답 정규화), transformRows(클라이언트 필터)
+   - **v1 잠복 버그 발견·수정**(f6c9c84): onQuery 핸들러가 fetchUrl을 stale closure로 스냅샷 → 필터 적용에 조회 2클릭 필요하던 결함. SWR 키를 prop 직접 파생으로 변경. **계약 주의**: fetchUrl은 반드시 "적용된(applied) 필터 상태"에서 파생할 것 — 라이브 입력 상태 직결 시 타이핑마다 fetch됨
+   - 전환 11화면: mng 8종 전부(CRUD 폼→beforeGrid, 듀얼 요약그리드→afterGrid), hr.retire.checklist, wel.benefit-types, tim.annual-leave. VibeGrid 총 사용처 16화면
+   - 보류 1: org.dept-history — useMenuActions().can() 권한 기반 툴바 숨김을 VibeGrid 미지원, 전환 시 권한 UI 회귀라 보류 (v2.1 후보: 권한 인지 툴바)
+2. **정리** (88356e5, d3de46f, 리뷰 PASS): init_db DO$$ + bootstrap ensure_*_schema 3종 제거(베이스라인 대조 후, fresh DB 부트 패치 없이 성공 검증), vouchers 선택 레이스 isSubmitting 가드
+3. **동일 레이스 픽스업** (메인 세션 직접): hr-retire-approval-manager에도 같은 가드 적용
+4. **스테일 DB 삭제**: vibe_hr_stale_20260709 → pg_dump 백업(output/db-backups/, 3.8MB) 후 DROP. 남은 DB: myhr, ehr6(별개)
+
+### Verification Summary
+- pytest 84 / validate:grid 66 / lint 0 errors / tsc 0 / build 통과 / **QA 23/23** (기존 13 + 전환 10 route) / drift 0
+- mng 화면들은 시드(회사) 부재로 CRUD 폼 실제 제출은 미검증 — 렌더+콘솔에러 0+네트워크 파라미터 정합+코드 패리티로 갈음 (원장 기록)
+
+### Follow-ups
+- VibeGrid v2.1: 권한 인지 툴바(useMenuActions 연동) → org.dept-history 전환 재개
+- mng 화면 CRUD 실검증용 mng.companies 시드 보강
 
 ## 운영 원칙 요약
 - 기록 없는 중요한 작업은 추적 불가 작업으로 본다. [Proposal]
