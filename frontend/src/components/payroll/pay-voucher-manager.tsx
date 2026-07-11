@@ -138,13 +138,19 @@ export function PayVoucherManager() {
   );
 
   useEffect(() => {
+    // Generate handlers call setSelectedVoucherId(newId) while isSubmitting is
+    // still true, before the vouchers list SWR cache has revalidated to include
+    // the new voucher. Skipping the sync while a mutation is in flight avoids
+    // reverting that selection back to the list's first row on the stale
+    // intermediate render; the effect re-checks once isSubmitting flips back.
+    if (isSubmitting) return;
     if (voucherItems.length === 0) {
       if (selectedVoucherId !== null) setSelectedVoucherId(null);
       return;
     }
     if (selectedVoucherId && voucherItems.some((item) => item.id === selectedVoucherId)) return;
     setSelectedVoucherId(firstVoucherId);
-  }, [voucherItems, firstVoucherId, selectedVoucherId]);
+  }, [voucherItems, firstVoucherId, selectedVoucherId, isSubmitting]);
 
   async function handleGenerateVoucher() {
     if (!selectedRunId) {
