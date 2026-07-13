@@ -140,8 +140,8 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
       onClick={() => setCenterTargetPath(node.path)}
       className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
         isActive
-          ? "bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
-          : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
+          ? "bg-primary/12 text-primary shadow-[inset_3px_0_0_var(--primary)]"
+          : "text-[color:var(--vibe-nav-text)] hover:bg-accent/70 hover:text-[color:var(--vibe-nav-text-strong)]"
       }`}
       aria-current={isActive ? "page" : undefined}
     >
@@ -441,7 +441,7 @@ export function DashboardSidebar() {
     <>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-3 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card shadow-sm">
             <Image
               src="/vibehr_mark.svg"
               alt="VIBE-HR"

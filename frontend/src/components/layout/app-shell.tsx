@@ -297,10 +297,10 @@ export function AppShell({ title: _title, description: _description, children }:
   }, [contextMenu]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--vibe-background-light)] text-[var(--vibe-text-base)]">
+    <div className="flex h-screen overflow-hidden bg-background text-[var(--vibe-text-base)]">
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border bg-card text-card-foreground">
+        <header className="border-b border-border/80 bg-card/95 text-card-foreground backdrop-blur-sm">
           <div className="grid grid-cols-3 items-center border-b border-border px-4 py-2 lg:px-6">
             <div className="flex items-center gap-2">
               <span className="h-8 w-8" aria-hidden="true" />
@@ -335,7 +335,7 @@ export function AppShell({ title: _title, description: _description, children }:
             </div>
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 px-3 py-2 lg:px-6">
+          <div className="flex items-center gap-1 overflow-x-auto border-t border-border/70 bg-[var(--vibe-surface-sunken)]/80 px-3 py-2 lg:px-6">
             <button
               type="button"
               className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold transition-colors ${

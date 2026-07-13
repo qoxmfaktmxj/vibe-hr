@@ -97,7 +97,12 @@ export function ManagerGridSection({
   contentClassName,
 }: ManagerGridSectionProps) {
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col rounded-xl border bg-white", className)}>
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col rounded-xl border border-border/80 bg-card shadow-[var(--vibe-shadow-card)]",
+        className,
+      )}
+    >
       <div
         className={cn(
           "flex flex-col gap-2 px-3 py-3 md:flex-row md:items-center md:justify-between md:px-6",

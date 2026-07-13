@@ -21,11 +21,11 @@ import {
 type TrendDatum = { day: string; count: number };
 
 const attendanceConfig = {
-  count: { label: "출근", color: "hsl(var(--primary))" },
+  count: { label: "출근", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
 const leaveConfig = {
-  count: { label: "건수", color: "hsl(var(--primary))" },
+  count: { label: "건수", color: "var(--chart-1)" },
 } satisfies ChartConfig;
 
 export function AttendanceTrendChart({ data }: { data: TrendDatum[] }) {

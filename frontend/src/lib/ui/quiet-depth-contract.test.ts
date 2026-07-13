@@ -21,6 +21,23 @@ describe("Quiet Depth UI contract", () => {
     expect(source).not.toContain("bg-white");
   });
 
+  test("application shell separates canvas, header, and tab surfaces", () => {
+    const source = readSource("components", "layout", "app-shell.tsx");
+
+    expect(source).toContain("bg-background");
+    expect(source).toContain("bg-card/95");
+    expect(source).toContain("bg-[var(--vibe-surface-sunken)]/80");
+    expect(source).not.toContain("bg-[var(--vibe-background-light)]");
+  });
+
+  test("sidebar active and brand states use the enterprise hierarchy", () => {
+    const source = readSource("components", "dashboard", "dashboard-sidebar.tsx");
+
+    expect(source).toContain("shadow-[inset_3px_0_0_var(--primary)]");
+    expect(source).toContain("rounded-xl border border-border/70 bg-card shadow-sm");
+    expect(source).not.toContain("rounded-lg bg-primary/10");
+  });
+
   test("shared cards consume the Quiet Depth shadow contract", () => {
     const source = readSource("components", "ui", "card.tsx");
 
