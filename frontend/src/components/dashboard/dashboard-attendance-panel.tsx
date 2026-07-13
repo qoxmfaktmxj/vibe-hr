@@ -48,10 +48,14 @@ function fmtTimeOnly(value: string | null) {
 
 // 시계만 격리 — 매초 setClock이 대시보드 전체를 흔들지 않도록 memo로 분리
 const ClockDisplay = memo(function ClockDisplay() {
-  const [clock, setClock] = useState<string>(() => getKoreaDateTime());
+  const [clock, setClock] = useState<string>("");
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setClock(getKoreaDateTime()));
     const timer = window.setInterval(() => setClock(getKoreaDateTime()), 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(timer);
+    };
   }, []);
   return <p className="font-mono text-lg font-semibold tracking-wide">{clock || "\u00a0"}</p>;
 });

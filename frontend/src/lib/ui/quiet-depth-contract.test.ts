@@ -68,6 +68,16 @@ describe("Quiet Depth UI contract", () => {
     expect(source).not.toContain("Dashboard summary is currently unavailable");
   });
 
+  test("dashboard clock hydrates from a deterministic placeholder", () => {
+    const source = readSource("components", "dashboard", "dashboard-attendance-panel.tsx");
+
+    expect(source).toContain('useState<string>("")');
+    expect(source).toContain("window.requestAnimationFrame");
+    expect(source).toContain("window.cancelAnimationFrame(frame)");
+    expect(source).toContain("setClock(getKoreaDateTime())");
+    expect(source).not.toContain("useState<string>(() => getKoreaDateTime())");
+  });
+
   test("shared cards consume the Quiet Depth shadow contract", () => {
     const source = readSource("components", "ui", "card.tsx");
 
