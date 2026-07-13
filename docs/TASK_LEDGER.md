@@ -1088,3 +1088,55 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - 채용, 인사정보, 조직발령, 근태, 복리후생, 급여, 퇴직 화면을 `grid-screens.json` registry key 기준으로 매핑했다.
 - 급여→전표는 등록 화면과 모듈이 없어 R3 설계 승인 전까지 명시적 gap으로 유지한다.
 - `/hr/retire/approvals`는 현재 AG Grid registry 대상이 아니므로 별도 브라우저 QA 또는 AG Grid 등록 판단이 필요하다.
+
+## TASK VH-QUIET-DEPTH-20260713 — Enterprise Quiet Depth UI/UX 개선
+- Date: 2026-07-13
+- Status: completed
+- Mode: Execution / Ultragoal
+- Risk Class: R2 (shared UI + 공통 AG Grid 표면)
+- Approval Status: approved (사용자: 두 테마 개선, A 진행, 승인)
+
+### Scope
+- Standard/Vivid의 Light/Dark 네 조합에 semantic canvas/surface/elevation 계약 적용
+- AppShell, Sidebar, Card, Dashboard chart, 공통 Grid의 시각 위계 및 반응형 UX 개선
+- 브라우저 감사에서 발견한 축 잘림, 다크 Grid palette 불일치, mobile overlay stacking, 영문 복구 안내, 시계 hydration 오류 수정
+- 인증/권한/급여 업무 의미/API/DB/배포 계약은 변경하지 않음
+
+### Changed Files
+- `frontend/src/app/globals.css`
+- `frontend/src/app/dashboard/page.tsx`
+- `frontend/src/components/ui/card.tsx`
+- `frontend/src/components/grid/manager-layout.tsx`
+- `frontend/src/components/layout/app-shell.tsx`
+- `frontend/src/components/dashboard/dashboard-sidebar.tsx`
+- `frontend/src/components/dashboard/dashboard-charts.tsx`
+- `frontend/src/components/dashboard/dashboard-attendance-panel.tsx`
+- `frontend/src/lib/ui/quiet-depth-contract.test.ts`
+- `docs/superpowers/plans/2026-07-13-vibe-hr-quiet-depth-implementation.md`
+
+### Verification Summary
+- `npm run validate:grid`: PASS
+- `npm run test`: PASS (4 files, 22 tests)
+- `npm run lint`: PASS (0 errors, 기존 범위 외 warning 15건)
+- `npm run build`: PASS (Next.js production build, 178 pages)
+- AI slop cleanup: PASS/no-op (변경 파일 한정, dead/debug/중복/불필요 추상화 없음)
+- Browser: Standard/Vivid Light/Dark dashboard, Standard/Vivid Dark vouchers, 390x844 mobile sidebar 확인
+- Fresh browser runtime: 한국어 서울 시계, 411x224 chart SVG 2개, warning/error 0건
+- Visual verdict: iteration 18, 97/100, PASS
+- Independent review: code-reviewer `APPROVE`, architect `CLEAR`
+
+### Evidence
+- `output/design-review/quiet-depth/dashboard-standard-light.png`
+- `output/design-review/quiet-depth/dashboard-standard-dark-hydration-clean.png`
+- `output/design-review/quiet-depth/dashboard-vivid-light.png`
+- `output/design-review/quiet-depth/dashboard-vivid-dark.png`
+- `output/design-review/quiet-depth/dashboard-vivid-dark-neutral-nav.png`
+- `output/design-review/quiet-depth/dashboard-vivid-light-neutral-nav.png`
+- `output/design-review/quiet-depth/vouchers-standard-dark.png`
+- `output/design-review/quiet-depth/vouchers-vivid-dark-fixed.png`
+- `output/design-review/quiet-depth/mobile-sidebar-standard-dark-fixed.png`
+- Commits: `c9448dc`, `92fa90c`, `511bfce`, `6edf40b`, `adaed44`, `98402a5`
+
+### Remaining Risks / Follow-ups
+- 전체 lint의 범위 외 warning 15건은 기존 기술부채로 유지한다.
+- 실제 브라우저 검증은 대표 dashboard/vouchers/mobile 화면 기준이며 모든 178개 route의 픽셀 회귀 검사는 아니다.
