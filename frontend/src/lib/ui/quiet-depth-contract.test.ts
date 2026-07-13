@@ -53,6 +53,19 @@ describe("Quiet Depth UI contract", () => {
     expect(source).not.toContain("rounded-lg bg-primary/10");
   });
 
+  test("Vivid inactive navigation stays neutral in light and dark themes", () => {
+    const source = readSource("app", "globals.css");
+
+    expect(source).toContain("--vibe-nav-text: #4b5563;");
+    expect(source).toContain("--vibe-nav-text-strong: #1f2937;");
+    expect(source).toContain("--vibe-nav-text-muted: #6b7280;");
+    expect(source).toContain("--vibe-nav-text: #d1d5db;");
+    expect(source).toContain("--vibe-nav-text-strong: #f3f4f6;");
+    expect(source).toContain("--vibe-nav-text-muted: #9ca3af;");
+    expect(source).not.toContain("--vibe-nav-text: #5e239d;");
+    expect(source).not.toContain("--vibe-nav-text: #ddd6fe;");
+  });
+
   test("mobile sidebar overlay covers floating page tools", () => {
     const source = readSource("components", "dashboard", "dashboard-sidebar.tsx");
 

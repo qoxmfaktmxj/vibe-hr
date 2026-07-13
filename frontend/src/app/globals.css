@@ -167,9 +167,9 @@
   --vibe-accent-red: #d35269;
   --vibe-background-light: #f4f3f5;
   --vibe-text-base: #2a1542;
-  --vibe-nav-text: #5e239d;
-  --vibe-nav-text-strong: #2a1542;
-  --vibe-nav-text-muted: #5e239d;
+  --vibe-nav-text: #4b5563;
+  --vibe-nav-text-strong: #1f2937;
+  --vibe-nav-text-muted: #6b7280;
   --vibe-canvas-glow: rgba(111, 67, 143, 0.07);
   --vibe-surface-raised: #ffffff;
   --vibe-surface-sunken: #ece8ef;
@@ -377,9 +377,9 @@
   --vibe-sidebar-bg: #181321;
   --vibe-background-light: #100f18;
   --vibe-text-base: #f5f3ff;
-  --vibe-nav-text: #ddd6fe;
-  --vibe-nav-text-strong: #f5f3ff;
-  --vibe-nav-text-muted: #c4b5fd;
+  --vibe-nav-text: #d1d5db;
+  --vibe-nav-text-strong: #f3f4f6;
+  --vibe-nav-text-muted: #9ca3af;
   --vibe-canvas-glow: rgba(168, 118, 195, 0.09);
   --vibe-surface-raised: #1b1723;
   --vibe-surface-sunken: #14111b;
