@@ -127,15 +127,15 @@ export function DevStaffViewer() {
               </option>
             ))}
           </select>
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객사별 투입 현황과 월별 매출/공수 요약을 함께 확인합니다.
           </div>
         </SearchFieldGrid>
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">월별 매출/공수 요약</CardTitle>
+            <CardTitle className="text-sm text-foreground">월별 매출/공수 요약</CardTitle>
           </CardHeader>
           <CardContent>
             <MngSimpleGrid<MngDevStaffRevenueItem>

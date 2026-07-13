@@ -640,7 +640,7 @@ export function HrRecruitFinalistManager() {
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
           <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-border">
-            <AgGridReact<RecruitGridRow> theme="legacy" rowData={pagedRows} columnDefs={columnDefs} defaultColDef={defaultColDef} rowSelection={{ mode: "multiRow", enableClickSelection: true }} selectionColumnDef={selectionColumnDef} singleClickEdit animateRows={false} localeText={AG_GRID_LOCALE_KO} rowClassRules={rowClassRules} getRowClass={getRowClass} getRowId={(params) => String(params.data.id)} onGridReady={(event: GridReadyEvent<RecruitGridRow>) => { gridApiRef.current = event.api; }} onCellValueChanged={onCellValueChanged} loading={isLoading} headerHeight={36} rowHeight={34} overlayNoRowsTemplate='<span class="text-sm text-slate-400">표시할 데이터가 없습니다.</span>' />
+            <AgGridReact<RecruitGridRow> theme="legacy" rowData={pagedRows} columnDefs={columnDefs} defaultColDef={defaultColDef} rowSelection={{ mode: "multiRow", enableClickSelection: true }} selectionColumnDef={selectionColumnDef} singleClickEdit animateRows={false} localeText={AG_GRID_LOCALE_KO} rowClassRules={rowClassRules} getRowClass={getRowClass} getRowId={(params) => String(params.data.id)} onGridReady={(event: GridReadyEvent<RecruitGridRow>) => { gridApiRef.current = event.api; }} onCellValueChanged={onCellValueChanged} loading={isLoading} headerHeight={36} rowHeight={34} overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">표시할 데이터가 없습니다.</span>' />
           </div>
         </div>
       </ManagerGridSection>

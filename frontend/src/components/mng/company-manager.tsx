@@ -793,7 +793,7 @@ export function CompanyManager() {
       <ManagerGridSection
         headerLeft={(
           <>
-            <span className="text-xs text-slate-400">조회 {filteredRows.length.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">조회 {filteredRows.length.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
           </>
         )}
@@ -816,7 +816,7 @@ export function CompanyManager() {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
         <div className="min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0">
-          <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-full w-full min-h-[420px] overflow-hidden rounded-lg border border-border">
             <AgGridReact<CompanyGridRow>
               theme="legacy"
               rowData={filteredRows}
@@ -833,7 +833,7 @@ export function CompanyManager() {
               loading={isLoading}
               headerHeight={36}
               rowHeight={34}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">데이터가 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">데이터가 없습니다.</span>'
             />
           </div>
         </div>

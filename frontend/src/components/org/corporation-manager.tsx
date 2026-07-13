@@ -877,7 +877,7 @@ export function CorporationManager() {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">{I18N.loading}</p>
+        <p className="text-sm text-muted-foreground">{I18N.loading}</p>
       </div>
     );
   }
@@ -926,14 +926,14 @@ export function CorporationManager() {
               disabled={loading || saving}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         )}
         headerRight={<GridToolbarActions actions={toolbarActions} saveAction={toolbarSaveAction} />}
         contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-0"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<CorporationRow>
             theme="legacy"
             rowData={rows}
@@ -947,7 +947,7 @@ export function CorporationManager() {
             getRowClass={getRowClass}
             loading={loading}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${I18N.noRows}</span>`}
             headerHeight={36}
             rowHeight={34}
             onGridReady={onGridReady}

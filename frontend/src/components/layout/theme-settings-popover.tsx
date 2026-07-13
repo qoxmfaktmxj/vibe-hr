@@ -122,24 +122,31 @@ export function ThemeSettingsPopover() {
           <Settings2 className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-64 p-0">
-        <div className="border-b bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800">테마 설정</div>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-64 border-[var(--vibe-border-emphasis)] p-0"
+      >
+        <div className="border-b bg-muted px-3 py-2 text-sm font-semibold text-foreground">테마 설정</div>
 
         <div className="space-y-4 p-3">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               <Palette className="h-3.5 w-3.5" />
               프라이머리 색상
             </div>
-            <div className="space-y-1">
+            <div role="group" aria-label="프라이머리 색상" className="space-y-1">
               {PRIMARY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  aria-pressed={draft.primaryTone === option.value}
                   onClick={() => setDraft((prev) => ({ ...prev, primaryTone: option.value }))}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-slate-700 hover:bg-slate-50",
-                    draft.primaryTone === option.value ? "bg-slate-100" : "",
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+                    draft.primaryTone === option.value
+                      ? "bg-primary/15 ring-1 ring-inset ring-primary/30"
+                      : "",
                   )}
                 >
                   <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: option.color }} />
@@ -151,19 +158,22 @@ export function ThemeSettingsPopover() {
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-slate-600">팔레트 모드</div>
-            <div className="space-y-1">
+            <div className="text-xs font-semibold text-muted-foreground">팔레트 모드</div>
+            <div role="group" aria-label="팔레트 모드" className="space-y-1">
               {PALETTE_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
+                  aria-pressed={draft.paletteMode === option.value}
                   onClick={() => setDraft((prev) => ({ ...prev, paletteMode: option.value }))}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-slate-700 hover:bg-slate-50",
-                    draft.paletteMode === option.value ? "bg-slate-100" : "",
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+                    draft.paletteMode === option.value
+                      ? "bg-primary/15 ring-1 ring-inset ring-primary/30"
+                      : "",
                   )}
                 >
-                  <span className="h-3 w-3 rounded-full border border-slate-300 bg-white" />
+                  <span className="h-3 w-3 rounded-full border border-border bg-background" />
                   <span className="flex-1">{option.label}</span>
                   {draft.paletteMode === option.value ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
                 </button>
@@ -172,35 +182,37 @@ export function ThemeSettingsPopover() {
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-slate-600">모드 설정</div>
+            <div className="text-xs font-semibold text-muted-foreground">모드 설정</div>
             <button
               type="button"
+              aria-pressed={draft.darkMode}
               onClick={() => setDraft((prev) => ({ ...prev, darkMode: !prev.darkMode }))}
-              className="flex w-full items-center justify-between rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex w-full items-center justify-between rounded-md border border-[var(--vibe-border-emphasis)] px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             >
               <span className="flex items-center gap-2">
                 {draft.darkMode ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
                 다크모드
               </span>
-              <span className={cn("text-xs font-semibold", draft.darkMode ? "text-primary" : "text-slate-500")}>
+              <span className={cn("text-xs font-semibold", draft.darkMode ? "text-primary" : "text-muted-foreground")}>
                 {draft.darkMode ? "ON" : "OFF"}
               </span>
             </button>
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-slate-600">화면 도구</div>
+            <div className="text-xs font-semibold text-muted-foreground">화면 도구</div>
             <button
               type="button"
+              aria-pressed={draft.chatbotButtonVisible}
               onClick={() => setDraft((prev) => ({ ...prev, chatbotButtonVisible: !prev.chatbotButtonVisible }))}
-              className="flex w-full items-center justify-between rounded-md border border-slate-200 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="flex w-full items-center justify-between rounded-md border border-[var(--vibe-border-emphasis)] px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             >
               <span className="flex items-center gap-2">
                 <Bot className="h-3.5 w-3.5" />
                 챗봇 버튼 표시
               </span>
               <span
-                className={cn("text-xs font-semibold", draft.chatbotButtonVisible ? "text-primary" : "text-slate-500")}
+                className={cn("text-xs font-semibold", draft.chatbotButtonVisible ? "text-primary" : "text-muted-foreground")}
               >
                 {draft.chatbotButtonVisible ? "ON" : "OFF"}
               </span>
@@ -209,7 +221,7 @@ export function ThemeSettingsPopover() {
         </div>
 
         <div className="flex items-center justify-between border-t px-3 py-2">
-          <p className="text-xs text-slate-500">현재 색상: {selectedPrimary.label}</p>
+          <p className="text-xs text-muted-foreground">현재 색상: {selectedPrimary.label}</p>
           <div className="flex items-center gap-2">
             <Button type="button" size="xs" variant="query" onClick={applyDraft}>
               확인

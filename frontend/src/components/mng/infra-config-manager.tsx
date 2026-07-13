@@ -249,15 +249,15 @@ export function InfraConfigManager() {
       selectedRowId={selectedMasterId}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객사별 인프라 마스터를 선택하고 환경 구성을 관리합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">인프라 마스터 등록</CardTitle>
+            <CardTitle className="text-sm text-foreground">인프라 마스터 등록</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-3">
@@ -299,9 +299,9 @@ export function InfraConfigManager() {
         </Card>
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">
+            <CardTitle className="text-sm text-foreground">
               구성 상세 {selectedMaster ? `(${selectedMaster.company_name} / ${selectedMaster.env_type})` : ""}
             </CardTitle>
           </CardHeader>

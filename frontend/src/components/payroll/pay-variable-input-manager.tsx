@@ -332,7 +332,7 @@ export function PayVariableInputManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">월 변동입력 데이터를 불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">월 변동입력 데이터를 불러오는 중...</p>
       </div>
     );
   }
@@ -342,7 +342,7 @@ export function PayVariableInputManager() {
       <ManagerSearchSection title="월 변동입력 관리" onQuery={handleQueryRequest}>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">귀속월(YYYY-MM)</div>
+            <div className="text-xs text-muted-foreground">귀속월(YYYY-MM)</div>
             <Input
               value={searchYearMonth}
               onChange={(event) => setSearchYearMonth(event.target.value)}
@@ -368,7 +368,7 @@ export function PayVariableInputManager() {
               goNext={pagination.goNext}
               goToPage={pagination.goToPage}
             />
-            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         }
@@ -392,7 +392,7 @@ export function PayVariableInputManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<RowData>
             theme="legacy"
             key={gridMountKey}
@@ -408,7 +408,7 @@ export function PayVariableInputManager() {
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             localeText={{ page: "페이지", more: "더보기", noRowsToShow: "데이터가 없습니다." }}
-            overlayNoRowsTemplate='<span class="text-sm text-slate-400">월 변동입력 데이터가 없습니다.</span>'
+            overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">월 변동입력 데이터가 없습니다.</span>'
             headerHeight={36}
             rowHeight={34}
           />

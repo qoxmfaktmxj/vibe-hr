@@ -738,7 +738,7 @@ export function PapAppraisalManager() {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">{I18N.loading}</p>
+        <p className="text-sm text-muted-foreground">{I18N.loading}</p>
       </div>
     );
   }
@@ -773,7 +773,7 @@ export function PapAppraisalManager() {
         headerLeft={(
           <>
             <GridPaginationControls page={page} totalPages={totalPages} pageInput={pageInput} setPageInput={setPageInput} goPrev={goPrev} goNext={goNext} goToPage={goToPage} disabled={loading || saving} className="mt-0 justify-start" />
-            <span className="text-xs text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         )}
@@ -791,7 +791,7 @@ export function PapAppraisalManager() {
             event.currentTarget.value = "";
           }}
         />
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<PapAppraisalRow>
             theme="legacy"
             rowData={rows}
@@ -804,7 +804,7 @@ export function PapAppraisalManager() {
             rowClassRules={rowClassRules}
             getRowClass={getRowClass}
             loading={loading}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${I18N.noRows}</span>`}
             headerHeight={36}
             rowHeight={34}
             onGridReady={onGridReady}

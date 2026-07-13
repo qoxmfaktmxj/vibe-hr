@@ -435,7 +435,7 @@ export function PayrollRunManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">급여 Run 데이터를 불러오는 중입니다.</p>
+        <p className="text-sm text-muted-foreground">급여 Run 데이터를 불러오는 중입니다.</p>
       </div>
     );
   }
@@ -445,7 +445,7 @@ export function PayrollRunManager() {
       <ManagerSearchSection title="정기급여 Run 관리" onQuery={() => void loadRuns()}>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">조회 급여월</div>
+            <div className="text-xs text-muted-foreground">조회 급여월</div>
             <Input
               value={searchYearMonth}
               onChange={(event) => setSearchYearMonth(event.target.value)}
@@ -454,7 +454,7 @@ export function PayrollRunManager() {
             />
           </div>
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">상태</div>
+            <div className="text-xs text-muted-foreground">상태</div>
             <Input
               value={searchStatus}
               onChange={(event) => setSearchStatus(event.target.value)}
@@ -463,7 +463,7 @@ export function PayrollRunManager() {
             />
           </div>
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">신규 Run 생성</div>
+            <div className="text-xs text-muted-foreground">신규 Run 생성</div>
             <div className="flex gap-2">
               <Input
                 value={createYearMonth}
@@ -500,7 +500,7 @@ export function PayrollRunManager() {
               goNext={pagination.goNext}
               goToPage={pagination.goToPage}
             />
-            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         }
@@ -553,7 +553,7 @@ export function PayrollRunManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid mb-3 h-[320px] w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid mb-3 h-[320px] w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<RowData>
             theme="legacy"
             rowData={pagedRows}
@@ -570,19 +570,19 @@ export function PayrollRunManager() {
               setSelectedRunId(event.data.id);
             }}
             localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
-            overlayNoRowsTemplate='<span class="text-sm text-slate-400">급여 Run 데이터가 없습니다.</span>'
+            overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">급여 Run 데이터가 없습니다.</span>'
             headerHeight={36}
             rowHeight={34}
           />
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-3">
-          <div className="mb-2 text-sm font-medium text-slate-700">
+        <div className="rounded-lg border border-border p-3">
+          <div className="mb-2 text-sm font-medium text-foreground">
             {selectedRow
               ? `Run #${selectedRow.id} 대상자 결과`
               : "Run을 선택하면 대상자 계산 결과가 표시됩니다."}
           </div>
-          <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-border">
             <AgGridReact<PayPayrollRunEmployeeItem>
               theme="legacy"
               rowData={employeeRows}
@@ -596,37 +596,37 @@ export function PayrollRunManager() {
                 setSelectedRunEmployeeId(event.data.id);
               }}
               localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">대상자 계산 결과가 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">대상자 계산 결과가 없습니다.</span>'
               headerHeight={36}
               rowHeight={34}
             />
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-3">
+        <div className="rounded-lg border border-border p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-medium text-slate-700">
+            <div className="text-sm font-medium text-foreground">
               {selectedEmployeeRow
                 ? `${selectedEmployeeRow.employee_no ?? "-"} ${selectedEmployeeRow.employee_name ?? ""} 상세 정보`
                 : "대상자를 선택하면 상세 정보가 표시됩니다."}
             </div>
             {selectedEmployeeRow ? (
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-muted-foreground">
                 과세소득 {selectedEmployeeRow.taxable_income.toLocaleString()} / 비과세 {selectedEmployeeRow.non_taxable_income.toLocaleString()}
               </div>
             ) : null}
           </div>
 
           {/* Tab switcher */}
-          <div className="mb-3 flex gap-1 border-b border-slate-200">
+          <div className="mb-3 flex gap-1 border-b border-border">
             {(["items", "snapshot", "events"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveDetailTab(tab)}
                 className={`rounded-t px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeDetailTab === tab
-                    ? "border border-b-white border-slate-200 bg-white text-slate-800"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "border border-b-background border-border bg-background text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab === "items" ? "계산결과" : tab === "snapshot" ? "스냅샷" : `이벤트 (${snapshotData?.events.length ?? 0})`}
@@ -638,21 +638,21 @@ export function PayrollRunManager() {
           {activeDetailTab === "items" && (
             <>
               <div className="mb-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-xs text-slate-500">지급 합계</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.earnings.toLocaleString()}</div>
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">지급 합계</div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">{detailSummary.earnings.toLocaleString()}</div>
                 </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-xs text-slate-500">공제 합계</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.deductions.toLocaleString()}</div>
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">공제 합계</div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">{detailSummary.deductions.toLocaleString()}</div>
                 </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-xs text-slate-500">복리후생 반영건</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.welfareCount.toLocaleString()}</div>
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">복리후생 반영건</div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">{detailSummary.welfareCount.toLocaleString()}</div>
                 </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="text-xs text-slate-500">사회보험 항목수</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-800">{detailSummary.insuranceCount.toLocaleString()}</div>
+                <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">사회보험 항목수</div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">{detailSummary.insuranceCount.toLocaleString()}</div>
                 </div>
               </div>
               {selectedEmployeeRow?.warning_message ? (
@@ -660,7 +660,7 @@ export function PayrollRunManager() {
                   경고: {selectedEmployeeRow.warning_message}
                 </div>
               ) : null}
-              <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-gray-200">
+              <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-lg border border-border">
                 <AgGridReact<PayPayrollRunEmployeeDetailItem>
                   theme="legacy"
                   rowData={detailRows}
@@ -670,7 +670,7 @@ export function PayrollRunManager() {
                   loading={detailLoading}
                   getRowId={(params) => String(params.data.id)}
                   localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
-                  overlayNoRowsTemplate='<span class="text-sm text-slate-400">항목 상세 데이터가 없습니다.</span>'
+                  overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">항목 상세 데이터가 없습니다.</span>'
                   headerHeight={36}
                   rowHeight={34}
                 />
@@ -685,7 +685,7 @@ export function PayrollRunManager() {
 
           {/* 이벤트 탭 */}
           {activeDetailTab === "events" && (
-            <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-lg border border-gray-200">
+            <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-lg border border-border">
               <AgGridReact<PayRunTargetEventItem>
                 theme="legacy"
                 rowData={snapshotData?.events ?? []}
@@ -695,7 +695,7 @@ export function PayrollRunManager() {
                 loading={snapshotLoading}
                 getRowId={(params) => String(params.data.id)}
                 localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
-                overlayNoRowsTemplate='<span class="text-sm text-slate-400">이벤트 데이터가 없습니다.</span>'
+                overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">이벤트 데이터가 없습니다.</span>'
                 headerHeight={36}
                 rowHeight={34}
               />
@@ -711,10 +711,10 @@ export function PayrollRunManager() {
 
 function SnapshotPanel({ snapshot, loading }: { snapshot: PayRunTargetSnapshotItem | null; loading: boolean }) {
   if (loading) {
-    return <div className="py-6 text-center text-sm text-slate-400">스냅샷 데이터를 불러오는 중...</div>;
+    return <div className="py-6 text-center text-sm text-muted-foreground">스냅샷 데이터를 불러오는 중...</div>;
   }
   if (!snapshot) {
-    return <div className="py-6 text-center text-sm text-slate-400">대상자를 선택하면 스냅샷 데이터가 표시됩니다.</div>;
+    return <div className="py-6 text-center text-sm text-muted-foreground">대상자를 선택하면 스냅샷 데이터가 표시됩니다.</div>;
   }
 
   const rows: { label: string; value: string | number | null | undefined }[] = [
@@ -741,13 +741,13 @@ function SnapshotPanel({ snapshot, loading }: { snapshot: PayRunTargetSnapshotIt
   ];
 
   return (
-    <div className="overflow-auto rounded-lg border border-slate-200">
+    <div className="overflow-auto rounded-lg border border-border">
       <table className="w-full text-sm">
         <tbody>
           {rows.map((row, idx) => (
-            <tr key={row.label} className={idx % 2 === 0 ? "bg-slate-50" : "bg-white"}>
-              <td className="w-40 px-3 py-1.5 text-xs font-medium text-slate-500">{row.label}</td>
-              <td className="px-3 py-1.5 text-slate-800">{row.value ?? "—"}</td>
+            <tr key={row.label} className={idx % 2 === 0 ? "bg-muted/50" : "bg-background"}>
+              <td className="w-40 px-3 py-1.5 text-xs font-medium text-muted-foreground">{row.label}</td>
+              <td className="px-3 py-1.5 text-foreground">{row.value ?? "—"}</td>
             </tr>
           ))}
         </tbody>

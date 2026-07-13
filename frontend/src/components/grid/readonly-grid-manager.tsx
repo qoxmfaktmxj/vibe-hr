@@ -212,14 +212,14 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
               disabled={queryDisabled}
               className="mt-0 justify-start"
             />
-            <span className="text-sm text-slate-500">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-sm text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={gridSummary} />
           </>
         }
         headerRight={<GridToolbarActions actions={toolbarActions} saveAction={saveAction} />}
       >
         <div
-          className="ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-slate-200"
+          className="ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-border"
           style={{ minHeight: gridHeight }}
         >
           <AgGridReact<Row>
@@ -234,7 +234,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             rowClassRules={rowClassRules}
             getRowClass={getRowClassName}
             loading={loading}
-            overlayNoRowsTemplate={`<span class='text-sm text-slate-400'>${emptyText}</span>`}
+            overlayNoRowsTemplate={`<span class='text-sm text-muted-foreground'>${emptyText}</span>`}
             onGridReady={(event: GridReadyEvent<Row>) => {
               if (!loading && rowData.length === 0) {
                 event.api.showNoRowsOverlay();

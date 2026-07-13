@@ -805,7 +805,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
               loading={loading}
               headerHeight={36}
               rowHeight={34}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">데이터가 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">데이터가 없습니다.</span>'
             />
           </div>
         </div>

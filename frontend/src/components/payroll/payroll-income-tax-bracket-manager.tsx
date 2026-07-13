@@ -520,7 +520,7 @@ export function PayrollIncomeTaxBracketManager() {
     if (loading) {
         return (
             <div className="flex items-center justify-center p-12">
-                <p className="text-sm text-slate-500">소득세 구간 데이터를 불러오는 중...</p>
+                <p className="text-sm text-muted-foreground">소득세 구간 데이터를 불러오는 중...</p>
             </div>
         );
     }
@@ -534,7 +534,7 @@ export function PayrollIncomeTaxBracketManager() {
             >
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">
-                        <div className="text-xs text-slate-500">조회 연도</div>
+                        <div className="text-xs text-muted-foreground">조회 연도</div>
                         <Input
                             type="number"
                             value={searchYear}
@@ -544,7 +544,7 @@ export function PayrollIncomeTaxBracketManager() {
                             className="h-9 w-48 text-sm"
                         />
                     </div>
-                    <div className="text-xs text-slate-400 self-end pb-1">
+                    <div className="text-xs text-muted-foreground self-end pb-1">
                         산식: (연간과세표준 × 세율 − 누진공제) ÷ 12 = 월 소득세
                     </div>
                 </div>
@@ -554,7 +554,7 @@ export function PayrollIncomeTaxBracketManager() {
                 headerLeft={
                     <>
                         <GridPaginationControls page={page} totalPages={pagination.totalPages} pageInput={pagination.pageInput} setPageInput={pagination.setPageInput} goPrev={pagination.goPrev} goNext={pagination.goNext} goToPage={pagination.goToPage} />
-                        <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+                        <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
                         <GridChangeSummaryBadges summary={changeSummary} />
                     </>
                 }
@@ -566,7 +566,7 @@ export function PayrollIncomeTaxBracketManager() {
                 }
                 contentClassName="min-h-0 flex-1 px-6 pb-4"
             >
-                <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+                <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
                     <AgGridReact<RowData>
                         theme="legacy"
                         key={gridMountKey}
@@ -582,7 +582,7 @@ export function PayrollIncomeTaxBracketManager() {
                         onGridReady={onGridReady}
                         onCellValueChanged={onCellValueChanged}
                         localeText={AG_GRID_LOCALE_KO}
-                        overlayNoRowsTemplate='<span class="text-sm text-slate-400">조회된 소득세 구간 데이터가 없습니다.</span>'
+                        overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">조회된 소득세 구간 데이터가 없습니다.</span>'
                         headerHeight={36}
                         rowHeight={34}
                     />

@@ -206,15 +206,15 @@ export function DevProjectManager() {
               </option>
             ))}
           </select>
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객사별 개발 프로젝트와 계약/투입 정보를 한 화면에서 관리합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">프로젝트 상세</CardTitle>
+            <CardTitle className="text-sm text-foreground">프로젝트 상세</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -283,7 +283,7 @@ export function DevProjectManager() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={form.has_tax_bill}

@@ -633,7 +633,7 @@ export function HrAppointmentCodeManager() {
       <ManagerGridSection
         headerLeft={(
           <>
-            <span className="text-xs text-slate-400">조회 {filteredRows.length.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">조회 {filteredRows.length.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} className="ml-2" />
           </>
         )}
@@ -672,7 +672,7 @@ export function HrAppointmentCodeManager() {
               loading={isLoading}
               headerHeight={36}
               rowHeight={34}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">데이터가 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">데이터가 없습니다.</span>'
             />
           </div>
         </div>

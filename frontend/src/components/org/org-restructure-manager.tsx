@@ -547,13 +547,13 @@ export function OrgRestructureManager() {
           const s = params.value as OrgRestructurePlanStatus;
           const label = PLAN_STATUS_LABELS[s] ?? s;
           const colors: Record<string, string> = {
-            draft: "bg-slate-100 text-slate-700",
+            draft: "bg-muted text-foreground",
             reviewing: "bg-blue-100 text-blue-700",
             applied: "bg-green-100 text-green-700",
             cancelled: "bg-red-100 text-red-700",
           };
           return (
-            <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${colors[s] ?? "bg-slate-100"}`}>
+            <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${colors[s] ?? "bg-muted"}`}>
               {label}
             </span>
           );
@@ -803,13 +803,13 @@ export function OrgRestructureManager() {
     <ManagerPageShell>
       <div className="flex h-full min-h-0 flex-col gap-0">
         {/* ─── Top bar ─── */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-6 py-3">
-          <h2 className="text-base font-semibold text-slate-800">조직개편안 관리</h2>
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-background px-6 py-3">
+          <h2 className="text-base font-semibold text-foreground">조직개편안 관리</h2>
           <div className="ml-auto flex items-center gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-8 rounded border border-slate-200 bg-white px-2 text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="h-8 rounded border border-border bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-blue-400"
             >
               <option value="">전체 상태</option>
               {PLAN_STATUS_OPTIONS.map((s) => (
@@ -833,11 +833,11 @@ export function OrgRestructureManager() {
         {/* ─── Split pane ─── */}
         <div className="flex min-h-0 flex-1 gap-0">
           {/* ─── Plans panel ─── */}
-          <div className="flex w-[380px] min-w-[280px] flex-shrink-0 flex-col border-r border-slate-200">
+          <div className="flex w-[380px] min-w-[280px] flex-shrink-0 flex-col border-r border-border">
             {/* Plans toolbar */}
-            <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
-              <span className="text-xs font-medium text-slate-500">개편안 목록</span>
-              <span className="text-xs text-slate-400">({planRows.length}건)</span>
+            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
+              <span className="text-xs font-medium text-muted-foreground">개편안 목록</span>
+              <span className="text-xs text-muted-foreground">({planRows.length}건)</span>
               {planChangeSummary.updated > 0 && (
                 <Badge variant="outline" className="ml-auto text-xs">
                   수정 {planChangeSummary.updated}
@@ -859,7 +859,7 @@ export function OrgRestructureManager() {
 
             {/* New plan input */}
             {can("create") && (
-              <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 <Input
                   value={newPlanTitle}
                   onChange={(e) => setNewPlanTitle(e.target.value)}
@@ -882,7 +882,7 @@ export function OrgRestructureManager() {
 
             {/* Plans grid */}
             <div className="min-h-0 flex-1 p-2">
-              <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+              <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
                 <AgGridReact<PlanRow>
                   theme="legacy"
                   rowData={planRows}
@@ -896,7 +896,7 @@ export function OrgRestructureManager() {
                   getRowClass={(p) => getGridRowClass(p.data?._status)}
                   loading={planLoading}
                   localeText={AG_GRID_LOCALE_KO}
-                  overlayNoRowsTemplate='<span class="text-sm text-slate-400">개편안이 없습니다.</span>'
+                  overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">개편안이 없습니다.</span>'
                   headerHeight={32}
                   rowHeight={34}
                   onGridReady={onPlanGridReady}
@@ -910,16 +910,16 @@ export function OrgRestructureManager() {
           {/* ─── Items panel ─── */}
           <div className="flex min-w-0 flex-1 flex-col">
             {/* Items toolbar */}
-            <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
+            <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2">
               {selectedPlan ? (
                 <>
-                  <span className="text-xs font-medium text-slate-700 truncate max-w-[200px]">
+                  <span className="text-xs font-medium text-foreground truncate max-w-[200px]">
                     {selectedPlan.title}
                   </span>
                   <span
                     className={`rounded px-1.5 py-0.5 text-xs font-medium ${
                       {
-                        draft: "bg-slate-100 text-slate-700",
+                        draft: "bg-muted text-foreground",
                         reviewing: "bg-blue-100 text-blue-700",
                         applied: "bg-green-100 text-green-700",
                         cancelled: "bg-red-100 text-red-700",
@@ -929,13 +929,13 @@ export function OrgRestructureManager() {
                     {PLAN_STATUS_LABELS[selectedPlan.status]}
                   </span>
                   {itemChangeSummary.added + itemChangeSummary.updated + itemChangeSummary.deleted > 0 && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-muted-foreground">
                       변경 {itemChangeSummary.added + itemChangeSummary.updated + itemChangeSummary.deleted}건
                     </span>
                   )}
                 </>
               ) : (
-                <span className="text-xs text-slate-400">개편안을 선택하세요</span>
+                <span className="text-xs text-muted-foreground">개편안을 선택하세요</span>
               )}
 
               <div className="ml-auto flex items-center gap-2">
@@ -981,7 +981,7 @@ export function OrgRestructureManager() {
 
             {/* Items grid */}
             <div className="min-h-0 flex-1 p-2">
-              <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+              <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
                 <AgGridReact<ItemRow>
                   theme="legacy"
                   rowData={itemRows}
@@ -997,8 +997,8 @@ export function OrgRestructureManager() {
                   localeText={AG_GRID_LOCALE_KO}
                   overlayNoRowsTemplate={
                     selectedPlanId
-                      ? '<span class="text-sm text-slate-400">항목이 없습니다. 항목을 추가하세요.</span>'
-                      : '<span class="text-sm text-slate-400">왼쪽에서 개편안을 선택하세요.</span>'
+                      ? '<span class="text-sm text-muted-foreground">항목이 없습니다. 항목을 추가하세요.</span>'
+                      : '<span class="text-sm text-muted-foreground">왼쪽에서 개편안을 선택하세요.</span>'
                   }
                   headerHeight={36}
                   rowHeight={34}

@@ -83,7 +83,7 @@ export function VibeDatePicker({
   );
 
   const calendar = (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-lg">
+    <div className="rounded-xl border border-border bg-background shadow-lg">
       <Calendar
         mode="single"
         month={month}
@@ -137,7 +137,7 @@ export function VibeDatePicker({
           )}
         >
           <span>{value || placeholder}</span>
-          <CalendarDays className="h-4 w-4 text-slate-400" />
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent

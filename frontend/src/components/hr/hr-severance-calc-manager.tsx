@@ -302,7 +302,7 @@ export function HrSeveranceCalcManager() {
                     <tbody>
                       {TAX_ROW_LABELS.map(({ key, label }) => (
                         <tr key={key} className="border-t first:border-t-0">
-                          <td className="px-3 py-1.5 text-slate-500">{label}</td>
+                          <td className="px-3 py-1.5 text-muted-foreground">{label}</td>
                           <td className="px-3 py-1.5 text-right font-medium">
                             {formatAmount(Number(calcDetail.tax_detail?.[key] ?? 0))}
                           </td>
@@ -350,7 +350,7 @@ export function HrSeveranceCalcManager() {
 
               <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
                 <div className="space-y-1">
-                  <div className="text-xs text-slate-500">조정액</div>
+                  <div className="text-xs text-muted-foreground">조정액</div>
                   <Input
                     type="number"
                     value={adjustmentAmount}
@@ -359,7 +359,7 @@ export function HrSeveranceCalcManager() {
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2">
-                  <div className="text-xs text-slate-500">조정 사유</div>
+                  <div className="text-xs text-muted-foreground">조정 사유</div>
                   <Input
                     value={adjustmentReason}
                     onChange={(event) => setAdjustmentReason(event.target.value)}

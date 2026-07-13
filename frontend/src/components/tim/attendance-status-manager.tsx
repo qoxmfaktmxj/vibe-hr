@@ -144,7 +144,7 @@ export function AttendanceStatusManager() {
             <option value="leave">휴가</option>
             <option value="remote">재택</option>
           </select>
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             기간별 출결 현황을 조회하고 정정 화면으로 이동할 수 있습니다.
           </div>
         </SearchFieldGrid>

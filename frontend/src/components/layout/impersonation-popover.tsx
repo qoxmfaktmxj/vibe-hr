@@ -112,11 +112,15 @@ export function ImpersonationPopover() {
           <UsersRound className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-80 p-0">
-        <div className="border-b bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800">다른 사용자로 로그인</div>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-80 border-[var(--vibe-border-emphasis)] p-0"
+      >
+        <div className="border-b bg-muted px-3 py-2 text-sm font-semibold text-foreground">다른 사용자로 로그인</div>
         <div className="space-y-2 p-3">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -125,26 +129,33 @@ export function ImpersonationPopover() {
             />
           </div>
 
-          <div className="max-h-56 overflow-auto rounded-md border">
+          <div
+            role="group"
+            aria-label="전환할 사용자"
+            className="max-h-56 overflow-auto rounded-md border border-[var(--vibe-border-emphasis)]"
+          >
             {isLoading ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-slate-500">
+              <div className="flex items-center justify-center gap-2 px-3 py-6 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 불러오는 중...
               </div>
             ) : users.length === 0 ? (
-              <div className="px-3 py-6 text-center text-xs text-slate-500">검색 결과가 없습니다.</div>
+              <div className="px-3 py-6 text-center text-xs text-muted-foreground">검색 결과가 없습니다.</div>
             ) : (
               users.map((user) => (
                 <button
                   key={user.id}
                   type="button"
+                  aria-pressed={selectedUserId === user.id}
                   onClick={() => setSelectedUserId(user.id)}
-                  className={`w-full border-b px-3 py-2 text-left last:border-b-0 ${
-                    selectedUserId === user.id ? "bg-primary/10" : "hover:bg-slate-50"
+                  className={`w-full border-b px-3 py-2 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70 ${
+                    selectedUserId === user.id
+                      ? "bg-primary/15 ring-1 ring-inset ring-primary/30"
+                      : "hover:bg-primary/10"
                   }`}
                 >
-                  <p className="text-sm font-medium text-slate-800">{user.display_name}</p>
-                  <p className="text-xs text-slate-500">{user.login_id}</p>
+                  <p className="text-sm font-medium text-foreground">{user.display_name}</p>
+                  <p className="text-xs text-muted-foreground">{user.login_id}</p>
                 </button>
               ))
             )}

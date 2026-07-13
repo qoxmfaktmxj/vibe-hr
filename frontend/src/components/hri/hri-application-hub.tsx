@@ -77,13 +77,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_CLASS: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-600 border-gray-200",
+  DRAFT: "bg-muted text-muted-foreground border-border",
   APPROVAL_IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
   APPROVAL_REJECTED: "bg-red-50 text-red-700 border-red-200",
   RECEIVE_IN_PROGRESS: "bg-yellow-50 text-yellow-700 border-yellow-200",
   RECEIVE_REJECTED: "bg-orange-50 text-orange-700 border-orange-200",
   COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  WITHDRAWN: "bg-gray-100 text-gray-400 border-gray-200",
+  WITHDRAWN: "bg-muted text-muted-foreground border-border",
 };
 
 /** 수정/재제출 가능한 상태 */
@@ -136,7 +136,7 @@ const ACTION_STATUS_CONFIG: Record<
   WAITING: {
     label: "대기",
     icon: <Clock className="h-4 w-4" />,
-    color: "text-slate-400",
+    color: "text-muted-foreground",
   },
   APPROVED: {
     label: "승인",
@@ -619,7 +619,7 @@ function FormEditView({
 /* ------------------------------------------------------------------ */
 function StatusBadge({ code }: { code: string }) {
   const label = STATUS_LABEL[code] ?? code;
-  const cls = STATUS_CLASS[code] ?? "bg-gray-100 text-gray-500 border-gray-200";
+  const cls = STATUS_CLASS[code] ?? "bg-muted text-muted-foreground border-border";
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
       {label}
@@ -1160,7 +1160,7 @@ export function HriApplicationHub() {
         cellRenderer: (params: ICellRendererParams<HriRequestItem>) => {
           const code = (params.value as string) ?? "";
           const label = STATUS_LABEL[code] ?? code;
-          const cls = STATUS_CLASS[code] ?? "bg-gray-100 text-gray-500 border-gray-200";
+          const cls = STATUS_CLASS[code] ?? "bg-muted text-muted-foreground border-border";
           return (
             <div className="flex h-full items-center">
               <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>
@@ -1263,7 +1263,7 @@ export function HriApplicationHub() {
       <ManagerGridSection
         contentClassName="flex flex-col"
         headerLeft={
-          <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+          <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
         }
         headerRight={
           <>
@@ -1292,7 +1292,7 @@ export function HriApplicationHub() {
               onRowClicked={(e) => { if (e.data) setDetailId(e.data.id); }}
               loading={isLoading}
               localeText={AG_LOCALE_KO}
-              overlayNoRowsTemplate={`<span class="text-sm text-slate-400">신청 내역이 없습니다.</span>`}
+              overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">신청 내역이 없습니다.</span>`}
               headerHeight={36}
               rowHeight={36}
             />

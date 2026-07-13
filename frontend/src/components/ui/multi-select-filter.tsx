@@ -94,7 +94,7 @@ export function MultiSelectFilter<T extends string = string>({
           className={cn("h-9 w-full justify-between px-3 text-left text-sm font-normal", className)}
         >
           <span className="truncate">{summaryLabel}</span>
-          <ChevronDown className="h-4 w-4 text-slate-500" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -103,8 +103,8 @@ export function MultiSelectFilter<T extends string = string>({
         className="w-[280px] p-2"
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-slate-200 px-2">
-          <Search className="h-3.5 w-3.5 text-slate-400" />
+        <div className="mb-2 flex items-center gap-2 rounded-md border border-border px-2">
+          <Search className="h-3.5 w-3.5 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -123,9 +123,9 @@ export function MultiSelectFilter<T extends string = string>({
           </Button>
         </div>
 
-        <div className="max-h-56 overflow-auto rounded-md border border-slate-200">
+        <div className="max-h-56 overflow-auto rounded-md border border-border">
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-4 text-center text-xs text-slate-500">검색 결과가 없습니다.</div>
+            <div className="px-3 py-4 text-center text-xs text-muted-foreground">검색 결과가 없습니다.</div>
           ) : (
             filteredOptions.map((option) => {
               const checked = valueSet.has(option.value);
@@ -133,7 +133,7 @@ export function MultiSelectFilter<T extends string = string>({
                 <button
                   key={option.value}
                   type="button"
-                  className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-sm last:border-b-0 hover:bg-muted/50"
                   onClick={() => toggleOption(option.value)}
                 >
                   <span
@@ -141,7 +141,7 @@ export function MultiSelectFilter<T extends string = string>({
                       "flex h-4 w-4 items-center justify-center rounded border",
                       checked
                         ? "border-[var(--vibe-primary)] bg-[var(--vibe-primary)] text-white"
-                        : "border-slate-300 bg-white text-transparent",
+                        : "border-border bg-background text-transparent",
                     )}
                   >
                     <Check className="h-3 w-3" />

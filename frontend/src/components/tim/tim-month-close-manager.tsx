@@ -126,7 +126,7 @@ export function TimMonthCloseManager() {
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">조회 연도</div>
+            <div className="text-xs text-muted-foreground">조회 연도</div>
             <Input
               type="number"
               value={searchYear}
@@ -142,10 +142,10 @@ export function TimMonthCloseManager() {
       <ManagerGridSection
         headerLeft={
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-slate-700">{appliedYear}년</span>
-            <span className="text-xs text-slate-500">
+            <span className="text-sm font-medium text-foreground">{appliedYear}년</span>
+            <span className="text-xs text-muted-foreground">
               마감 완료: <span className="font-semibold text-green-600">{closedCount}</span>개월 /
-              미마감: <span className="font-semibold text-slate-500">{12 - closedCount}</span>개월
+              미마감: <span className="font-semibold text-muted-foreground">{12 - closedCount}</span>개월
             </span>
           </div>
         }
@@ -164,26 +164,26 @@ export function TimMonthCloseManager() {
       >
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-slate-400">불러오는 중...</p>
+            <p className="text-sm text-muted-foreground">불러오는 중...</p>
           </div>
         ) : (
           <div className="overflow-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-2.5 pl-4 text-left font-medium text-slate-600">월</th>
-                  <th className="py-2.5 text-center font-medium text-slate-600">상태</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">인원수</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">출근</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">결근</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">지각</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">휴가</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">연장(h)</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">야간(h)</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">휴일(h)</th>
-                  <th className="py-2.5 pl-4 text-left font-medium text-slate-600">마감자 / 일시</th>
-                  <th className="py-2.5 pl-4 text-left font-medium text-slate-600">메모</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">처리</th>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">월</th>
+                  <th className="py-2.5 text-center font-medium text-muted-foreground">상태</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">인원수</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">출근</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">결근</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지각</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">휴가</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">연장(h)</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">야간(h)</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">휴일(h)</th>
+                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">마감자 / 일시</th>
+                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">메모</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">처리</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,11 +197,11 @@ export function TimMonthCloseManager() {
                   return (
                     <tr
                       key={month}
-                      className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${
+                      className={`border-b border-border transition-colors hover:bg-muted/50 ${
                         isClosed ? "bg-green-50/40" : ""
                       }`}
                     >
-                      <td className="py-3 pl-4 font-medium text-slate-700">
+                      <td className="py-3 pl-4 font-medium text-foreground">
                         {appliedYear}년 {MONTH_NAMES[idx]}
                       </td>
                       <td className="py-3 text-center">
@@ -211,16 +211,16 @@ export function TimMonthCloseManager() {
                             마감완료
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                             <LockOpen className="h-3 w-3" />
                             미마감
                           </span>
                         )}
                       </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-slate-600">
+                      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
                         {item ? item.employee_count.toLocaleString() : "-"}
                       </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-slate-600">
+                      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
                         {item ? item.present_days.toLocaleString() : "-"}
                       </td>
                       <td className="py-3 pr-4 text-right tabular-nums text-red-600">
@@ -242,21 +242,21 @@ export function TimMonthCloseManager() {
                         {item ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) > 0
                           ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) / 60).toFixed(1) : "-") : "-"}
                       </td>
-                      <td className="py-3 pl-4 text-xs text-slate-500">
+                      <td className="py-3 pl-4 text-xs text-muted-foreground">
                         {isClosed && item ? (
                           <>
-                            <span className="font-medium text-slate-700">
+                            <span className="font-medium text-foreground">
                               {item.closed_by_name ?? `ID:${String(item.closed_by)}`}
                             </span>
                             {item.closed_at && (
-                              <span className="ml-1 text-slate-400">
+                              <span className="ml-1 text-muted-foreground">
                                 {new Date(item.closed_at).toLocaleDateString("ko-KR")}
                               </span>
                             )}
                           </>
                         ) : "-"}
                       </td>
-                      <td className="max-w-[160px] truncate py-3 pl-4 text-xs text-slate-500">
+                      <td className="max-w-[160px] truncate py-3 pl-4 text-xs text-muted-foreground">
                         {item?.note ?? "-"}
                       </td>
                       <td className="py-3 pr-4 text-right">
@@ -303,11 +303,11 @@ export function TimMonthCloseManager() {
         title={`${appliedYear}년 ${targetMonth ?? ""}월 근태를 마감하시겠습니까?`}
         description={
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               마감 후에는 해당 월 근태 수정이 제한됩니다. 마감 해제(재오픈)는 가능합니다.
             </p>
             <div>
-              <label className="mb-1 block text-xs text-slate-500">메모 (선택)</label>
+              <label className="mb-1 block text-xs text-muted-foreground">메모 (선택)</label>
               <Input
                 value={actionNote}
                 onChange={(e) => setActionNote(e.target.value)}
@@ -330,7 +330,7 @@ export function TimMonthCloseManager() {
         onOpenChange={setReopenDialogOpen}
         title={`${appliedYear}년 ${targetMonth ?? ""}월 마감을 해제하시겠습니까?`}
         description={
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             마감 해제 후 해당 월 근태 데이터를 수정할 수 있습니다.
           </p>
         }

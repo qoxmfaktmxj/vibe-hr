@@ -70,7 +70,7 @@ function CalendarCaption({ calendarMonth, className, ...props }: MonthCaptionPro
           <span className="sr-only">Select year</span>
           <select
             aria-label="Select year"
-            className="h-8 min-w-[92px] appearance-none rounded-md border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 shadow-xs outline-none transition-colors hover:border-slate-300 focus:border-slate-400"
+            className="h-8 min-w-[92px] appearance-none rounded-md border border-border bg-background pl-3 pr-8 text-sm font-semibold text-foreground shadow-xs outline-none transition-colors hover:border-border focus:border-ring"
             value={currentYear}
             onChange={(event) => moveToMonth(Number(event.target.value), currentMonth)}
           >
@@ -80,14 +80,14 @@ function CalendarCaption({ calendarMonth, className, ...props }: MonthCaptionPro
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </label>
 
         <label className="relative">
           <span className="sr-only">Select month</span>
           <select
             aria-label="Select month"
-            className="h-8 min-w-[76px] appearance-none rounded-md border border-slate-200 bg-white pl-3 pr-8 text-sm font-semibold text-slate-700 shadow-xs outline-none transition-colors hover:border-slate-300 focus:border-slate-400"
+            className="h-8 min-w-[76px] appearance-none rounded-md border border-border bg-background pl-3 pr-8 text-sm font-semibold text-foreground shadow-xs outline-none transition-colors hover:border-border focus:border-ring"
             value={currentMonth}
             onChange={(event) => moveToMonth(currentYear, Number(event.target.value))}
           >
@@ -97,7 +97,7 @@ function CalendarCaption({ calendarMonth, className, ...props }: MonthCaptionPro
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </label>
       </div>
 
@@ -144,7 +144,7 @@ function Calendar({ className, classNames, showOutsideDays = false, ...props }: 
         ),
         month_grid: "w-full border-collapse",
         weekdays: "grid grid-cols-7",
-        weekday: "h-8 text-center text-xs font-medium text-slate-500",
+        weekday: "h-8 text-center text-xs font-medium text-muted-foreground",
         week: "mt-1 grid grid-cols-7 gap-1",
         day: cn(
           buttonVariants({ variant: "ghost", size: "icon-sm" }),

@@ -477,7 +477,7 @@ export function PayItemGroupManager() {
     if (loading) {
         return (
             <div className="flex items-center justify-center p-12">
-                <p className="text-sm text-slate-500">항목그룹 데이터를 불러오는 중...</p>
+                <p className="text-sm text-muted-foreground">항목그룹 데이터를 불러오는 중...</p>
             </div>
         );
     }
@@ -491,7 +491,7 @@ export function PayItemGroupManager() {
             >
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">
-                        <div className="text-xs text-slate-500">코드/그룹명</div>
+                        <div className="text-xs text-muted-foreground">코드/그룹명</div>
                         <Input
                             value={searchName}
                             onChange={(e) => setSearchName(e.target.value)}
@@ -515,7 +515,7 @@ export function PayItemGroupManager() {
                             goNext={pagination.goNext}
                             goToPage={pagination.goToPage}
                         />
-                        <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+                        <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
                         <GridChangeSummaryBadges summary={changeSummary} />
                     </>
                 }
@@ -527,7 +527,7 @@ export function PayItemGroupManager() {
                 }
                 contentClassName="min-h-0 flex-1 px-6 pb-4"
             >
-                <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+                <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
                     <AgGridReact<RowData>
                         theme="legacy"
                         key={gridMountKey}
@@ -543,7 +543,7 @@ export function PayItemGroupManager() {
                         onGridReady={onGridReady}
                         onCellValueChanged={onCellValueChanged}
                         localeText={AG_GRID_LOCALE_KO}
-                        overlayNoRowsTemplate='<span class="text-sm text-slate-400">조회된 데이터가 없습니다.</span>'
+                        overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">조회된 데이터가 없습니다.</span>'
                         headerHeight={36}
                         rowHeight={34}
                     />

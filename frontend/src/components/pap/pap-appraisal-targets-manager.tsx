@@ -259,7 +259,7 @@ export function PapAppraisalTargetsManager() {
             ))}
           </select>
           {!selectedAppraisalId && (
-            <p className="text-sm text-slate-500">평가를 선택하면 대상자 목록이 표시됩니다.</p>
+            <p className="text-sm text-muted-foreground">평가를 선택하면 대상자 목록이 표시됩니다.</p>
           )}
         </div>
       </ManagerSearchSection>
@@ -276,7 +276,7 @@ export function PapAppraisalTargetsManager() {
               goNext={pagination.goNext}
               goToPage={pagination.goToPage}
             />
-            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={gridSummary} />
           </>
         }
@@ -316,10 +316,10 @@ export function PapAppraisalTargetsManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-6"
       >
-        <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-border">
           {isLoading ? (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-slate-500">불러오는 중...</p>
+              <p className="text-sm text-muted-foreground">불러오는 중...</p>
             </div>
           ) : (
             <AgGridReact<TargetRow>
@@ -335,7 +335,7 @@ export function PapAppraisalTargetsManager() {
               onGridReady={onGridReady}
               onCellValueChanged={onCellValueChanged}
               localeText={{ noRowsToShow: "평가 대상자가 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">평가를 선택하거나 행을 추가하세요.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">평가를 선택하거나 행을 추가하세요.</span>'
               headerHeight={36}
               rowHeight={34}
             />

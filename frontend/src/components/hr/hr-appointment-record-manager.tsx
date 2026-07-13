@@ -829,7 +829,7 @@ export function HrAppointmentRecordManager() {
       </ManagerSearchSection>
 
       <ManagerGridSection
-        headerLeft={<><span className="text-xs text-slate-400">총 {rows.length.toLocaleString()}건</span><GridChangeSummaryBadges summary={changeSummary} className="ml-2" /></>}
+        headerLeft={<><span className="text-xs text-muted-foreground">총 {rows.length.toLocaleString()}건</span><GridChangeSummaryBadges summary={changeSummary} className="ml-2" /></>}
         headerRight={(
           <>
             <GridToolbarActions actions={toolbarActions} />
@@ -870,7 +870,7 @@ export function HrAppointmentRecordManager() {
               loading={loading}
               headerHeight={36}
               rowHeight={34}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">데이터가 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">데이터가 없습니다.</span>'
             />
           </div>
         </div>

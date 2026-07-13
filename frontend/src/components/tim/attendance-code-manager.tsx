@@ -603,7 +603,7 @@ export function AttendanceCodeManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">근태코드 데이터를 불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">근태코드 데이터를 불러오는 중...</p>
       </div>
     );
   }
@@ -617,7 +617,7 @@ export function AttendanceCodeManager() {
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">근태명/코드</div>
+            <div className="text-xs text-muted-foreground">근태명/코드</div>
             <Input
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
@@ -627,12 +627,12 @@ export function AttendanceCodeManager() {
             />
           </div>
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">분류</div>
+            <div className="text-xs text-muted-foreground">분류</div>
             <select
               value={searchCategory}
               onChange={(e) => setSearchCategory(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleQueryRequest(); }}
-              className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm"
+              className="h-9 rounded-md border border-border bg-background px-3 text-sm"
             >
               <option value="">전체</option>
               {CATEGORY_OPTIONS.map((c) => (
@@ -647,7 +647,7 @@ export function AttendanceCodeManager() {
         headerLeft={
           <>
             <GridPaginationControls page={page} totalPages={pagination.totalPages} pageInput={pagination.pageInput} setPageInput={pagination.setPageInput} goPrev={pagination.goPrev} goNext={pagination.goNext} goToPage={pagination.goToPage} />
-            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         }
@@ -659,7 +659,7 @@ export function AttendanceCodeManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<AttendanceCodeRow>
             theme="legacy"
             key={gridMountKey}
@@ -675,7 +675,7 @@ export function AttendanceCodeManager() {
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate='<span class="text-sm text-slate-400">근태코드 데이터가 없습니다.</span>'
+            overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">근태코드 데이터가 없습니다.</span>'
             headerHeight={36}
             rowHeight={34}
           />

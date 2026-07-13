@@ -84,7 +84,7 @@ const HireDateCellEditor = forwardRef<
   );
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+    <div className="rounded-md border border-border bg-background p-2 shadow-lg">
       <CustomDatePicker
         value={value}
         onChange={handleChange}

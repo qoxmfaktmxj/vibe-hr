@@ -150,11 +150,11 @@ export function RoleAdminManager() {
                 setSelectedRoleId(role.id);
               }}
               className={`w-full rounded-md px-3 py-2 text-left text-sm transition ${
-                selectedRoleId === role.id ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
+                selectedRoleId === role.id ? "bg-primary/10 text-primary" : "hover:bg-muted"
               }`}
             >
               <span className="font-medium">{role.name}</span>
-              <span className="ml-2 text-xs text-gray-500">({role.code})</span>
+              <span className="ml-2 text-xs text-muted-foreground">({role.code})</span>
             </button>
           ))}
         </CardContent>

@@ -92,7 +92,7 @@ export function OrgDeptHistoryManager() {
         flex: 1,
         minWidth: 140,
         valueFormatter: (params) => params.value ?? "-",
-        cellClass: "text-slate-500",
+        cellClass: "text-muted-foreground",
       },
       {
         headerName: "변경 후",
@@ -198,7 +198,7 @@ export function OrgDeptHistoryManager() {
   if (!initialLoaded && loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">이력 데이터를 불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">이력 데이터를 불러오는 중...</p>
       </div>
     );
   }
@@ -213,7 +213,7 @@ export function OrgDeptHistoryManager() {
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">부서 ID (미입력 시 전체)</div>
+            <div className="text-xs text-muted-foreground">부서 ID (미입력 시 전체)</div>
             <Input
               type="number"
               value={searchDeptId}
@@ -224,7 +224,7 @@ export function OrgDeptHistoryManager() {
             />
           </div>
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">조회 건수</div>
+            <div className="text-xs text-muted-foreground">조회 건수</div>
             <Input
               type="number"
               value={searchLimit}
@@ -239,12 +239,12 @@ export function OrgDeptHistoryManager() {
 
       <ManagerGridSection
         headerLeft={
-          <span className="text-xs text-slate-500">총 {rows.length.toLocaleString()}건</span>
+          <span className="text-xs text-muted-foreground">총 {rows.length.toLocaleString()}건</span>
         }
         headerRight={<GridToolbarActions actions={toolbarActions} />}
         contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-0"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<OrgDeptChangeHistoryItem>
             theme="legacy"
             rowData={rows}
@@ -254,7 +254,7 @@ export function OrgDeptHistoryManager() {
             animateRows={false}
             loading={loading}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate='<span class="text-sm text-slate-400">변경 이력이 없습니다.</span>'
+            overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">변경 이력이 없습니다.</span>'
             headerHeight={36}
             rowHeight={34}
             onGridReady={onGridReady}

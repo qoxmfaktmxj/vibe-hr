@@ -119,7 +119,7 @@ const HolidayDateCellEditor = forwardRef<
   );
 
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+    <div className="rounded-md border border-border bg-background p-2 shadow-lg">
       <CustomDatePicker
         value={value}
         onChange={handleChange}
@@ -604,7 +604,7 @@ export function HolidayManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">{year}년 공휴일 데이터를 불러오는 중...</p>
+        <p className="text-sm text-muted-foreground">{year}년 공휴일 데이터를 불러오는 중...</p>
       </div>
     );
   }
@@ -618,7 +618,7 @@ export function HolidayManager() {
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
-            <div className="text-xs text-slate-500">조회 연도</div>
+            <div className="text-xs text-muted-foreground">조회 연도</div>
             <Input
               type="number"
               value={yearInput}
@@ -629,22 +629,22 @@ export function HolidayManager() {
               className="h-9 w-24 text-sm"
             />
           </div>
-          <div className="mx-2 h-8 w-px bg-gray-200" />
+          <div className="mx-2 h-8 w-px bg-muted" />
           <div className="flex items-end gap-2">
             <div className="space-y-1">
-              <div className="text-xs text-slate-500">복사 원본 연도</div>
+              <div className="text-xs text-muted-foreground">복사 원본 연도</div>
               <Input type="number" value={copyFrom} min={2000} max={2100} onChange={(e) => setCopyFrom(e.target.value)} className="h-9 w-24 text-sm" />
             </div>
-            <span className="mb-2 text-slate-400">→</span>
+            <span className="mb-2 text-muted-foreground">→</span>
             <div className="space-y-1">
-              <div className="text-xs text-slate-500">대상 연도</div>
+              <div className="text-xs text-muted-foreground">대상 연도</div>
               <Input type="number" value={copyTo} min={2000} max={2100} onChange={(e) => setCopyTo(e.target.value)} className="h-9 w-24 text-sm" />
             </div>
             <button
               type="button"
               onClick={handleCopyYearRequest}
               disabled={copyLoading}
-              className="inline-flex h-9 items-center rounded-md border border-gray-200 px-3 text-sm"
+              className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm"
             >
               <CopyPlus className="mr-1 h-3.5 w-3.5" />
               {copyLoading ? "복사중..." : "연도 복사"}
@@ -657,7 +657,7 @@ export function HolidayManager() {
         headerLeft={
           <>
             <GridPaginationControls page={page} totalPages={pagination.totalPages} pageInput={pagination.pageInput} setPageInput={pagination.setPageInput} goPrev={pagination.goPrev} goNext={pagination.goNext} goToPage={pagination.goToPage} />
-            <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
           </>
         }
@@ -669,7 +669,7 @@ export function HolidayManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<HolidayRow>
             theme="legacy"
             key={gridMountKey}
@@ -685,7 +685,7 @@ export function HolidayManager() {
             onGridReady={onGridReady}
             onCellValueChanged={onCellValueChanged}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${year}년 공휴일 데이터가 없습니다.</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${year}년 공휴일 데이터가 없습니다.</span>`}
             headerHeight={36}
             rowHeight={34}
           />

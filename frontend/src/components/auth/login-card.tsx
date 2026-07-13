@@ -27,7 +27,7 @@ const FALLBACK_CORPORATIONS: LoginCorporationItem[] = [
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="overflow-hidden border-white/20 bg-card/95 shadow-2xl backdrop-blur dark:bg-card/95">
+    <Card className="overflow-hidden border-[var(--vibe-border-emphasis)] bg-card/95 shadow-2xl backdrop-blur dark:bg-card/95">
       {children}
     </Card>
   );
@@ -180,7 +180,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
           </Label>
           <div className="relative">
             <User
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
             />
             <Input
@@ -202,7 +202,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
           </Label>
           <div className="relative">
             <LockKeyhole
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden="true"
             />
             <Input

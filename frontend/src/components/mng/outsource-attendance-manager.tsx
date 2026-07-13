@@ -205,15 +205,15 @@ export function OutsourceAttendanceManager() {
       selectedRowId={selectedContractId}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             계약별 잔여 일수와 상세 근태 이력을 함께 관리합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">근태 상세 등록</CardTitle>
+            <CardTitle className="text-sm text-foreground">근태 상세 등록</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -266,9 +266,9 @@ export function OutsourceAttendanceManager() {
         </Card>
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">
+            <CardTitle className="text-sm text-foreground">
               근태 상세 {selectedSummary ? `- ${selectedSummary.employee_name}` : ""}
             </CardTitle>
           </CardHeader>

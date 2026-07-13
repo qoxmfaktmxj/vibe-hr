@@ -825,7 +825,7 @@ export function EmployeeMasterManager() {
             onCellValueChanged={onCellValueChanged}
             loading={loading}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noRows}</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${I18N.noRows}</span>`}
             headerHeight={36}
             rowHeight={34}
           />

@@ -25,13 +25,13 @@ function SummaryCard({
   description: string;
 }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-slate-600">{title}</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-slate-900">{value}</div>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
@@ -111,7 +111,7 @@ export function WelBenefitTypeOverview() {
             onChange={setKeywordInput}
             placeholder="코드, 유형명, 모듈 경로, 급여 항목"
           />
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             신규 메뉴를 추가할 때 seed 유형이 이 화면에 바로 노출되도록 관리합니다.
           </div>
         </SearchFieldGrid>

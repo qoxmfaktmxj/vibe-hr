@@ -127,7 +127,7 @@ export function MyPayslipViewer() {
                 {parseYearMonth(summary.year_month)} 급여 상세
               </span>
               {summary.run_name && (
-                <span className="text-xs text-slate-400">({summary.run_name})</span>
+                <span className="text-xs text-muted-foreground">({summary.run_name})</span>
               )}
             </div>
           }
@@ -227,47 +227,47 @@ export function MyPayslipViewer() {
       <ManagerGridSection
         headerLeft={
           <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-700">내 급여 이력</span>
-            <span className="text-xs text-slate-400">({payslips.length}건)</span>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">내 급여 이력</span>
+            <span className="text-xs text-muted-foreground">({payslips.length}건)</span>
           </div>
         }
         contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-2"
       >
         {loading || detailLoading ? (
           <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-slate-400">불러오는 중...</p>
+            <p className="text-sm text-muted-foreground">불러오는 중...</p>
           </div>
         ) : payslips.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <Receipt className="mb-3 h-10 w-10 text-slate-300" />
-            <p className="text-sm text-slate-400">조회 가능한 급여 내역이 없습니다.</p>
+            <Receipt className="mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">조회 가능한 급여 내역이 없습니다.</p>
           </div>
         ) : (
           <div className="overflow-auto">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-2.5 pl-4 text-left font-medium text-slate-600">급여월</th>
-                  <th className="py-2.5 text-left font-medium text-slate-600">구분</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">지급합계</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">공제합계</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">실수령액</th>
-                  <th className="py-2.5 text-center font-medium text-slate-600">상태</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-slate-600">지급일</th>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">급여월</th>
+                  <th className="py-2.5 text-left font-medium text-muted-foreground">구분</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지급합계</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">공제합계</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">실수령액</th>
+                  <th className="py-2.5 text-center font-medium text-muted-foreground">상태</th>
+                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지급일</th>
                 </tr>
               </thead>
               <tbody>
                 {payslips.map((ps) => (
                   <tr
                     key={ps.run_employee_id}
-                    className="cursor-pointer border-b border-slate-100 transition-colors hover:bg-slate-50"
+                    className="cursor-pointer border-b border-border transition-colors hover:bg-muted/50"
                     onClick={() => void openDetail(ps.run_id)}
                   >
-                    <td className="py-3 pl-4 font-medium text-slate-700">
+                    <td className="py-3 pl-4 font-medium text-foreground">
                       {parseYearMonth(ps.year_month)}
                     </td>
-                    <td className="py-3 text-slate-500">{ps.run_name ?? "-"}</td>
+                    <td className="py-3 text-muted-foreground">{ps.run_name ?? "-"}</td>
                     <td className="py-3 pr-4 text-right tabular-nums text-green-700">
                       {formatCurrency(ps.gross_pay)}
                     </td>
@@ -288,7 +288,7 @@ export function MyPayslipViewer() {
                         {ps.run_status === "paid" ? "지급완료" : "확정"}
                       </span>
                     </td>
-                    <td className="py-3 pr-4 text-right text-xs text-slate-400">
+                    <td className="py-3 pr-4 text-right text-xs text-muted-foreground">
                       {ps.paid_at ? new Date(ps.paid_at).toLocaleDateString("ko-KR") : "-"}
                     </td>
                   </tr>
@@ -318,13 +318,13 @@ function SummaryCard({
   return (
     <div
       className={`rounded-lg border p-3 ${
-        highlight ? "border-blue-200 bg-blue-50" : "border-slate-200 bg-white"
+        highlight ? "border-blue-200 bg-blue-50" : "border-border bg-background"
       }`}
     >
-      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className={`mt-1 text-lg font-bold tabular-nums ${color}`}>
         {formatCurrency(amount)}
-        <span className="ml-0.5 text-xs font-normal text-slate-400">원</span>
+        <span className="ml-0.5 text-xs font-normal text-muted-foreground">원</span>
       </div>
     </div>
   );

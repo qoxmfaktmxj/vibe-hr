@@ -164,11 +164,11 @@ export function LeaveApprovalManager() {
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">승인 처리 기준</CardTitle>
+            <CardTitle className="text-sm text-foreground">승인 처리 기준</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-slate-500">
+          <CardContent className="text-sm text-muted-foreground">
             각 행의 승인 또는 반려 버튼으로 휴가 요청을 즉시 처리할 수 있습니다.
           </CardContent>
         </Card>

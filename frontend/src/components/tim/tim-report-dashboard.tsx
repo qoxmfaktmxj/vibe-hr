@@ -42,10 +42,10 @@ function ReportMetricCard({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-sm font-semibold text-slate-600">{title}</div>
-      <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">{value}</div>
-      <div className="mt-1 text-sm text-slate-500">{description}</div>
+    <div className="rounded-xl border border-border bg-background p-4 shadow-sm">
+      <div className="text-sm font-semibold text-muted-foreground">{title}</div>
+      <div className="mt-2 text-3xl font-black tracking-tight text-foreground">{value}</div>
+      <div className="mt-1 text-sm text-muted-foreground">{description}</div>
     </div>
   );
 }
@@ -126,13 +126,13 @@ export function TimReportDashboard() {
     <ManagerPageShell>
       <ManagerSearchSection title="근태 리포트" onQuery={() => void mutate()} queryDisabled={isLoading}>
         <SearchFieldGrid className="md:grid-cols-3">
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
             집계 기간: {data?.start_date ?? "-"} ~ {data?.end_date ?? "-"}
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
             출결 데이터: {(data?.total_attendance_records ?? 0).toLocaleString()}건
           </div>
-          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
             휴가 요청: {(data?.total_leave_requests ?? 0).toLocaleString()}건
           </div>
         </SearchFieldGrid>
@@ -147,10 +147,10 @@ export function TimReportDashboard() {
       </div>
 
       <ManagerGridSection
-        headerLeft={<span className="text-sm text-slate-500">부서별 집계 {departmentRows.length.toLocaleString()}건</span>}
+        headerLeft={<span className="text-sm text-muted-foreground">부서별 집계 {departmentRows.length.toLocaleString()}건</span>}
         headerRight={<GridToolbarActions actions={[{ key: "query", label: "조회", onClick: () => void mutate() }]} />}
       >
-        <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-b-xl border-t border-slate-200">
+        <div className="ag-theme-quartz vibe-grid h-[320px] w-full overflow-hidden rounded-b-xl border-t border-border">
           <AgGridReact<DepartmentReportRow>
             theme="legacy"
             rowData={departmentRows}
@@ -160,16 +160,16 @@ export function TimReportDashboard() {
             getRowClass={(params) => getGridRowClass(params.data?._status)}
             rowHeight={36}
             headerHeight={36}
-            overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+            overlayNoRowsTemplate="<span class='text-sm text-muted-foreground'>데이터가 없습니다.</span>"
           />
         </div>
       </ManagerGridSection>
 
       <ManagerGridSection
-        headerLeft={<span className="text-sm text-slate-500">휴가유형별 집계 {leaveTypeRows.length.toLocaleString()}건</span>}
+        headerLeft={<span className="text-sm text-muted-foreground">휴가유형별 집계 {leaveTypeRows.length.toLocaleString()}건</span>}
         headerRight={<GridToolbarActions actions={[{ key: "query", label: "조회", onClick: () => void mutate() }]} />}
       >
-        <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-b-xl border-t border-slate-200">
+        <div className="ag-theme-quartz vibe-grid h-[260px] w-full overflow-hidden rounded-b-xl border-t border-border">
           <AgGridReact<LeaveTypeReportRow>
             theme="legacy"
             rowData={leaveTypeRows}
@@ -179,7 +179,7 @@ export function TimReportDashboard() {
             getRowClass={(params) => getGridRowClass(params.data?._status)}
             rowHeight={36}
             headerHeight={36}
-            overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+            overlayNoRowsTemplate="<span class='text-sm text-muted-foreground'>데이터가 없습니다.</span>"
           />
         </div>
       </ManagerGridSection>

@@ -76,7 +76,7 @@ export function MngSimpleGrid<Row>({
   return (
     <AgGridModulesProvider>
       <div
-        className={cn("ag-theme-quartz vibe-grid w-full overflow-hidden rounded-xl border border-slate-200", className)}
+        className={cn("ag-theme-quartz vibe-grid w-full overflow-hidden rounded-xl border border-border", className)}
         style={{ height }}
       >
         <AgGridReact<Row>
@@ -92,7 +92,7 @@ export function MngSimpleGrid<Row>({
             if (!selectedRowId || !getRowId || !params.data) return "";
             return getRowId(params.data) === selectedRowId ? "vibe-row-selected" : "";
           }}
-          overlayNoRowsTemplate="<span class='text-sm text-slate-400'>데이터가 없습니다.</span>"
+          overlayNoRowsTemplate="<span class='text-sm text-muted-foreground'>데이터가 없습니다.</span>"
           onRowClicked={(event: RowClickedEvent<Row>) => {
             if (event.data && onRowClick) {
               onRowClick(event.data);

@@ -41,7 +41,7 @@ const STATUS_COLORS: Record<string, string> = {
   approved: "text-emerald-600 font-medium",
   rejected: "text-red-600 font-medium",
   payroll_reflected: "text-blue-600 font-medium",
-  withdrawn: "text-slate-400",
+  withdrawn: "text-muted-foreground",
 };
 
 function SummaryCard({
@@ -54,13 +54,13 @@ function SummaryCard({
   description: string;
 }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-slate-600">{title}</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-slate-900">{value}</div>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </CardContent>
     </Card>
   );
@@ -266,7 +266,7 @@ export function WelBenefitRequestOverview() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">복리후생 신청 내역을 불러오는 중입니다.</p>
+        <p className="text-sm text-muted-foreground">복리후생 신청 내역을 불러오는 중입니다.</p>
       </div>
     );
   }
@@ -310,7 +310,7 @@ export function WelBenefitRequestOverview() {
                 goNext={pagination.goNext}
                 goToPage={pagination.goToPage}
               />
-              <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+              <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
               <GridChangeSummaryBadges summary={{ added: 0, updated: 0, deleted: 0 }} />
             </>
           }
@@ -361,7 +361,7 @@ export function WelBenefitRequestOverview() {
               description={`${reflectedCount}건이 급여와 연결됨`}
             />
           </div>
-          <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-border">
             <AgGridReact<WelRequestGridRow>
               theme="legacy"
               rowData={filteredItems}
@@ -374,7 +374,7 @@ export function WelBenefitRequestOverview() {
               rowClassRules={rowClassRules}
               getRowClass={(params) => getGridRowClass(params.data?._status)}
               localeText={{ page: "페이지", noRowsToShow: "신청 내역이 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">복리후생 신청 내역이 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">복리후생 신청 내역이 없습니다.</span>'
               headerHeight={36}
               rowHeight={34}
             />
@@ -394,11 +394,11 @@ export function WelBenefitRequestOverview() {
         onConfirm={handleApprove}
         description={
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               {selectedRow?.request_no} ({selectedRow?.employee_name}) 신청을 승인합니다.
             </p>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">승인금액 (원) *</label>
+              <label className="text-xs font-medium text-muted-foreground">승인금액 (원) *</label>
               <Input
                 type="text"
                 placeholder="승인금액을 입력하세요"
@@ -408,7 +408,7 @@ export function WelBenefitRequestOverview() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">승인 메모 (선택)</label>
+              <label className="text-xs font-medium text-muted-foreground">승인 메모 (선택)</label>
               <Input
                 type="text"
                 placeholder="승인 메모를 입력하세요"
@@ -433,11 +433,11 @@ export function WelBenefitRequestOverview() {
         onConfirm={handleReject}
         description={
           <div className="space-y-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               {selectedRow?.request_no} ({selectedRow?.employee_name}) 신청을 반려합니다.
             </p>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">반려 사유 (선택)</label>
+              <label className="text-xs font-medium text-muted-foreground">반려 사유 (선택)</label>
               <Input
                 type="text"
                 placeholder="반려 사유를 입력하세요"

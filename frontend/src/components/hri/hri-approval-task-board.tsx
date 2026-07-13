@@ -186,7 +186,7 @@ export function HriApprovalTaskBoard() {
         ) : null
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm text-foreground">처리 의견</CardTitle>
           </CardHeader>

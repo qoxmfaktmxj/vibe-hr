@@ -39,11 +39,11 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: "text-slate-500",
+  draft: "text-muted-foreground",
   submitted: "text-blue-600 font-medium",
   approved: "text-green-600 font-medium",
   rejected: "text-red-500",
-  canceled: "text-slate-400",
+  canceled: "text-muted-foreground",
 };
 
 type CourseRow = { id: number; course_name: string; in_out_type?: string };
@@ -164,12 +164,12 @@ export function TraMyApplicationsManager() {
   return (
     <ManagerPageShell>
       <ManagerSearchSection title="나의 교육 신청" onQuery={() => void mutate()}>
-        <p className="text-sm text-slate-500">신청한 교육 목록을 확인하고 새로 신청할 수 있습니다.</p>
+        <p className="text-sm text-muted-foreground">신청한 교육 목록을 확인하고 새로 신청할 수 있습니다.</p>
       </ManagerSearchSection>
 
       <ManagerGridSection
         headerLeft={
-          <span className="text-xs text-slate-400">총 {rowData.length.toLocaleString()}건</span>
+          <span className="text-xs text-muted-foreground">총 {rowData.length.toLocaleString()}건</span>
         }
         headerRight={
           <GridToolbarActions
@@ -200,10 +200,10 @@ export function TraMyApplicationsManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-6"
       >
-        <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-border">
           {isLoading ? (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-slate-500">불러오는 중...</p>
+              <p className="text-sm text-muted-foreground">불러오는 중...</p>
             </div>
           ) : (
             <AgGridReact<TraApplicationItem>

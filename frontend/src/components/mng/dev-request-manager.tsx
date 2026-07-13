@@ -276,15 +276,15 @@ export function DevRequestManager() {
               </option>
             ))}
           </select>
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객사별 추가 개발 요청과 월별 유상 현황을 함께 확인합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">요청 상세</CardTitle>
+            <CardTitle className="text-sm text-foreground">요청 상세</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -339,7 +339,7 @@ export function DevRequestManager() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={form.is_paid}
@@ -347,7 +347,7 @@ export function DevRequestManager() {
                 />
                 유상 여부
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={form.has_tax_bill}
@@ -371,9 +371,9 @@ export function DevRequestManager() {
         </Card>
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">월별 요약</CardTitle>
+            <CardTitle className="text-sm text-foreground">월별 요약</CardTitle>
           </CardHeader>
           <CardContent>
             <MngSimpleGrid<MngDevRequestMonthlySummaryItem>

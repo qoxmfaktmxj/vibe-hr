@@ -300,13 +300,13 @@ export function PermissionMatrixManager() {
               하위 메뉴까지 함께 반영
             </label>
           </div>
-          <div className="rounded-md border bg-slate-50 p-3">
-            <p className="mb-2 text-xs font-semibold text-slate-600">표시할 역할</p>
+          <div className="rounded-md border bg-muted/50 p-3">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">표시할 역할</p>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => {
                 const checked = selectedRoleIds.includes(role.id);
                 return (
-                  <label key={role.id} className="flex items-center gap-2 rounded border bg-white px-3 py-1.5 text-sm">
+                  <label key={role.id} className="flex items-center gap-2 rounded border bg-background px-3 py-1.5 text-sm">
                     <Checkbox checked={checked} onCheckedChange={() => toggleRole(role.id)} />
                     {role.name} ({role.code})
                   </label>
@@ -330,7 +330,7 @@ export function PermissionMatrixManager() {
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[900px] border-collapse text-sm">
-              <thead className="bg-slate-100">
+              <thead className="bg-muted">
                 <tr>
                   <th className="border px-2 py-2 text-left">메뉴</th>
                   {roles
@@ -344,7 +344,7 @@ export function PermissionMatrixManager() {
               </thead>
               <tbody>
                 {visibleMenus.map((menu) => (
-                  <tr key={menu.id} className="odd:bg-white even:bg-slate-50">
+                  <tr key={menu.id} className="odd:bg-background even:bg-muted/50">
                     <td className="border px-2 py-2">
                       <span style={{ paddingLeft: `${menu.depth * 14}px` }}>
                         {menu.depth > 0 ? "- " : ""}
@@ -386,7 +386,7 @@ export function PermissionMatrixManager() {
         <CardContent>
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full min-w-[1200px] border-collapse text-sm">
-              <thead className="bg-slate-100">
+              <thead className="bg-muted">
                 <tr>
                   <th className="border px-2 py-2 text-left">화면</th>
                   {roles
@@ -400,12 +400,12 @@ export function PermissionMatrixManager() {
               </thead>
               <tbody>
                 {visibleActionMenus.map((menu) => (
-                  <tr key={menu.id} className="align-top odd:bg-white even:bg-slate-50">
+                  <tr key={menu.id} className="align-top odd:bg-background even:bg-muted/50">
                     <td className="border px-2 py-2">
                       <div className="font-medium">
                         {menu.name} ({menu.code})
                       </div>
-                      <div className="text-xs text-slate-500">{menu.path}</div>
+                      <div className="text-xs text-muted-foreground">{menu.path}</div>
                     </td>
                     {roles
                       .filter((role) => selectedRoleIds.includes(role.id))

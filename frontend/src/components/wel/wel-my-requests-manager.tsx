@@ -42,7 +42,7 @@ const STATUS_COLORS: Record<string, string> = {
   approved: "text-emerald-600 font-medium",
   rejected: "text-red-600 font-medium",
   payroll_reflected: "text-blue-600 font-medium",
-  withdrawn: "text-slate-400",
+  withdrawn: "text-muted-foreground",
 };
 
 function formatCurrency(value: number | null) {
@@ -221,7 +221,7 @@ export function WelMyRequestsManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">복리후생 신청 내역을 불러오는 중입니다.</p>
+        <p className="text-sm text-muted-foreground">복리후생 신청 내역을 불러오는 중입니다.</p>
       </div>
     );
   }
@@ -230,7 +230,7 @@ export function WelMyRequestsManager() {
     <>
       <ManagerPageShell>
         <ManagerSearchSection title="내 복리후생 신청" onQuery={() => void mutate()}>
-          <p className="text-sm text-slate-500">복리후생 신청 내역을 조회하고 신규 신청할 수 있습니다.</p>
+          <p className="text-sm text-muted-foreground">복리후생 신청 내역을 조회하고 신규 신청할 수 있습니다.</p>
         </ManagerSearchSection>
 
         <ManagerGridSection
@@ -245,7 +245,7 @@ export function WelMyRequestsManager() {
                 goNext={pagination.goNext}
                 goToPage={pagination.goToPage}
               />
-              <span className="text-xs text-slate-400">총 {totalCount.toLocaleString()}건</span>
+              <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
               <GridChangeSummaryBadges summary={{ added: 0, updated: 0, deleted: 0 }} />
             </>
           }
@@ -279,7 +279,7 @@ export function WelMyRequestsManager() {
           }
           contentClassName="min-h-0 flex-1 px-6 pb-6"
         >
-          <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-gray-200">
+          <div className="ag-theme-quartz vibe-grid h-full min-h-[400px] w-full overflow-hidden rounded-lg border border-border">
             <AgGridReact<WelRequestGridRow>
               theme="legacy"
               rowData={pagedItems}
@@ -292,7 +292,7 @@ export function WelMyRequestsManager() {
               rowClassRules={rowClassRules}
               getRowClass={(params) => getGridRowClass(params.data?._status)}
               localeText={{ page: "페이지", noRowsToShow: "신청 내역이 없습니다." }}
-              overlayNoRowsTemplate='<span class="text-sm text-slate-400">복리후생 신청 내역이 없습니다.</span>'
+              overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">복리후생 신청 내역이 없습니다.</span>'
               headerHeight={36}
               rowHeight={34}
             />
@@ -313,7 +313,7 @@ export function WelMyRequestsManager() {
         description={
           <div className="space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">복리후생 유형 *</label>
+              <label className="text-xs font-medium text-muted-foreground">복리후생 유형 *</label>
               <select
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={createTypeCode}
@@ -328,7 +328,7 @@ export function WelMyRequestsManager() {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">신청금액 (원) *</label>
+              <label className="text-xs font-medium text-muted-foreground">신청금액 (원) *</label>
               <Input
                 type="text"
                 placeholder="예: 500000"
@@ -338,7 +338,7 @@ export function WelMyRequestsManager() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">내용/사유 (선택)</label>
+              <label className="text-xs font-medium text-muted-foreground">내용/사유 (선택)</label>
               <Input
                 type="text"
                 placeholder="신청 내용 또는 사유를 입력하세요"

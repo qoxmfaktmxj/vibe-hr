@@ -201,15 +201,15 @@ export function DevInquiryManager() {
               </option>
             ))}
           </select>
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객 문의 접수, 확정 여부, 예상 투입량을 관리합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">문의 상세</CardTitle>
+            <CardTitle className="text-sm text-foreground">문의 상세</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -269,7 +269,7 @@ export function DevInquiryManager() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"
                   checked={form.is_confirmed}

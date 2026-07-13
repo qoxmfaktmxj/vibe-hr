@@ -509,7 +509,7 @@ export function CommonCodeManager() {
                 className={`rounded border px-2 py-0.5 text-[11px] font-medium ${
                   isSelected
                     ? "border-blue-600 bg-blue-50 text-blue-700"
-                    : "border-slate-300 bg-white text-slate-600 hover:border-slate-400"
+                    : "border-border bg-background text-muted-foreground hover:border-ring"
                 }`}
                 onClick={(event) => {
                   event.preventDefault();
@@ -1332,7 +1332,7 @@ export function CommonCodeManager() {
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <p className="text-sm text-slate-500">{I18N.loading}</p>
+        <p className="text-sm text-muted-foreground">{I18N.loading}</p>
       </div>
     );
   }
@@ -1387,19 +1387,19 @@ export function CommonCodeManager() {
               disabled={groupLoading || groupSaving}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-slate-500">총 {groupTotalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {groupTotalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={groupSummary} />
           </>
         }
         headerRight={
           <>
-            <div className="mr-2 text-sm font-semibold text-slate-700">{I18N.groupTitle}</div>
+            <div className="mr-2 text-sm font-semibold text-foreground">{I18N.groupTitle}</div>
             <GridToolbarActions actions={groupToolbarActions} saveAction={groupSaveAction} />
           </>
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<GroupRow>
             theme="legacy"
             rowData={groupRows}
@@ -1416,7 +1416,7 @@ export function CommonCodeManager() {
             singleClickEdit={true}
             loading={groupLoading}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noGroupRows}</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${I18N.noGroupRows}</span>`}
             headerHeight={36}
             rowHeight={34}
           />
@@ -1438,13 +1438,13 @@ export function CommonCodeManager() {
               disabled={detailLoading || detailSaving || !selectedGroupId}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-slate-500">총 {detailTotalCount.toLocaleString()}건</span>
+            <span className="text-xs text-muted-foreground">총 {detailTotalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={detailSummary} />
           </>
         }
         headerRight={
           <>
-            <div className="mr-2 text-sm font-semibold text-slate-700">
+            <div className="mr-2 text-sm font-semibold text-foreground">
               {selectedGroup ? `${I18N.detailTitle} · ${selectedGroup.name}` : I18N.detailTitle}
             </div>
             <GridToolbarActions actions={detailToolbarActions} saveAction={detailSaveAction} />
@@ -1452,7 +1452,7 @@ export function CommonCodeManager() {
         }
         contentClassName="min-h-0 flex-1 px-6 pb-4"
       >
-        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<DetailRow>
             theme="legacy"
             rowData={detailRows}
@@ -1473,7 +1473,7 @@ export function CommonCodeManager() {
             singleClickEdit={true}
             loading={detailLoading}
             localeText={AG_GRID_LOCALE_KO}
-            overlayNoRowsTemplate={`<span class="text-sm text-slate-400">${I18N.noDetailRows}</span>`}
+            overlayNoRowsTemplate={`<span class="text-sm text-muted-foreground">${I18N.noDetailRows}</span>`}
             headerHeight={36}
             rowHeight={34}
           />

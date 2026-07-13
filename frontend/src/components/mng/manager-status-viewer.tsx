@@ -150,15 +150,15 @@ export function ManagerStatusViewer() {
       emptyText="담당자 매핑 데이터가 없습니다."
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
-          <div className="flex items-center text-sm text-slate-500">
+          <div className="flex items-center text-sm text-muted-foreground">
             고객사별 담당자 매핑과 적용 기간을 관리합니다.
           </div>
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">담당자 배정 등록</CardTitle>
+            <CardTitle className="text-sm text-foreground">담당자 배정 등록</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -214,9 +214,9 @@ export function ManagerStatusViewer() {
         </Card>
       }
       afterGrid={
-        <Card className="border-slate-200">
+        <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-slate-700">일괄 삭제</CardTitle>
+            <CardTitle className="text-sm text-foreground">일괄 삭제</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {items.map((item) => (

@@ -51,7 +51,7 @@ export function IconCatalogManager() {
           <CardTitle>아이콘 관리</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted-foreground">
             기본은 사전 승인된 아이콘만 보여줘. 고급 검색을 켜면 Lucide 전체 아이콘을 탐색할 수 있어.
           </p>
           <div className="flex flex-wrap items-center gap-2">
@@ -68,7 +68,7 @@ export function IconCatalogManager() {
             >
               {advanced ? "고급 검색 사용 중" : "고급 검색 켜기"}
             </Button>
-            <span className="text-xs text-slate-500">{items.length.toLocaleString()}개</span>
+            <span className="text-xs text-muted-foreground">{items.length.toLocaleString()}개</span>
           </div>
         </CardContent>
       </Card>
@@ -85,7 +85,7 @@ export function IconCatalogManager() {
               key={name}
               type="button"
               onClick={() => void handleCopy(name)}
-              className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-lg border bg-white px-2 py-3 text-center hover:border-primary/40 hover:bg-primary/5"
+              className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-lg border bg-background px-2 py-3 text-center hover:border-primary/40 hover:bg-primary/5"
             >
               {advanced
                 ? Icon

@@ -28,7 +28,7 @@ export function GridPaginationControls({
   className,
 }: GridPaginationControlsProps) {
   return (
-    <div className={cn("mt-2 flex items-center justify-end gap-2 text-xs text-slate-500", className)}>
+    <div className={cn("mt-2 flex items-center justify-end gap-2 text-xs text-muted-foreground", className)}>
       <Button size="sm" variant="outline" disabled={page <= 1 || disabled} onClick={goPrev}>
         이전
       </Button>

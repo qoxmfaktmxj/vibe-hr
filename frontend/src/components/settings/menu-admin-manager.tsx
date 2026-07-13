@@ -88,17 +88,17 @@ function IconPickerGrid({
   return (
     <div className="space-y-2">
       {/* 현재 선택된 아이콘 미리보기 + 선택 토글 버튼 */}
-      <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-500">
+      <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
           {renderMenuIcon(value || null, "h-5 w-5")}
         </span>
-        <span className="min-w-0 flex-1 truncate text-sm text-gray-700">
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
           {value || "(기본 아이콘)"}
         </span>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="shrink-0 rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+          className="shrink-0 rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:bg-muted"
         >
           {open ? "닫기" : "선택"}
         </button>
@@ -106,9 +106,9 @@ function IconPickerGrid({
 
       {/* 아이콘 그리드 피커 */}
       {open && (
-        <div className="rounded-md border border-gray-200 bg-white">
+        <div className="rounded-md border border-border bg-background">
           {/* 검색 + 고급 토글 */}
-          <div className="flex items-center gap-2 border-b border-gray-100 p-2">
+          <div className="flex items-center gap-2 border-b border-border p-2">
             <Input
               className="h-7 flex-1 text-xs"
               placeholder={advanced ? "전체 아이콘 검색..." : "기본 아이콘 검색..."}
@@ -121,12 +121,12 @@ function IconPickerGrid({
               className={`shrink-0 rounded border px-2 py-1 text-[10px] font-medium transition-colors ${
                 advanced
                   ? "border-primary/40 bg-primary/10 text-primary"
-                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  : "border-border text-muted-foreground hover:bg-muted/50"
               }`}
             >
               {advanced ? "고급 켜짐" : "고급 검색"}
             </button>
-            <span className="shrink-0 text-[10px] text-gray-400">{filtered.length}개</span>
+            <span className="shrink-0 text-[10px] text-muted-foreground">{filtered.length}개</span>
           </div>
 
           {/* 아이콘 그리드 */}
@@ -137,11 +137,11 @@ function IconPickerGrid({
                 <button
                   type="button"
                   onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
-                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-gray-100 ${!value ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
+                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-muted ${!value ? "bg-primary/10 ring-1 ring-primary/40" : ""}`}
                   title="없음"
                 >
-                  <span className="flex h-5 w-5 items-center justify-center text-[11px] text-gray-400">—</span>
-                  <span className="w-full truncate text-center text-[10px] text-gray-400">없음</span>
+                  <span className="flex h-5 w-5 items-center justify-center text-[11px] text-muted-foreground">—</span>
+                  <span className="w-full truncate text-center text-[10px] text-muted-foreground">없음</span>
                 </button>
               )}
               {filtered.map((name) => (
@@ -149,8 +149,8 @@ function IconPickerGrid({
                   key={name}
                   type="button"
                   onClick={() => { onChange(name); setOpen(false); setQuery(""); }}
-                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-gray-100 ${
-                    value === name ? "bg-primary/10 text-primary ring-1 ring-primary/40" : "text-gray-600"
+                  className={`flex flex-col items-center gap-1 rounded-md px-1 py-2 hover:bg-muted ${
+                    value === name ? "bg-primary/10 text-primary ring-1 ring-primary/40" : "text-muted-foreground"
                   }`}
                   title={name}
                 >
@@ -159,7 +159,7 @@ function IconPickerGrid({
                 </button>
               ))}
               {filtered.length === 0 && (
-                <p className="col-span-5 py-4 text-center text-xs text-gray-400">
+                <p className="col-span-5 py-4 text-center text-xs text-muted-foreground">
                   검색 결과가 없습니다.
                 </p>
               )}
@@ -190,10 +190,10 @@ function MenuTree({
               type="button"
               onClick={() => onSelect(node.id)}
               className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
-                selected ? "bg-primary/10 text-primary" : "hover:bg-gray-100"
+                selected ? "bg-primary/10 text-primary" : "hover:bg-muted"
               }`}
             >
-              <span className={`shrink-0 ${selected ? "text-primary" : "text-gray-400"}`}>
+              <span className={`shrink-0 ${selected ? "text-primary" : "text-muted-foreground"}`}>
                 {node.icon
                   ? renderMenuIcon(node.icon, "h-4 w-4")
                   : <span className="inline-block h-4 w-4" aria-hidden="true" />}
@@ -201,7 +201,7 @@ function MenuTree({
               <span className="font-medium">{node.name}</span>
             </button>
             {node.children.length > 0 ? (
-              <div className="ml-4 border-l border-gray-200 pl-2">
+              <div className="ml-4 border-l border-border pl-2">
                 <MenuTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} />
               </div>
             ) : null}
@@ -456,7 +456,7 @@ export function MenuAdminManager() {
                 <div className="space-y-2">
                   <Label>부모 메뉴</Label>
                   <select
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm"
+                    className="h-10 w-full rounded-md border border-border px-3 text-sm"
                     value={form.parent_id}
                     onChange={(e) => setForm((p) => ({ ...p, parent_id: e.target.value }))}
                   >
@@ -531,7 +531,7 @@ export function MenuAdminManager() {
               </div>
             </>
           ) : (
-            <p className="text-sm text-gray-500">왼쪽에서 메뉴를 선택해 주세요.</p>
+            <p className="text-sm text-muted-foreground">왼쪽에서 메뉴를 선택해 주세요.</p>
           )}
         </CardContent>
       </Card>
@@ -554,7 +554,7 @@ export function MenuAdminManager() {
               <div className="space-y-2">
                 <Label>부모 메뉴</Label>
                 <select
-                  className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm"
+                  className="h-10 w-full rounded-md border border-border px-3 text-sm"
                   value={form.parent_id}
                   onChange={(e) => setForm((p) => ({ ...p, parent_id: e.target.value }))}
                 >

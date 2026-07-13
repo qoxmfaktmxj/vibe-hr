@@ -20,12 +20,12 @@ type AnnualLeaveGridRow = TimAnnualLeaveItem & ReadonlyGridRow;
 
 function LeaveMetricCard({ title, value }: { title: string; value: number | string }) {
   return (
-    <Card className="border-slate-200">
+    <Card className="border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-slate-600">{title}</CardTitle>
+        <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold text-slate-900">{value}</div>
+        <div className="text-2xl font-bold text-foreground">{value}</div>
       </CardContent>
     </Card>
   );
@@ -135,7 +135,7 @@ export function AnnualLeaveManager() {
             onChange={setKeywordInput}
             placeholder="사번 또는 이름"
           />
-          <div className="flex items-center text-sm text-slate-500 md:col-span-2">
+          <div className="flex items-center text-sm text-muted-foreground md:col-span-2">
             연도별 연차 현황과 잔여 일수를 조회할 수 있습니다.
           </div>
         </SearchFieldGrid>
@@ -148,9 +148,9 @@ export function AnnualLeaveManager() {
             <LeaveMetricCard title="이월" value={myLeave?.item.carried_over_days ?? "-"} />
             <LeaveMetricCard title="잔여" value={myLeave?.item.remaining_days ?? "-"} />
           </div>
-          <Card className="border-slate-200">
+          <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-slate-700">관리자 연차 조정</CardTitle>
+              <CardTitle className="text-sm text-foreground">관리자 연차 조정</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2">
               <Input
