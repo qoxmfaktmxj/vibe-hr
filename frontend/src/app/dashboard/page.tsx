@@ -138,8 +138,11 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               {!summaryResult.ok ? (
-                <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  Dashboard summary is currently unavailable. The cards are intentionally showing an empty state.
+                <div
+                  role="status"
+                  className="mb-4 rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-100"
+                >
+                  대시보드 정보를 불러오지 못했습니다. 현재 값은 0으로 표시되며, 잠시 후 새로고침해 주세요.
                 </div>
               ) : null}
               <div className="mb-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">

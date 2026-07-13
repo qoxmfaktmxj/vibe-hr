@@ -31,11 +31,11 @@ const leaveConfig = {
 export function AttendanceTrendChart({ data }: { data: TrendDatum[] }) {
   return (
     <ChartContainer config={attendanceConfig} className="h-56 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 6, right: 12, left: -10, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
+        <AreaChart data={data} margin={{ top: 6, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="day" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis fontSize={12} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <YAxis fontSize={12} tickLine={false} axisLine={false} width={44} allowDecimals={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Area
             type="monotone"
@@ -54,11 +54,11 @@ export function AttendanceTrendChart({ data }: { data: TrendDatum[] }) {
 export function LeaveTrendChart({ data }: { data: TrendDatum[] }) {
   return (
     <ChartContainer config={leaveConfig} className="h-56 w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 6, right: 12, left: -10, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 320, height: 224 }}>
+        <BarChart data={data} margin={{ top: 6, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="day" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis fontSize={12} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+          <YAxis fontSize={12} tickLine={false} axisLine={false} width={44} allowDecimals={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
         </BarChart>

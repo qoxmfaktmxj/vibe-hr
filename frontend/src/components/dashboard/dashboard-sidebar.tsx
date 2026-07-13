@@ -546,7 +546,7 @@ export function DashboardSidebar() {
       </button>
 
       {mobileOpen ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
           <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]">
             <div className="flex justify-end p-3">
