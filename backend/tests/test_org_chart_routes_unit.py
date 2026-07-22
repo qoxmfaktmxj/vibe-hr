@@ -1,8 +1,13 @@
 from datetime import datetime, timezone
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.api.organization import organization_chart
+from app.api.organization import router as organization_router
+from app.core.auth import build_access_token
+from app.core.database import get_session
 from app.models import AppMenu, AppMenuAction, AppMenuRole, AppRoleMenuAction, AuthRole, AuthUser, AuthUserRole, HrEmployee, OrgDepartment
 
 
@@ -86,8 +91,24 @@ def _seed_permission_context(
     return user
 
 
-def test_chart_returns_all_departments_without_department_menu_fallback() -> None:
-    engine = create_engine("sqlite://")
+def _create_test_client(engine) -> TestClient:
+    app = FastAPI()
+    app.include_router(organization_router, prefix="/api/v1")
+
+    def _override_get_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_get_session
+    return TestClient(app)
+
+
+def test_chart_http_route_returns_200_when_query_permission_exists_without_hr_role_gate() -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     _create_permission_tables(engine)
     SQLModel.metadata.create_all(engine, tables=[OrgDepartment.__table__, HrEmployee.__table__])
 
@@ -96,10 +117,9 @@ def test_chart_returns_all_departments_without_department_menu_fallback() -> Non
             session,
             menu_code="org.chart",
             path="/org/chart",
-            role_code="hr_manager",
+            role_code="org_viewer",
             allow_query=True,
         )
-
         session.add(
             OrgDepartment(
                 code="D001",
@@ -119,8 +139,54 @@ def test_chart_returns_all_departments_without_department_menu_fallback() -> Non
             )
         )
         session.commit()
+        token = build_access_token(int(user.id))
 
-        result = organization_chart(session=session, current_user=user)
+    with _create_test_client(engine) as client:
+        response = client.get(
+            "/api/v1/org/chart",
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
-        assert result.total_count == 2
-        assert [department.code for department in result.departments] == ["D001", "D002"]
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_count"] == 2
+    assert [department["code"] for department in payload["departments"]] == ["D001", "D002"]
+
+
+def test_chart_http_route_denies_when_query_permission_is_missing() -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    _create_permission_tables(engine)
+    SQLModel.metadata.create_all(engine, tables=[OrgDepartment.__table__, HrEmployee.__table__])
+
+    with Session(engine) as session:
+        user = _seed_permission_context(
+            session,
+            menu_code="org.chart",
+            path="/org/chart",
+            role_code="org_viewer",
+            allow_query=False,
+        )
+        session.add(
+            OrgDepartment(
+                code="D001",
+                name="인사",
+                is_active=True,
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        )
+        session.commit()
+        token = build_access_token(int(user.id))
+
+    with _create_test_client(engine) as client:
+        response = client.get(
+            "/api/v1/org/chart",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Action not allowed."}

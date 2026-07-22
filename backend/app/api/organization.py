@@ -193,7 +193,6 @@ def organization_departments(
 @router.get(
     "/chart",
     response_model=OrganizationChartResponse,
-    dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
 def organization_chart(
     session: Session = Depends(get_session),
