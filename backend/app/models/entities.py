@@ -3,7 +3,19 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, ForeignKeyConstraint, Index, Integer, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    UniqueConstraint,
+    text,
+)
 from sqlmodel import Field, SQLModel
 
 
@@ -80,18 +92,38 @@ class OrgMappingTypeItem(SQLModel, table=True):
     erp_employee_code: Optional[str] = Field(default=None, max_length=50)
     cost_center_type: Optional[str] = Field(default=None, max_length=50)
     remark: Optional[str] = Field(default=None, max_length=500)
-    sort_order: int = Field(default=0)
-    is_active: bool = Field(default=True)
+    sort_order: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default=text("0")),
+    )
+    is_active: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default=text("true")),
+    )
     created_by: Optional[int] = Field(
         default=None,
-        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+        sa_column=Column(
+            Integer,
+            ForeignKey("auth_users.id", name="fk_org_mapping_type_items_created_by", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     updated_by: Optional[int] = Field(
         default=None,
-        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+        sa_column=Column(
+            Integer,
+            ForeignKey("auth_users.id", name="fk_org_mapping_type_items_updated_by", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    )
 
 
 class OrgMappingAssignment(SQLModel, table=True):
@@ -121,7 +153,11 @@ class OrgMappingAssignment(SQLModel, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True, nullable=False),
     )
     department_id: int = Field(
-        sa_column=Column(Integer, ForeignKey("org_departments.id", ondelete="RESTRICT"), nullable=False)
+        sa_column=Column(
+            Integer,
+            ForeignKey("org_departments.id", name="fk_org_mapping_assignments_department", ondelete="RESTRICT"),
+            nullable=False,
+        )
     )
     type_code: str = Field(max_length=50)
     item_id: int = Field(sa_column=Column(Integer, nullable=False))
@@ -129,14 +165,28 @@ class OrgMappingAssignment(SQLModel, table=True):
     effective_to: Optional[date] = None
     created_by: Optional[int] = Field(
         default=None,
-        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+        sa_column=Column(
+            Integer,
+            ForeignKey("auth_users.id", name="fk_org_mapping_assignments_created_by", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
     updated_by: Optional[int] = Field(
         default=None,
-        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+        sa_column=Column(
+            Integer,
+            ForeignKey("auth_users.id", name="fk_org_mapping_assignments_updated_by", ondelete="SET NULL"),
+            nullable=True,
+        ),
     )
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    )
+    updated_at: datetime = Field(
+        default_factory=utc_now,
+        sa_column=Column(DateTime(timezone=True), nullable=False, server_default=text("now()")),
+    )
 
 
 class OrgCorporation(SQLModel, table=True):
