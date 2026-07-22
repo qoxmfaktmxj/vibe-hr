@@ -177,7 +177,7 @@ class OrgMappingTypeItem(SQLModel, table=True):
         CheckConstraint("effective_to IS NULL OR effective_to >= effective_from", name="ck_org_mapping_type_items_date_order"),
         Index("ix_org_mapping_type_items_type_item_from", "type_code", "item_code", "effective_from"),
     )
-    id: int | None = Field(default=None, primary_key=True, sa_column=Column(sa.Integer, autoincrement=True, nullable=False))
+    id: int | None = Field(default=None, sa_column=Column(sa.Integer, primary_key=True, autoincrement=True, nullable=False))
     type_code: str = Field(sa_column=Column(sa.String(50), nullable=False))
     item_code: str = Field(sa_column=Column(sa.String(50), nullable=False))
     name: str = Field(sa_column=Column(sa.String(100), nullable=False))
