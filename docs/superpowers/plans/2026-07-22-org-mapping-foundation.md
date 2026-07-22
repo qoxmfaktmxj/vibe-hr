@@ -27,7 +27,8 @@
 | Contract | Exact value |
 | --- | --- |
 | Chart backend/BFF | `GET /api/v1/org/chart` ↔ `GET /api/org/chart`, both guarded by menu path `/org/chart`, action `query` |
-| Type lookups | `GET /api/v1/org/mapping-type-options`, `/mapping-item-options?type_code=`, `/department-options`; all guarded by `/org/types`, `query` |
+| Type-item source | `GET /api/v1/org/mapping-types` ↔ `GET /api/org/mapping-types`, guarded by `/org/type-items`, `query` |
+| Type lookups | `GET /api/v1/org/mapping-type-options`, `/mapping-item-options?type_code=COST`, `/department-options`; all guarded by `/org/types`, `query` |
 | Item CRUD | `/api/v1/org/mapping-type-items` and `/api/org/mapping-type-items`; list uses `page,limit,type_code,reference_date`, write path `/org/type-items` action `save` |
 | Assignment CRUD | `/api/v1/org/mapping-assignments` and `/api/org/mapping-assignments`; list uses `page,limit,department_id,type_code,reference_date`, write path `/org/types` action `save` |
 | Personal status | `/api/v1/org/mapping-personal-status` ↔ `/api/org/mapping-personal-status`, path `/org/type-personal-status`, action `query` |
@@ -74,7 +75,7 @@ def organization_chart(session: Session = Depends(get_session), current_user: Au
 
 - [ ] **Step 4: Run focused verification**
 
-Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_chart_routes_unit.py tests/test_menu_action_permission_unit.py -q; cd ../../frontend; npx eslint src/app/api/org/chart/route.ts; git diff --check`
+Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_chart_routes_unit.py tests/test_menu_action_permission_unit.py -q; cd ../../frontend; npx vitest run src/lib/org/org-chart-bff-route.test.ts; npx eslint src/app/api/org/chart/route.ts; git diff --check`
 
 Expected: chart 403/200 tests and BFF lint pass with no whitespace errors.
 
@@ -152,7 +153,8 @@ Run: `git add frontend/src/lib/org/org-chart-tree.ts frontend/src/lib/org/org-ch
 
 ```python
 def test_mapping_metadata_has_composite_item_key_and_assignment_fk() -> None:
-    assert {"id", "type_code"} == set(OrgMappingTypeItem.__table__.primary_key.columns.keys())
+    assert ["id"] == list(OrgMappingTypeItem.__table__.primary_key.columns.keys())
+    assert "uq_org_mapping_type_items_id_type" in constraint_names(OrgMappingTypeItem.__table__)
     assert "fk_org_mapping_assignments_item_type" in foreign_key_names(OrgMappingAssignment.__table__)
 def test_mapping_period_date_order_and_indexes_are_declared() -> None:
     assert "ck_org_mapping_type_items_date_order" in constraint_names(OrgMappingTypeItem.__table__)
@@ -171,11 +173,11 @@ Expected: FAIL because models and migration are absent.
 class OrgMappingTypeItem(SQLModel, table=True):
     __tablename__ = "org_mapping_type_items"
     __table_args__ = (
-        PrimaryKeyConstraint("id", "type_code", name="pk_org_mapping_type_items"),
+        UniqueConstraint("id", "type_code", name="uq_org_mapping_type_items_id_type"),
         CheckConstraint("effective_to IS NULL OR effective_to >= effective_from", name="ck_org_mapping_type_items_date_order"),
         Index("ix_org_mapping_type_items_type_item_from", "type_code", "item_code", "effective_from"),
     )
-    id: int | None = Field(default=None, sa_column=Column(sa.Integer, autoincrement=True, nullable=False))
+    id: int | None = Field(default=None, primary_key=True, sa_column=Column(sa.Integer, autoincrement=True, nullable=False))
     type_code: str = Field(sa_column=Column(sa.String(50), nullable=False))
     item_code: str = Field(sa_column=Column(sa.String(50), nullable=False))
     name: str = Field(sa_column=Column(sa.String(100), nullable=False))
@@ -183,7 +185,7 @@ class OrgMappingTypeItem(SQLModel, table=True):
     effective_to: date | None = Field(default=None, sa_column=Column(sa.Date, nullable=True))
 ```
 
-Add nullable `erp_employee_code VARCHAR(50)`, `cost_center_type VARCHAR(50)`, `remark VARCHAR(500)`, nullable `created_by/updated_by INTEGER` FKs `fk_org_mapping_type_items_created_by/updated_by` with `ON DELETE SET NULL`; non-null `sort_order INTEGER DEFAULT 0`, `is_active BOOLEAN DEFAULT true`, `created_at/updated_at TIMESTAMPTZ DEFAULT now()`. Assignment has non-null `id INTEGER`, `department_id INTEGER`, `type_code VARCHAR(50)`, `item_id INTEGER`, `effective_from DATE`, nullable `effective_to DATE`, same nullable audit FKs and timestamp fields; department FK `fk_org_mapping_assignments_department` uses `ON DELETE RESTRICT`, composite item FK `fk_org_mapping_assignments_item_type(item_id,type_code)` uses `ON DELETE RESTRICT`, check `ck_org_mapping_assignments_date_order`, indexes `ix_org_mapping_assignments_department_type_from(department_id,type_code,effective_from)` and `ix_org_mapping_assignments_item_id(item_id)`.
+Add nullable `erp_employee_code VARCHAR(50)`, `cost_center_type VARCHAR(50)`, `remark VARCHAR(500)`, nullable `created_by/updated_by INTEGER` FKs `fk_org_mapping_type_items_created_by/updated_by` with `ON DELETE SET NULL`; non-null `sort_order INTEGER DEFAULT 0`, `is_active BOOLEAN DEFAULT true`, `created_at/updated_at TIMESTAMPTZ DEFAULT now()`. Assignment has single autoincrement primary key `id INTEGER`, non-null `department_id INTEGER`, `type_code VARCHAR(50)`, `item_id INTEGER`, `effective_from DATE`, nullable `effective_to DATE`, same nullable audit FKs and timestamp fields; department FK `fk_org_mapping_assignments_department` uses `ON DELETE RESTRICT`, composite item FK `fk_org_mapping_assignments_item_type(item_id,type_code)` uses `ON DELETE RESTRICT`, check `ck_org_mapping_assignments_date_order`, indexes `ix_org_mapping_assignments_department_type_from(department_id,type_code,effective_from)` and `ix_org_mapping_assignments_item_id(item_id)`.
 
 Migration creates `btree_gist` if absent, then tables/FKs/checks/indexes, `ex_org_mapping_type_items_period` on `(type_code WITH =, item_code WITH =, daterange(effective_from,coalesce(effective_to,'infinity'::date),'[]') WITH &&)`, and `ex_org_mapping_assignments_period` on `(department_id WITH =, type_code WITH =, daterange(effective_from,coalesce(effective_to,'infinity'::date),'[]') WITH &&)`. Downgrade reverses exactly: exclusions, indexes, FKs/checks/tables; leaves shared `btree_gist` installed. It never modifies `org_departments` data or hierarchy fields.
 
@@ -201,16 +203,22 @@ Run: `git add backend/app/models/entities.py backend/app/models/__init__.py back
 
 **Files:** Create `backend/tests/test_org_mapping_lookup_routes_unit.py`; modify `backend/app/bootstrap.py`, `backend/app/schemas/organization.py`, `backend/app/services/organization_mapping_service.py`, `backend/app/api/organization.py`, `backend/tests/test_menu_action_permission_unit.py`.
 
-**Interfaces:** produces `GET /api/v1/org/mapping-type-options`, `/mapping-item-options?type_code=`, `/department-options`; all call `require_menu_action_for_user(..., path="/org/types", action_code="query")` and return `{items:[...]}`.
+**Interfaces:** produces `GET /api/v1/org/mapping-types` guarded by `/org/type-items/query`, plus `GET /api/v1/org/mapping-type-options`, `/mapping-item-options?type_code=COST`, `/department-options`, all guarded by `/org/types/query`; every route returns `{items:[...]}`.
 
 - [ ] **Step 1: Write failing lookup authorization tests**
 
 ```python
-@pytest.mark.parametrize("handler", [mapping_type_options, mapping_item_options, department_options])
-def test_types_lookup_denies_without_types_query(handler) -> None:
+@pytest.mark.parametrize("handler,kwargs", [(mapping_type_options, {}), (mapping_item_options, {"type_code": "COST"}), (department_options, {})])
+def test_types_lookup_denies_without_types_query(handler, kwargs) -> None:
     user = seed_permissions(session, path="/org/types", allow_query=False)
     with pytest.raises(HTTPException, match="Action not allowed"):
-        handler(session=session, current_user=user)
+        handler(session=session, current_user=user, **kwargs)
+
+def test_mapping_types_requires_type_items_query_and_returns_200_when_allowed() -> None:
+    denied = seed_permissions(session, path="/org/type-items", allow_query=False)
+    with pytest.raises(HTTPException, match="Action not allowed"): mapping_types(session=session, current_user=denied)
+    allowed = seed_permissions(session, path="/org/type-items", allow_query=True)
+    assert mapping_types(session=session, current_user=allowed).items == []
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -221,13 +229,13 @@ Expected: FAIL because protected lookup routes are absent.
 
 - [ ] **Step 3: Write minimal source and lookup implementation**
 
-Seed group `ORG_MAPPING_TYPE` only; do not seed item values or read `/settings/common-codes`. Seed existing menu defaults: chart query; type-items query/create/copy/save/download; types query/create/copy/save/download; status query/download; upload query/template_download/upload/download. Lookup handlers return type codes, active type-filtered items, and active departments respectively; no shared lookup route accepts a caller-selected menu path.
+Seed group `ORG_MAPPING_TYPE` only; do not seed item values or read `/settings/common-codes`. `mapping_types` reads active `AppCode` rows in this group after `/org/type-items/query`. Seed existing menu defaults: chart query; type-items query/create/copy/save/download; types query/create/copy/save/download; status query/download; upload query/template_download/upload/download. Types lookup handlers return type codes, active type-filtered items, and active departments after `/org/types/query`; no shared lookup route accepts a caller-selected menu path.
 
 - [ ] **Step 4: Run focused verification**
 
 Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_mapping_lookup_routes_unit.py tests/test_menu_action_permission_unit.py -q; git diff --check`
 
-Expected: all three direct API paths return 403 without `/org/types/query` and 200 with it.
+Expected: mapping-types returns 403/200 through `/org/type-items/query`; all three types lookups return 403/200 through `/org/types/query`, including `mapping-item-options?type_code=COST`.
 
 - [ ] **Step 5: Commit**
 
@@ -237,7 +245,7 @@ Run: `git add backend/app/bootstrap.py backend/app/schemas/organization.py backe
 
 **Files:** Create `backend/tests/test_org_mapping_item_service_unit.py`, `backend/tests/test_org_mapping_item_routes_unit.py`; modify `backend/app/schemas/organization.py`, `backend/app/services/organization_mapping_service.py`, `backend/app/api/organization.py`.
 
-**Interfaces:** `OrgMappingTypeItemCreateRequest(type_code,item_code,name,effective_from,effective_to,erp_employee_code,cost_center_type,sort_order,remark,is_active)`; `GET /api/v1/org/mapping-type-items?page&limit&type_code&reference_date` → `{items,total_count,page,limit}`; `POST`, `PUT`, `DELETE /{item_id}` on `/org/type-items` with query/save permissions.
+**Interfaces:** `OrgMappingTypeItemCreateRequest(type_code,item_code,name,effective_from,effective_to,erp_employee_code,cost_center_type,sort_order,remark,is_active)`; `GET /api/v1/org/mapping-type-items?page&limit&type_code&reference_date` → `{items,total_count,page,limit}`; `GET /api/v1/org/mapping-types` → `{items:[{code,name}]}`; `POST`, `PUT`, `DELETE /{item_id}` on `/org/type-items` with query/save permissions.
 
 - [ ] **Step 1: Write failing period/mutation tests**
 
@@ -301,13 +309,13 @@ Expected: FAIL because placeholder page and BFF routes remain.
 
 - [ ] **Step 3: Write minimal BFF/UI implementation**
 
-Each BFF duplicates the existing departments token proxy shape; no generic helper is introduced. `GET/POST/PUT` parses JSON success/error; `DELETE` branches 204 before JSON parsing. Page declares `GRID_SCREEN` engine `ag-grid`, profile `standard-v2`, registryKey `org.type-items`. Manager uses every Global Constraints Grid module, status row fields `_status/_original/_prevStatus`, and columns 유형코드/항목코드/명칭/시작일/종료일/ERP 사원코드/CC유형/정렬/비고/사용여부.
+`mapping-types/route.ts` targets `/api/v1/org/mapping-types`; the item BFF routes target `/api/v1/org/mapping-type-items`. Each BFF duplicates the existing departments token proxy shape; no generic helper is introduced. `GET/POST/PUT` parses JSON success/error; `DELETE` branches 204 before JSON parsing. Page declares `GRID_SCREEN` engine `ag-grid`, profile `standard-v2`, registryKey `org.type-items`. Manager uses every Global Constraints Grid module, status row fields `_status/_original/_prevStatus`, and columns 유형코드/항목코드/명칭/시작일/종료일/ERP 사원코드/CC유형/정렬/비고/사용여부.
 
 `org-bff-route-contract.test.ts` stubs upstream `fetch` and asserts absent cookie → 401 JSON, upstream 200/422 JSON body/status propagation, and upstream 204 → empty `NextResponse`; add every BFF route module to this contract table.
 
 - [ ] **Step 4: Run focused verification**
 
-Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-types/route.ts src/app/api/org/mapping-type-items/route.ts src/app/api/org/mapping-type-items/[itemId]/route.ts src/app/org/type-items/page.tsx src/components/org/org-mapping-type-item-manager.tsx src/types/organization.ts; npx tsc --noEmit; npx playwright test tests/e2e/org-type-items.spec.ts --workers=1; git diff --check`
+Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-types/route.ts src/app/api/org/mapping-type-items/route.ts src/app/api/org/mapping-type-items/[itemId]/route.ts src/app/org/type-items/page.tsx src/components/org/org-mapping-type-item-manager.tsx src/types/organization.ts; npx vitest run src/lib/org/org-bff-route-contract.test.ts; npx tsc --noEmit; npx playwright test tests/e2e/org-type-items.spec.ts --workers=1; git diff --check`
 
 Expected: registry, BFF JSON/204 behavior, interface checkpoint, canonical toolbar, and Korean screenshot pass.
 
@@ -387,7 +395,7 @@ Extend `org-bff-route-contract.test.ts` with all five route modules and the same
 
 - [ ] **Step 4: Run focused verification**
 
-Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-type-options/route.ts src/app/api/org/mapping-item-options/route.ts src/app/api/org/department-options/route.ts src/app/api/org/mapping-assignments/route.ts src/app/api/org/mapping-assignments/[assignmentId]/route.ts src/app/org/types/page.tsx src/components/org/org-mapping-assignment-manager.tsx src/types/organization.ts; npx playwright test tests/e2e/org-types.spec.ts tests/e2e/org-chart.spec.ts --workers=1; git diff --check`
+Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-type-options/route.ts src/app/api/org/mapping-item-options/route.ts src/app/api/org/department-options/route.ts src/app/api/org/mapping-assignments/route.ts src/app/api/org/mapping-assignments/[assignmentId]/route.ts src/app/org/types/page.tsx src/components/org/org-mapping-assignment-manager.tsx src/types/organization.ts; npx vitest run src/lib/org/org-bff-route-contract.test.ts; npx playwright test tests/e2e/org-types.spec.ts tests/e2e/org-chart.spec.ts --workers=1; git diff --check`
 
 Expected: registry and lint pass; types and existing chart Korean screenshots pass.
 
@@ -477,7 +485,7 @@ Extend the BFF contract test with this GET module's 401 and JSON 200/403 propaga
 
 - [ ] **Step 4: Run focused verification**
 
-Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-personal-status/route.ts src/app/org/type-personal-status/page.tsx src/components/org/org-mapping-personal-status-manager.tsx src/types/organization.ts; npx playwright test tests/e2e/org-type-personal-status.spec.ts --workers=1; git diff --check`
+Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-personal-status/route.ts src/app/org/type-personal-status/page.tsx src/components/org/org-mapping-personal-status-manager.tsx src/types/organization.ts; npx vitest run src/lib/org/org-bff-route-contract.test.ts; npx playwright test tests/e2e/org-type-personal-status.spec.ts --workers=1; git diff --check`
 
 Expected: registry/lint pass and E2E proves Korean, dynamic columns, and no write controls.
 
@@ -499,12 +507,14 @@ def test_upload_permission_select_precedes_successful_confirm() -> None:
     assert upload_confirm(payload(valid_row()), session=session, current_user=user).inserted_count == 1
 def test_flush_constraint_error_rolls_back_all_staged_rows() -> None:
     force_exclusion_integrity_error_on_flush(session)
-    with pytest.raises(HTTPException, match="overlaps"):
+    with pytest.raises(HTTPException, match="overlaps") as exc_info:
         confirm_mapping_assignment_upload(session, [valid_row(), valid_row_2()], actor_id=user.id)
+    assert exc_info.value.status_code == 422
     assert assignment_count(session) == 0
 def test_invalid_row_causes_zero_writes_without_begin_context() -> None:
-    with pytest.raises(HTTPException, match="upload validation failed"):
+    with pytest.raises(HTTPException, match="upload validation failed") as exc_info:
         confirm_mapping_assignment_upload(session, [valid_row(), invalid_row()], actor_id=user.id)
+    assert exc_info.value.status_code == 422
     assert assignment_count(session) == 0
 ```
 
@@ -516,13 +526,13 @@ Expected: FAIL because JSON upload handlers do not exist.
 
 - [ ] **Step 3: Write minimal atomic service/API**
 
-`upload_template` first checks `/org/type-upload/template_download`, then returns the header JSON; it creates no workbook. Preview first checks `upload`, parses only JSON rows, and calls `validate_upload_rows` without writing. Confirm first checks `upload`; validation resolves codes, validates closed dates, item containment, database conflicts, and conflicts among incoming rows. After validation succeeds, stage all inserts/updates with `session.add`, call `session.flush`, then one `session.commit`. Every `HTTPException`, `IntegrityError`, or unexpected exception calls `session.rollback`; translated exclusion conflict is 409 and validation failure is 422. Do not use `session.begin()`.
+`upload_template` first checks `/org/type-upload/template_download`, then returns the header JSON; it creates no workbook. Preview first checks `upload`, parses only JSON rows, and calls `validate_upload_rows` without writing. Confirm first checks `upload`; validation resolves codes, validates closed dates, item containment, database conflicts, and conflicts among incoming rows. After validation succeeds, stage all inserts/updates with `session.add`, call `session.flush`, then one `session.commit`. Every confirm row/period/constraint `HTTPException` or `IntegrityError` calls `session.rollback` and returns HTTP 422 in the preview response shape; unexpected exceptions roll back and return a sanitized 500. HTTP 409 remains limited to normal item/assignment CRUD conflicts. Do not use `session.begin()`.
 
 - [ ] **Step 4: Run focused verification**
 
 Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_mapping_upload_service_unit.py tests/test_org_mapping_upload_routes_unit.py -q; git diff --check`
 
-Expected: permission-select success, preview no-write, invalid zero-write, flush conflict zero-write, one-commit success, and JSON template tests pass.
+Expected: permission-select success, preview no-write, invalid/flush constraint zero-write 422 preview responses, one-commit success, and JSON template tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -559,7 +569,7 @@ Extend BFF contract tests with template/preview/confirm 401 and JSON 200/422 pro
 
 - [ ] **Step 4: Run focused verification**
 
-Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-assignments/upload-template/route.ts src/app/api/org/mapping-assignments/upload-preview/route.ts src/app/api/org/mapping-assignments/upload-confirm/route.ts src/app/org/type-upload/page.tsx src/components/org/org-mapping-upload-manager.tsx src/types/organization.ts; npx playwright test tests/e2e/org-type-upload.spec.ts --workers=1; git diff --check`
+Run: `cd frontend; npm run validate:grid; npx eslint src/app/api/org/mapping-assignments/upload-template/route.ts src/app/api/org/mapping-assignments/upload-preview/route.ts src/app/api/org/mapping-assignments/upload-confirm/route.ts src/app/org/type-upload/page.tsx src/components/org/org-mapping-upload-manager.tsx src/types/organization.ts; npx vitest run src/lib/org/org-bff-route-contract.test.ts; npx playwright test tests/e2e/org-type-upload.spec.ts --workers=1; git diff --check`
 
 Expected: JSON BFF, canonical toolbar, browser-created template, invalid preview guard, error workbook, fixed Korean screenshot, and lint pass.
 
@@ -594,7 +604,7 @@ Checklist for every Step 3 in Tasks 1–12: exact signature/request/response exi
 
 - [ ] **Step 4: Run final ORG-focused verification**
 
-Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_chart_routes_unit.py tests/test_org_mapping_migration_contract.py tests/test_org_mapping_lookup_routes_unit.py tests/test_org_mapping_item_service_unit.py tests/test_org_mapping_item_routes_unit.py tests/test_org_mapping_assignment_service_unit.py tests/test_org_mapping_assignment_routes_unit.py tests/test_org_mapping_personal_status_service_unit.py tests/test_org_mapping_personal_status_routes_unit.py tests/test_org_mapping_upload_service_unit.py tests/test_org_mapping_upload_routes_unit.py tests/test_organization_service_unit.py tests/test_menu_action_permission_unit.py -q; cd ../../frontend; npm run validate:grid; npx tsc --noEmit; npm run build; npx playwright test tests/e2e/org-chart.spec.ts tests/e2e/org-type-items.spec.ts tests/e2e/org-types.spec.ts tests/e2e/org-type-personal-status.spec.ts tests/e2e/org-type-upload.spec.ts tests/e2e/org-departments-regression.spec.ts --workers=1; git diff --check`
+Run: `cd backend; ./.venv/Scripts/python.exe -m pytest tests/test_org_chart_routes_unit.py tests/test_org_mapping_migration_contract.py tests/test_org_mapping_lookup_routes_unit.py tests/test_org_mapping_item_service_unit.py tests/test_org_mapping_item_routes_unit.py tests/test_org_mapping_assignment_service_unit.py tests/test_org_mapping_assignment_routes_unit.py tests/test_org_mapping_personal_status_service_unit.py tests/test_org_mapping_personal_status_routes_unit.py tests/test_org_mapping_upload_service_unit.py tests/test_org_mapping_upload_routes_unit.py tests/test_organization_service_unit.py tests/test_menu_action_permission_unit.py -q; cd ../../frontend; npm run validate:grid; npx vitest run src/lib/org/org-chart-bff-route.test.ts src/lib/org/org-bff-route-contract.test.ts; npx tsc --noEmit; npm run build; npx playwright test tests/e2e/org-chart.spec.ts tests/e2e/org-type-items.spec.ts tests/e2e/org-types.spec.ts tests/e2e/org-type-personal-status.spec.ts tests/e2e/org-type-upload.spec.ts tests/e2e/org-departments-regression.spec.ts --workers=1; git diff --check`
 
 Expected: named ORG tests, one final typecheck/build, five focused E2E screenshots, and whitespace check pass; no whole-repository test suite is invoked.
 
