@@ -1167,7 +1167,7 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 - `frontend: npm run validate:grid` — PASS: validator가 수치 count는 출력하지 않았고, 등록된 모든 AG Grid 화면 통과를 보고.
 - `frontend: npm run lint` — PASS: 0 errors, 15 warnings (기존 범위 밖 unused variable/Hooks dependency 경고).
 - `frontend: npx tsc --noEmit` — PASS: 0 diagnostics.
-- `frontend: npm test` — PASS: 5 test files, 24 tests, warnings 0.
+- `frontend: npm test` — PASS: 5 test files, 24 tests.
 - `frontend: npx playwright test tests/e2e/lifecycle-grid-qa.spec.ts tests/e2e/grid-retirement-mng-crud.spec.ts tests/e2e/grid-retirement-workflow-mutations.spec.ts --workers=1 --reporter=line` — PASS: 38 tests, Node `NO_COLOR`/`FORCE_COLOR` warnings 2건.
 - `frontend: npm run build` — PASS: Next.js production build; prebuild `validate:grid`도 PASS.
 
