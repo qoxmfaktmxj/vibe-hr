@@ -19,6 +19,10 @@ from app.schemas.organization import (
     OrgRestructurePlanItemUpdateRequest,
     OrgRestructurePlanListResponse,
     OrgRestructurePlanUpdateRequest,
+    OrgMappingTypeItemCreateRequest,
+    OrgMappingTypeItemDetailResponse,
+    OrgMappingTypeItemListResponse,
+    OrgMappingTypeItemUpdateRequest,
     OrganizationLookupItemsResponse,
     OrganizationChartResponse,
     OrganizationCorporationCreateRequest,
@@ -31,10 +35,14 @@ from app.schemas.organization import (
     OrganizationDepartmentUpdateRequest,
 )
 from app.services.organization_mapping_service import (
+    create_mapping_type_item,
     list_department_options,
     list_mapping_item_options,
     list_mapping_type_options,
     list_mapping_types,
+    list_mapping_type_items,
+    delete_mapping_type_item,
+    update_mapping_type_item,
 )
 from app.services.org_restructure_service import (
     add_plan_item,
@@ -221,6 +229,75 @@ def mapping_types(
 ) -> OrganizationLookupItemsResponse:
     require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="query")
     return OrganizationLookupItemsResponse(items=list_mapping_types(session))
+
+
+@router.get(
+    "/mapping-type-items",
+    response_model=OrgMappingTypeItemListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_type_items(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    type_code: str | None = Query(default=None),
+    reference_date: date | None = Query(default=None),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingTypeItemListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="query")
+    items, total_count = list_mapping_type_items(
+        session,
+        page=page,
+        limit=limit,
+        type_code=type_code,
+        reference_date=reference_date,
+    )
+    return OrgMappingTypeItemListResponse(items=items, total_count=total_count, page=page, limit=limit)
+
+
+@router.post(
+    "/type-items",
+    response_model=OrgMappingTypeItemDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_type_item_create(
+    payload: OrgMappingTypeItemCreateRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingTypeItemDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="save")
+    return OrgMappingTypeItemDetailResponse(item=create_mapping_type_item(session, payload))
+
+
+@router.put(
+    "/type-items/{item_id}",
+    response_model=OrgMappingTypeItemDetailResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_type_item_update(
+    item_id: int,
+    payload: OrgMappingTypeItemUpdateRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingTypeItemDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="save")
+    return OrgMappingTypeItemDetailResponse(item=update_mapping_type_item(session, item_id, payload))
+
+
+@router.delete(
+    "/type-items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_type_item_delete(
+    item_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="save")
+    delete_mapping_type_item(session, item_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
