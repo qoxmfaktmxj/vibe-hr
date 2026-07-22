@@ -857,6 +857,16 @@ STANDARD_MENU_ACTION_CODES: tuple[str, ...] = (
     "download",
 )
 
+MAPPING_TYPE_GROUP_SEED = ("ORG_MAPPING_TYPE", "조직매핑유형", "조직 매핑 유형", 7)
+
+MENU_ACTION_DEFAULT_OVERRIDES: dict[str, set[str]] = {
+    "/org/chart": {"query"},
+    "/org/type-items": {"query", "create", "copy", "save", "download"},
+    "/org/types": {"query", "create", "copy", "save", "download"},
+    "/org/type-personal-status": {"query", "download"},
+    "/org/type-upload": {"query", "template_download", "upload", "download"},
+}
+
 
 COMMON_CODE_GROUP_SEEDS = [
     ("POSITION", "직위", "직위 구분", 1),
@@ -1462,27 +1472,35 @@ def ensure_menus(session: Session) -> None:
 def ensure_menu_actions(session: Session) -> None:
     menu_rows = session.exec(select(AppMenu).where(AppMenu.path.is_not(None), AppMenu.is_active == True)).all()
     existing_rows = session.exec(select(AppMenuAction)).all()
-    existing_keys = {(row.menu_id, row.action_code) for row in existing_rows}
+    existing_by_key = {(row.menu_id, row.action_code): row for row in existing_rows}
     now_utc = datetime.utcnow()
     changed = False
 
     for menu in menu_rows:
         if menu.id is None:
             continue
+        allowed_actions = MENU_ACTION_DEFAULT_OVERRIDES.get(menu.path or "", set(STANDARD_MENU_ACTION_CODES))
         for action_code in STANDARD_MENU_ACTION_CODES:
             key = (menu.id, action_code)
-            if key in existing_keys:
-                continue
-            session.add(
-                AppMenuAction(
-                    menu_id=menu.id,
-                    action_code=action_code,
-                    enabled_default=True,
-                    created_at=now_utc,
-                    updated_at=now_utc,
+            enabled_default = action_code in allowed_actions
+            row = existing_by_key.get(key)
+            if row is None:
+                session.add(
+                    AppMenuAction(
+                        menu_id=menu.id,
+                        action_code=action_code,
+                        enabled_default=enabled_default,
+                        created_at=now_utc,
+                        updated_at=now_utc,
+                    )
                 )
-            )
-            changed = True
+                changed = True
+                continue
+            if row.enabled_default != enabled_default:
+                row.enabled_default = enabled_default
+                row.updated_at = now_utc
+                session.add(row)
+                changed = True
 
     if changed:
         session.commit()
@@ -3897,6 +3915,40 @@ def ensure_hr_recruitment_cycle_seed(session: Session) -> None:
             session.commit()
             session.refresh(item)
 
+
+def ensure_org_mapping_type_group(session: Session) -> None:
+    code, name, description, sort_order = MAPPING_TYPE_GROUP_SEED
+    group = session.exec(select(AppCodeGroup).where(AppCodeGroup.code == code)).first()
+    if group is None:
+        session.add(
+            AppCodeGroup(
+                code=code,
+                name=name,
+                description=description,
+                is_active=True,
+                sort_order=sort_order,
+            )
+        )
+        session.commit()
+        return
+
+    changed = False
+    if group.name != name:
+        group.name = name
+        changed = True
+    if group.description != description:
+        group.description = description
+        changed = True
+    if group.sort_order != sort_order:
+        group.sort_order = sort_order
+        changed = True
+    if not group.is_active:
+        group.is_active = True
+        changed = True
+    if changed:
+        session.add(group)
+        session.commit()
+
         if order.status == "draft" and admin_user_id is not None:
             confirm_appointment_order(session, order.id, admin_user_id)
 
@@ -5956,6 +6008,7 @@ def seed_initial_data(session: Session) -> None:
     ensure_menus(session)
     ensure_welfare_menu_overrides(session)
     ensure_menu_actions(session)
+    ensure_org_mapping_type_group(session)
     ensure_system_settings(session)
     ensure_common_codes(session)
     ensure_pap_final_results(session)

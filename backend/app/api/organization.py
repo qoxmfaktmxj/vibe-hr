@@ -19,6 +19,7 @@ from app.schemas.organization import (
     OrgRestructurePlanItemUpdateRequest,
     OrgRestructurePlanListResponse,
     OrgRestructurePlanUpdateRequest,
+    OrganizationLookupItemsResponse,
     OrganizationChartResponse,
     OrganizationCorporationCreateRequest,
     OrganizationCorporationDetailResponse,
@@ -28,6 +29,12 @@ from app.schemas.organization import (
     OrganizationDepartmentDetailResponse,
     OrganizationDepartmentListResponse,
     OrganizationDepartmentUpdateRequest,
+)
+from app.services.organization_mapping_service import (
+    list_department_options,
+    list_mapping_item_options,
+    list_mapping_type_options,
+    list_mapping_types,
 )
 from app.services.org_restructure_service import (
     add_plan_item,
@@ -201,6 +208,59 @@ def organization_chart(
     require_menu_action_for_user(session, user_id=current_user.id, path="/org/chart", action_code="query")
     departments, total_count = list_chart_departments(session)
     return OrganizationChartResponse(departments=departments, total_count=total_count)
+
+
+@router.get(
+    "/mapping-types",
+    response_model=OrganizationLookupItemsResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_types(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrganizationLookupItemsResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="query")
+    return OrganizationLookupItemsResponse(items=list_mapping_types(session))
+
+
+@router.get(
+    "/mapping-type-options",
+    response_model=OrganizationLookupItemsResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_type_options(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrganizationLookupItemsResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="query")
+    return OrganizationLookupItemsResponse(items=list_mapping_type_options(session))
+
+
+@router.get(
+    "/mapping-item-options",
+    response_model=OrganizationLookupItemsResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_item_options(
+    type_code: str = Query(..., min_length=1),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrganizationLookupItemsResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="query")
+    return OrganizationLookupItemsResponse(items=list_mapping_item_options(session, type_code=type_code))
+
+
+@router.get(
+    "/department-options",
+    response_model=OrganizationLookupItemsResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def department_options(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrganizationLookupItemsResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="query")
+    return OrganizationLookupItemsResponse(items=list_department_options(session))
 
 
 @router.post(

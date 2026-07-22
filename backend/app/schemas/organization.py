@@ -37,6 +37,15 @@ class OrganizationDepartmentDetailResponse(BaseModel):
     department: OrganizationDepartmentItem
 
 
+class OrganizationLookupItem(BaseModel):
+    code: str
+    name: str
+
+
+class OrganizationLookupItemsResponse(BaseModel):
+    items: list[OrganizationLookupItem]
+
+
 class OrganizationDepartmentCreateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=30)
     name: str = Field(min_length=1, max_length=100)

@@ -4,8 +4,9 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
+from app.bootstrap import ensure_menu_actions
 from app.api.common_code import code_group_create, code_groups
 from app.api.employee import employee_batch_save, employee_list
 from app.api.organization import organization_chart, organization_department_create, organization_departments
@@ -319,3 +320,68 @@ def test_code_group_create_denies_when_save_permission_is_missing() -> None:
 
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == "Action not allowed."
+
+
+def test_ensure_menu_actions_seeds_organization_mapping_defaults() -> None:
+    engine = create_engine("sqlite://")
+    _create_permission_tables(engine)
+
+    menus = [
+        AppMenu(
+            code="org.chart",
+            name="org.chart",
+            path="/org/chart",
+            is_active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        ),
+        AppMenu(
+            code="org.type-items",
+            name="org.type-items",
+            path="/org/type-items",
+            is_active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        ),
+        AppMenu(
+            code="org.types",
+            name="org.types",
+            path="/org/types",
+            is_active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        ),
+        AppMenu(
+            code="org.type-personal-status",
+            name="org.type-personal-status",
+            path="/org/type-personal-status",
+            is_active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        ),
+        AppMenu(
+            code="org.type-upload",
+            name="org.type-upload",
+            path="/org/type-upload",
+            is_active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        ),
+    ]
+
+    with Session(engine) as session:
+        session.add_all(menus)
+        session.commit()
+        ensure_menu_actions(session)
+
+        def enabled_actions(menu_code: str) -> set[str]:
+            menu = session.exec(select(AppMenu).where(AppMenu.code == menu_code)).first()
+            assert menu is not None
+            rows = session.exec(select(AppMenuAction).where(AppMenuAction.menu_id == menu.id)).all()
+            return {row.action_code for row in rows if row.enabled_default}
+
+        assert enabled_actions("org.chart") == {"query"}
+        assert enabled_actions("org.type-items") == {"query", "create", "copy", "save", "download"}
+        assert enabled_actions("org.types") == {"query", "create", "copy", "save", "download"}
+        assert enabled_actions("org.type-personal-status") == {"query", "download"}
+        assert enabled_actions("org.type-upload") == {"query", "template_download", "upload", "download"}
