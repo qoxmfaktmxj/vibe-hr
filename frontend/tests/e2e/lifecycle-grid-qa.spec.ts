@@ -177,8 +177,8 @@ test.describe("HR lifecycle grid QA", () => {
     test(`screen check: ${route}`, async ({ page }) => {
       const result = await test.step(`inspect ${route}`, async () => inspectScreen(page, route));
 
-      // Soft assertion: record the fact, but only fail the test on hard navigation/load failure.
       expect(result.loaded, `${route} failed to load: ${result.note}`).toBeTruthy();
+      expect(result.hasGrid, `${route} AG Grid missing: ${result.note}`).toBeTruthy();
     });
   }
 });

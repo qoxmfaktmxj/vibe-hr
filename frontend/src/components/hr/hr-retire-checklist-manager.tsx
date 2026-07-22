@@ -248,7 +248,11 @@ export function HrRetireChecklistManager() {
       rowData={rowData}
       columnDefs={columnDefs}
       onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "퇴직 체크리스트 관리", "hr-retire-checklist")}
-      totalCount={filteredItems.length}
+      totalCount={
+        appliedKeyword.trim() || appliedActiveFilter !== "all"
+          ? filteredItems.length
+          : (data?.total_count ?? 0)
+      }
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}

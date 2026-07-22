@@ -166,7 +166,7 @@ export function WelBenefitTypeOverview() {
       rowData={rowData}
       columnDefs={columnDefs}
       onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "복리후생 유형관리", "wel-benefit-types")}
-      totalCount={filteredItems.length}
+      totalCount={appliedKeyword.trim() ? filteredItems.length : (data?.total_count ?? 0)}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}

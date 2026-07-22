@@ -46,7 +46,11 @@ async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
   const data = rows.map((row) =>
     visibleColumns.map((column) => {
       const field = column.field as keyof Row | undefined;
-      const rawValue = field ? row[field] : undefined;
+      const rawValue = field
+        ? row[field]
+        : typeof column.valueGetter === "function"
+          ? (column.valueGetter as (params: { data: Row }) => unknown)({ data: row })
+          : undefined;
       if (typeof column.valueFormatter === "function") {
         return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
           value: rawValue,
