@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 type Json = Record<string, unknown>;
 type Write = { method: string; path: string; body: Json | null };
+type RouteAudit = { unhandledWrites: Write[] };
 
 const NOW = "2026-07-22T00:00:00.000Z";
 const EMPLOYEE = {
@@ -35,6 +36,18 @@ function caseList(detail: Json): Json {
 
 async function expectGridRow(page: Page, text: string): Promise<void> {
   await expect(page.locator(".ag-row").filter({ hasText: text }).first()).toBeVisible();
+}
+
+async function installGlobalWriteGuard(page: Page): Promise<RouteAudit> {
+  const audit: RouteAudit = { unhandledWrites: [] };
+  await page.route("**/api/**", async (route) => {
+    const request = route.request();
+    if (request.method() === "GET") return route.fallback();
+    const url = new URL(request.url());
+    audit.unhandledWrites.push({ method: request.method(), path: url.pathname, body: body(route) });
+    throw new Error(`Unhandled API write blocked before shared backend: ${request.method()} ${url.pathname}`);
+  });
+  return audit;
 }
 
 async function installHrRoutes(page: Page): Promise<Write[]> {
@@ -153,7 +166,14 @@ async function installTimRoutes(page: Page): Promise<Write[]> {
 test.use({ viewport: { width: 1440, height: 1600 } });
 
 test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts", () => {
-  test.beforeEach(async ({ page }) => { page.on("dialog", (dialog) => void dialog.accept("테스트 취소 사유")); });
+  let audit: RouteAudit;
+
+  test.beforeEach(async ({ page }) => {
+    audit = await installGlobalWriteGuard(page);
+    page.on("dialog", (dialog) => void dialog.accept("테스트 취소 사유"));
+  });
+
+  test.afterEach(() => { expect(audit.unhandledWrites).toEqual([]); });
 
   test("퇴직 체크리스트 등록은 실제 입력값을 POST하고 목록을 갱신한다", async ({ page }) => {
     const writes = await installHrRoutes(page);
@@ -164,7 +184,7 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
     await page.getByPlaceholder("정렬순서").fill("7");
     await page.getByRole("button", { name: "등록", exact: true }).click();
     await expectGridRow(page, "출입증 반납");
-    expect(writes).toContainEqual({ method: "POST", path: "/api/hr/retire/checklist", body: { code: "badge_return", title: "출입증 반납", description: "보안팀 확인", is_required: true, is_active: true, sort_order: 7 } });
+    expect(writes).toEqual([{ method: "POST", path: "/api/hr/retire/checklist", body: { code: "badge_return", title: "출입증 반납", description: "보안팀 확인", is_required: true, is_active: true, sort_order: 7 } }]);
   });
 
   test("퇴직 승인은 체크·확정·취소 요청과 상세 상태를 갱신한다", async ({ page }) => {
@@ -172,14 +192,16 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
     await page.goto("/hr/retire/approvals");
     await expectGridRow(page, EMPLOYEE.employee_no);
     await page.locator(".ag-row").filter({ hasText: EMPLOYEE.employee_no }).first().click();
-    await page.getByText("자산 반납", { exact: false }).click();
+    const assetReturn = page.getByRole("checkbox", { name: /자산 반납/ });
+    await assetReturn.click();
+    await expect(assetReturn).toBeChecked();
     await expect.poll(() => writes.some((item) => item.path.endsWith("/items/401"))).toBeTruthy();
-    expect(writes.find((item) => item.path.endsWith("/items/401"))?.body).toEqual({ is_checked: true, note: null });
     await page.getByRole("button", { name: "퇴직 확정", exact: true }).click();
     await expect(page.getByText("상태: 확정", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "퇴직 취소", exact: true }).click();
     await expect(page.getByText("상태: 취소", { exact: false })).toBeVisible();
-    expect(writes.filter((item) => item.path.includes("/confirm") || item.path.includes("/cancel"))).toEqual([
+    expect(writes).toEqual([
+      { method: "PUT", path: "/api/hr/retire/cases/301/items/401", body: { is_checked: true, note: null } },
       { method: "POST", path: "/api/hr/retire/cases/301/confirm", body: null },
       { method: "POST", path: "/api/hr/retire/cases/301/cancel", body: { cancel_reason: "테스트 취소 사유" } },
     ]);
@@ -189,18 +211,19 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
     const writes = await installHrRoutes(page);
     await page.goto("/hr/severance/calcs");
     await expectGridRow(page, EMPLOYEE.employee_no);
-    await page.locator('input[type="number"]').last().fill("1000");
+    const detailCard = page.getByText("퇴직금 산정 상세", { exact: true }).locator("xpath=../..");
+    await detailCard.locator('input[type="number"]').fill("1000");
     await page.getByPlaceholder("조정 사유를 입력해 주세요.").fill("정산 차이");
     await page.getByRole("button", { name: "조정액 저장", exact: true }).click();
     await expect(page.getByText("최종액 19,375,150", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "재산정", exact: true }).click();
     await page.getByRole("button", { name: "퇴직금 확정", exact: true }).click();
     await expect(page.getByText("상태 확정", { exact: false })).toBeVisible();
-    expect(writes).toEqual(expect.arrayContaining([
+    expect(writes).toEqual([
       { method: "PUT", path: "/api/hr/severance/calcs/501", body: { adjustment_amount: 1000, adjustment_reason: "정산 차이" } },
       { method: "POST", path: "/api/hr/severance/calcs/501/recalculate", body: null },
       { method: "POST", path: "/api/hr/severance/calcs/501/confirm", body: null },
-    ]));
+    ]);
   });
 
   test("급여 전표는 생성·확정·취소를 격리된 급여 route로 수행한다", async ({ page }) => {
@@ -254,7 +277,10 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
       await reply(route, list(items, url));
     });
     await page.goto("/wel/benefit-types");
-    await expect(page.getByText("2", { exact: true }).first()).toBeVisible();
+    const summaryCard = (title: string) => page.getByText(title, { exact: true }).locator("xpath=ancestor::div[contains(@class, 'border-border')][1]");
+    await expect(summaryCard("유형 수").getByText("2", { exact: true })).toBeVisible();
+    await expect(summaryCard("지급형 / 공제형").getByText("1 / 1", { exact: true })).toBeVisible();
+    await expect(summaryCard("활성 유형").getByText("1", { exact: true })).toBeVisible();
     await page.getByPlaceholder("코드, 유형명, 모듈 경로, 급여 항목").fill("식대");
     await page.getByRole("button", { name: "조회", exact: true }).first().click();
     await expectGridRow(page, "식대");
