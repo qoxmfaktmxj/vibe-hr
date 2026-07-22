@@ -109,11 +109,9 @@ def _item_period_contains_assignments(
     for assignment in assignments:
         if assignment.effective_from < effective_from:
             return False
-        if effective_to is None:
-            if assignment.effective_to is not None:
-                return False
-            continue
-        if assignment.effective_to is None or assignment.effective_to > effective_to:
+        if effective_to is not None and (
+            assignment.effective_to is None or assignment.effective_to > effective_to
+        ):
             return False
     return True
 

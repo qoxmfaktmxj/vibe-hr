@@ -217,10 +217,10 @@ def test_referenced_item_cannot_change_code_type_shrink_period_or_deactivate() -
         extended = update_mapping_type_item(
             session,
             referenced.id,
-            _patch_item(name="원가센터 B2", effective_to=date(2026, 12, 31)),
+            _patch_item(name="원가센터 B2", effective_to=None),
         )
         assert extended.name == "원가센터 B2"
-        assert extended.effective_to == date(2026, 12, 31)
+        assert extended.effective_to is None
 
         with pytest.raises(HTTPException, match="Referenced"):
             delete_mapping_type_item(session, referenced.id)
