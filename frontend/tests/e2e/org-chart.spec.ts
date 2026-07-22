@@ -48,5 +48,24 @@ test("chart saves Korean screenshot", async ({ page }) => {
   await page.goto("/org/chart");
   await expect(page.getByText("조직도관리")).toBeVisible();
   await expect(page.getByRole("link", { name: "조직코드관리에서 편집" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "본부" })).toBeVisible();
+  await expect(page.getByText("CC-100")).toBeVisible();
+  await page.screenshot({ path: "output/playwright/org-chart-ko.png", fullPage: true });
+});
+
+test("chart shows empty UI when backend returns 204", async ({ page }) => {
+  mkdirSync("output/playwright", { recursive: true });
+
+  await page.route("**/api/org/chart", async (route) => {
+    await route.fulfill({
+      status: 204,
+      contentType: "application/json",
+      body: "",
+    });
+  });
+
+  await page.goto("/org/chart");
+  await expect(page.getByText("조직도 데이터가 없습니다.")).toBeVisible();
+  await expect(page.getByText("조직코드관리에서 부서를 추가한 뒤 다시 확인하세요.")).toBeVisible();
   await page.screenshot({ path: "output/playwright/org-chart-ko.png", fullPage: true });
 });

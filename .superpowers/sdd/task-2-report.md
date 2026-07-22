@@ -17,3 +17,8 @@
 ## Notes
 - Playwright는 실제 DB가 없는 환경이라 8000번 포트에 검증용 mock backend를 띄워 로그인/메뉴 응답만 제공했다.
 - 스크린샷 파일은 `frontend/output/playwright/org-chart-ko.png`에 생성했다.
+
+## Follow-up
+- `frontend/src/components/org/org-chart-manager.tsx`에서 `204` 또는 빈 바디를 `departments: []`로 정규화했다.
+- `frontend/tests/e2e/org-chart.spec.ts`에 204 empty-state 회귀를 추가했다.
+- `npx playwright test tests/e2e/org-chart.spec.ts --workers=1`는 2개 테스트 모두 통과했다.

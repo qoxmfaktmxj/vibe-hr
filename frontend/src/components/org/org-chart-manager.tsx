@@ -170,10 +170,24 @@ export function OrgChartManager() {
       signal,
     });
 
+    if (response.status === 204) {
+      return { departments: [], total_count: 0, reference_date: null } as OrganizationChartResponse;
+    }
+
+    const body = await response.text();
+
+    if (!body.trim()) {
+      return { departments: [], total_count: 0, reference_date: null } as OrganizationChartResponse;
+    }
+
     if (!response.ok) {
-      const json = (await response.json().catch(() => null)) as
-        | { detail?: unknown; message?: unknown; error?: unknown }
-        | null;
+      const json = (() => {
+        try {
+          return JSON.parse(body) as { detail?: unknown; message?: unknown; error?: unknown } | null;
+        } catch {
+          return null;
+        }
+      })();
       const message =
         (typeof json?.detail === "string" && json.detail.trim()) ||
         (typeof json?.message === "string" && json.message.trim()) ||
@@ -182,7 +196,7 @@ export function OrgChartManager() {
       throw new Error(message);
     }
 
-    return (await response.json()) as OrganizationChartResponse;
+    return JSON.parse(body) as OrganizationChartResponse;
   }, []);
 
   const refreshChart = useCallback(
