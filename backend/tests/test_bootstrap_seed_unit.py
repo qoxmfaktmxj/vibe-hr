@@ -2,8 +2,12 @@ from datetime import date, datetime, timezone
 
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.bootstrap import _build_wel_benefit_request_seed_rows, ensure_payroll_detail_visual_samples
-from app.models import AuthUser, HrEmployee, OrgDepartment, PayVariableInput
+from app.bootstrap import (
+    _build_wel_benefit_request_seed_rows,
+    ensure_org_mapping_type_group,
+    ensure_payroll_detail_visual_samples,
+)
+from app.models import AppCodeGroup, AuthUser, HrEmployee, OrgDepartment, PayVariableInput
 
 
 def _utc_now() -> datetime:
@@ -52,6 +56,27 @@ def _seed_employee(session: Session, *, employee_no: str, display_name: str) -> 
     return employee
 
 
+def _seed_mapping_group(
+    session: Session,
+    *,
+    name: str,
+    description: str | None,
+    is_active: bool,
+    sort_order: int,
+) -> AppCodeGroup:
+    group = AppCodeGroup(
+        code="ORG_MAPPING_TYPE",
+        name=name,
+        description=description,
+        is_active=is_active,
+        sort_order=sort_order,
+    )
+    session.add(group)
+    session.commit()
+    session.refresh(group)
+    return group
+
+
 def test_build_welfare_seed_rows_follow_reference_month() -> None:
     rows = _build_wel_benefit_request_seed_rows(date(2026, 4, 15))
 
@@ -96,3 +121,66 @@ def test_ensure_payroll_detail_visual_samples_upserts_target_inputs() -> None:
         assert item_map[("KR-0004", "POS")].amount == 150_000.0
         assert item_map[("KR-0004", "OTX")].amount == 125_000.0
         assert item_map[("KR-0008", "NGT")].amount == 70_000.0
+
+
+def test_ensure_org_mapping_type_group_creates_missing_group() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        ensure_org_mapping_type_group(session)
+
+        group = session.exec(
+            select(AppCodeGroup).where(AppCodeGroup.code == "ORG_MAPPING_TYPE")
+        ).one()
+
+        assert group.name == "조직매핑유형"
+        assert group.description == "조직 매핑 유형"
+        assert group.is_active is True
+        assert group.sort_order == 7
+
+
+def test_ensure_org_mapping_type_group_updates_and_stays_idempotent() -> None:
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        group = _seed_mapping_group(
+            session,
+            name="잘못된 이름",
+            description="잘못된 설명",
+            is_active=False,
+            sort_order=99,
+        )
+
+        ensure_org_mapping_type_group(session)
+
+        updated = session.get(AppCodeGroup, group.id)
+        assert updated is not None
+        assert updated.name == "조직매핑유형"
+        assert updated.description == "조직 매핑 유형"
+        assert updated.is_active is True
+        assert updated.sort_order == 7
+
+        snapshot = (
+            updated.name,
+            updated.description,
+            updated.is_active,
+            updated.sort_order,
+            updated.created_at,
+            updated.updated_at,
+        )
+
+        ensure_org_mapping_type_group(session)
+
+        reloaded = session.get(AppCodeGroup, group.id)
+        assert reloaded is not None
+        assert (
+            reloaded.name,
+            reloaded.description,
+            reloaded.is_active,
+            reloaded.sort_order,
+            reloaded.created_at,
+            reloaded.updated_at,
+        ) == snapshot
+        assert session.exec(select(AppCodeGroup)).all() == [reloaded]

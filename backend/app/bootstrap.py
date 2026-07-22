@@ -3915,6 +3915,9 @@ def ensure_hr_recruitment_cycle_seed(session: Session) -> None:
             session.commit()
             session.refresh(item)
 
+        if order.status == "draft" and admin_user_id is not None:
+            confirm_appointment_order(session, order.id, admin_user_id)
+
 
 def ensure_org_mapping_type_group(session: Session) -> None:
     code, name, description, sort_order = MAPPING_TYPE_GROUP_SEED
@@ -3948,9 +3951,6 @@ def ensure_org_mapping_type_group(session: Session) -> None:
     if changed:
         session.add(group)
         session.commit()
-
-        if order.status == "draft" and admin_user_id is not None:
-            confirm_appointment_order(session, order.id, admin_user_id)
 
 
 def ensure_pay_welfare_allowance_definitions(session: Session) -> None:
