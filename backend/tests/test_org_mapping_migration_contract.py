@@ -87,3 +87,13 @@ def test_mapping_downgrade_reverse_order_is_explicit() -> None:
             'op.drop_table("org_mapping_type_items")',
         ],
     )
+
+
+def test_mapping_exclusion_constraints_are_explicit_in_source() -> None:
+    source = Path(__file__).resolve().parents[1] / "migrations" / "versions" / "org_mapping_foundation_20260722_add_mapping_tables.py"
+    text = source.read_text(encoding="utf-8")
+
+    assert "ex_org_mapping_type_items_period" in text
+    assert "ex_org_mapping_assignments_period" in text
+    assert text.count("EXCLUDE USING gist") == 2
+    assert text.count("daterange(effective_from, coalesce(effective_to, 'infinity'::date), '[]') WITH &&") == 2
