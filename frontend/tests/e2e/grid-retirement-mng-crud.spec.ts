@@ -1,7 +1,12 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 type JsonObject = Record<string, unknown>;
-type CapturedRequest = { method: string; path: string; body: JsonObject | null };
+type CapturedRequest = {
+  method: string;
+  path: string;
+  body: JsonObject | null;
+  createdIds?: number[];
+};
 
 const NOW = "2026-07-22T00:00:00.000Z";
 const COMPANY = { id: 1, company_name: "테스트 고객사" };
@@ -59,7 +64,8 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
     const path = url.pathname;
     const method = request.method();
     const body = await requestBody(route);
-    if (method !== "GET") captured.push({ method, path, body });
+    const capturedRequest: CapturedRequest | null = method !== "GET" ? { method, path, body } : null;
+    if (capturedRequest) captured.push(capturedRequest);
     if (method === "GET" && path.startsWith("/api/mng/dev-staff/")) readUrls?.push(request.url());
 
     if (path === "/api/mng/companies/dropdown") {
@@ -75,6 +81,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const id = Number(body?.id ?? nextId++);
+        capturedRequest!.createdIds = [id];
         const item = { ...body, id, company_name: COMPANY.company_name, created_at: NOW, updated_at: NOW };
         const index = inquiries.findIndex((entry) => entry.id === id);
         if (index >= 0) inquiries[index] = item;
@@ -92,6 +99,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const id = Number(body?.id ?? nextId++);
+        capturedRequest!.createdIds = [id];
         const item = { ...body, id, company_name: COMPANY.company_name, created_at: NOW, updated_at: NOW };
         const index = projects.findIndex((entry) => entry.id === id);
         if (index >= 0) projects[index] = item;
@@ -125,6 +133,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const id = Number(body?.id ?? nextId++);
+        capturedRequest!.createdIds = [id];
         const item = { ...body, id, company_name: COMPANY.company_name, created_at: NOW, updated_at: NOW };
         const index = requests.findIndex((entry) => entry.id === id);
         if (index >= 0) requests[index] = item;
@@ -143,6 +152,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const item = { ...body, id: nextId++, company_name: COMPANY.company_name, is_active: true, created_at: NOW, updated_at: NOW };
+        capturedRequest!.createdIds = [item.id];
         masters.unshift(item);
         await json(route, { master: item });
       }
@@ -162,6 +172,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
       else {
         const rows = (body?.rows as JsonObject[]) ?? [];
         const created = rows.map((row) => ({ ...row, id: nextId++, master_id: masterId, created_at: NOW, updated_at: NOW }));
+        capturedRequest!.createdIds = created.map((item) => item.id);
         configs.unshift(...created);
         await json(route, { items: created });
       }
@@ -176,6 +187,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const item = { ...body, id: nextId++, employee_name: EMPLOYEE.display_name, company_name: COMPANY.company_name, is_active: true, created_at: NOW, updated_at: NOW };
+        capturedRequest!.createdIds = [item.id];
         mappings.unshift(item);
         await json(route, { item });
       }
@@ -195,6 +207,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const id = Number(body?.id ?? nextId++);
+        capturedRequest!.createdIds = [id];
         const item = { ...body, id, employee_name: EMPLOYEE.display_name, employee_no: EMPLOYEE.employee_no, created_at: NOW, updated_at: NOW };
         const index = contracts.findIndex((entry) => entry.id === id);
         if (index >= 0) contracts[index] = item;
@@ -224,6 +237,7 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
         await json(route, { deleted_count: ids.length });
       } else {
         const item = { ...body, id: nextId++, created_at: NOW, updated_at: NOW };
+        capturedRequest!.createdIds = [item.id];
         attendances.unshift(item);
         await json(route, { attendance: item });
       }
@@ -246,6 +260,9 @@ async function installMngRoutes(page: Page, readUrls?: string[]): Promise<Captur
       return;
     }
 
+    if (method !== "GET") {
+      throw new Error(`Unexpected MNG domain write escaped fixture: ${method} ${path}`);
+    }
     await route.fallback();
   });
 
@@ -309,7 +326,9 @@ test.describe("MNG UI mutation contracts", () => {
     await page.locator(".ag-row").filter({ hasText: "프로젝트 수정 값" }).click();
     await page.getByRole("button", { name: "삭제", exact: true }).click();
     await expect.poll(() => captured.filter((entry) => entry.path === "/api/mng/dev-projects" && entry.method === "DELETE").length).toBe(1);
-    expect(captured.at(-1)?.body).toEqual({ ids: [expect.any(Number)] });
+    const deleted = captured.find((entry) => entry.path === "/api/mng/dev-projects" && entry.method === "DELETE");
+    expect(deleted?.body).toEqual({ ids: [expect.any(Number)] });
+    await expect(page.locator(".ag-row").filter({ hasText: "프로젝트 수정 값" })).toHaveCount(0);
   });
 
   test("추가 개발 요청은 실제 UI로 생성·수정·삭제한다", async ({ page }) => {
@@ -336,7 +355,9 @@ test.describe("MNG UI mutation contracts", () => {
     await page.getByRole("grid").first().getByRole("gridcell", { name: "요청 수정 값", exact: true }).click();
     await page.getByRole("button", { name: "삭제", exact: true }).click();
     await expect.poll(() => captured.filter((entry) => entry.path === "/api/mng/dev-requests" && entry.method === "DELETE").length).toBe(1);
-    expect(captured.at(-1)?.body).toEqual({ ids: [expect.any(Number)] });
+    const deleted = captured.find((entry) => entry.path === "/api/mng/dev-requests" && entry.method === "DELETE");
+    expect(deleted?.body).toEqual({ ids: [expect.any(Number)] });
+    await expect(page.locator(".ag-row").filter({ hasText: "요청 수정 값" })).toHaveCount(0);
   });
 
   test("인프라 마스터와 구성은 관계형 생성·삭제 요청을 만든다", async ({ page }) => {
@@ -346,19 +367,28 @@ test.describe("MNG UI mutation contracts", () => {
     await page.getByPlaceholder("서비스 구분").fill("mng-e2e-service");
     await page.getByRole("button", { name: "등록", exact: true }).click();
     await expectRow(page, "mng-e2e-service");
-    expect(captured.find((entry) => entry.path === "/api/mng/infra-masters" && entry.method === "POST")?.body).toEqual({ company_id: 1, service_type: "mng-e2e-service", env_type: "dev" });
+    const masterPost = captured.find((entry) => entry.path === "/api/mng/infra-masters" && entry.method === "POST");
+    expect(masterPost?.body).toEqual({ company_id: 1, service_type: "mng-e2e-service", env_type: "dev" });
+    const masterId = masterPost?.createdIds?.[0];
+    expect(masterId).toEqual(expect.any(Number));
 
     await page.getByPlaceholder("섹션").fill("app");
     await page.getByPlaceholder("키").fill("feature-x");
     await page.getByRole("button", { name: "구성 저장", exact: true }).click();
-    const configPost = captured.find((entry) => entry.path.startsWith("/api/mng/infra-configs/") && entry.method === "POST");
+    const configPost = captured.find((entry) => entry.path === `/api/mng/infra-configs/${masterId}` && entry.method === "POST");
     expect(configPost?.body).toEqual({ rows: [{ section: "app", config_key: "feature-x", config_value: null, sort_order: 0 }] });
+    const configId = configPost?.createdIds?.[0];
+    expect(configId).toEqual(expect.any(Number));
     await expect(page.getByRole("button", { name: "app/feature-x 삭제", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "app/feature-x 삭제", exact: true }).click();
-    await expect.poll(() => captured.some((entry) => entry.path.startsWith("/api/mng/infra-configs/item/") && entry.method === "DELETE")).toBeTruthy();
+    await expect.poll(() => captured.some((entry) => entry.path === `/api/mng/infra-configs/item/${configId}` && entry.method === "DELETE")).toBeTruthy();
+    expect(captured.find((entry) => entry.path === `/api/mng/infra-configs/item/${configId}` && entry.method === "DELETE")?.body).toBeNull();
+    await expect(page.getByRole("button", { name: "app/feature-x 삭제", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "테스트 고객사 / dev 삭제", exact: true }).click();
     await expect.poll(() => captured.some((entry) => entry.path === "/api/mng/infra-masters" && entry.method === "DELETE")).toBeTruthy();
+    expect(captured.find((entry) => entry.path === "/api/mng/infra-masters" && entry.method === "DELETE")?.body).toEqual({ ids: [masterId] });
+    await expect(page.locator(".ag-row").filter({ hasText: "mng-e2e-service" })).toHaveCount(0);
   });
 
   test("담당자 현황은 매핑 생성·삭제 요청을 만든다", async ({ page }) => {
@@ -369,29 +399,42 @@ test.describe("MNG UI mutation contracts", () => {
     await page.getByPlaceholder("비고").fill("담당자 매핑");
     await page.getByRole("button", { name: "등록", exact: true }).click();
     await expectRow(page, "테스트 담당자");
-    expect(captured.find((entry) => entry.path === "/api/mng/manager-status" && entry.method === "POST")?.body).toMatchObject({ employee_id: 7, company_id: 1, note: "담당자 매핑" });
+    const mappingPost = captured.find((entry) => entry.path === "/api/mng/manager-status" && entry.method === "POST");
+    expect(mappingPost?.body).toMatchObject({ employee_id: 7, company_id: 1, note: "담당자 매핑" });
+    const mappingId = mappingPost?.createdIds?.[0];
+    expect(mappingId).toEqual(expect.any(Number));
     await page.getByRole("button", { name: "테스트 담당자 삭제", exact: true }).click();
     await expect.poll(() => captured.some((entry) => entry.path === "/api/mng/manager-status" && entry.method === "DELETE")).toBeTruthy();
+    expect(captured.find((entry) => entry.path === "/api/mng/manager-status" && entry.method === "DELETE")?.body).toEqual({ ids: [mappingId] });
+    await expect(page.getByRole("button", { name: "테스트 담당자 삭제", exact: true })).toHaveCount(0);
   });
 
   test("외주 계약은 중복 확인 후 생성·수정·삭제한다", async ({ page }) => {
     const captured = await installMngRoutes(page);
     await page.goto("/mng/outsource-contracts");
     await page.getByRole("combobox").selectOption(String(EMPLOYEE.id));
-    await page.getByRole("button", { name: "날짜 선택" }).last().click();
+    const contractForm = page.locator("[data-slot='card']").filter({ has: page.getByText("계약 상세", { exact: true }) });
+    // 계약 종료일은 필수이므로 계약 상세 form 안의 두 번째 날짜 선택기를 사용한다.
+    await contractForm.getByRole("button", { name: "날짜 선택" }).nth(1).click();
     await page.locator(".rdp-day_button:not([disabled])").first().click();
     await page.getByPlaceholder("기본 연차 수").fill("12");
     await page.getByRole("button", { name: "저장", exact: true }).first().click();
     await expectRow(page, "테스트 담당자");
-    expect(captured.find((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "POST")?.body).toMatchObject({ employee_id: 7, total_leave_count: 12 });
+    const contractPost = captured.find((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "POST");
+    expect(contractPost?.body).toMatchObject({ employee_id: 7, total_leave_count: 12 });
+    const contractId = contractPost?.createdIds?.[0];
+    expect(contractId).toEqual(expect.any(Number));
 
     await page.locator(".ag-row").filter({ hasText: "테스트 담당자" }).click();
     await page.getByPlaceholder("기본 연차 수").fill("13");
     await page.getByRole("button", { name: "저장", exact: true }).first().click();
+    await expect.poll(() => captured.some((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "PUT")).toBeTruthy();
     expect(captured.find((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "PUT")?.body).toMatchObject({ id: expect.any(Number), total_leave_count: 13 });
     await page.locator(".ag-row").filter({ hasText: "테스트 담당자" }).click();
     await page.getByRole("button", { name: "삭제", exact: true }).click();
     await expect.poll(() => captured.some((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "DELETE")).toBeTruthy();
+    expect(captured.find((entry) => entry.path === "/api/mng/outsource-contracts" && entry.method === "DELETE")?.body).toEqual({ ids: [contractId] });
+    await expect(page.locator(".ag-row").filter({ hasText: "테스트 담당자" })).toHaveCount(0);
   });
 
   test("외주 근태는 선택된 계약에 생성·삭제 요청을 만든다", async ({ page }) => {
@@ -401,9 +444,14 @@ test.describe("MNG UI mutation contracts", () => {
     await page.getByPlaceholder("근태코드").fill("VAC");
     await page.getByRole("button", { name: "등록", exact: true }).click();
     await expect(page.getByRole("button", { name: "VAC 삭제", exact: true })).toBeVisible();
-    expect(captured.find((entry) => entry.path === "/api/mng/outsource-attendances" && entry.method === "POST")?.body).toMatchObject({ contract_id: 88, employee_id: 7, attendance_code: "VAC" });
+    const attendancePost = captured.find((entry) => entry.path === "/api/mng/outsource-attendances" && entry.method === "POST");
+    expect(attendancePost?.body).toMatchObject({ contract_id: 88, employee_id: 7, attendance_code: "VAC" });
+    const attendanceId = attendancePost?.createdIds?.[0];
+    expect(attendanceId).toEqual(expect.any(Number));
     await page.getByRole("button", { name: "VAC 삭제", exact: true }).click();
     await expect.poll(() => captured.some((entry) => entry.path === "/api/mng/outsource-attendances" && entry.method === "DELETE")).toBeTruthy();
+    expect(captured.find((entry) => entry.path === "/api/mng/outsource-attendances" && entry.method === "DELETE")?.body).toEqual({ ids: [attendanceId] });
+    await expect(page.getByRole("button", { name: "VAC 삭제", exact: true })).toHaveCount(0);
   });
 
   test("개발 인력 현황은 고객사 조회 GET만 수행한다", async ({ page }) => {
