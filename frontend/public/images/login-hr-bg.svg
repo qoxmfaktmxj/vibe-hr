@@ -1,46 +1,52 @@
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0f172a"/>
-      <stop offset="0.55" stop-color="#1d4ed8"/>
-      <stop offset="1" stop-color="#334155"/>
+    <radialGradient id="canvas" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1020 420) rotate(118) scale(1220 1600)">
+      <stop stop-color="#263C58"/>
+      <stop offset="0.54" stop-color="#18283D"/>
+      <stop offset="1" stop-color="#0C1524"/>
+    </radialGradient>
+    <radialGradient id="northernLight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(340 120) rotate(43) scale(730 410)">
+      <stop stop-color="#6E9AC6" stop-opacity="0.38"/>
+      <stop offset="0.48" stop-color="#47759F" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#47759F" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="southernLight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1640 910) rotate(-139) scale(610 360)">
+      <stop stop-color="#77A3A8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#77A3A8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="arc" x1="1440" y1="0" x2="1770" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A9C7DD" stop-opacity="0"/>
+      <stop offset="0.48" stop-color="#A9C7DD" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#A9C7DD" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(460 240) rotate(34) scale(520 320)">
-      <stop stop-color="#60a5fa" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="#60a5fa" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1520 820) rotate(12) scale(480 300)">
-      <stop stop-color="#a5b4fc" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#a5b4fc" stop-opacity="0"/>
-    </radialGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" stroke="#B8C8D8" stroke-opacity="0.1"/>
+    </pattern>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <linearGradient id="fadeGrid" x1="0" y1="1080" x2="1920" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D6E4EE" stop-opacity="0.2"/>
+      <stop offset="0.54" stop-color="#D6E4EE" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#D6E4EE" stop-opacity="0"/>
+    </linearGradient>
   </defs>
 
-  <rect width="1920" height="1080" fill="url(#bg)"/>
-  <rect width="1920" height="1080" fill="url(#glowA)"/>
-  <rect width="1920" height="1080" fill="url(#glowB)"/>
+  <rect width="1920" height="1080" fill="url(#canvas)"/>
+  <rect width="1920" height="1080" fill="url(#northernLight)"/>
+  <rect width="1920" height="1080" fill="url(#southernLight)"/>
+  <rect width="1920" height="1080" fill="url(#grid)" opacity="0.5"/>
+  <path d="M1470 -120C1260 210 1320 740 1740 1180" stroke="url(#arc)" stroke-width="182"/>
+  <path d="M-90 1000C370 660 760 890 1070 630C1370 380 1530 290 2010 480" stroke="url(#fadeGrid)" stroke-width="1.5"/>
 
-  <g opacity="0.18" stroke="#E2E8F0" stroke-width="1">
-    <path d="M120 920L500 520L860 780L1280 420L1760 700"/>
-    <path d="M160 860L540 460L900 720L1320 360L1800 640"/>
-    <path d="M100 980L480 580L840 840L1260 480L1740 760"/>
+  <g fill="#DDEBF3">
+    <circle cx="168" cy="836" r="3" opacity="0.42"/>
+    <circle cx="242" cy="780" r="2" opacity="0.26"/>
+    <circle cx="1210" cy="190" r="3" opacity="0.24"/>
+    <circle cx="1528" cy="360" r="2" opacity="0.36"/>
+    <circle cx="1742" cy="744" r="4" opacity="0.3"/>
   </g>
 
-  <g opacity="0.22" fill="#F8FAFC">
-    <circle cx="420" cy="500" r="6"/>
-    <circle cx="860" cy="780" r="6"/>
-    <circle cx="1280" cy="420" r="6"/>
-    <circle cx="1760" cy="700" r="6"/>
-  </g>
-
-  <g opacity="0.16" fill="#DBEAFE">
-    <rect x="240" y="180" width="420" height="220" rx="20"/>
-    <rect x="300" y="250" width="300" height="14" rx="7"/>
-    <rect x="300" y="282" width="220" height="14" rx="7"/>
-    <rect x="300" y="314" width="260" height="14" rx="7"/>
-
-    <rect x="1260" y="680" width="420" height="220" rx="20"/>
-    <rect x="1320" y="750" width="300" height="14" rx="7"/>
-    <rect x="1320" y="782" width="220" height="14" rx="7"/>
-    <rect x="1320" y="814" width="260" height="14" rx="7"/>
-  </g>
+  <rect width="1920" height="1080" filter="url(#grain)" opacity="0.045"/>
 </svg>
