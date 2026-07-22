@@ -9,6 +9,7 @@ from app.models import (
     HrAnnualLeave,
     HrEmployee,
     HrEmployeeBasicProfile,
+    HrRetireCase,
     HrRetireChecklistItem,
     MngCompany,
     MngDevInquiry,
@@ -386,10 +387,14 @@ def test_retire_case_cancellation_restores_employee_status_and_retire_date() -> 
         )
         assert cancelled.status == "cancelled"
         session.expire_all()
+        persisted_case = session.get(HrRetireCase, created.id)
         persisted_employee = session.get(HrEmployee, employee.id)
         profile = session.exec(
             select(HrEmployeeBasicProfile).where(HrEmployeeBasicProfile.employee_id == employee.id),
         ).first()
+        assert persisted_case is not None
+        assert persisted_case.status == "cancelled"
+        assert persisted_case.cancel_reason == "격리 테스트 취소"
         assert persisted_employee is not None and persisted_employee.employment_status == "active"
         assert profile is not None and profile.retire_date is None
 
