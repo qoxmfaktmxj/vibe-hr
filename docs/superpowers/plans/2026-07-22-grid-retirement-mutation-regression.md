@@ -271,4 +271,3 @@ Confirm the diff contains only the new test files, this plan, and the ledger ent
 - [ ] **Step 3: Record evidence**
 
 Append a completed R1 entry to `docs/TASK_LEDGER.md` listing test counts, commands, the 12 mutation-capable/3 read-only classification, and the fact that backend mutations used disposable SQLite while Playwright workflow mutations were route-isolated.
-
