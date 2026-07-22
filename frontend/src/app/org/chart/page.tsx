@@ -1,9 +1,8 @@
 import { requireMenuAccess } from "@/lib/guard";
+import { OrgChartManager } from "@/components/org/org-chart-manager";
 
 export default async function Page() {
   await requireMenuAccess("/org/chart");
 
-  return (
-      <div className="p-6 text-sm text-muted-foreground">조직도관리 화면 준비 완료. 다음 단계에서 상세 기능을 연결합니다.</div>
-  );
+  return <OrgChartManager />;
 }

@@ -21,6 +21,12 @@ export type OrganizationDepartmentListResponse = {
   limit?: number | null;
 };
 
+export type OrganizationChartResponse = {
+  departments: OrganizationDepartmentItem[];
+  total_count?: number | null;
+  reference_date?: string | null;
+};
+
 export type OrganizationDepartmentDetailResponse = {
   department: OrganizationDepartmentItem;
 };
