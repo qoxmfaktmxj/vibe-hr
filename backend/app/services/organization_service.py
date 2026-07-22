@@ -112,6 +112,12 @@ def list_departments(
     )
 
 
+def list_chart_departments(
+    session: Session,
+) -> tuple[list[OrganizationDepartmentItem], int]:
+    return list_departments(session)
+
+
 def create_department(
     session: Session,
     payload: OrganizationDepartmentCreateRequest,

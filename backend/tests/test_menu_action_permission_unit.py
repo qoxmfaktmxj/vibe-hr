@@ -8,7 +8,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.api.common_code import code_group_create, code_groups
 from app.api.employee import employee_batch_save, employee_list
-from app.api.organization import organization_department_create, organization_departments
+from app.api.organization import organization_chart, organization_department_create, organization_departments
 from app.models import AppMenu, AppMenuAction, AppMenuRole, AppRoleMenuAction, AuthRole, AuthUser, AuthUserRole
 from app.schemas.common_code import CodeGroupCreateRequest
 from app.schemas.employee import EmployeeBatchRequest
@@ -237,6 +237,29 @@ def test_organization_department_create_denies_when_save_permission_is_missing()
         with pytest.raises(HTTPException) as exc_info:
             organization_department_create(
                 OrganizationDepartmentCreateRequest(code="D001", name="조직1"),
+                session=session,
+                current_user=user,
+            )
+
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.detail == "Action not allowed."
+
+
+def test_organization_chart_denies_when_query_permission_is_missing() -> None:
+    engine = create_engine("sqlite://")
+    _create_permission_tables(engine)
+
+    with Session(engine) as session:
+        user = _seed_permission_context(
+            session,
+            menu_code="org.chart",
+            path="/org/chart",
+            role_code="hr_manager",
+            allow_query=False,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            organization_chart(
                 session=session,
                 current_user=user,
             )

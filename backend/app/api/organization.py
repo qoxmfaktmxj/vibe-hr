@@ -19,6 +19,7 @@ from app.schemas.organization import (
     OrgRestructurePlanItemUpdateRequest,
     OrgRestructurePlanListResponse,
     OrgRestructurePlanUpdateRequest,
+    OrganizationChartResponse,
     OrganizationCorporationCreateRequest,
     OrganizationCorporationDetailResponse,
     OrganizationCorporationListResponse,
@@ -45,6 +46,7 @@ from app.services.organization_service import (
     create_department,
     delete_corporation,
     delete_department,
+    list_chart_departments,
     list_corporations,
     list_departments,
     update_corporation,
@@ -186,6 +188,20 @@ def organization_departments(
         page=page,
         limit=limit,
     )
+
+
+@router.get(
+    "/chart",
+    response_model=OrganizationChartResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def organization_chart(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrganizationChartResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/chart", action_code="query")
+    departments, total_count = list_chart_departments(session)
+    return OrganizationChartResponse(departments=departments, total_count=total_count)
 
 
 @router.post(

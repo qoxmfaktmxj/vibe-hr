@@ -28,6 +28,11 @@ class OrganizationDepartmentListResponse(BaseModel):
     limit: int | None = None
 
 
+class OrganizationChartResponse(BaseModel):
+    departments: list[OrganizationDepartmentItem]
+    total_count: int
+
+
 class OrganizationDepartmentDetailResponse(BaseModel):
     department: OrganizationDepartmentItem
 
