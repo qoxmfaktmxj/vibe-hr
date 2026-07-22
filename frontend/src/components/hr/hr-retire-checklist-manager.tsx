@@ -2,20 +2,22 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import type { HrRetireChecklistItem } from "@/types/hr-retire";
+import { fetcher } from "@/lib/fetcher";
+import type { HrRetireChecklistItem, HrRetireChecklistListResponse } from "@/types/hr-retire";
 import { parseError } from "./hr-retire-shared";
-
-const BASE_URL = "/api/hr/retire/checklist";
 
 type ChecklistGridRow = HrRetireChecklistItem & ReadonlyGridRow;
 
@@ -24,6 +26,8 @@ export function HrRetireChecklistManager() {
   const [appliedKeyword, setAppliedKeyword] = useState("");
   const [activeFilterInput, setActiveFilterInput] = useState("all");
   const [appliedActiveFilter, setAppliedActiveFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   const [newChecklistCode, setNewChecklistCode] = useState("");
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
@@ -33,28 +37,37 @@ export function HrRetireChecklistManager() {
   const [newChecklistSortOrder, setNewChecklistSortOrder] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { mutate: globalMutate } = useSWRConfig();
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      include_inactive: "true",
+      page: String(page),
+      limit: String(pageSize),
+    });
+    return `/api/hr/retire/checklist?${params.toString()}`;
+  }, [page]);
 
-  async function refreshList() {
-    await globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL));
-  }
+  const { data, mutate, isLoading } = useSWR<HrRetireChecklistListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
 
-  // Client-side filter applied after fetch (same as before: only the current
-  // page's fetched rows are searched/filtered, not the full server-side set).
-  const transformRows = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const keyword = appliedKeyword.trim().toLowerCase();
-    return (rows: ChecklistGridRow[]) =>
-      rows.filter((row) => {
-        if (appliedActiveFilter === "active" && !row.is_active) return false;
-        if (appliedActiveFilter === "inactive" && row.is_active) return false;
-        if (!keyword) return true;
-        return (
-          row.code.toLowerCase().includes(keyword) ||
-          row.title.toLowerCase().includes(keyword) ||
-          (row.description ?? "").toLowerCase().includes(keyword)
-        );
-      });
-  }, [appliedActiveFilter, appliedKeyword]);
+    return (data?.items ?? []).filter((item) => {
+      if (appliedActiveFilter === "active" && !item.is_active) return false;
+      if (appliedActiveFilter === "inactive" && item.is_active) return false;
+      if (!keyword) return true;
+      return (
+        item.code.toLowerCase().includes(keyword) ||
+        item.title.toLowerCase().includes(keyword) ||
+        (item.description ?? "").toLowerCase().includes(keyword)
+      );
+    });
+  }, [appliedActiveFilter, appliedKeyword, data?.items]);
+
+  const rowData = useMemo<ChecklistGridRow[]>(
+    () => createReadonlyGridRows(filteredItems),
+    [filteredItems],
+  );
 
   async function handleCreateChecklist() {
     if (!newChecklistCode.trim() || !newChecklistTitle.trim()) {
@@ -70,7 +83,7 @@ export function HrRetireChecklistManager() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/hr/retire/checklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,7 +105,7 @@ export function HrRetireChecklistManager() {
       setNewChecklistRequired(true);
       setNewChecklistActive(true);
       setNewChecklistSortOrder("0");
-      await refreshList();
+      await mutate();
       toast.success("체크리스트 항목을 등록했습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "체크리스트 항목 등록에 실패했습니다.");
@@ -124,20 +137,8 @@ export function HrRetireChecklistManager() {
   );
 
   return (
-    <VibeGrid<HrRetireChecklistItem>
-      registryKey="hr.retire.checklist"
+    <ReadonlyGridManager<ChecklistGridRow>
       title="퇴직 체크리스트 관리"
-      variant="readonly"
-      columns={columnDefs}
-      fetchUrl={`${BASE_URL}?include_inactive=true`}
-      transformRows={transformRows}
-      pageSize={50}
-      downloadFileName="hr-retire-checklist"
-      emptyText="등록된 퇴직 체크리스트가 없습니다."
-      onQueryStart={() => {
-        setAppliedKeyword(keywordInput);
-        setAppliedActiveFilter(activeFilterInput);
-      }}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[1fr_160px]">
           <SearchTextField
@@ -157,7 +158,7 @@ export function HrRetireChecklistManager() {
         </SearchFieldGrid>
       }
       beforeGrid={
-        <Card>
+        <Card className="border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm text-foreground">체크리스트 항목 등록</CardTitle>
           </CardHeader>
@@ -213,6 +214,25 @@ export function HrRetireChecklistManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={appliedKeyword || appliedActiveFilter !== "all" ? filteredItems.length : (data?.total_count ?? 0)}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedKeyword(keywordInput);
+        setAppliedActiveFilter(activeFilterInput);
+        void mutate();
+      }}
+      queryDisabled={isLoading || isSubmitting}
+      loading={isLoading}
+      emptyText="등록된 퇴직 체크리스트가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

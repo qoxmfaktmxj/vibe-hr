@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid, type VibeGridListResponse } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
 import { Button } from "@/components/ui/button";
@@ -21,8 +24,6 @@ import type {
   MngOutsourceAttendanceSummaryItem,
   MngOutsourceAttendanceSummaryResponse,
 } from "@/types/mng";
-
-const BASE_URL = "/api/mng/outsource-attendances";
 
 type AttendanceForm = {
   attendance_code: string;
@@ -50,19 +51,20 @@ export function OutsourceAttendanceManager() {
   const [selectedContractId, setSelectedContractId] = useState<number | null>(null);
   const [form, setForm] = useState<AttendanceForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { mutate: globalMutate } = useSWRConfig();
+  const summaryQuery = useMemo(
+    () => `/api/mng/outsource-attendances?page=${page}&limit=${pageSize}`,
+    [page],
+  );
 
-  // afterGrid needs the selected contract's summary row (employee_id for the
-  // save payload) outside any row-click callback. VibeGrid's internal fetch
-  // is not exposed to the parent, so a dedicated fetch at the API's max
-  // limit (200) keeps this decoupled from VibeGrid's own pagination state.
-  const { data: allSummaryData, mutate: mutateAllSummary } = useSWR<MngOutsourceAttendanceSummaryResponse>(
-    `${BASE_URL}?page=1&limit=200`,
+  const { data: summaryData, mutate: mutateSummary, isLoading } = useSWR<MngOutsourceAttendanceSummaryResponse>(
+    summaryQuery,
     fetcher,
     { revalidateOnFocus: false },
   );
-  const summaryItems = useMemo(() => allSummaryData?.items ?? [], [allSummaryData?.items]);
+  const summaryItems = useMemo(() => summaryData?.items ?? [], [summaryData?.items]);
 
   useEffect(() => {
     if (!selectedContractId && summaryItems.length > 0) {
@@ -75,7 +77,7 @@ export function OutsourceAttendanceManager() {
     [selectedContractId, summaryItems],
   );
 
-  const detailEndpoint = selectedContractId ? `${BASE_URL}/${selectedContractId}` : null;
+  const detailEndpoint = selectedContractId ? `/api/mng/outsource-attendances/${selectedContractId}` : null;
   const { data: detailData, mutate: mutateDetail } = useSWR<MngOutsourceAttendanceListResponse>(
     detailEndpoint,
     fetcher,
@@ -83,26 +85,16 @@ export function OutsourceAttendanceManager() {
   );
   const details = detailData?.items ?? [];
 
-  async function refreshAll() {
-    await Promise.all([
-      globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL)),
-      mutateAllSummary(),
-      mutateDetail(),
-    ]);
-  }
-
-  // API rows key on `contract_id`, not `id` — VibeGrid rows require `id`.
-  const fetchAdapter = (
-    json: unknown,
-  ): VibeGridListResponse<MngOutsourceAttendanceSummaryItem & { id: number }> => {
-    const response = json as MngOutsourceAttendanceSummaryResponse;
-    return {
-      items: response.items.map((item) => ({ ...item, id: item.contract_id })),
-      total_count: response.total_count,
-      page: response.page,
-      limit: response.limit,
-    };
-  };
+  const rowData = useMemo<AttendanceSummaryGridRow[]>(
+    () =>
+      createReadonlyGridRows(
+        summaryItems.map((item) => ({
+          ...item,
+          id: item.contract_id,
+        })),
+      ),
+    [summaryItems],
+  );
 
   const summaryColumnDefs = useMemo<ColDef<AttendanceSummaryGridRow>[]>(
     () => [
@@ -140,7 +132,7 @@ export function OutsourceAttendanceManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/outsource-attendances", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -160,7 +152,7 @@ export function OutsourceAttendanceManager() {
 
       toast.success("등록되었습니다.");
       setForm(EMPTY_FORM);
-      await refreshAll();
+      await Promise.all([mutateDetail(), mutateSummary()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -173,7 +165,7 @@ export function OutsourceAttendanceManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/outsource-attendances", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [item.id] }),
@@ -182,7 +174,7 @@ export function OutsourceAttendanceManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await refreshAll();
+      await Promise.all([mutateDetail(), mutateSummary()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -191,18 +183,8 @@ export function OutsourceAttendanceManager() {
   }
 
   return (
-    <VibeGrid<MngOutsourceAttendanceSummaryItem & { id: number }>
-      registryKey="mng.outsource-attendance"
+    <ReadonlyGridManager<AttendanceSummaryGridRow>
       title="외주 근태 현황"
-      variant="readonly"
-      columns={summaryColumnDefs}
-      fetchUrl={BASE_URL}
-      fetchAdapter={fetchAdapter}
-      pageSize={50}
-      downloadFileName="mng-outsource-attendance"
-      emptyText="외주 근태 요약 데이터가 없습니다."
-      onRowClick={(row) => setSelectedContractId(row.contract_id)}
-      selectedRowId={selectedContractId}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
           <div className="flex items-center text-sm text-muted-foreground">
@@ -295,6 +277,25 @@ export function OutsourceAttendanceManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={summaryColumnDefs}
+      totalCount={summaryData?.total_count ?? 0}
+      page={summaryData?.page ?? page}
+      pageSize={summaryData?.limit ?? pageSize}
+      selectedRowId={selectedContractId}
+      onRowClick={(row) => setSelectedContractId(row.contract_id)}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        void mutateSummary();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="외주 근태 요약 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

@@ -3,15 +3,20 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ColDef } from "ag-grid-community";
+import useSWR from "swr";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { TimAttendanceDailyItem } from "@/types/tim";
+import { fetcher } from "@/lib/fetcher";
+import type { TimAttendanceDailyItem, TimAttendanceDailyListResponse } from "@/types/tim";
 
-type AttendanceRow = TimAttendanceDailyItem & ReadonlyGridRow;
+type AttendanceStatusGridRow = TimAttendanceDailyItem & ReadonlyGridRow;
 
 const STATUS_LABELS: Record<string, string> = {
   present: "정상출근",
@@ -32,17 +37,32 @@ export function AttendanceStatusManager() {
     status: "",
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const fetchUrl = useMemo(() => {
+  const query = useMemo(() => {
     const params = new URLSearchParams({
       start_date: appliedFilters.startDate,
       end_date: appliedFilters.endDate,
+      page: String(page),
+      limit: String(pageSize),
     });
-    if (appliedFilters.status) params.set("status", appliedFilters.status);
+    if (appliedFilters.status) {
+      params.set("status", appliedFilters.status);
+    }
     return `/api/tim/attendance-daily?${params.toString()}`;
-  }, [appliedFilters]);
+  }, [appliedFilters, page]);
 
-  const columns = useMemo<ColDef<AttendanceRow>[]>(
+  const { data, isLoading, mutate } = useSWR<TimAttendanceDailyListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const rowData = useMemo<AttendanceStatusGridRow[]>(
+    () => createReadonlyGridRows(data?.items ?? []),
+    [data?.items],
+  );
+
+  const columnDefs = useMemo<ColDef<AttendanceStatusGridRow>[]>(
     () => [
       { field: "employee_no", headerName: "사번", width: 120 },
       { field: "employee_name", headerName: "이름", width: 120 },
@@ -53,46 +73,33 @@ export function AttendanceStatusManager() {
         headerName: "출근",
         width: 120,
         valueFormatter: (params) =>
-          params.value
-            ? new Date(params.value as string).toLocaleTimeString("ko-KR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "-",
+          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-",
       },
       {
         field: "check_out_at",
         headerName: "퇴근",
         width: 120,
         valueFormatter: (params) =>
-          params.value
-            ? new Date(params.value as string).toLocaleTimeString("ko-KR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            : "-",
+          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-",
       },
       {
         field: "attendance_status",
         headerName: "상태",
         width: 120,
-        valueFormatter: (params) =>
-          STATUS_LABELS[String(params.value ?? "")] ?? String(params.value ?? ""),
+        valueFormatter: (params) => STATUS_LABELS[String(params.value ?? "")] ?? params.value,
       },
       {
         headerName: "정정",
         width: 110,
         sortable: false,
         filter: false,
-        cellRenderer: (params: { data?: AttendanceRow }) => {
+        cellRenderer: (params: { data?: AttendanceStatusGridRow }) => {
           if (!params.data) return null;
           return (
             <Button
               size="sm"
               variant="outline"
-              onClick={() =>
-                router.push(`/tim/correction?attendance_id=${params.data!.id}`)
-              }
+              onClick={() => router.push(`/tim/correction?attendance_id=${params.data!.id}`)}
             >
               정정
             </Button>
@@ -104,38 +111,24 @@ export function AttendanceStatusManager() {
   );
 
   return (
-    <VibeGrid<TimAttendanceDailyItem>
-      registryKey="tim.attendance-status"
+    <ReadonlyGridManager<AttendanceStatusGridRow>
       title="근태 현황"
-      variant="readonly"
-      columns={columns}
-      fetchUrl={fetchUrl}
-      pageSize={50}
-      emptyText="조회된 근태 데이터가 없습니다."
-      downloadFileName="attendance-status"
-      onQueryStart={() => setAppliedFilters(filters)}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-4">
           <Input
             type="date"
             value={filters.startDate}
-            onChange={(event) =>
-              setFilters((prev) => ({ ...prev, startDate: event.target.value }))
-            }
+            onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
           />
           <Input
             type="date"
             value={filters.endDate}
-            onChange={(event) =>
-              setFilters((prev) => ({ ...prev, endDate: event.target.value }))
-            }
+            onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
           />
           <select
             className="h-9 rounded-md border border-border bg-background px-3 text-sm"
             value={filters.status}
-            onChange={(event) =>
-              setFilters((prev) => ({ ...prev, status: event.target.value }))
-            }
+            onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
           >
             <option value="">전체 상태</option>
             <option value="present">정상출근</option>
@@ -149,6 +142,24 @@ export function AttendanceStatusManager() {
           </div>
         </SearchFieldGrid>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedFilters(filters);
+        void mutate();
+      }}
+      queryDisabled={isLoading}
+      loading={isLoading}
+      emptyText="조회된 근태 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

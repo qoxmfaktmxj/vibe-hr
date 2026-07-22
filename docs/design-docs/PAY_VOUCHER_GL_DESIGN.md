@@ -87,7 +87,7 @@ GET                /api/v1/pay/vouchers/mapping-gaps ?run_id=   # 매핑 누락 
 
 액션 권한: menu/action permission 체계 준수 (query/save + confirm은 서버 검증 필수).
 
-## 7. 화면 (3개 — VibeGrid 기반)
+## 7. 화면 (3개 — ReadonlyGridManager / AG Grid 기반)
 
 | registryKey | variant | 내용 |
 |---|---|---|

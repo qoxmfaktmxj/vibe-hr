@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
 import { Button } from "@/components/ui/button";
@@ -20,8 +23,6 @@ import type {
   MngInfraMasterItem,
   MngInfraMasterListResponse,
 } from "@/types/mng";
-
-const BASE_URL = "/api/mng/infra-masters";
 
 type MasterForm = {
   company_id: string;
@@ -56,23 +57,25 @@ export function InfraConfigManager() {
   const [configForm, setConfigForm] = useState<ConfigForm>(EMPTY_CONFIG_FORM);
   const [selectedMasterId, setSelectedMasterId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { mutate: globalMutate } = useSWRConfig();
+  const masterQuery = useMemo(
+    () => `/api/mng/infra-masters?page=${page}&limit=${pageSize}`,
+    [page],
+  );
+
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
-  const companies = companyData?.companies ?? [];
-
-  // afterGrid's per-master delete buttons and the "selected master" label
-  // need the full loaded set outside any row-click callback. VibeGrid's
-  // internal fetch is not exposed to the parent, so a dedicated fetch at the
-  // API's max limit (200) keeps this decoupled from VibeGrid's pagination.
-  const { data: allMasterData, mutate: mutateAllMasters } = useSWR<MngInfraMasterListResponse>(
-    `${BASE_URL}?page=1&limit=200`,
+  const { data: masterData, mutate: mutateMasters, isLoading } = useSWR<MngInfraMasterListResponse>(
+    masterQuery,
     fetcher,
-    { revalidateOnFocus: false },
+    {
+      revalidateOnFocus: false,
+    },
   );
-  const masters = useMemo(() => allMasterData?.items ?? [], [allMasterData?.items]);
+  const masters = useMemo(() => masterData?.items ?? [], [masterData?.items]);
 
   useEffect(() => {
     if (!selectedMasterId && masters.length > 0) {
@@ -91,12 +94,8 @@ export function InfraConfigManager() {
     [masters, selectedMasterId],
   );
 
-  async function refreshMasters() {
-    await Promise.all([
-      globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL)),
-      mutateAllMasters(),
-    ]);
-  }
+  const companies = companyData?.companies ?? [];
+  const rowData = useMemo<InfraMasterGridRow[]>(() => createReadonlyGridRows(masters), [masters]);
 
   const masterColumnDefs = useMemo<ColDef<InfraMasterGridRow>[]>(
     () => [
@@ -130,7 +129,7 @@ export function InfraConfigManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/infra-masters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -144,7 +143,7 @@ export function InfraConfigManager() {
 
       toast.success("인프라 마스터가 등록되었습니다.");
       setMasterForm(EMPTY_MASTER_FORM);
-      await refreshMasters();
+      await mutateMasters();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -157,7 +156,7 @@ export function InfraConfigManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/infra-masters", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [item.id] }),
@@ -169,7 +168,7 @@ export function InfraConfigManager() {
       if (selectedMasterId === item.id) {
         setSelectedMasterId(null);
       }
-      await Promise.all([refreshMasters(), mutateConfigs()]);
+      await Promise.all([mutateMasters(), mutateConfigs()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -236,17 +235,8 @@ export function InfraConfigManager() {
   }
 
   return (
-    <VibeGrid<MngInfraMasterItem>
-      registryKey="mng.infra"
+    <ReadonlyGridManager<InfraMasterGridRow>
       title="인프라 구성관리"
-      variant="readonly"
-      columns={masterColumnDefs}
-      fetchUrl={BASE_URL}
-      pageSize={50}
-      downloadFileName="mng-infra"
-      emptyText="인프라 마스터 데이터가 없습니다."
-      onRowClick={(row) => setSelectedMasterId(row.id)}
-      selectedRowId={selectedMasterId}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-1">
           <div className="flex items-center text-sm text-muted-foreground">
@@ -369,6 +359,25 @@ export function InfraConfigManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={masterColumnDefs}
+      totalCount={masterData?.total_count ?? 0}
+      page={masterData?.page ?? page}
+      pageSize={masterData?.limit ?? pageSize}
+      selectedRowId={selectedMasterId}
+      onRowClick={(row) => setSelectedMasterId(row.id)}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        void mutateMasters();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="인프라 마스터 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

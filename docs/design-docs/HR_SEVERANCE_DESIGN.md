@@ -64,7 +64,7 @@ POST /api/v1/hr/severance/calcs/{id}/confirm
 GET/POST /api/v1/pay/severance-item-rules  (+batch)
 ```
 
-## 6. 화면 (2개 — VibeGrid)
+## 6. 화면 (2개 — ReadonlyGridManager / AG Grid)
 
 | registryKey | variant | 내용 |
 |---|---|---|

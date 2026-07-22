@@ -5,8 +5,11 @@ import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,8 +55,30 @@ async function parseError(response: Response, fallback: string): Promise<string>
   }
 }
 
+async function downloadRowsAsXlsx(rows: VoucherRow[], columns: ColDef<VoucherRow>[]) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const value = column.field ? row[column.field as keyof VoucherRow] : "";
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: VoucherRow }) => string)({
+          value,
+          data: row,
+        });
+      }
+      return value ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, utils.aoa_to_sheet([headers, ...data]), "급여 전표 목록");
+  writeFileXLSX(workbook, `payroll-vouchers-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 export function PayVoucherManager() {
   const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -68,6 +93,10 @@ export function PayVoucherManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+  const pageSize = 50;
+  const pagedVoucherKey = `/api/pay/vouchers?page=${page}&limit=${pageSize}`;
+  const { data: pagedVoucherData, isLoading: isPagedVoucherLoading, mutate: mutatePagedVouchers } =
+    useSWR<PayVoucherListResponse>(pagedVoucherKey, fetcher, { revalidateOnFocus: false });
 
   async function mutateAllVoucherLists() {
     await mutateVouchers();
@@ -83,6 +112,10 @@ export function PayVoucherManager() {
 
   const runs = useMemo(() => runData?.items ?? [], [runData?.items]);
   const voucherItems = useMemo(() => voucherData?.items ?? [], [voucherData?.items]);
+  const voucherRows = useMemo<VoucherRow[]>(
+    () => createReadonlyGridRows(pagedVoucherData?.items ?? []),
+    [pagedVoucherData?.items],
+  );
   const firstVoucherId = voucherItems[0]?.id ?? null;
 
   const selectedRun = useMemo(
@@ -292,16 +325,22 @@ export function PayVoucherManager() {
         </CardContent>
       </Card>
 
-      <VibeGrid<PayVoucherItem>
-        registryKey="payroll.vouchers"
+      <ReadonlyGridManager<VoucherRow>
         title="급여 전표 목록"
-        description="생성된 급여 전표 목록. 행을 클릭하면 아래에서 상세 라인과 확정/취소 처리를 할 수 있습니다."
-        variant="readonly"
-        columns={voucherColumns}
-        fetchUrl="/api/pay/vouchers"
-        pageSize={50}
+        searchFields={null}
+        rowData={voucherRows}
+        columnDefs={voucherColumns}
+        totalCount={pagedVoucherData?.total_count ?? 0}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onQuery={() => {
+          setPage(1);
+          void mutatePagedVouchers();
+        }}
+        onDownload={() => void downloadRowsAsXlsx(voucherRows, voucherColumns)}
+        loading={isPagedVoucherLoading}
         emptyText="등록된 급여 전표가 없습니다."
-        downloadFileName="payroll-vouchers"
         onRowClick={(row) => setSelectedVoucherId(row.id as number)}
         selectedRowId={selectedVoucherId}
       />
@@ -417,3 +456,7 @@ export function PayVoucherManager() {
     </div>
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

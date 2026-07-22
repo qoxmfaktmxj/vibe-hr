@@ -31,7 +31,7 @@ const ROUTES = [
   "/payroll/vouchers",
   "/hr/severance/calcs",
   "/payroll/severance-item-rules",
-  // VibeGrid v2 Wave 1 re-conversion (docs/VIBE_GRID_ROADMAP.md)
+  // ReadonlyGridManager 직접 연결 회귀 범위
   "/mng/dev-inquiries",
   "/mng/dev-projects",
   "/mng/dev-requests",

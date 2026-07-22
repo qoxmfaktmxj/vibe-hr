@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,9 +17,11 @@ import { CustomDatePicker } from "@/components/ui/custom-date-picker";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
-import type { MngCompanyDropdownResponse, MngDevInquiryItem } from "@/types/mng";
-
-const BASE_URL = "/api/mng/dev-inquiries";
+import type {
+  MngCompanyDropdownResponse,
+  MngDevInquiryItem,
+  MngDevInquiryListResponse,
+} from "@/types/mng";
 
 type InquiryForm = {
   id: number | null;
@@ -69,28 +74,30 @@ export function DevInquiryManager() {
   const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<InquiryForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { mutate: globalMutate } = useSWRConfig();
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-inquiries?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
+
+  const { data, mutate, isLoading } = useSWR<MngDevInquiryListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
+
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const companies = companyData?.companies ?? [];
+  const rowData = useMemo<InquiryGridRow[]>(() => createReadonlyGridRows(items), [items]);
 
-  const fetchUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
-    const qs = params.toString();
-    return qs ? `${BASE_URL}?${qs}` : BASE_URL;
-  }, [appliedCompanyFilter]);
-
-  // VibeGrid owns the paginated fetch under its own SWR key (`${fetchUrl}&page=..&limit=..`).
-  // Invalidate every cached key for this endpoint after a mutation, mirroring the
-  // mutateAllCaseLists pattern in hr-retire-approval-manager.tsx.
-  async function refreshList() {
-    await globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL));
-  }
-
-  const columns = useMemo<ColDef<InquiryGridRow>[]>(
+  const columnDefs = useMemo<ColDef<InquiryGridRow>[]>(
     () => [
       { field: "company_name", headerName: "고객사", width: 180 },
       { field: "inquiry_content", headerName: "문의내용", minWidth: 220, flex: 1.2 },
@@ -132,7 +139,7 @@ export function DevInquiryManager() {
         is_confirmed: form.is_confirmed,
       };
 
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/dev-inquiries", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -141,7 +148,7 @@ export function DevInquiryManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await refreshList();
+      await mutate();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -156,7 +163,7 @@ export function DevInquiryManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/dev-inquiries", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [form.id] }),
@@ -165,7 +172,7 @@ export function DevInquiryManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await refreshList();
+      await mutate();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -175,18 +182,8 @@ export function DevInquiryManager() {
   }
 
   return (
-    <VibeGrid<MngDevInquiryItem>
-      registryKey="mng.dev-inquiries"
+    <ReadonlyGridManager<InquiryGridRow>
       title="개발 문의 관리"
-      variant="readonly"
-      columns={columns}
-      fetchUrl={fetchUrl}
-      pageSize={50}
-      downloadFileName="mng-dev-inquiries"
-      emptyText="개발 문의 데이터가 없습니다."
-      onQueryStart={() => setAppliedCompanyFilter(companyFilterInput)}
-      onRowClick={(row) => setForm(toForm(row))}
-      selectedRowId={form.id}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
@@ -292,6 +289,26 @@ export function DevInquiryManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="개발 문의 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

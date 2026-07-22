@@ -4,14 +4,15 @@ import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetcher } from "@/lib/fetcher";
 import type { WelBenefitTypeItem, WelBenefitTypeListResponse } from "@/types/welfare";
-
-const BASE_URL = "/api/wel/benefit-types";
 
 type BenefitTypeGridRow = WelBenefitTypeItem & ReadonlyGridRow;
 
@@ -40,34 +41,43 @@ function SummaryCard({
 export function WelBenefitTypeOverview() {
   const [keywordInput, setKeywordInput] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  // The summary cards need the full loaded set for counts (지급/공제/활성),
-  // which VibeGrid's internal paginated fetch does not expose to the parent.
-  // A dedicated fetch at the API's max limit (200) keeps this decoupled from
-  // VibeGrid's own pagination state.
-  const { data: allData } = useSWR<WelBenefitTypeListResponse>(`${BASE_URL}?page=1&limit=200`, fetcher, {
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    return `/api/wel/benefit-types?${params.toString()}`;
+  }, [page]);
+
+  const { data, isLoading, mutate } = useSWR<WelBenefitTypeListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
-  const allItems = allData?.items ?? [];
-  const activeCount = allItems.filter((item) => item.is_active).length;
-  const deductionCount = allItems.filter((item) => item.is_deduction).length;
-  const paymentCount = allItems.length - deductionCount;
 
-  // Client-side keyword filter applied after fetch (same as before: only the
-  // current page's fetched rows are searched, not the full server-side set).
-  const transformRows = useMemo(() => {
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const filteredItems = useMemo(() => {
     const keyword = appliedKeyword.trim().toLowerCase();
-    return (rows: BenefitTypeGridRow[]) => {
-      if (!keyword) return rows;
-      return rows.filter(
-        (row) =>
-          row.code.toLowerCase().includes(keyword) ||
-          row.name.toLowerCase().includes(keyword) ||
-          row.module_path.toLowerCase().includes(keyword) ||
-          (row.pay_item_code ?? "").toLowerCase().includes(keyword),
+    if (!keyword) return items;
+    return items.filter((item) => {
+      return (
+        item.code.toLowerCase().includes(keyword) ||
+        item.name.toLowerCase().includes(keyword) ||
+        item.module_path.toLowerCase().includes(keyword) ||
+        (item.pay_item_code ?? "").toLowerCase().includes(keyword)
       );
-    };
-  }, [appliedKeyword]);
+    });
+  }, [appliedKeyword, items]);
+
+  const rowData = useMemo<BenefitTypeGridRow[]>(
+    () => createReadonlyGridRows(filteredItems),
+    [filteredItems],
+  );
+
+  const activeCount = items.filter((item) => item.is_active).length;
+  const deductionCount = items.filter((item) => item.is_deduction).length;
+  const paymentCount = items.length - deductionCount;
 
   const columnDefs = useMemo<ColDef<BenefitTypeGridRow>[]>(
     () => [
@@ -93,17 +103,8 @@ export function WelBenefitTypeOverview() {
   );
 
   return (
-    <VibeGrid<WelBenefitTypeItem>
-      registryKey="wel.benefit-types"
+    <ReadonlyGridManager<BenefitTypeGridRow>
       title="복리후생 유형관리"
-      variant="readonly"
-      columns={columnDefs}
-      fetchUrl={BASE_URL}
-      transformRows={transformRows}
-      pageSize={50}
-      downloadFileName="wel-benefit-types"
-      emptyText="복리후생 유형 데이터가 없습니다."
-      onQueryStart={() => setAppliedKeyword(keywordInput)}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-2">
           <SearchTextField
@@ -118,7 +119,7 @@ export function WelBenefitTypeOverview() {
       }
       beforeGrid={
         <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard title="유형 수" value={String(allItems.length)} description="현재 적재된 복리후생 유형 수" />
+          <SummaryCard title="유형 수" value={String(items.length)} description="현재 페이지에 적재된 복리후생 유형 수" />
           <SummaryCard
             title="지급형 / 공제형"
             value={`${paymentCount} / ${deductionCount}`}
@@ -127,6 +128,23 @@ export function WelBenefitTypeOverview() {
           <SummaryCard title="활성 유형" value={String(activeCount)} description="메뉴와 seed에서 바로 노출 가능한 유형" />
         </div>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={appliedKeyword ? filteredItems.length : (data?.total_count ?? 0)}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedKeyword(keywordInput);
+        void mutate();
+      }}
+      loading={isLoading}
+      emptyText="복리후생 유형 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

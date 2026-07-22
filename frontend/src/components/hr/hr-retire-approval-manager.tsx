@@ -5,21 +5,50 @@ import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import type { EmployeeListResponse } from "@/types/employee";
-import type { HrRetireCaseDetail, HrRetireCaseListItem, HrRetireCaseListResponse } from "@/types/hr-retire";
+import type {
+  HrRetireCaseDetail,
+  HrRetireCaseListItem,
+  HrRetireCaseListResponse,
+} from "@/types/hr-retire";
 import { parseError, statusLabel } from "./hr-retire-shared";
 
 type RetireCaseRow = HrRetireCaseListItem & ReadonlyGridRow;
 
+async function downloadRowsAsXlsx(rows: RetireCaseRow[], columns: ColDef<RetireCaseRow>[]) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const value = column.field ? row[column.field as keyof RetireCaseRow] : "";
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: RetireCaseRow }) => string)({
+          value,
+          data: row,
+        });
+      }
+      return value ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, utils.aoa_to_sheet([headers, ...data]), "퇴직 케이스 목록");
+  writeFileXLSX(workbook, `hr-retire-approvals-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 export function HrRetireApprovalManager() {
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const [newEmployeeId, setNewEmployeeId] = useState<string>("");
   const [newRetireDate, setNewRetireDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [newReason, setNewReason] = useState<string>("");
@@ -36,15 +65,14 @@ export function HrRetireApprovalManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+  const pageSize = 50;
+  const pagedCaseKey = `/api/hr/retire/cases?page=${page}&limit=${pageSize}`;
+  const { data: pagedCaseData, isLoading: isPagedCaseLoading, mutate: mutatePagedCases } =
+    useSWR<HrRetireCaseListResponse>(pagedCaseKey, fetcher, { revalidateOnFocus: false });
 
-  // VibeGrid fetches "/api/hr/retire/cases?page=...&limit=..." under its own
-  // SWR key, separate from the `caseData` key above (used for auto-select).
-  // Revalidate both whenever case data changes.
   async function mutateAllCaseLists() {
     await mutateCases();
-    await globalMutate(
-      (key) => typeof key === "string" && key.startsWith("/api/hr/retire/cases?"),
-    );
+    await globalMutate((key) => typeof key === "string" && key.startsWith("/api/hr/retire/cases?"));
   }
 
   const detailKey = selectedCaseId ? `/api/hr/retire/cases/${selectedCaseId}` : null;
@@ -57,8 +85,11 @@ export function HrRetireApprovalManager() {
     [employeeData?.employees],
   );
   const caseItems = useMemo(() => caseData?.items ?? [], [caseData?.items]);
+  const caseRows = useMemo<RetireCaseRow[]>(
+    () => createReadonlyGridRows(pagedCaseData?.items ?? []),
+    [pagedCaseData?.items],
+  );
   const firstCaseId = caseItems[0]?.id ?? null;
-
   const retireColumns = useMemo<ColDef<RetireCaseRow>[]>(
     () => [
       { field: "employee_no", headerName: "사번", width: 120 },
@@ -67,26 +98,13 @@ export function HrRetireApprovalManager() {
       { field: "position_title", headerName: "직위", width: 120 },
       { field: "retire_date", headerName: "퇴직예정일", width: 130 },
       { field: "reason", headerName: "사유", minWidth: 160, flex: 1 },
-      {
-        field: "status",
-        headerName: "상태",
-        width: 110,
-        valueFormatter: (params) => statusLabel(String(params.value ?? "")),
-      },
-      {
-        field: "created_at",
-        headerName: "생성일",
-        width: 130,
-        valueFormatter: (params) => String(params.value ?? "").slice(0, 10),
-      },
+      { field: "status", headerName: "상태", width: 110, valueFormatter: (params) => statusLabel(String(params.value ?? "")) },
+      { field: "created_at", headerName: "생성일", width: 130, valueFormatter: (params) => String(params.value ?? "").slice(0, 10) },
     ],
     [],
   );
 
   useEffect(() => {
-    // 생성 핸들러가 setSelectedCaseId(신규 id)를 호출하는 시점에는 케이스 목록
-    // SWR 캐시가 아직 재검증 전이라, 이 동기화가 선택을 첫 행으로 되돌린다.
-    // 뮤테이션 진행 중에는 건너뛰고 isSubmitting 해제 시 재평가한다.
     if (isSubmitting) return;
     if (caseItems.length === 0) {
       if (selectedCaseId !== null) setSelectedCaseId(null);
@@ -247,16 +265,22 @@ export function HrRetireApprovalManager() {
         </CardContent>
       </Card>
 
-      <VibeGrid<HrRetireCaseListItem>
-        registryKey="hr.retire.approvals"
+      <ReadonlyGridManager<RetireCaseRow>
         title="퇴직 케이스 목록"
-        description="생성된 퇴직 처리 목록. 행을 클릭하면 아래에서 상세/승인 처리를 할 수 있습니다."
-        variant="readonly"
-        columns={retireColumns}
-        fetchUrl="/api/hr/retire/cases"
-        pageSize={50}
+        searchFields={null}
+        rowData={caseRows}
+        columnDefs={retireColumns}
+        totalCount={pagedCaseData?.total_count ?? 0}
+        page={pagedCaseData?.page ?? page}
+        pageSize={pagedCaseData?.limit ?? pageSize}
+        onPageChange={setPage}
+        onQuery={() => {
+          setPage(1);
+          void mutatePagedCases();
+        }}
+        onDownload={() => void downloadRowsAsXlsx(caseRows, retireColumns)}
+        loading={isPagedCaseLoading}
         emptyText="등록된 퇴직 케이스가 없습니다."
-        downloadFileName="hr-retire-approvals"
         onRowClick={(row) => setSelectedCaseId(row.id as number)}
         selectedRowId={selectedCaseId}
       />
@@ -369,3 +393,7 @@ export function HrRetireApprovalManager() {
     </div>
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

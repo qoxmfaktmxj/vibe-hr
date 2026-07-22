@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +18,7 @@ import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import type { EmployeeItem } from "@/types/employee";
-import type { MngOutsourceContractItem } from "@/types/mng";
-
-const BASE_URL = "/api/mng/outsource-contracts";
+import type { MngOutsourceContractItem, MngOutsourceContractListResponse } from "@/types/mng";
 
 type ContractForm = {
   id: number | null;
@@ -61,23 +62,28 @@ export function OutsourceContractManager() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [form, setForm] = useState<ContractForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { mutate: globalMutate } = useSWRConfig();
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedSearch) params.set("search", appliedSearch);
+    return `/api/mng/outsource-contracts?${params.toString()}`;
+  }, [appliedSearch, page]);
+
+  const { data, mutate, isLoading } = useSWR<MngOutsourceContractListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
   const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
     revalidateOnFocus: false,
   });
+
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const employees = employeeData?.employees ?? [];
-
-  const fetchUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    if (appliedSearch) params.set("search", appliedSearch);
-    const qs = params.toString();
-    return qs ? `${BASE_URL}?${qs}` : BASE_URL;
-  }, [appliedSearch]);
-
-  async function refreshList() {
-    await globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL));
-  }
+  const rowData = useMemo<OutsourceContractGridRow[]>(() => createReadonlyGridRows(items), [items]);
 
   const columnDefs = useMemo<ColDef<OutsourceContractGridRow>[]>(
     () => [
@@ -143,7 +149,7 @@ export function OutsourceContractManager() {
         is_active: form.is_active,
       };
 
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/outsource-contracts", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -152,7 +158,7 @@ export function OutsourceContractManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await refreshList();
+      await mutate();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -167,7 +173,7 @@ export function OutsourceContractManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/outsource-contracts", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [form.id] }),
@@ -176,7 +182,7 @@ export function OutsourceContractManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await refreshList();
+      await mutate();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -186,18 +192,8 @@ export function OutsourceContractManager() {
   }
 
   return (
-    <VibeGrid<MngOutsourceContractItem>
-      registryKey="mng.outsource-contracts"
+    <ReadonlyGridManager<OutsourceContractGridRow>
       title="외주 계약 관리"
-      variant="readonly"
-      columns={columnDefs}
-      fetchUrl={fetchUrl}
-      pageSize={50}
-      downloadFileName="mng-outsource-contracts"
-      emptyText="외주 계약 데이터가 없습니다."
-      onQueryStart={() => setAppliedSearch(searchInput.trim())}
-      onRowClick={(row) => setForm(toForm(row))}
-      selectedRowId={form.id}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[1fr_1fr]">
           <SearchTextField
@@ -280,6 +276,26 @@ export function OutsourceContractManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedSearch(searchInput.trim());
+        void mutate();
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="외주 계약 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { useSWRConfig } from "swr";
+import useSWR from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
 import { Button } from "@/components/ui/button";
@@ -22,8 +25,6 @@ import type {
   MngDevRequestMonthlySummaryItem,
   MngDevRequestMonthlySummaryResponse,
 } from "@/types/mng";
-
-const BASE_URL = "/api/mng/dev-requests";
 
 type DevRequestForm = {
   id: number | null;
@@ -76,63 +77,43 @@ export function DevRequestManager() {
   const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [form, setForm] = useState<DevRequestForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const { mutate: globalMutate } = useSWRConfig();
-
-  const fetchUrl = useMemo(() => {
-    const params = new URLSearchParams();
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
     if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
-    const qs = params.toString();
-    return qs ? `${BASE_URL}?${qs}` : BASE_URL;
-  }, [appliedCompanyFilter]);
-
-  // VibeGrid's own paginated fetch (50/page) is not exposed to this component,
-  // but request_seq auto-increment needs the full loaded set. A dedicated,
-  // decoupled fetch at the API's max limit (200) preserves that behavior
-  // without depending on VibeGrid's internal page state.
-  const seqQuery = useMemo(() => {
-    const params = new URLSearchParams({ page: "1", limit: "200" });
-    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
-    return `${BASE_URL}?${params.toString()}`;
-  }, [appliedCompanyFilter]);
-  const { data: seqData, mutate: mutateSeq } = useSWR<MngDevRequestListResponse>(seqQuery, fetcher, {
-    revalidateOnFocus: false,
-  });
+    return `/api/mng/dev-requests?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
 
   const monthlyQuery = useMemo(() => {
-    const params = new URLSearchParams({ page: "1", limit: "24" });
+    const params = new URLSearchParams({
+      page: "1",
+      limit: "24",
+    });
     if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
     return `/api/mng/dev-requests/monthly-summary?${params.toString()}`;
   }, [appliedCompanyFilter]);
+
+  const { data, mutate, isLoading } = useSWR<MngDevRequestListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
   const { data: monthlyData, mutate: mutateMonthly } = useSWR<MngDevRequestMonthlySummaryResponse>(
     monthlyQuery,
     fetcher,
     { revalidateOnFocus: false },
   );
-
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
 
   const companies = companyData?.companies ?? [];
+  const items = useMemo(() => data?.items ?? [], [data?.items]);
   const monthlyItems = monthlyData?.items ?? [];
-
-  const seqByMonth = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const item of seqData?.items ?? []) {
-      const key = item.request_ym.slice(0, 7);
-      map.set(key, Math.max(map.get(key) ?? 0, item.request_seq));
-    }
-    return map;
-  }, [seqData?.items]);
-
-  async function refreshList() {
-    await Promise.all([
-      globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL)),
-      mutateSeq(),
-      mutateMonthly(),
-    ]);
-  }
+  const rowData = useMemo<DevRequestGridRow[]>(() => createReadonlyGridRows(items), [items]);
 
   const requestColumnDefs = useMemo<ColDef<DevRequestGridRow>[]>(
     () => [
@@ -173,6 +154,15 @@ export function DevRequestManager() {
     [],
   );
 
+  const seqByMonth = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      const key = item.request_ym.slice(0, 7);
+      map.set(key, Math.max(map.get(key) ?? 0, item.request_seq));
+    }
+    return map;
+  }, [items]);
+
   function resetForm() {
     setForm(EMPTY_FORM);
   }
@@ -207,7 +197,7 @@ export function DevRequestManager() {
         note: form.note || null,
       };
 
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/dev-requests", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -216,7 +206,7 @@ export function DevRequestManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await refreshList();
+      await Promise.all([mutate(), mutateMonthly()]);
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -231,7 +221,7 @@ export function DevRequestManager() {
 
     setSaving(true);
     try {
-      const response = await fetch(BASE_URL, {
+      const response = await fetch("/api/mng/dev-requests", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [form.id] }),
@@ -240,7 +230,7 @@ export function DevRequestManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await refreshList();
+      await Promise.all([mutate(), mutateMonthly()]);
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -250,18 +240,8 @@ export function DevRequestManager() {
   }
 
   return (
-    <VibeGrid<MngDevRequestItem>
-      registryKey="mng.dev-requests"
+    <ReadonlyGridManager<DevRequestGridRow>
       title="추가 개발 요청 관리"
-      variant="readonly"
-      columns={requestColumnDefs}
-      fetchUrl={fetchUrl}
-      pageSize={50}
-      downloadFileName="mng-dev-requests"
-      emptyText="추가 개발 요청 데이터가 없습니다."
-      onQueryStart={() => setAppliedCompanyFilter(companyFilterInput)}
-      onRowClick={(row) => setForm(toForm(row))}
-      selectedRowId={form.id}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
@@ -385,6 +365,26 @@ export function DevRequestManager() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={requestColumnDefs}
+      totalCount={data?.total_count ?? 0}
+      page={data?.page ?? page}
+      pageSize={data?.limit ?? pageSize}
+      selectedRowId={form.id}
+      onRowClick={(row) => setForm(toForm(row))}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void Promise.all([mutate(), mutateMonthly()]);
+      }}
+      queryDisabled={saving || isLoading}
+      loading={isLoading}
+      emptyText="추가 개발 요청 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

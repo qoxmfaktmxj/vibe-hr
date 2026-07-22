@@ -1,20 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { mutate, useSWRConfig } from "swr";
+import useSWR, { mutate } from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
-import type { TimAnnualLeaveItem, TimAnnualLeaveResponse } from "@/types/tim";
-
-const BASE_URL = "/api/tim/annual-leave/list";
+import type { TimAnnualLeaveItem, TimAnnualLeaveListResponse, TimAnnualLeaveResponse } from "@/types/tim";
 
 type AnnualLeaveGridRow = TimAnnualLeaveItem & ReadonlyGridRow;
 
@@ -36,34 +37,53 @@ export function AnnualLeaveManager() {
   const [appliedYear, setAppliedYear] = useState(yearInput);
   const [keywordInput, setKeywordInput] = useState("");
   const [appliedKeyword, setAppliedKeyword] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
   const [employeeId, setEmployeeId] = useState("");
   const [adjustmentDays, setAdjustmentDays] = useState("0");
   const [reason, setReason] = useState("");
 
-  const { mutate: globalMutate } = useSWRConfig();
-
   const myKey = `/api/tim/annual-leave/my?year=${appliedYear}`;
+  const listKey = useMemo(() => {
+    const params = new URLSearchParams({
+      year: String(appliedYear),
+      page: String(page),
+      limit: String(pageSize),
+    });
+    if (appliedKeyword.trim()) {
+      params.set("keyword", appliedKeyword.trim());
+    }
+    return `/api/tim/annual-leave/list?${params.toString()}`;
+  }, [appliedKeyword, appliedYear, page]);
+
   const { data: myLeave } = useSWR<TimAnnualLeaveResponse>(myKey, fetcher, {
     revalidateOnFocus: false,
   });
+  const { data: listData, isLoading, mutate: mutateList } = useSWR<TimAnnualLeaveListResponse>(
+    listKey,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
 
-  const fetchUrl = (() => {
-    const params = new URLSearchParams({ year: String(appliedYear) });
-    if (appliedKeyword.trim()) params.set("keyword", appliedKeyword.trim());
-    return `${BASE_URL}?${params.toString()}`;
-  })();
+  const rowData = useMemo<AnnualLeaveGridRow[]>(
+    () => createReadonlyGridRows(listData?.items ?? []),
+    [listData?.items],
+  );
 
-  const columnDefs: ColDef<AnnualLeaveGridRow>[] = [
-    { field: "department_name", headerName: "부서", minWidth: 140, flex: 1 },
-    { field: "employee_no", headerName: "사번", width: 120 },
-    { field: "employee_name", headerName: "이름", width: 120 },
-    { field: "granted_days", headerName: "발생", width: 100 },
-    { field: "used_days", headerName: "사용", width: 100 },
-    { field: "carried_over_days", headerName: "이월", width: 100 },
-    { field: "remaining_days", headerName: "잔여", width: 110 },
-    { field: "grant_type", headerName: "부여유형", width: 120 },
-  ];
+  const columnDefs = useMemo<ColDef<AnnualLeaveGridRow>[]>(
+    () => [
+      { field: "department_name", headerName: "부서", minWidth: 140, flex: 1 },
+      { field: "employee_no", headerName: "사번", width: 120 },
+      { field: "employee_name", headerName: "이름", width: 120 },
+      { field: "granted_days", headerName: "발생", width: 100 },
+      { field: "used_days", headerName: "사용", width: 100 },
+      { field: "carried_over_days", headerName: "이월", width: 100 },
+      { field: "remaining_days", headerName: "잔여", width: 110 },
+      { field: "grant_type", headerName: "부여유형", width: 120 },
+    ],
+    [],
+  );
 
   async function adjustAnnualLeave() {
     const parsedEmployeeId = Number(employeeId);
@@ -104,24 +124,12 @@ export function AnnualLeaveManager() {
     setAdjustmentDays("0");
     setReason("");
     await mutate(myKey);
-    await globalMutate((key) => typeof key === "string" && key.startsWith(BASE_URL));
+    await mutateList();
   }
 
   return (
-    <VibeGrid<TimAnnualLeaveItem>
-      registryKey="tim.annual-leave"
+    <ReadonlyGridManager<AnnualLeaveGridRow>
       title="연차 관리"
-      variant="readonly"
-      columns={columnDefs}
-      fetchUrl={fetchUrl}
-      pageSize={50}
-      downloadFileName="tim-annual-leave"
-      emptyText="연차 데이터가 없습니다."
-      onQueryStart={() => {
-        setAppliedYear(yearInput);
-        setAppliedKeyword(keywordInput);
-        void mutate(myKey);
-      }}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-4">
           <Input
@@ -173,6 +181,25 @@ export function AnnualLeaveManager() {
           </Card>
         </div>
       }
+      rowData={rowData}
+      columnDefs={columnDefs}
+      totalCount={listData?.total_count ?? 0}
+      page={listData?.page ?? page}
+      pageSize={listData?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedYear(yearInput);
+        setAppliedKeyword(keywordInput);
+        void mutate(myKey);
+        void mutateList();
+      }}
+      loading={isLoading}
+      emptyText="연차 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

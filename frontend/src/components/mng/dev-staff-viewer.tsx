@@ -4,8 +4,11 @@ import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR from "swr";
 
-import { VibeGrid, type VibeGridListResponse } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { MngSimpleGrid } from "@/components/mng/mng-simple-grid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,27 +21,37 @@ import type {
   MngDevStaffRevenueSummaryResponse,
 } from "@/types/mng";
 
-const BASE_URL = "/api/mng/dev-staff/projects";
-
 type DevStaffProjectGridRow = (MngDevStaffProjectItem & { id: number }) & ReadonlyGridRow;
 
 export function DevStaffViewer() {
   const [companyFilterInput, setCompanyFilterInput] = useState("");
   const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
 
-  const fetchUrl = useMemo(() => {
-    const params = new URLSearchParams();
+  const projectsKey = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+    });
     if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
-    const qs = params.toString();
-    return qs ? `${BASE_URL}?${qs}` : BASE_URL;
-  }, [appliedCompanyFilter]);
+    return `/api/mng/dev-staff/projects?${params.toString()}`;
+  }, [appliedCompanyFilter, page]);
 
   const revenueKey = useMemo(() => {
-    const params = new URLSearchParams({ page: "1", limit: "24" });
+    const params = new URLSearchParams({
+      page: "1",
+      limit: "24",
+    });
     if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
     return `/api/mng/dev-staff/revenue-summary?${params.toString()}`;
   }, [appliedCompanyFilter]);
 
+  const { data: projectData, isLoading, mutate: mutateProjects } = useSWR<MngDevStaffProjectListResponse>(
+    projectsKey,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
   const { data: revenueData, mutate: mutateRevenue } = useSWR<MngDevStaffRevenueSummaryResponse>(
     revenueKey,
     fetcher,
@@ -51,16 +64,16 @@ export function DevStaffViewer() {
   const revenues = revenueData?.items ?? [];
   const companies = companyData?.companies ?? [];
 
-  // API rows key on `project_id`, not `id` — VibeGrid rows require `id`.
-  const fetchAdapter = (json: unknown): VibeGridListResponse<MngDevStaffProjectItem & { id: number }> => {
-    const response = json as MngDevStaffProjectListResponse;
-    return {
-      items: response.items.map((item) => ({ ...item, id: item.project_id })),
-      total_count: response.total_count,
-      page: response.page,
-      limit: response.limit,
-    };
-  };
+  const rowData = useMemo<DevStaffProjectGridRow[]>(
+    () =>
+      createReadonlyGridRows(
+        (projectData?.items ?? []).map((item) => ({
+          ...item,
+          id: item.project_id,
+        })),
+      ),
+    [projectData?.items],
+  );
 
   const projectColumnDefs = useMemo<ColDef<DevStaffProjectGridRow>[]>(
     () => [
@@ -99,20 +112,8 @@ export function DevStaffViewer() {
   );
 
   return (
-    <VibeGrid<MngDevStaffProjectItem & { id: number }>
-      registryKey="mng.dev-staff"
+    <ReadonlyGridManager<DevStaffProjectGridRow>
       title="프로젝트별 인력 현황"
-      variant="readonly"
-      columns={projectColumnDefs}
-      fetchUrl={fetchUrl}
-      fetchAdapter={fetchAdapter}
-      pageSize={50}
-      downloadFileName="mng-dev-staff"
-      emptyText="투입 프로젝트 데이터가 없습니다."
-      onQueryStart={() => {
-        setAppliedCompanyFilter(companyFilterInput);
-        void mutateRevenue();
-      }}
       searchFields={
         <SearchFieldGrid className="md:grid-cols-[220px_1fr]">
           <select
@@ -147,6 +148,24 @@ export function DevStaffViewer() {
           </CardContent>
         </Card>
       }
+      rowData={rowData}
+      columnDefs={projectColumnDefs}
+      totalCount={projectData?.total_count ?? 0}
+      page={projectData?.page ?? page}
+      pageSize={projectData?.limit ?? pageSize}
+      onPageChange={setPage}
+      onQuery={() => {
+        setPage(1);
+        setAppliedCompanyFilter(companyFilterInput);
+        void Promise.all([mutateProjects(), mutateRevenue()]);
+      }}
+      queryDisabled={isLoading}
+      loading={isLoading}
+      emptyText="투입 프로젝트 데이터가 없습니다."
     />
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls

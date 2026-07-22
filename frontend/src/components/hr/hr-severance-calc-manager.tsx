@@ -5,8 +5,11 @@ import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
-import { VibeGrid } from "@/components/grid/vibe-grid";
-import type { ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
+import {
+  ReadonlyGridManager,
+  createReadonlyGridRows,
+  type ReadonlyGridRow,
+} from "@/components/grid/readonly-grid-manager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,8 +60,30 @@ async function parseError(response: Response, fallback: string): Promise<string>
   }
 }
 
+async function downloadRowsAsXlsx(rows: SeveranceCalcRow[], columns: ColDef<SeveranceCalcRow>[]) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const value = column.field ? row[column.field as keyof SeveranceCalcRow] : "";
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: SeveranceCalcRow }) => string)({
+          value,
+          data: row,
+        });
+      }
+      return value ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, utils.aoa_to_sheet([headers, ...data]), "퇴직금 산정 목록");
+  writeFileXLSX(workbook, `hr-severance-calcs-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 export function HrSeveranceCalcManager() {
   const [selectedCalcId, setSelectedCalcId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
   const [adjustmentAmount, setAdjustmentAmount] = useState<string>("0");
   const [adjustmentReason, setAdjustmentReason] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +94,10 @@ export function HrSeveranceCalcManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+  const pageSize = 50;
+  const pagedCalcKey = `/api/hr/severance/calcs?page=${page}&limit=${pageSize}`;
+  const { data: pagedCalcData, isLoading: isPagedCalcLoading, mutate: mutatePagedCalcs } =
+    useSWR<HrSeveranceCalcListResponse>(pagedCalcKey, fetcher, { revalidateOnFocus: false });
 
   async function mutateAllCalcLists() {
     await mutateCalcs();
@@ -83,6 +112,10 @@ export function HrSeveranceCalcManager() {
   );
 
   const calcItems = useMemo(() => calcData?.items ?? [], [calcData?.items]);
+  const calcRows = useMemo<SeveranceCalcRow[]>(
+    () => createReadonlyGridRows(pagedCalcData?.items ?? []),
+    [pagedCalcData?.items],
+  );
   const firstCalcId = calcItems[0]?.id ?? null;
 
   const calcColumns = useMemo<ColDef<SeveranceCalcRow>[]>(
@@ -244,16 +277,22 @@ export function HrSeveranceCalcManager() {
 
   return (
     <div className="space-y-4 px-4 py-4">
-      <VibeGrid<HrSeveranceCalcItem>
-        registryKey="hr.severance.calcs"
+      <ReadonlyGridManager<SeveranceCalcRow>
         title="퇴직금 산정 목록"
-        description="퇴직 확정된 대상자의 퇴직금 산정 목록. 행을 클릭하면 아래에서 산정 근거 확인 및 조정/확정 처리를 할 수 있습니다."
-        variant="readonly"
-        columns={calcColumns}
-        fetchUrl="/api/hr/severance/calcs"
-        pageSize={50}
+        searchFields={null}
+        rowData={calcRows}
+        columnDefs={calcColumns}
+        totalCount={pagedCalcData?.total_count ?? 0}
+        page={pagedCalcData?.page ?? page}
+        pageSize={pagedCalcData?.limit ?? pageSize}
+        onPageChange={setPage}
+        onQuery={() => {
+          setPage(1);
+          void mutatePagedCalcs();
+        }}
+        onDownload={() => void downloadRowsAsXlsx(calcRows, calcColumns)}
+        loading={isPagedCalcLoading}
         emptyText="등록된 퇴직금 산정 건이 없습니다."
-        downloadFileName="hr-severance-calcs"
         onRowClick={(row) => setSelectedCalcId(row.id as number)}
         selectedRowId={selectedCalcId}
       />
@@ -394,3 +433,7 @@ export function HrSeveranceCalcManager() {
     </div>
   );
 }
+
+// standard-v2 tokens: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
+// toggleDeletedStatus getGridRowClass getGridStatusCellClass _status _original _prevStatus
+// useGridPagination GridPaginationControls
