@@ -14,7 +14,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetcher } from "@/lib/fetcher";
 import type { WelBenefitTypeItem, WelBenefitTypeListResponse } from "@/types/welfare";
 
-type BenefitTypeGridRow = WelBenefitTypeItem & ReadonlyGridRow;
+type BenefitTypeGridRow = WelBenefitTypeItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 function SummaryCard({
   title,
@@ -55,8 +85,17 @@ export function WelBenefitTypeOverview() {
   const { data, isLoading, mutate } = useSWR<WelBenefitTypeListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
+  const { data: allData } = useSWR<WelBenefitTypeListResponse>(
+    "/api/wel/benefit-types?page=1&limit=200",
+    fetcher,
+    { revalidateOnFocus: false },
+  );
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const allItems = allData?.items ?? [];
+  const activeCount = allItems.filter((item) => item.is_active).length;
+  const deductionCount = allItems.filter((item) => item.is_deduction).length;
+  const paymentCount = allItems.length - deductionCount;
   const filteredItems = useMemo(() => {
     const keyword = appliedKeyword.trim().toLowerCase();
     if (!keyword) return items;
@@ -74,10 +113,6 @@ export function WelBenefitTypeOverview() {
     () => createReadonlyGridRows(filteredItems),
     [filteredItems],
   );
-
-  const activeCount = items.filter((item) => item.is_active).length;
-  const deductionCount = items.filter((item) => item.is_deduction).length;
-  const paymentCount = items.length - deductionCount;
 
   const columnDefs = useMemo<ColDef<BenefitTypeGridRow>[]>(
     () => [
@@ -130,7 +165,8 @@ export function WelBenefitTypeOverview() {
       }
       rowData={rowData}
       columnDefs={columnDefs}
-      totalCount={appliedKeyword ? filteredItems.length : (data?.total_count ?? 0)}
+      onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "복리후생 유형관리", "wel-benefit-types")}
+      totalCount={filteredItems.length}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}
@@ -139,6 +175,7 @@ export function WelBenefitTypeOverview() {
         setAppliedKeyword(keywordInput);
         void mutate();
       }}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="복리후생 유형 데이터가 없습니다."
     />

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -32,7 +32,37 @@ type MappingForm = {
   note: string;
 };
 
-type ManagerStatusGridRow = MngManagerCompanyItem & ReadonlyGridRow;
+type ManagerStatusGridRow = MngManagerCompanyItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 const EMPTY_FORM: MappingForm = {
   employee_id: "",
@@ -47,12 +77,18 @@ export function ManagerStatusViewer() {
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const { mutate: globalMutate } = useSWRConfig();
 
   const query = useMemo(() => `/api/mng/manager-status?page=${page}&limit=${pageSize}`, [page]);
 
   const { data, mutate, isLoading } = useSWR<MngManagerCompanyListResponse>(query, fetcher, {
     revalidateOnFocus: false,
   });
+  const { data: allData, mutate: mutateAll } = useSWR<MngManagerCompanyListResponse>(
+    "/api/mng/manager-status?page=1&limit=200",
+    fetcher,
+    { revalidateOnFocus: false },
+  );
   const { data: companyData } = useSWR<MngCompanyDropdownResponse>("/api/mng/companies/dropdown", fetcher, {
     revalidateOnFocus: false,
   });
@@ -61,9 +97,17 @@ export function ManagerStatusViewer() {
   });
 
   const items = useMemo(() => data?.items ?? [], [data?.items]);
+  const allItems = useMemo(() => allData?.items ?? [], [allData?.items]);
   const companies = companyData?.companies ?? [];
   const employees = employeeData?.employees ?? [];
   const rowData = useMemo<ManagerStatusGridRow[]>(() => createReadonlyGridRows(items), [items]);
+
+  async function refreshList() {
+    await Promise.all([
+      globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/manager-status")),
+      mutateAll(),
+    ]);
+  }
 
   const columnDefs = useMemo<ColDef<ManagerStatusGridRow>[]>(
     () => [
@@ -100,7 +144,7 @@ export function ManagerStatusViewer() {
 
       toast.success("등록되었습니다.");
       setForm(EMPTY_FORM);
-      await mutate();
+      await refreshList();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -122,7 +166,7 @@ export function ManagerStatusViewer() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await mutate();
+      await refreshList();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -204,7 +248,7 @@ export function ManagerStatusViewer() {
             <CardTitle className="text-sm text-foreground">일괄 삭제</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {items.map((item) => (
+            {allItems.map((item) => (
               <Button
                 key={item.id}
                 size="sm"
@@ -220,6 +264,7 @@ export function ManagerStatusViewer() {
       }
       rowData={rowData}
       columnDefs={columnDefs}
+      onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "담당자 현황", "mng-manager-status")}
       totalCount={data?.total_count ?? 0}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
@@ -228,7 +273,7 @@ export function ManagerStatusViewer() {
         setPage(1);
         void mutate();
       }}
-      queryDisabled={saving || isLoading}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="담당자 매핑 데이터가 없습니다."
     />

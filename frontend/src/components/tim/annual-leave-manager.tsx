@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR, { mutate } from "swr";
+import useSWR, { mutate, useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -17,7 +17,37 @@ import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import type { TimAnnualLeaveItem, TimAnnualLeaveListResponse, TimAnnualLeaveResponse } from "@/types/tim";
 
-type AnnualLeaveGridRow = TimAnnualLeaveItem & ReadonlyGridRow;
+type AnnualLeaveGridRow = TimAnnualLeaveItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 function LeaveMetricCard({ title, value }: { title: string; value: number | string }) {
   return (
@@ -43,6 +73,7 @@ export function AnnualLeaveManager() {
   const [employeeId, setEmployeeId] = useState("");
   const [adjustmentDays, setAdjustmentDays] = useState("0");
   const [reason, setReason] = useState("");
+  const { mutate: globalMutate } = useSWRConfig();
 
   const myKey = `/api/tim/annual-leave/my?year=${appliedYear}`;
   const listKey = useMemo(() => {
@@ -124,7 +155,7 @@ export function AnnualLeaveManager() {
     setAdjustmentDays("0");
     setReason("");
     await mutate(myKey);
-    await mutateList();
+    await globalMutate((key) => typeof key === "string" && key.startsWith("/api/tim/annual-leave/list"));
   }
 
   return (
@@ -183,6 +214,7 @@ export function AnnualLeaveManager() {
       }
       rowData={rowData}
       columnDefs={columnDefs}
+      onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "연차 관리", "tim-annual-leave")}
       totalCount={listData?.total_count ?? 0}
       page={listData?.page ?? page}
       pageSize={listData?.limit ?? pageSize}
@@ -194,6 +226,7 @@ export function AnnualLeaveManager() {
         void mutate(myKey);
         void mutateList();
       }}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="연차 데이터가 없습니다."
     />

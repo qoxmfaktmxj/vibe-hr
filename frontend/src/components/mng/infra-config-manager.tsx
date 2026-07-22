@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -37,7 +37,37 @@ type ConfigForm = {
   sort_order: string;
 };
 
-type InfraMasterGridRow = MngInfraMasterItem & ReadonlyGridRow;
+type InfraMasterGridRow = MngInfraMasterItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 const EMPTY_MASTER_FORM: MasterForm = {
   company_id: "",
@@ -59,6 +89,7 @@ export function InfraConfigManager() {
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const { mutate: globalMutate } = useSWRConfig();
 
   const masterQuery = useMemo(
     () => `/api/mng/infra-masters?page=${page}&limit=${pageSize}`,
@@ -75,7 +106,13 @@ export function InfraConfigManager() {
       revalidateOnFocus: false,
     },
   );
-  const masters = useMemo(() => masterData?.items ?? [], [masterData?.items]);
+  const { data: allMasterData, mutate: mutateAllMasters } = useSWR<MngInfraMasterListResponse>(
+    "/api/mng/infra-masters?page=1&limit=200",
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const masters = useMemo(() => allMasterData?.items ?? [], [allMasterData?.items]);
+  const pageMasters = useMemo(() => masterData?.items ?? [], [masterData?.items]);
 
   useEffect(() => {
     if (!selectedMasterId && masters.length > 0) {
@@ -94,8 +131,15 @@ export function InfraConfigManager() {
     [masters, selectedMasterId],
   );
 
+  async function refreshMasters() {
+    await Promise.all([
+      globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/infra-masters")),
+      mutateAllMasters(),
+    ]);
+  }
+
   const companies = companyData?.companies ?? [];
-  const rowData = useMemo<InfraMasterGridRow[]>(() => createReadonlyGridRows(masters), [masters]);
+  const rowData = useMemo<InfraMasterGridRow[]>(() => createReadonlyGridRows(pageMasters), [pageMasters]);
 
   const masterColumnDefs = useMemo<ColDef<InfraMasterGridRow>[]>(
     () => [
@@ -143,7 +187,7 @@ export function InfraConfigManager() {
 
       toast.success("인프라 마스터가 등록되었습니다.");
       setMasterForm(EMPTY_MASTER_FORM);
-      await mutateMasters();
+      await refreshMasters();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -168,7 +212,7 @@ export function InfraConfigManager() {
       if (selectedMasterId === item.id) {
         setSelectedMasterId(null);
       }
-      await Promise.all([mutateMasters(), mutateConfigs()]);
+      await Promise.all([refreshMasters(), mutateConfigs()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -207,7 +251,7 @@ export function InfraConfigManager() {
 
       toast.success("구성이 저장되었습니다.");
       setConfigForm(EMPTY_CONFIG_FORM);
-      await mutateConfigs();
+      await Promise.all([mutateConfigs(), refreshMasters()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
@@ -226,7 +270,7 @@ export function InfraConfigManager() {
         throw new Error(json?.detail ?? "삭제에 실패했습니다.");
       }
       toast.success("삭제되었습니다.");
-      await mutateConfigs();
+      await Promise.all([mutateConfigs(), refreshMasters()]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -361,6 +405,7 @@ export function InfraConfigManager() {
       }
       rowData={rowData}
       columnDefs={masterColumnDefs}
+      onDownload={() => void downloadRowsAsXlsx(masterColumnDefs, rowData, "인프라 구성관리", "mng-infra")}
       totalCount={masterData?.total_count ?? 0}
       page={masterData?.page ?? page}
       pageSize={masterData?.limit ?? pageSize}
@@ -371,7 +416,7 @@ export function InfraConfigManager() {
         setPage(1);
         void mutateMasters();
       }}
-      queryDisabled={saving || isLoading}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="인프라 마스터 데이터가 없습니다."
     />

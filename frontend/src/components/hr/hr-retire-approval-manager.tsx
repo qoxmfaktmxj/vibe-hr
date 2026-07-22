@@ -279,6 +279,7 @@ export function HrRetireApprovalManager() {
           void mutatePagedCases();
         }}
         onDownload={() => void downloadRowsAsXlsx(caseRows, retireColumns)}
+        queryDisabled={isPagedCaseLoading}
         loading={isPagedCaseLoading}
         emptyText="등록된 퇴직 케이스가 없습니다."
         onRowClick={(row) => setSelectedCaseId(row.id as number)}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -19,7 +19,37 @@ import { fetcher } from "@/lib/fetcher";
 import type { HrRetireChecklistItem, HrRetireChecklistListResponse } from "@/types/hr-retire";
 import { parseError } from "./hr-retire-shared";
 
-type ChecklistGridRow = HrRetireChecklistItem & ReadonlyGridRow;
+type ChecklistGridRow = HrRetireChecklistItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 export function HrRetireChecklistManager() {
   const [keywordInput, setKeywordInput] = useState("");
@@ -36,6 +66,7 @@ export function HrRetireChecklistManager() {
   const [newChecklistActive, setNewChecklistActive] = useState(true);
   const [newChecklistSortOrder, setNewChecklistSortOrder] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutate: globalMutate } = useSWRConfig();
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -105,7 +136,7 @@ export function HrRetireChecklistManager() {
       setNewChecklistRequired(true);
       setNewChecklistActive(true);
       setNewChecklistSortOrder("0");
-      await mutate();
+      await globalMutate((key) => typeof key === "string" && key.startsWith("/api/hr/retire/checklist"));
       toast.success("체크리스트 항목을 등록했습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "체크리스트 항목 등록에 실패했습니다.");
@@ -216,7 +247,8 @@ export function HrRetireChecklistManager() {
       }
       rowData={rowData}
       columnDefs={columnDefs}
-      totalCount={appliedKeyword || appliedActiveFilter !== "all" ? filteredItems.length : (data?.total_count ?? 0)}
+      onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "퇴직 체크리스트 관리", "hr-retire-checklist")}
+      totalCount={filteredItems.length}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
       onPageChange={setPage}
@@ -226,7 +258,7 @@ export function HrRetireChecklistManager() {
         setAppliedActiveFilter(activeFilterInput);
         void mutate();
       }}
-      queryDisabled={isLoading || isSubmitting}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="등록된 퇴직 체크리스트가 없습니다."
     />

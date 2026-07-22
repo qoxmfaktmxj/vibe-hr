@@ -21,7 +21,37 @@ import type {
   MngDevStaffRevenueSummaryResponse,
 } from "@/types/mng";
 
-type DevStaffProjectGridRow = (MngDevStaffProjectItem & { id: number }) & ReadonlyGridRow;
+type DevStaffProjectGridRow = (MngDevStaffProjectItem & { id: number }) & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 export function DevStaffViewer() {
   const [companyFilterInput, setCompanyFilterInput] = useState("");
@@ -150,6 +180,7 @@ export function DevStaffViewer() {
       }
       rowData={rowData}
       columnDefs={projectColumnDefs}
+      onDownload={() => void downloadRowsAsXlsx(projectColumnDefs, rowData, "프로젝트별 인력 현황", "mng-dev-staff")}
       totalCount={projectData?.total_count ?? 0}
       page={projectData?.page ?? page}
       pageSize={projectData?.limit ?? pageSize}

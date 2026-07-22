@@ -291,6 +291,7 @@ export function HrSeveranceCalcManager() {
           void mutatePagedCalcs();
         }}
         onDownload={() => void downloadRowsAsXlsx(calcRows, calcColumns)}
+        queryDisabled={isPagedCalcLoading}
         loading={isPagedCalcLoading}
         emptyText="등록된 퇴직금 산정 건이 없습니다."
         onRowClick={(row) => setSelectedCalcId(row.id as number)}

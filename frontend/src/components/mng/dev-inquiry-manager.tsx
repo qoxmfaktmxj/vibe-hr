@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -37,7 +37,37 @@ type InquiryForm = {
   is_confirmed: boolean;
 };
 
-type InquiryGridRow = MngDevInquiryItem & ReadonlyGridRow;
+type InquiryGridRow = MngDevInquiryItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 const EMPTY_FORM: InquiryForm = {
   id: null,
@@ -75,6 +105,7 @@ export function DevInquiryManager() {
   const [form, setForm] = useState<InquiryForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
+  const { mutate: globalMutate } = useSWRConfig();
   const pageSize = 50;
 
   const query = useMemo(() => {
@@ -148,7 +179,7 @@ export function DevInquiryManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await mutate();
+      await globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/dev-inquiries"));
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -172,7 +203,7 @@ export function DevInquiryManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await mutate();
+      await globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/dev-inquiries"));
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -291,6 +322,7 @@ export function DevInquiryManager() {
       }
       rowData={rowData}
       columnDefs={columnDefs}
+      onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "개발 문의 관리", "mng-dev-inquiries")}
       totalCount={data?.total_count ?? 0}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
@@ -302,7 +334,7 @@ export function DevInquiryManager() {
         setAppliedCompanyFilter(companyFilterInput);
         void mutate();
       }}
-      queryDisabled={saving || isLoading}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="개발 문의 데이터가 없습니다."
     />

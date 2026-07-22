@@ -331,14 +331,15 @@ export function PayVoucherManager() {
         rowData={voucherRows}
         columnDefs={voucherColumns}
         totalCount={pagedVoucherData?.total_count ?? 0}
-        page={page}
-        pageSize={pageSize}
+        page={(pagedVoucherData as (PayVoucherListResponse & { page?: number }) | undefined)?.page ?? page}
+        pageSize={(pagedVoucherData as (PayVoucherListResponse & { limit?: number }) | undefined)?.limit ?? pageSize}
         onPageChange={setPage}
         onQuery={() => {
           setPage(1);
           void mutatePagedVouchers();
         }}
         onDownload={() => void downloadRowsAsXlsx(voucherRows, voucherColumns)}
+        queryDisabled={isPagedVoucherLoading}
         loading={isPagedVoucherLoading}
         emptyText="등록된 급여 전표가 없습니다."
         onRowClick={(row) => setSelectedVoucherId(row.id as number)}

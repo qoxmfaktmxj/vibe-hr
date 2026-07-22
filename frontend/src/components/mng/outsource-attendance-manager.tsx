@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -35,7 +35,37 @@ type AttendanceForm = {
   note: string;
 };
 
-type AttendanceSummaryGridRow = (MngOutsourceAttendanceSummaryItem & { id: number }) & ReadonlyGridRow;
+type AttendanceSummaryGridRow = (MngOutsourceAttendanceSummaryItem & { id: number }) & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 const EMPTY_FORM: AttendanceForm = {
   attendance_code: "",
@@ -53,6 +83,7 @@ export function OutsourceAttendanceManager() {
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const { mutate: globalMutate } = useSWRConfig();
 
   const summaryQuery = useMemo(
     () => `/api/mng/outsource-attendances?page=${page}&limit=${pageSize}`,
@@ -64,17 +95,23 @@ export function OutsourceAttendanceManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+  const { data: allSummaryData, mutate: mutateAllSummary } = useSWR<MngOutsourceAttendanceSummaryResponse>(
+    "/api/mng/outsource-attendances?page=1&limit=200",
+    fetcher,
+    { revalidateOnFocus: false },
+  );
   const summaryItems = useMemo(() => summaryData?.items ?? [], [summaryData?.items]);
+  const allSummaryItems = useMemo(() => allSummaryData?.items ?? [], [allSummaryData?.items]);
 
   useEffect(() => {
-    if (!selectedContractId && summaryItems.length > 0) {
-      setSelectedContractId(summaryItems[0].contract_id);
+    if (!selectedContractId && allSummaryItems.length > 0) {
+      setSelectedContractId(allSummaryItems[0].contract_id);
     }
-  }, [selectedContractId, summaryItems]);
+  }, [allSummaryItems, selectedContractId]);
 
   const selectedSummary = useMemo(
-    () => summaryItems.find((item) => item.contract_id === selectedContractId) ?? null,
-    [selectedContractId, summaryItems],
+    () => allSummaryItems.find((item) => item.contract_id === selectedContractId) ?? null,
+    [allSummaryItems, selectedContractId],
   );
 
   const detailEndpoint = selectedContractId ? `/api/mng/outsource-attendances/${selectedContractId}` : null;
@@ -83,6 +120,14 @@ export function OutsourceAttendanceManager() {
     fetcher,
     { revalidateOnFocus: false },
   );
+
+  async function refreshAll() {
+    await Promise.all([
+      globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/outsource-attendances")),
+      mutateAllSummary(),
+      mutateDetail(),
+    ]);
+  }
   const details = detailData?.items ?? [];
 
   const rowData = useMemo<AttendanceSummaryGridRow[]>(
@@ -152,7 +197,7 @@ export function OutsourceAttendanceManager() {
 
       toast.success("등록되었습니다.");
       setForm(EMPTY_FORM);
-      await Promise.all([mutateDetail(), mutateSummary()]);
+      await refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "등록에 실패했습니다.");
     } finally {
@@ -174,7 +219,7 @@ export function OutsourceAttendanceManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await Promise.all([mutateDetail(), mutateSummary()]);
+      await refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
     } finally {
@@ -279,6 +324,7 @@ export function OutsourceAttendanceManager() {
       }
       rowData={rowData}
       columnDefs={summaryColumnDefs}
+      onDownload={() => void downloadRowsAsXlsx(summaryColumnDefs, rowData, "외주 근태 현황", "mng-outsource-attendance")}
       totalCount={summaryData?.total_count ?? 0}
       page={summaryData?.page ?? page}
       pageSize={summaryData?.limit ?? pageSize}
@@ -289,7 +335,7 @@ export function OutsourceAttendanceManager() {
         setPage(1);
         void mutateSummary();
       }}
-      queryDisabled={saving || isLoading}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="외주 근태 요약 데이터가 없습니다."
     />

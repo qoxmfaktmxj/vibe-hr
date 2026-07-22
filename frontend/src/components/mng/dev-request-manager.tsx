@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
 
 import {
@@ -40,7 +40,37 @@ type DevRequestForm = {
   note: string;
 };
 
-type DevRequestGridRow = MngDevRequestItem & ReadonlyGridRow;
+type DevRequestGridRow = MngDevRequestItem & ReadonlyGridRow;function toXlsxSheetName(name: string): string {
+  return name.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
+  columns: ColDef<Row>[],
+  rows: Row[],
+  title: string,
+  fileName: string,
+) {
+  const visibleColumns = columns.filter((column) => column.field || column.valueGetter);
+  const headers = visibleColumns.map((column) => column.headerName ?? String(column.field ?? ""));
+  const data = rows.map((row) =>
+    visibleColumns.map((column) => {
+      const field = column.field as keyof Row | undefined;
+      const rawValue = field ? row[field] : undefined;
+      if (typeof column.valueFormatter === "function") {
+        return (column.valueFormatter as (params: { value: unknown; data: Row }) => string)({
+          value: rawValue,
+          data: row,
+        }) ?? "";
+      }
+      return rawValue ?? "";
+    }),
+  );
+  const { utils, writeFileXLSX } = await import("xlsx");
+  const sheet = utils.aoa_to_sheet([headers, ...data]);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
+  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 const EMPTY_FORM: DevRequestForm = {
   id: null,
@@ -79,6 +109,7 @@ export function DevRequestManager() {
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const { mutate: globalMutate } = useSWRConfig();
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -99,6 +130,14 @@ export function DevRequestManager() {
   }, [appliedCompanyFilter]);
 
   const { data, mutate, isLoading } = useSWR<MngDevRequestListResponse>(query, fetcher, {
+    revalidateOnFocus: false,
+  });
+  const seqQuery = useMemo(() => {
+    const params = new URLSearchParams({ page: "1", limit: "200" });
+    if (appliedCompanyFilter) params.set("company_id", appliedCompanyFilter);
+    return `/api/mng/dev-requests?${params.toString()}`;
+  }, [appliedCompanyFilter]);
+  const { data: seqData, mutate: mutateSeq } = useSWR<MngDevRequestListResponse>(seqQuery, fetcher, {
     revalidateOnFocus: false,
   });
   const { data: monthlyData, mutate: mutateMonthly } = useSWR<MngDevRequestMonthlySummaryResponse>(
@@ -156,12 +195,20 @@ export function DevRequestManager() {
 
   const seqByMonth = useMemo(() => {
     const map = new Map<string, number>();
-    for (const item of items) {
+    for (const item of seqData?.items ?? []) {
       const key = item.request_ym.slice(0, 7);
       map.set(key, Math.max(map.get(key) ?? 0, item.request_seq));
     }
     return map;
-  }, [items]);
+  }, [seqData?.items]);
+
+  async function refreshList() {
+    await Promise.all([
+      globalMutate((key) => typeof key === "string" && key.startsWith("/api/mng/dev-requests")),
+      mutateSeq(),
+      mutateMonthly(),
+    ]);
+  }
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -206,7 +253,7 @@ export function DevRequestManager() {
       if (!response.ok) throw new Error(json?.detail ?? "저장에 실패했습니다.");
 
       toast.success("저장되었습니다.");
-      await Promise.all([mutate(), mutateMonthly()]);
+      await refreshList();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -230,7 +277,7 @@ export function DevRequestManager() {
       if (!response.ok) throw new Error(json?.detail ?? "삭제에 실패했습니다.");
 
       toast.success("삭제되었습니다.");
-      await Promise.all([mutate(), mutateMonthly()]);
+      await refreshList();
       resetForm();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "삭제에 실패했습니다.");
@@ -367,6 +414,7 @@ export function DevRequestManager() {
       }
       rowData={rowData}
       columnDefs={requestColumnDefs}
+      onDownload={() => void downloadRowsAsXlsx(requestColumnDefs, rowData, "추가 개발 요청 관리", "mng-dev-requests")}
       totalCount={data?.total_count ?? 0}
       page={data?.page ?? page}
       pageSize={data?.limit ?? pageSize}
@@ -378,7 +426,7 @@ export function DevRequestManager() {
         setAppliedCompanyFilter(companyFilterInput);
         void Promise.all([mutate(), mutateMonthly()]);
       }}
-      queryDisabled={saving || isLoading}
+      queryDisabled={isLoading}
       loading={isLoading}
       emptyText="추가 개발 요청 데이터가 없습니다."
     />
