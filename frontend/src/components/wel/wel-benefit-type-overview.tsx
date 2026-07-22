@@ -154,7 +154,7 @@ export function WelBenefitTypeOverview() {
       }
       beforeGrid={
         <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard title="유형 수" value={String(items.length)} description="현재 페이지에 적재된 복리후생 유형 수" />
+          <SummaryCard title="유형 수" value={String(allItems.length)} description="현재 적재된 복리후생 유형 수" />
           <SummaryCard
             title="지급형 / 공제형"
             value={`${paymentCount} / ${deductionCount}`}
