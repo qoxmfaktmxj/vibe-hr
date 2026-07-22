@@ -1140,3 +1140,40 @@ Incident / Hotfix는 반드시 아래를 포함한다. [Proposal]
 ### Remaining Risks / Follow-ups
 - 전체 lint의 범위 외 warning 15건은 기존 기술부채로 유지한다.
 - 실제 브라우저 검증은 대표 dashboard/vouchers/mobile 화면 기준이며 모든 178개 route의 픽셀 회귀 검사는 아니다.
+
+## TASK VH-GRID-RETIREMENT-MUTATION-QA-20260722 — Grid retirement mutation regression evidence
+- Date: 2026-07-22
+- Status: completed
+- Mode: Execution / verification
+- Risk Class: R1
+- Approval Status: not_required (테스트·원장만 변경)
+
+### Goal
+- retirement 관련 화면의 mutation 가능 경로 12개와 read-only 경로 3개에 대해, 서비스 단위 및 실제 UI E2E 회귀 검증을 완료한다.
+
+### Classification and Safety
+- Mutation-capable: 12개. backend 서비스 mutation 단위 테스트는 disposable SQLite를 사용하므로 영속 업무 데이터에 쓰지 않는다.
+- Read-only: 3개. Playwright workflow mutation은 route-isolated mock/route interception으로 검증하여 local backend 업무 데이터에 쓰지 않는다.
+
+### Changed Files
+- `docs/superpowers/plans/2026-07-22-grid-retirement-mutation-regression.md`
+- `backend/tests/test_grid_retirement_mutation_services_unit.py`
+- `frontend/tests/e2e/grid-retirement-mng-crud.spec.ts`
+- `frontend/tests/e2e/grid-retirement-workflow-mutations.spec.ts`
+- `docs/TASK_LEDGER.md`
+
+### Commands Run / Verification Summary
+- `backend: python -m pytest -q` — PASS: 93 passed, warnings 106 (FastAPI/Starlette `asyncio.iscoroutinefunction` deprecation).
+- `frontend: npm run validate:grid` — PASS: validator가 수치 count는 출력하지 않았고, 등록된 모든 AG Grid 화면 통과를 보고.
+- `frontend: npm run lint` — PASS: 0 errors, 15 warnings (기존 범위 밖 unused variable/Hooks dependency 경고).
+- `frontend: npx tsc --noEmit` — PASS: 0 diagnostics.
+- `frontend: npm test` — PASS: 5 test files, 24 tests, warnings 0.
+- `frontend: npx playwright test tests/e2e/lifecycle-grid-qa.spec.ts tests/e2e/grid-retirement-mng-crud.spec.ts tests/e2e/grid-retirement-workflow-mutations.spec.ts --workers=1 --reporter=line` — PASS: 38 tests, Node `NO_COLOR`/`FORCE_COLOR` warnings 2건.
+- `frontend: npm run build` — PASS: Next.js production build; prebuild `validate:grid`도 PASS.
+
+### Scope Review
+- 기준 `602c751` 이후 tracked diff는 plan 1개, backend test 1개, frontend E2E test 2개, 본 ledger 1개뿐이다.
+- production/API/schema/migration/shared grid/config/CSS/data 파일 변경은 0개다. 기존 user untracked 파일은 보존하고 검증 범위에서 제외했다.
+
+### Remaining Risks
+- 인증 및 메뉴 권한을 포함하는 실제 서비스 통합 검증은 local service 환경과 해당 권한 시드가 필요하다.
