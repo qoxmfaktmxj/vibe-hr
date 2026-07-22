@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, Column, Index, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Column, ForeignKey, ForeignKeyConstraint, Index, Integer, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -53,6 +53,88 @@ class OrgDepartment(SQLModel, table=True):
     cost_center_code: Optional[str] = Field(default=None, max_length=30)
     description: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class OrgMappingTypeItem(SQLModel, table=True):
+    __tablename__ = "org_mapping_type_items"
+    __table_args__ = (
+        UniqueConstraint("id", "type_code", name="uq_org_mapping_type_items_id_type"),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="ck_org_mapping_type_items_date_order",
+        ),
+        Index("ix_org_mapping_type_items_type_item_from", "type_code", "item_code", "effective_from"),
+    )
+
+    id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True, nullable=False),
+    )
+    type_code: str = Field(max_length=50)
+    item_code: str = Field(max_length=50)
+    name: str = Field(max_length=100)
+    effective_from: date
+    effective_to: Optional[date] = None
+    erp_employee_code: Optional[str] = Field(default=None, max_length=50)
+    cost_center_type: Optional[str] = Field(default=None, max_length=50)
+    remark: Optional[str] = Field(default=None, max_length=500)
+    sort_order: int = Field(default=0)
+    is_active: bool = Field(default=True)
+    created_by: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+    )
+    updated_by: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+    )
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class OrgMappingAssignment(SQLModel, table=True):
+    __tablename__ = "org_mapping_assignments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["item_id", "type_code"],
+            ["org_mapping_type_items.id", "org_mapping_type_items.type_code"],
+            name="fk_org_mapping_assignments_item_type",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_to >= effective_from",
+            name="ck_org_mapping_assignments_date_order",
+        ),
+        Index(
+            "ix_org_mapping_assignments_department_type_from",
+            "department_id",
+            "type_code",
+            "effective_from",
+        ),
+        Index("ix_org_mapping_assignments_item_id", "item_id"),
+    )
+
+    id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True, nullable=False),
+    )
+    department_id: int = Field(
+        sa_column=Column(Integer, ForeignKey("org_departments.id", ondelete="RESTRICT"), nullable=False)
+    )
+    type_code: str = Field(max_length=50)
+    item_id: int = Field(sa_column=Column(Integer, nullable=False))
+    effective_from: date
+    effective_to: Optional[date] = None
+    created_by: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+    )
+    updated_by: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("auth_users.id", ondelete="SET NULL"), nullable=True),
+    )
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
