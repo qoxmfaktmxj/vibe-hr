@@ -1,0 +1,6 @@
+# Task 6 Report
+
+- Code commit SHA: `fb445e1`
+- Scope: `config/grid-screens.json`, `frontend/src/app/api/org/mapping-types/route.ts`, `frontend/src/app/api/org/mapping-type-items/route.ts`, `frontend/src/app/api/org/mapping-type-items/[itemId]/route.ts`, `frontend/src/components/org/org-mapping-type-item-manager.tsx`, `frontend/tests/e2e/org-type-items.spec.ts`, `frontend/src/lib/org/org-bff-route-contract.test.ts`, `frontend/src/app/org/type-items/page.tsx`, `frontend/src/types/organization.ts`
+- Behavior: added the `/org/type-items` standard-v2 AG Grid screen with the mapped type-item BFF routes, item CRUD/save/download flow, grid metadata registration, and end-to-end coverage for the supported toolbar subset
+- Verification: `npm run validate:grid`; `npx eslint src/app/api/org/mapping-types/route.ts src/app/api/org/mapping-type-items/route.ts "src/app/api/org/mapping-type-items/[itemId]/route.ts" src/app/org/type-items/page.tsx src/components/org/org-mapping-type-item-manager.tsx src/lib/org/org-bff-route-contract.test.ts src/types/organization.ts tests/e2e/org-type-items.spec.ts`; `npx vitest run src/lib/org/org-bff-route-contract.test.ts`; `npx tsc --noEmit`; `npx playwright test tests/e2e/org-type-items.spec.ts --workers=1`
