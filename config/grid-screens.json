@@ -455,7 +455,7 @@
       "componentFile": "frontend/src/components/org/org-mapping-upload-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
-      "variant": "upload",
+      "variant": "workflow",
       "toolbar": [
         "query",
         "template",
