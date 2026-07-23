@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -169,6 +170,41 @@ class OrgMappingAssignmentUpdateRequest(BaseModel):
     item_id: int | None = None
     effective_from: date | None = None
     effective_to: date | None = None
+
+
+class OrgMappingAssignmentUploadRow(BaseModel):
+    department_code: str = Field(min_length=1, max_length=30)
+    type_code: str = Field(min_length=1, max_length=50)
+    item_code: str = Field(min_length=1, max_length=50)
+    effective_from: date
+    effective_to: date | None = None
+
+
+class OrgMappingAssignmentUploadRequest(BaseModel):
+    mode: Literal["atomic"]
+    rows: list[OrgMappingAssignmentUploadRow]
+
+
+class OrgMappingAssignmentUploadPreviewRow(BaseModel):
+    row_number: int
+    valid: bool
+    errors: list[str] = Field(default_factory=list)
+    normalized: dict[str, str | date | None] | None = None
+
+
+class OrgMappingAssignmentUploadPreviewResponse(BaseModel):
+    rows: list[OrgMappingAssignmentUploadPreviewRow]
+    valid_count: int
+    invalid_count: int
+
+
+class OrgMappingAssignmentUploadConfirmResponse(BaseModel):
+    inserted_count: int
+    updated_count: int
+
+
+class OrgMappingAssignmentUploadTemplateResponse(BaseModel):
+    headers: list[str]
 
 
 class OrganizationDepartmentCreateRequest(BaseModel):

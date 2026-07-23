@@ -22,6 +22,10 @@ from app.schemas.organization import (
     OrgMappingAssignmentCreateRequest,
     OrgMappingAssignmentDetailResponse,
     OrgMappingAssignmentListResponse,
+    OrgMappingAssignmentUploadConfirmResponse,
+    OrgMappingAssignmentUploadPreviewResponse,
+    OrgMappingAssignmentUploadRequest,
+    OrgMappingAssignmentUploadTemplateResponse,
     OrgMappingAssignmentUpdateRequest,
     OrgMappingPersonalStatusListResponse,
     OrgMappingTypeItemCreateRequest,
@@ -41,6 +45,7 @@ from app.schemas.organization import (
 )
 from app.services.organization_mapping_service import (
     create_mapping_assignment,
+    confirm_mapping_assignment_upload,
     create_mapping_type_item,
     delete_mapping_assignment,
     list_department_options,
@@ -50,6 +55,7 @@ from app.services.organization_mapping_service import (
     list_mapping_types,
     list_mapping_personal_status,
     list_mapping_type_items,
+    preview_mapping_assignment_upload,
     update_mapping_assignment,
     delete_mapping_type_item,
     update_mapping_type_item,
@@ -280,6 +286,54 @@ def mapping_assignment_create(
 ) -> OrgMappingAssignmentDetailResponse:
     require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="save")
     return OrgMappingAssignmentDetailResponse(item=create_mapping_assignment(session, payload))
+
+
+@router.get(
+    "/mapping-assignments/upload-template",
+    response_model=OrgMappingAssignmentUploadTemplateResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_upload_template(
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentUploadTemplateResponse:
+    require_menu_action_for_user(
+        session,
+        user_id=current_user.id,
+        path="/org/type-upload",
+        action_code="template_download",
+    )
+    return OrgMappingAssignmentUploadTemplateResponse(
+        headers=["조직코드", "유형코드", "항목코드", "시작일", "종료일"],
+    )
+
+
+@router.post(
+    "/mapping-assignments/upload-preview",
+    response_model=OrgMappingAssignmentUploadPreviewResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_upload_preview(
+    payload: OrgMappingAssignmentUploadRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentUploadPreviewResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-upload", action_code="upload")
+    return preview_mapping_assignment_upload(session, payload.rows)
+
+
+@router.post(
+    "/mapping-assignments/upload-confirm",
+    response_model=OrgMappingAssignmentUploadConfirmResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_upload_confirm(
+    payload: OrgMappingAssignmentUploadRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentUploadConfirmResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-upload", action_code="upload")
+    return confirm_mapping_assignment_upload(session, payload.rows, actor_id=int(current_user.id))
 
 
 @router.put(

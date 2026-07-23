@@ -22,6 +22,10 @@ from app.models import (
 from app.schemas.organization import (
     OrgMappingAssignmentCreateRequest,
     OrgMappingAssignmentItem,
+    OrgMappingAssignmentUploadConfirmResponse,
+    OrgMappingAssignmentUploadPreviewResponse,
+    OrgMappingAssignmentUploadPreviewRow,
+    OrgMappingAssignmentUploadRow,
     OrgMappingAssignmentUpdateRequest,
     OrgMappingPersonalStatusCell,
     OrgMappingPersonalStatusListResponse,
@@ -55,6 +59,17 @@ class _PersonalStatusScanResult:
     department_id: int
     position_title: str
     employment_status: str
+
+
+@dataclass(slots=True)
+class _PreparedUploadRow:
+    row_number: int
+    department: OrgDepartment
+    item: OrgMappingTypeItem
+    type_code: str
+    effective_from: date
+    effective_to: date | None
+    existing_assignment: OrgMappingAssignment | None
 
 
 def _snapshot_employee_state_at_reference(
@@ -278,6 +293,236 @@ def _ensure_no_assignment_overlap(
             status_code=status.HTTP_409_CONFLICT,
             detail="Mapping assignment period overlaps existing record.",
         )
+
+
+def _periods_overlap(
+    first_from: date,
+    first_to: date | None,
+    second_from: date,
+    second_to: date | None,
+) -> bool:
+    return first_from <= (second_to or _OPEN_END_DATE) and second_from <= (first_to or _OPEN_END_DATE)
+
+
+def _normalized_upload_row(row: OrgMappingAssignmentUploadRow) -> dict[str, str | date | None]:
+    return {
+        "department_code": _normalize_code(row.department_code),
+        "type_code": _normalize_code(row.type_code),
+        "item_code": _normalize_code(row.item_code),
+        "effective_from": row.effective_from,
+        "effective_to": row.effective_to,
+    }
+
+
+def _upload_preview_from_errors(
+    rows: list[OrgMappingAssignmentUploadRow],
+    errors_by_row: list[list[str]],
+) -> OrgMappingAssignmentUploadPreviewResponse:
+    preview_rows = [
+        OrgMappingAssignmentUploadPreviewRow(
+            row_number=index,
+            valid=not errors,
+            errors=errors,
+            normalized=_normalized_upload_row(row),
+        )
+        for index, (row, errors) in enumerate(zip(rows, errors_by_row), start=1)
+    ]
+    invalid_count = sum(not row.valid for row in preview_rows)
+    return OrgMappingAssignmentUploadPreviewResponse(
+        rows=preview_rows,
+        valid_count=len(preview_rows) - invalid_count,
+        invalid_count=invalid_count,
+    )
+
+
+def _validate_upload_rows(
+    session: Session,
+    rows: list[OrgMappingAssignmentUploadRow],
+) -> tuple[OrgMappingAssignmentUploadPreviewResponse, list[_PreparedUploadRow | None]]:
+    errors_by_row: list[list[str]] = [[] for _ in rows]
+    prepared_rows: list[_PreparedUploadRow | None] = [None for _ in rows]
+
+    for index, row in enumerate(rows):
+        normalized = _normalized_upload_row(row)
+        department = session.exec(
+            select(OrgDepartment).where(func.upper(OrgDepartment.code) == normalized["department_code"])
+        ).first()
+        if department is None:
+            errors_by_row[index].append("Department code not found.")
+
+        type_code = normalized["type_code"]
+        item_code = normalized["item_code"]
+        item = session.exec(
+            select(OrgMappingTypeItem).where(
+                OrgMappingTypeItem.type_code == type_code,
+                OrgMappingTypeItem.item_code == item_code,
+            )
+        ).first()
+        if item is None:
+            errors_by_row[index].append("Mapping item code not found.")
+        elif not item.is_active:
+            errors_by_row[index].append("Mapping item is inactive.")
+
+        if row.effective_to is not None and row.effective_to < row.effective_from:
+            errors_by_row[index].append("effective_to must be on or after effective_from.")
+        elif item is not None and item.is_active:
+            if row.effective_from < item.effective_from or (
+                item.effective_to is not None
+                and (row.effective_to is None or row.effective_to > item.effective_to)
+            ):
+                errors_by_row[index].append("Mapping assignment item period must contain the assignment period.")
+
+        if department is not None and item is not None and item.is_active and not errors_by_row[index]:
+            existing_rows = session.exec(
+                select(OrgMappingAssignment).where(
+                    OrgMappingAssignment.department_id == department.id,
+                    OrgMappingAssignment.type_code == type_code,
+                )
+            ).all()
+            same_start_rows = [candidate for candidate in existing_rows if candidate.effective_from == row.effective_from]
+            if len(same_start_rows) > 1:
+                errors_by_row[index].append("Mapping assignment period overlaps existing record.")
+                continue
+            existing_assignment = same_start_rows[0] if same_start_rows else None
+            if any(
+                candidate.id != (existing_assignment.id if existing_assignment is not None else None)
+                and _periods_overlap(
+                    row.effective_from,
+                    row.effective_to,
+                    candidate.effective_from,
+                    candidate.effective_to,
+                )
+                for candidate in existing_rows
+            ):
+                errors_by_row[index].append("Mapping assignment period overlaps existing record.")
+                continue
+            prepared_rows[index] = _PreparedUploadRow(
+                row_number=index + 1,
+                department=department,
+                item=item,
+                type_code=type_code,
+                effective_from=row.effective_from,
+                effective_to=row.effective_to,
+                existing_assignment=existing_assignment,
+            )
+
+    for first_index, first in enumerate(prepared_rows):
+        if first is None:
+            continue
+        for second_index in range(first_index + 1, len(prepared_rows)):
+            second = prepared_rows[second_index]
+            if second is None:
+                continue
+            if (
+                first.department.id == second.department.id
+                and first.type_code == second.type_code
+                and _periods_overlap(first.effective_from, first.effective_to, second.effective_from, second.effective_to)
+            ):
+                errors_by_row[first_index].append("Mapping assignment period overlaps another upload row.")
+                errors_by_row[second_index].append("Mapping assignment period overlaps another upload row.")
+
+    preview = _upload_preview_from_errors(rows, errors_by_row)
+    return preview, prepared_rows
+
+
+def validate_upload_rows(
+    session: Session,
+    rows: list[OrgMappingAssignmentUploadRow],
+) -> OrgMappingAssignmentUploadPreviewResponse:
+    preview, _ = _validate_upload_rows(session, rows)
+    return preview
+
+
+def preview_mapping_assignment_upload(
+    session: Session,
+    rows: list[OrgMappingAssignmentUploadRow],
+) -> OrgMappingAssignmentUploadPreviewResponse:
+    with session.no_autoflush:
+        return validate_upload_rows(session, rows)
+
+
+def _upload_validation_exception(
+    preview: OrgMappingAssignmentUploadPreviewResponse,
+) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail={"message": "upload validation failed", **preview.model_dump(mode="json")},
+    )
+
+
+def confirm_mapping_assignment_upload(
+    session: Session,
+    rows: list[OrgMappingAssignmentUploadRow],
+    *,
+    actor_id: int,
+) -> OrgMappingAssignmentUploadConfirmResponse:
+    try:
+        with session.no_autoflush:
+            preview, prepared_rows = _validate_upload_rows(session, rows)
+    except HTTPException:
+        session.rollback()
+        raise
+    except IntegrityError as exc:
+        session.rollback()
+        errors = [["Mapping assignment period overlaps existing record."] for _ in rows]
+        raise _upload_validation_exception(_upload_preview_from_errors(rows, errors)) from exc
+    except Exception as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Upload confirmation failed.",
+        ) from exc
+    if preview.invalid_count:
+        session.rollback()
+        raise _upload_validation_exception(preview)
+
+    inserted_count = 0
+    updated_count = 0
+    try:
+        for prepared in prepared_rows:
+            assert prepared is not None
+            if prepared.existing_assignment is None:
+                session.add(
+                    OrgMappingAssignment(
+                        department_id=int(prepared.department.id),
+                        type_code=prepared.type_code,
+                        item_id=int(prepared.item.id),
+                        effective_from=prepared.effective_from,
+                        effective_to=prepared.effective_to,
+                        created_by=actor_id,
+                        updated_by=actor_id,
+                        created_at=_utc_now(),
+                        updated_at=_utc_now(),
+                    )
+                )
+                inserted_count += 1
+            else:
+                prepared.existing_assignment.item_id = int(prepared.item.id)
+                prepared.existing_assignment.effective_to = prepared.effective_to
+                prepared.existing_assignment.updated_by = actor_id
+                prepared.existing_assignment.updated_at = _utc_now()
+                session.add(prepared.existing_assignment)
+                updated_count += 1
+        session.flush()
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        errors = [["Mapping assignment period overlaps existing record."] for _ in rows]
+        raise _upload_validation_exception(_upload_preview_from_errors(rows, errors)) from exc
+    except HTTPException:
+        session.rollback()
+        raise
+    except Exception as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Upload confirmation failed.",
+        ) from exc
+
+    return OrgMappingAssignmentUploadConfirmResponse(
+        inserted_count=inserted_count,
+        updated_count=updated_count,
+    )
 
 
 def _list_mapping_type_codes(session: Session) -> list[OrganizationLookupItem]:
