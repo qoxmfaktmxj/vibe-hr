@@ -31,6 +31,15 @@ export type OrganizationDepartmentDetailResponse = {
   department: OrganizationDepartmentItem;
 };
 
+export type OrganizationLookupItem = {
+  code: string;
+  name: string;
+};
+
+export type OrganizationLookupItemsResponse = {
+  items: OrganizationLookupItem[];
+};
+
 export type OrgMappingTypeItem = {
   id: number;
   type_code: string;
@@ -52,6 +61,48 @@ export type OrgMappingTypeItemListResponse = {
   total_count: number;
   page: number;
   limit: number;
+};
+
+export type OrgMappingAssignmentItem = {
+  id: number;
+  department_id: number;
+  department_code: string;
+  department_name: string;
+  type_code: string;
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrgMappingAssignmentListResponse = {
+  items: OrgMappingAssignmentItem[];
+  total_count: number;
+  page: number;
+  limit: number;
+};
+
+export type OrgMappingAssignmentDetailResponse = {
+  item: OrgMappingAssignmentItem;
+};
+
+export type OrgMappingAssignmentCreateRequest = {
+  department_id: number;
+  type_code: string;
+  item_id: number;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+export type OrgMappingAssignmentUpdateRequest = {
+  department_id?: number;
+  type_code?: string;
+  item_id?: number;
+  effective_from?: string;
+  effective_to?: string | null;
 };
 
 export type OrganizationCorporationItem = {

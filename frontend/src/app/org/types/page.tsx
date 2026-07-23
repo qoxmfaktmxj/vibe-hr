@@ -1,9 +1,14 @@
+import { OrgMappingAssignmentManager } from "@/components/org/org-mapping-assignment-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export default async function Page() {
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "org.types",
+} as const;
+
+export default async function OrgTypesPage() {
   await requireMenuAccess("/org/types");
 
-  return (
-      <div className="p-6 text-sm text-muted-foreground">조직구분 화면 준비 완료. 다음 단계에서 상세 기능을 연결합니다.</div>
-  );
+  return <OrgMappingAssignmentManager />;
 }

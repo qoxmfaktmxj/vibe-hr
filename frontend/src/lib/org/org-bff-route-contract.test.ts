@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
+import { GET as GET_DEPARTMENT_OPTIONS } from "@/app/api/org/department-options/route";
+import {
+  DELETE as DELETE_MAPPING_ASSIGNMENT,
+  PUT as PUT_MAPPING_ASSIGNMENT,
+} from "@/app/api/org/mapping-assignments/[assignmentId]/route";
+import {
+  GET as GET_MAPPING_ASSIGNMENTS,
+  POST as POST_MAPPING_ASSIGNMENTS,
+} from "@/app/api/org/mapping-assignments/route";
+import { GET as GET_MAPPING_ITEM_OPTIONS } from "@/app/api/org/mapping-item-options/route";
+import { GET as GET_MAPPING_TYPE_OPTIONS } from "@/app/api/org/mapping-type-options/route";
 import { GET as GET_MAPPING_TYPES } from "@/app/api/org/mapping-types/route";
 import {
   DELETE as DELETE_MAPPING_TYPE_ITEM,
@@ -18,12 +29,28 @@ type RouteCase = {
   upstreamUrl: string;
   method: "GET" | "POST" | "PUT" | "DELETE";
   body?: Record<string, unknown>;
-  context?: any;
   upstreamStatus?: number;
   expect204?: boolean;
+  context?: RouteContext;
+};
+
+type RouteContext = {
+  params?: Promise<Record<string, string>> | Record<string, string>;
 };
 
 const basePayload = {
+  assignment_id: 7,
+  department_code: "D001",
+  department_name: "인사팀",
+  type_code: "COST",
+  item_code: "CC-100",
+  item_name: "원가센터 A",
+  effective_from: "2026-01-31",
+  effective_to: null,
+  is_active: true,
+};
+
+const typeItemPayload = {
   type_code: "COST",
   item_code: "CC-100",
   name: "원가센터 A",
@@ -37,6 +64,60 @@ const basePayload = {
 };
 
 const ROUTES: RouteCase[] = [
+  {
+    name: "mapping-type-options",
+    handler: GET_MAPPING_TYPE_OPTIONS,
+    requestUrl: "http://localhost/api/org/mapping-type-options",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-options",
+    method: "GET",
+  },
+  {
+    name: "mapping-item-options",
+    handler: GET_MAPPING_ITEM_OPTIONS,
+    requestUrl: "http://localhost/api/org/mapping-item-options?type_code=COST",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-item-options?type_code=COST",
+    method: "GET",
+  },
+  {
+    name: "department-options",
+    handler: GET_DEPARTMENT_OPTIONS,
+    requestUrl: "http://localhost/api/org/department-options",
+    upstreamUrl: "http://localhost:8000/api/v1/org/department-options",
+    method: "GET",
+  },
+  {
+    name: "mapping-assignments GET",
+    handler: GET_MAPPING_ASSIGNMENTS,
+    requestUrl: "http://localhost/api/org/mapping-assignments",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
+    method: "GET",
+  },
+  {
+    name: "mapping-assignments POST",
+    handler: POST_MAPPING_ASSIGNMENTS,
+    requestUrl: "http://localhost/api/org/mapping-assignments",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
+    method: "POST",
+    body: basePayload,
+  },
+  {
+    name: "mapping-assignments PUT",
+    handler: PUT_MAPPING_ASSIGNMENT,
+    requestUrl: "http://localhost/api/org/mapping-assignments/7",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
+    method: "PUT",
+    body: basePayload,
+    context: { params: { assignmentId: "7" } },
+  },
+  {
+    name: "mapping-assignments DELETE",
+    handler: DELETE_MAPPING_ASSIGNMENT,
+    requestUrl: "http://localhost/api/org/mapping-assignments/7",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
+    method: "DELETE",
+    context: { params: { assignmentId: "7" } },
+    expect204: true,
+  },
   {
     name: "mapping-types",
     handler: GET_MAPPING_TYPES,
@@ -57,7 +138,7 @@ const ROUTES: RouteCase[] = [
     requestUrl: "http://localhost/api/org/mapping-type-items",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items",
     method: "POST",
-    body: basePayload,
+    body: typeItemPayload,
   },
   {
     name: "mapping-type-items PUT",
@@ -65,7 +146,7 @@ const ROUTES: RouteCase[] = [
     requestUrl: "http://localhost/api/org/mapping-type-items/42",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items/42",
     method: "PUT",
-    body: basePayload,
+    body: typeItemPayload,
     context: { params: { itemId: "42" } },
   },
   {
@@ -88,7 +169,7 @@ function buildRequest(routeCase: RouteCase, withCookie: boolean) {
     headers["content-type"] = "application/json";
   }
 
-  const init: any = {
+  const init: ConstructorParameters<typeof NextRequest>[1] = {
     method: routeCase.method,
     headers,
   };

@@ -436,6 +436,21 @@
       ],
       "ownerModule": "ORG"
     },
+    "org.types": {
+      "path": "/org/types",
+      "pageFile": "frontend/src/app/org/types/page.tsx",
+      "componentFile": "frontend/src/components/org/org-mapping-assignment-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "save",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
     "org.departments": {
       "path": "/org/departments",
       "pageFile": "frontend/src/app/org/departments/page.tsx",
