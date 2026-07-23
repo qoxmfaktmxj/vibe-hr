@@ -21,7 +21,7 @@ import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/co
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
-import { clearSavedStatuses, reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import {
   buildGridRowClassRules,
   getGridRowClass,
@@ -33,6 +33,11 @@ import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
 import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import type { OrgMappingTypeItem, OrgMappingTypeItemListResponse } from "@/types/organization";
+import {
+  applySuccessfulOrgMappingTypeItemSave,
+  collectPendingOrgMappingTypeItemRows,
+  type OrgMappingTypeItemSaveRow,
+} from "@/lib/org/org-mapping-type-item-save";
 
 type RowStatus = GridRowStatus;
 
@@ -41,11 +46,7 @@ type MappingTypeOption = {
   name: string;
 };
 
-type RowData = OrgMappingTypeItem & {
-  _status: RowStatus;
-  _original?: Record<string, unknown>;
-  _prevStatus?: RowStatus;
-};
+type RowData = OrgMappingTypeItemSaveRow;
 
 type SearchFilters = {
   typeCode: string;
@@ -274,6 +275,7 @@ const DateCellEditor = forwardRef<
 
 export function OrgMappingTypeItemManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/org/type-items");
+  const canSave = can("save");
   const [rows, setRows] = useState<RowData[]>([]);
   const [typeOptions, setTypeOptions] = useState<MappingTypeOption[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({ typeCode: "", referenceDate: "" });
@@ -466,6 +468,7 @@ export function OrgMappingTypeItemManager() {
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
+      if (!canSave) return;
       commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
@@ -473,7 +476,7 @@ export function OrgMappingTypeItemManager() {
         }),
       );
     },
-    [commitRows],
+    [canSave, commitRows],
   );
 
   const columnDefs = useMemo<ColDef<RowData>[]>(() => {
@@ -506,8 +509,12 @@ export function OrgMappingTypeItemManager() {
               <input
                 type="checkbox"
                 checked={row._status === "deleted"}
-                className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]"
-                onChange={(event) => toggleDeleteById(row.id, event.target.checked)}
+                disabled={!canSave}
+                className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)] disabled:cursor-not-allowed"
+                onChange={(event) => {
+                  if (!canSave) return;
+                  toggleDeleteById(row.id, event.target.checked);
+                }}
                 onClick={(event) => event.stopPropagation()}
               />
             </div>
@@ -528,27 +535,27 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colTypeCode,
         field: "type_code",
         width: 130,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
         ...typeCodeEditor,
       },
       {
         headerName: I18N.colItemCode,
         field: "item_code",
         width: 150,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colName,
         field: "name",
         flex: 1.2,
         minWidth: 180,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colEffectiveFrom,
         field: "effective_from",
         width: 120,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
         cellEditor: DateCellEditor,
         cellEditorPopup: true,
         cellEditorPopupPosition: "under",
@@ -558,7 +565,7 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colEffectiveTo,
         field: "effective_to",
         width: 120,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
         cellEditor: DateCellEditor,
         cellEditorPopup: true,
         cellEditorPopupPosition: "under",
@@ -568,19 +575,19 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colErpEmployeeCode,
         field: "erp_employee_code",
         width: 150,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colCostCenterType,
         field: "cost_center_type",
         width: 120,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colSortOrder,
         field: "sort_order",
         width: 90,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
         valueParser: (params) => normalizeSortOrder(params.newValue),
       },
       {
@@ -588,20 +595,20 @@ export function OrgMappingTypeItemManager() {
         field: "remark",
         flex: 1.4,
         minWidth: 220,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colIsActive,
         field: "is_active",
         width: 100,
-        editable: (params) => params.data?._status !== "deleted",
+        editable: (params) => canSave && params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: ["Y", "N"] },
         valueFormatter: (params) => (params.value ? "Y" : "N"),
         valueParser: (params) => normalizeBoolean(params.newValue),
       },
     ];
-  }, [toggleDeleteById, typeCodeOptions]);
+  }, [canSave, toggleDeleteById, typeCodeOptions]);
 
   const getRowClass = useCallback((params: RowClassParams<RowData>) => getGridRowClass(params.data?._status), []);
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
@@ -612,6 +619,7 @@ export function OrgMappingTypeItemManager() {
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent<RowData>) => {
+      if (!canSave) return;
       if (event.newValue === event.oldValue) return;
       const rowId = event.data?.id;
       const field = event.colDef.field as keyof RowData | undefined;
@@ -642,10 +650,11 @@ export function OrgMappingTypeItemManager() {
         }),
       );
     },
-    [commitRows],
+    [canSave, commitRows],
   );
 
   function addRow() {
+    if (!canSave) return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
     const now = new Date().toISOString();
@@ -672,6 +681,7 @@ export function OrgMappingTypeItemManager() {
   }
 
   function copyRow() {
+    if (!canSave) return;
     if (!selectedRow || selectedRow._status === "deleted") return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
@@ -723,11 +733,12 @@ export function OrgMappingTypeItemManager() {
   }
 
   async function saveAll() {
+    if (!canSave) return;
     gridApiRef.current?.stopEditing();
-
-    const toDelete = rows.filter((row) => row._status === "deleted" && row.id > 0);
-    const toInsert = rows.filter((row) => row._status === "added");
-    const toUpdate = rows.filter((row) => row._status === "updated");
+    const pending = collectPendingOrgMappingTypeItemRows(rows);
+    const toDelete = pending.deleted.filter((row) => row.id > 0);
+    const toInsert = pending.added;
+    const toUpdate = pending.updated;
 
     if (toDelete.length + toInsert.length + toUpdate.length === 0) return;
 
@@ -747,30 +758,61 @@ export function OrgMappingTypeItemManager() {
           const payload = (await response.json().catch(() => null)) as unknown;
           throw new Error(stringifyErrorDetail(payload) ?? `삭제 실패: ${row.item_code}`);
         }
+        commitRows((prev) =>
+          applySuccessfulOrgMappingTypeItemSave(prev, { type: "delete", rowId: row.id }, snapshotOriginal),
+        );
+        setSelectedId((current) => (current === row.id ? null : current));
       }
 
-      for (const row of [...toInsert, ...toUpdate]) {
-        const isCreate = row._status === "added";
-        const response = await fetch(
-          isCreate ? "/api/org/mapping-type-items" : `/api/org/mapping-type-items/${row.id}`,
-          {
-            method: isCreate ? "POST" : "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(createSavePayload(row)),
-          },
-        );
+      for (const row of toInsert) {
+        const response = await fetch("/api/org/mapping-type-items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(createSavePayload(row)),
+        });
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as unknown;
-          throw new Error(stringifyErrorDetail(payload) ?? `${isCreate ? "입력" : "수정"} 실패: ${row.item_code}`);
+          throw new Error(stringifyErrorDetail(payload) ?? `입력 실패: ${row.item_code}`);
         }
+        const payload = (await response.json().catch(() => null)) as { item?: OrgMappingTypeItem } | null;
+        const savedRow = payload?.item;
+        if (!savedRow) {
+          throw new Error(`입력 응답이 올바르지 않습니다: ${row.item_code}`);
+        }
+        commitRows((prev) =>
+          applySuccessfulOrgMappingTypeItemSave(
+            prev,
+            { type: "upsert", previousId: row.id, row: savedRow },
+            snapshotOriginal,
+          ),
+        );
+        setSelectedId((current) => (current === row.id ? savedRow.id : current));
       }
 
-      commitRows((prev) =>
-        clearSavedStatuses(prev, {
-          removeDeleted: true,
-          buildOriginal: (row) => snapshotOriginal(row),
-        }),
-      );
+      for (const row of toUpdate) {
+        const response = await fetch(`/api/org/mapping-type-items/${row.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(createSavePayload(row)),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as unknown;
+          throw new Error(stringifyErrorDetail(payload) ?? `수정 실패: ${row.item_code}`);
+        }
+        const payload = (await response.json().catch(() => null)) as { item?: OrgMappingTypeItem } | null;
+        const savedRow = payload?.item;
+        if (!savedRow) {
+          throw new Error(`수정 응답이 올바르지 않습니다: ${row.item_code}`);
+        }
+        commitRows((prev) =>
+          applySuccessfulOrgMappingTypeItemSave(
+            prev,
+            { type: "upsert", previousId: row.id, row: savedRow },
+            snapshotOriginal,
+          ),
+        );
+        setSelectedId((current) => (current === row.id ? savedRow.id : current));
+      }
 
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
@@ -814,14 +856,14 @@ export function OrgMappingTypeItemManager() {
       label: I18N.addRow,
       icon: Plus,
       onClick: addRow,
-      disabled: saving,
+      disabled: saving || !canSave,
     },
     {
       key: "copy",
       label: I18N.copy,
       icon: Copy,
       onClick: copyRow,
-      disabled: saving || !selectedRow,
+      disabled: saving || !selectedRow || !canSave,
     },
     {
       key: "download",
