@@ -436,6 +436,19 @@
       ],
       "ownerModule": "ORG"
     },
+    "org.type-personal-status": {
+      "path": "/org/type-personal-status",
+      "pageFile": "frontend/src/app/org/type-personal-status/page.tsx",
+      "componentFile": "frontend/src/components/org/org-mapping-personal-status-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "readonly",
+      "toolbar": [
+        "query",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
     "org.types": {
       "path": "/org/types",
       "pageFile": "frontend/src/app/org/types/page.tsx",

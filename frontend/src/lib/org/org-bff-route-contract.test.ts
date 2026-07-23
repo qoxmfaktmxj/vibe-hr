@@ -21,6 +21,7 @@ import {
   GET as GET_MAPPING_TYPE_ITEMS,
   POST as POST_MAPPING_TYPE_ITEMS,
 } from "@/app/api/org/mapping-type-items/route";
+import { GET as GET_MAPPING_PERSONAL_STATUS } from "@/app/api/org/mapping-personal-status/route";
 
 type RouteCase = {
   name: string;
@@ -64,6 +65,13 @@ const typeItemPayload = {
 };
 
 const ROUTES: RouteCase[] = [
+  {
+    name: "mapping-personal-status",
+    handler: GET_MAPPING_PERSONAL_STATUS,
+    requestUrl: "http://localhost/api/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
+    method: "GET",
+  },
   {
     name: "mapping-type-options",
     handler: GET_MAPPING_TYPE_OPTIONS,
@@ -275,4 +283,23 @@ describe("/api/org mapping BFF routes", () => {
       expect(await response.text()).toBe("");
     },
   );
+
+  it("forwards 403 JSON responses for mapping-personal-status", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Forbidden." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET_MAPPING_PERSONAL_STATUS(
+      new NextRequest("http://localhost/api/org/mapping-personal-status?reference_date=2026-07-31", {
+        headers: { cookie: "vibe_hr_token=token-123" },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ detail: "Forbidden." });
+  });
 });

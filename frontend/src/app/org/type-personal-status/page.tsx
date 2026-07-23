@@ -1,9 +1,14 @@
 import { requireMenuAccess } from "@/lib/guard";
+import { OrgMappingPersonalStatusManager } from "@/components/org/org-mapping-personal-status-manager";
+
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "org.type-personal-status",
+} as const;
 
 export default async function Page() {
   await requireMenuAccess("/org/type-personal-status");
 
-  return (
-      <div className="p-6 text-sm text-muted-foreground">조직구분개인별현황 화면 준비 완료. 다음 단계에서 상세 기능을 연결합니다.</div>
-  );
+  return <OrgMappingPersonalStatusManager />;
 }

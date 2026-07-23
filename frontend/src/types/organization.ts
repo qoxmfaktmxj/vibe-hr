@@ -106,6 +106,35 @@ export type OrgMappingAssignmentUpdateRequest = {
   effective_to?: string | null;
 };
 
+export type OrgMappingPersonalStatusCell = {
+  item_code: string;
+  item_name: string;
+};
+
+export type OrgMappingPersonalStatusRow = {
+  employee_id: number;
+  employee_no: string;
+  display_name: string;
+  department_id: number;
+  department_code: string;
+  department_name: string;
+  position_title: string;
+  mappings: Record<string, OrgMappingPersonalStatusCell>;
+};
+
+export type OrgMappingPersonalStatusTypeColumn = {
+  type_code: string;
+  name: string;
+};
+
+export type OrgMappingPersonalStatusListResponse = {
+  items: OrgMappingPersonalStatusRow[];
+  type_columns: OrgMappingPersonalStatusTypeColumn[];
+  total_count: number;
+  page: number;
+  limit: number;
+};
+
 export type OrganizationCorporationItem = {
   id: number;
   enter_cd: string;
