@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException, status
@@ -7,11 +9,24 @@ from sqlalchemy import and_, func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from app.models import AppCode, AppCodeGroup, OrgDepartment, OrgMappingAssignment, OrgMappingTypeItem
+from app.models import (
+    AppCode,
+    AppCodeGroup,
+    AuthUser,
+    HrEmployee,
+    HrPersonnelHistory,
+    OrgDepartment,
+    OrgMappingAssignment,
+    OrgMappingTypeItem,
+)
 from app.schemas.organization import (
     OrgMappingAssignmentCreateRequest,
     OrgMappingAssignmentItem,
     OrgMappingAssignmentUpdateRequest,
+    OrgMappingPersonalStatusCell,
+    OrgMappingPersonalStatusListResponse,
+    OrgMappingPersonalStatusRow,
+    OrgMappingPersonalStatusTypeColumn,
     OrgMappingTypeItemCreateRequest,
     OrgMappingTypeItemDetail,
     OrgMappingTypeItemUpdateRequest,
@@ -20,6 +35,16 @@ from app.schemas.organization import (
 
 MAPPING_TYPE_GROUP_CODE = "ORG_MAPPING_TYPE"
 _OPEN_END_DATE = date.max
+
+
+@dataclass(slots=True)
+class _PersonalStatusEmployeeSnapshot:
+    employee_id: int
+    employee_no: str
+    display_name: str
+    department_id: int
+    position_title: str
+    employment_status: str
 
 
 def _lookup_item(code: str, name: str, id: int | None = None) -> OrganizationLookupItem:
@@ -336,6 +361,156 @@ def list_mapping_assignments(
         rows = rows[offset : offset + limit]
 
     return [_build_assignment_item(assignment=row[0], department=row[1], item=row[2]) for row in rows], total_count
+
+
+def _snapshot_employee_at_reference(
+    employee: HrEmployee,
+    histories: list[HrPersonnelHistory],
+    display_name: str,
+) -> _PersonalStatusEmployeeSnapshot:
+    snapshot = _PersonalStatusEmployeeSnapshot(
+        employee_id=int(employee.id),
+        employee_no=employee.employee_no,
+        display_name=display_name,
+        department_id=int(employee.department_id),
+        position_title=employee.position_title,
+        employment_status=employee.employment_status,
+    )
+    for history in histories:
+        if history.field_name == "department_id" and history.before_value not in (None, ""):
+            snapshot.department_id = int(history.before_value)
+        elif history.field_name == "employment_status" and history.before_value is not None:
+            snapshot.employment_status = history.before_value
+    return snapshot
+
+
+def list_mapping_personal_status(
+    session: Session,
+    *,
+    reference_date: date,
+    page: int,
+    limit: int,
+) -> OrgMappingPersonalStatusListResponse:
+    type_columns = [
+        OrgMappingPersonalStatusTypeColumn(type_code=item.code, name=item.name)
+        for item in list_mapping_types(session)
+    ]
+
+    candidate_rows = session.exec(
+        select(HrEmployee, AuthUser)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .where(HrEmployee.hire_date <= reference_date)
+        .order_by(HrEmployee.employee_no, HrEmployee.id)
+    ).all()
+    if not candidate_rows:
+        return OrgMappingPersonalStatusListResponse(
+            items=[],
+            type_columns=type_columns,
+            total_count=0,
+            page=page,
+            limit=limit,
+        )
+
+    candidate_ids = [int(employee.id) for employee, _user in candidate_rows]
+    histories_by_employee: dict[int, list[HrPersonnelHistory]] = defaultdict(list)
+    history_rows = session.exec(
+        select(HrPersonnelHistory)
+        .where(
+            HrPersonnelHistory.employee_id.in_(candidate_ids),
+            HrPersonnelHistory.effective_date > reference_date,
+            HrPersonnelHistory.field_name.in_(("department_id", "employment_status")),
+        )
+        .order_by(
+            HrPersonnelHistory.employee_id,
+            HrPersonnelHistory.effective_date.desc(),
+            HrPersonnelHistory.id.desc(),
+        )
+    ).all()
+    for history in history_rows:
+        histories_by_employee[int(history.employee_id)].append(history)
+
+    active_rows: list[tuple[_PersonalStatusEmployeeSnapshot, AuthUser]] = []
+    for employee, user in candidate_rows:
+        snapshot = _snapshot_employee_at_reference(
+            employee,
+            histories_by_employee.get(int(employee.id), []),
+            user.display_name,
+        )
+        if snapshot.employment_status != "active":
+            continue
+        active_rows.append((snapshot, user))
+
+    active_department_ids = {snapshot.department_id for snapshot, _user in active_rows}
+    department_map = {
+        int(department.id): department
+        for department in session.exec(
+            select(OrgDepartment).where(OrgDepartment.id.in_(active_department_ids))
+        ).all()
+    } if active_department_ids else {}
+
+    assignment_map: dict[tuple[int, str], OrgMappingPersonalStatusCell] = {}
+    if active_department_ids:
+        assignment_rows = session.exec(
+            select(OrgMappingAssignment, OrgMappingTypeItem)
+            .join(
+                OrgMappingTypeItem,
+                and_(
+                    OrgMappingTypeItem.id == OrgMappingAssignment.item_id,
+                    OrgMappingTypeItem.type_code == OrgMappingAssignment.type_code,
+                ),
+            )
+            .where(
+                OrgMappingAssignment.department_id.in_(active_department_ids),
+                OrgMappingAssignment.effective_from <= reference_date,
+                func.coalesce(OrgMappingAssignment.effective_to, _OPEN_END_DATE) >= reference_date,
+            )
+            .order_by(
+                OrgMappingAssignment.department_id,
+                OrgMappingAssignment.type_code,
+                OrgMappingAssignment.effective_from.desc(),
+                OrgMappingAssignment.id.desc(),
+            )
+        ).all()
+        for assignment, item in assignment_rows:
+            assignment_map[(int(assignment.department_id), assignment.type_code)] = OrgMappingPersonalStatusCell(
+                item_code=item.item_code,
+                item_name=item.name,
+            )
+
+    items: list[OrgMappingPersonalStatusRow] = []
+    for snapshot, _user in active_rows:
+        department = department_map.get(snapshot.department_id)
+        mappings = {
+            column.type_code: OrgMappingPersonalStatusCell(item_code="", item_name="")
+            for column in type_columns
+        }
+        for column in type_columns:
+            cell = assignment_map.get((snapshot.department_id, column.type_code))
+            if cell is not None:
+                mappings[column.type_code] = cell
+        items.append(
+            OrgMappingPersonalStatusRow(
+                employee_id=snapshot.employee_id,
+                employee_no=snapshot.employee_no,
+                display_name=snapshot.display_name,
+                department_id=snapshot.department_id,
+                department_code=department.code if department is not None else "",
+                department_name=department.name if department is not None else "",
+                position_title=snapshot.position_title,
+                mappings=mappings,
+            )
+        )
+
+    total_count = len(items)
+    offset = max(0, (page - 1) * limit)
+    page_items = items[offset : offset + limit]
+    return OrgMappingPersonalStatusListResponse(
+        items=page_items,
+        type_columns=type_columns,
+        total_count=total_count,
+        page=page,
+        limit=limit,
+    )
 
 
 def create_mapping_assignment(

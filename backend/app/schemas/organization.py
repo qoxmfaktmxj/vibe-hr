@@ -126,6 +126,35 @@ class OrgMappingAssignmentDetailResponse(BaseModel):
     item: OrgMappingAssignmentItem
 
 
+class OrgMappingPersonalStatusTypeColumn(BaseModel):
+    type_code: str
+    name: str
+
+
+class OrgMappingPersonalStatusCell(BaseModel):
+    item_code: str
+    item_name: str
+
+
+class OrgMappingPersonalStatusRow(BaseModel):
+    employee_id: int
+    employee_no: str
+    display_name: str
+    department_id: int
+    department_code: str
+    department_name: str
+    position_title: str
+    mappings: dict[str, OrgMappingPersonalStatusCell] = Field(default_factory=dict)
+
+
+class OrgMappingPersonalStatusListResponse(BaseModel):
+    items: list[OrgMappingPersonalStatusRow]
+    type_columns: list[OrgMappingPersonalStatusTypeColumn]
+    total_count: int
+    page: int
+    limit: int
+
+
 class OrgMappingAssignmentCreateRequest(BaseModel):
     department_id: int
     type_code: str = Field(min_length=1, max_length=50)

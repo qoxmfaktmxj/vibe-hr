@@ -23,6 +23,7 @@ from app.schemas.organization import (
     OrgMappingAssignmentDetailResponse,
     OrgMappingAssignmentListResponse,
     OrgMappingAssignmentUpdateRequest,
+    OrgMappingPersonalStatusListResponse,
     OrgMappingTypeItemCreateRequest,
     OrgMappingTypeItemDetailResponse,
     OrgMappingTypeItemListResponse,
@@ -47,6 +48,7 @@ from app.services.organization_mapping_service import (
     list_mapping_item_options,
     list_mapping_type_options,
     list_mapping_types,
+    list_mapping_personal_status,
     list_mapping_type_items,
     update_mapping_assignment,
     delete_mapping_type_item,
@@ -308,6 +310,27 @@ def mapping_assignment_delete(
     require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="save")
     delete_mapping_assignment(session, assignment_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/mapping-personal-status",
+    response_model=OrgMappingPersonalStatusListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_personal_status(
+    reference_date: date = Query(...),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingPersonalStatusListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-personal-status", action_code="query")
+    return list_mapping_personal_status(
+        session,
+        reference_date=reference_date,
+        page=page,
+        limit=limit,
+    )
 
 
 @router.get(
