@@ -31,6 +31,29 @@ export type OrganizationDepartmentDetailResponse = {
   department: OrganizationDepartmentItem;
 };
 
+export type OrgMappingTypeItem = {
+  id: number;
+  type_code: string;
+  item_code: string;
+  name: string;
+  effective_from: string;
+  effective_to: string | null;
+  erp_employee_code: string | null;
+  cost_center_type: string | null;
+  remark: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrgMappingTypeItemListResponse = {
+  items: OrgMappingTypeItem[];
+  total_count: number;
+  page: number;
+  limit: number;
+};
+
 export type OrganizationCorporationItem = {
   id: number;
   enter_cd: string;
