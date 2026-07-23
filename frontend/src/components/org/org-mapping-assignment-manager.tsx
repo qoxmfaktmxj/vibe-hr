@@ -345,6 +345,8 @@ export function OrgMappingAssignmentManager() {
   const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
   const departmentSelectOptions = useMemo(() => buildLookupEditorOptions(departmentLookupOptions), [departmentLookupOptions]);
   const typeSelectOptions = useMemo(() => buildTypeEditorOptions(typeOptions), [typeOptions]);
+  const canCreateAction = !menuActionLoading && can("create");
+  const canCopyAction = !menuActionLoading && can("copy");
   const canSaveAction = !menuActionLoading && !loading && can("save");
   const departmentById = useMemo(() => {
     const entries: Array<[number, OrganizationLookupItem]> = [];
@@ -750,7 +752,7 @@ export function OrgMappingAssignmentManager() {
   );
 
   function addRow() {
-    if (!canSaveAction) return;
+    if (!canCreateAction || !canSaveAction) return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
     const now = new Date().toISOString();
@@ -784,7 +786,7 @@ export function OrgMappingAssignmentManager() {
   }
 
   function copyRow() {
-    if (!canSaveAction) return;
+    if (!canCopyAction || !canSaveAction) return;
     if (!selectedRow || selectedRow._status === "deleted") return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
@@ -951,7 +953,7 @@ export function OrgMappingAssignmentManager() {
       label: I18N.addRow,
       icon: Plus,
       onClick: addRow,
-      disabled: saving || !canSaveAction || loading,
+      disabled: saving || loading || !canSaveAction,
     },
     {
       key: "copy",
@@ -969,7 +971,8 @@ export function OrgMappingAssignmentManager() {
     },
   ].filter((action) => {
     if (action.key === "download") return can("download");
-    return canSaveAction;
+    if (action.key === "create") return canCreateAction;
+    return canCopyAction;
   });
 
   const toolbarSaveAction = canSaveAction

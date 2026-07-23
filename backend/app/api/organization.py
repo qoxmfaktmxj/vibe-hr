@@ -412,7 +412,7 @@ def mapping_type_items(
 
 
 @router.post(
-    "/type-items",
+    "/mapping-type-items",
     response_model=OrgMappingTypeItemDetailResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
@@ -427,7 +427,7 @@ def mapping_type_item_create(
 
 
 @router.put(
-    "/type-items/{item_id}",
+    "/mapping-type-items/{item_id}",
     response_model=OrgMappingTypeItemDetailResponse,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )
@@ -442,7 +442,7 @@ def mapping_type_item_update(
 
 
 @router.delete(
-    "/type-items/{item_id}",
+    "/mapping-type-items/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_roles("hr_manager", "admin"))],
 )

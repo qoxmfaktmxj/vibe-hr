@@ -270,7 +270,6 @@ const DateCellEditor = forwardRef<
 
 export function OrgMappingTypeItemManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/org/type-items");
-  const canSave = isOrgMappingTypeItemSaveAllowed(menuActionLoading, can("save"));
   const [rows, setRows] = useState<RowData[]>([]);
   const [typeOptions, setTypeOptions] = useState<MappingTypeOption[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({ typeCode: "", referenceDate: "" });
@@ -284,6 +283,10 @@ export function OrgMappingTypeItemManager() {
   const [saving, setSaving] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [pendingReloadAction, setPendingReloadAction] = useState<PendingReloadAction | null>(null);
+
+  const canCreateAction = !menuActionLoading && can("create");
+  const canCopyAction = !menuActionLoading && can("copy");
+  const canSaveAction = !loading && isOrgMappingTypeItemSaveAllowed(menuActionLoading, can("save"));
 
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
   const rowsRef = useRef<RowData[]>([]);
@@ -463,7 +466,7 @@ export function OrgMappingTypeItemManager() {
 
   const toggleDeleteById = useCallback(
     (rowId: number, checked: boolean) => {
-      if (!canSave) return;
+      if (!canSaveAction) return;
       commitRows((prev) =>
         toggleDeletedStatus(prev, rowId, checked, {
           removeAddedRow: true,
@@ -471,7 +474,7 @@ export function OrgMappingTypeItemManager() {
         }),
       );
     },
-    [canSave, commitRows],
+    [canSaveAction, commitRows],
   );
 
   const columnDefs = useMemo<ColDef<RowData>[]>(() => {
@@ -504,10 +507,10 @@ export function OrgMappingTypeItemManager() {
               <input
                 type="checkbox"
                 checked={row._status === "deleted"}
-                disabled={!canSave}
+                disabled={!canSaveAction}
                 className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)] disabled:cursor-not-allowed"
                 onChange={(event) => {
-                  if (!canSave) return;
+                  if (!canSaveAction) return;
                   toggleDeleteById(row.id, event.target.checked);
                 }}
                 onClick={(event) => event.stopPropagation()}
@@ -530,27 +533,27 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colTypeCode,
         field: "type_code",
         width: 130,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
         ...typeCodeEditor,
       },
       {
         headerName: I18N.colItemCode,
         field: "item_code",
         width: 150,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colName,
         field: "name",
         flex: 1.2,
         minWidth: 180,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colEffectiveFrom,
         field: "effective_from",
         width: 120,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
         cellEditor: DateCellEditor,
         cellEditorPopup: true,
         cellEditorPopupPosition: "under",
@@ -560,7 +563,7 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colEffectiveTo,
         field: "effective_to",
         width: 120,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
         cellEditor: DateCellEditor,
         cellEditorPopup: true,
         cellEditorPopupPosition: "under",
@@ -570,19 +573,19 @@ export function OrgMappingTypeItemManager() {
         headerName: I18N.colErpEmployeeCode,
         field: "erp_employee_code",
         width: 150,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colCostCenterType,
         field: "cost_center_type",
         width: 120,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colSortOrder,
         field: "sort_order",
         width: 90,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
         valueParser: (params) => normalizeSortOrder(params.newValue),
       },
       {
@@ -590,20 +593,20 @@ export function OrgMappingTypeItemManager() {
         field: "remark",
         flex: 1.4,
         minWidth: 220,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
       },
       {
         headerName: I18N.colIsActive,
         field: "is_active",
         width: 100,
-        editable: (params) => canSave && params.data?._status !== "deleted",
+        editable: (params) => canSaveAction && params.data?._status !== "deleted",
         cellEditor: "agSelectCellEditor",
         cellEditorParams: { values: ["Y", "N"] },
         valueFormatter: (params) => (params.value ? "Y" : "N"),
         valueParser: (params) => normalizeBoolean(params.newValue),
       },
     ];
-  }, [canSave, toggleDeleteById, typeCodeOptions]);
+  }, [canSaveAction, toggleDeleteById, typeCodeOptions]);
 
   const getRowClass = useCallback((params: RowClassParams<RowData>) => getGridRowClass(params.data?._status), []);
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
@@ -614,7 +617,7 @@ export function OrgMappingTypeItemManager() {
 
   const onCellValueChanged = useCallback(
     (event: CellValueChangedEvent<RowData>) => {
-      if (!canSave) return;
+      if (!canSaveAction) return;
       if (event.newValue === event.oldValue) return;
       const rowId = event.data?.id;
       const field = event.colDef.field as keyof RowData | undefined;
@@ -645,11 +648,11 @@ export function OrgMappingTypeItemManager() {
         }),
       );
     },
-    [canSave, commitRows],
+    [canSaveAction, commitRows],
   );
 
   function addRow() {
-    if (!canSave) return;
+    if (!canCreateAction || !canSaveAction) return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
     const now = new Date().toISOString();
@@ -676,7 +679,7 @@ export function OrgMappingTypeItemManager() {
   }
 
   function copyRow() {
-    if (!canSave) return;
+    if (!canCopyAction || !canSaveAction) return;
     if (!selectedRow || selectedRow._status === "deleted") return;
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
@@ -728,7 +731,7 @@ export function OrgMappingTypeItemManager() {
   }
 
   async function saveAll() {
-    if (!canSave) return;
+    if (!canSaveAction) return;
     gridApiRef.current?.stopEditing();
     const pending = collectPendingOrgMappingTypeItemRows(rows);
     const toDelete = pending.deleted.filter((row) => row.id > 0);
@@ -851,34 +854,35 @@ export function OrgMappingTypeItemManager() {
       label: I18N.addRow,
       icon: Plus,
       onClick: addRow,
-      disabled: saving || !canSave,
+      disabled: saving || loading || !canSaveAction,
     },
     {
       key: "copy",
       label: I18N.copy,
       icon: Copy,
       onClick: copyRow,
-      disabled: saving || !selectedRow || !canSave,
+      disabled: saving || loading || !selectedRow || !canSaveAction,
     },
     {
       key: "download",
       label: I18N.download,
       icon: Download,
       onClick: () => void downloadXlsx(),
-      disabled: saving,
+      disabled: saving || loading,
     },
   ].filter((action) => {
     if (action.key === "download") return can("download");
-    return canSave;
+    if (action.key === "create") return canCreateAction;
+    return canCopyAction;
   });
 
-  const toolbarSaveAction = canSave
+  const toolbarSaveAction = canSaveAction
     ? {
         key: "save",
         label: saving ? `${I18N.save}...` : I18N.save,
         icon: Save,
         onClick: () => void saveAll(),
-        disabled: saving,
+        disabled: saving || loading || menuActionLoading,
         variant: "save" as const,
       }
     : undefined;

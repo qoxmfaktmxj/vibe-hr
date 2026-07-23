@@ -330,7 +330,7 @@ def test_type_item_routes_require_save_permission_and_support_crud() -> None:
 
     with _create_test_client(engine) as client:
         denied_create = client.post(
-            "/api/v1/org/type-items",
+            "/api/v1/org/mapping-type-items",
             json=create_payload,
             headers={"Authorization": f"Bearer {denied_token}"},
         )
@@ -354,14 +354,14 @@ def test_type_item_routes_require_save_permission_and_support_crud() -> None:
 
     with _create_test_client(engine) as client:
         created = client.post(
-            "/api/v1/org/type-items",
+            "/api/v1/org/mapping-type-items",
             json=create_payload,
             headers={"Authorization": f"Bearer {token}"},
         )
         created_item_id = created.json()["item"]["id"]
 
         updated = client.put(
-            f"/api/v1/org/type-items/{created_item_id}",
+            f"/api/v1/org/mapping-type-items/{created_item_id}",
             json={
                 "name": "원가센터 C2",
                 "effective_to": "2026-12-31",
@@ -370,7 +370,7 @@ def test_type_item_routes_require_save_permission_and_support_crud() -> None:
         )
 
         deleted = client.delete(
-            f"/api/v1/org/type-items/{created_item_id}",
+            f"/api/v1/org/mapping-type-items/{created_item_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
 
