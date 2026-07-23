@@ -35,6 +35,7 @@ from app.schemas.organization import (
 
 MAPPING_TYPE_GROUP_CODE = "ORG_MAPPING_TYPE"
 _OPEN_END_DATE = date.max
+_PERSONAL_STATUS_CHUNK_SIZE = 200
 
 
 @dataclass(slots=True)
@@ -45,6 +46,34 @@ class _PersonalStatusEmployeeSnapshot:
     department_id: int
     position_title: str
     employment_status: str
+
+
+@dataclass(slots=True)
+class _PersonalStatusScanResult:
+    employee_id: int
+    employee_no: str
+    department_id: int
+    position_title: str
+    employment_status: str
+
+
+def _snapshot_employee_state_at_reference(
+    employee: HrEmployee,
+    histories: list[HrPersonnelHistory],
+) -> _PersonalStatusScanResult:
+    snapshot = _PersonalStatusScanResult(
+        employee_id=int(employee.id),
+        employee_no=employee.employee_no,
+        department_id=int(employee.department_id),
+        position_title=employee.position_title,
+        employment_status=employee.employment_status,
+    )
+    for history in histories:
+        if history.field_name == "department_id" and history.before_value not in (None, ""):
+            snapshot.department_id = int(history.before_value)
+        elif history.field_name == "employment_status" and history.before_value is not None:
+            snapshot.employment_status = history.before_value
+    return snapshot
 
 
 def _lookup_item(code: str, name: str, id: int | None = None) -> OrganizationLookupItem:
@@ -368,51 +397,32 @@ def _snapshot_employee_at_reference(
     histories: list[HrPersonnelHistory],
     display_name: str,
 ) -> _PersonalStatusEmployeeSnapshot:
-    snapshot = _PersonalStatusEmployeeSnapshot(
-        employee_id=int(employee.id),
-        employee_no=employee.employee_no,
+    state = _snapshot_employee_state_at_reference(employee, histories)
+    return _PersonalStatusEmployeeSnapshot(
+        employee_id=state.employee_id,
+        employee_no=state.employee_no,
         display_name=display_name,
-        department_id=int(employee.department_id),
-        position_title=employee.position_title,
-        employment_status=employee.employment_status,
+        department_id=state.department_id,
+        position_title=state.position_title,
+        employment_status=state.employment_status,
     )
-    for history in histories:
-        if history.field_name == "department_id" and history.before_value not in (None, ""):
-            snapshot.department_id = int(history.before_value)
-        elif history.field_name == "employment_status" and history.before_value is not None:
-            snapshot.employment_status = history.before_value
-    return snapshot
 
 
-def list_mapping_personal_status(
+def _load_personal_status_candidate_chunk(
     session: Session,
     *,
+    candidate_ids: list[int],
     reference_date: date,
-    page: int,
-    limit: int,
-) -> OrgMappingPersonalStatusListResponse:
-    type_columns = [
-        OrgMappingPersonalStatusTypeColumn(type_code=item.code, name=item.name)
-        for item in list_mapping_types(session)
-    ]
+) -> list[tuple[HrEmployee, AuthUser, list[HrPersonnelHistory]]]:
+    if not candidate_ids:
+        return []
 
-    candidate_rows = session.exec(
+    employee_rows = session.exec(
         select(HrEmployee, AuthUser)
         .join(AuthUser, HrEmployee.user_id == AuthUser.id)
-        .where(HrEmployee.hire_date <= reference_date)
+        .where(HrEmployee.id.in_(candidate_ids))
         .order_by(HrEmployee.employee_no, HrEmployee.id)
     ).all()
-    if not candidate_rows:
-        return OrgMappingPersonalStatusListResponse(
-            items=[],
-            type_columns=type_columns,
-            total_count=0,
-            page=page,
-            limit=limit,
-        )
-
-    candidate_ids = [int(employee.id) for employee, _user in candidate_rows]
-    histories_by_employee: dict[int, list[HrPersonnelHistory]] = defaultdict(list)
     history_rows = session.exec(
         select(HrPersonnelHistory)
         .where(
@@ -426,30 +436,114 @@ def list_mapping_personal_status(
             HrPersonnelHistory.id.desc(),
         )
     ).all()
+    histories_by_employee: dict[int, list[HrPersonnelHistory]] = defaultdict(list)
     for history in history_rows:
         histories_by_employee[int(history.employee_id)].append(history)
 
-    active_rows: list[tuple[_PersonalStatusEmployeeSnapshot, AuthUser]] = []
-    for employee, user in candidate_rows:
-        snapshot = _snapshot_employee_at_reference(
-            employee,
-            histories_by_employee.get(int(employee.id), []),
-            user.display_name,
-        )
-        if snapshot.employment_status != "active":
-            continue
-        active_rows.append((snapshot, user))
+    return [
+        (employee, user, histories_by_employee.get(int(employee.id), []))
+        for employee, user in employee_rows
+    ]
 
-    active_department_ids = {snapshot.department_id for snapshot, _user in active_rows}
+
+def _collect_personal_status_page_employee_ids(
+    session: Session,
+    *,
+    reference_date: date,
+    page: int,
+    limit: int,
+) -> tuple[list[int], int]:
+    candidate_ids = session.exec(
+        select(HrEmployee.id)
+        .where(HrEmployee.hire_date <= reference_date)
+        .order_by(HrEmployee.employee_no, HrEmployee.id)
+    ).all()
+    if not candidate_ids:
+        return [], 0
+
+    start = max(0, (page - 1) * limit)
+    active_count = 0
+    page_employee_ids: list[int] = []
+
+    for offset in range(0, len(candidate_ids), _PERSONAL_STATUS_CHUNK_SIZE):
+        chunk_ids = [int(candidate_id) for candidate_id in candidate_ids[offset : offset + _PERSONAL_STATUS_CHUNK_SIZE]]
+        for employee, _user, histories in _load_personal_status_candidate_chunk(
+            session,
+            candidate_ids=chunk_ids,
+            reference_date=reference_date,
+        ):
+            snapshot = _snapshot_employee_state_at_reference(employee, histories)
+            if snapshot.employment_status != "active":
+                continue
+            if active_count >= start and len(page_employee_ids) < limit:
+                page_employee_ids.append(int(employee.id))
+            active_count += 1
+
+    return page_employee_ids, active_count
+
+
+def _load_personal_status_page_rows(
+    session: Session,
+    *,
+    employee_ids: list[int],
+    reference_date: date,
+    type_columns: list[OrgMappingPersonalStatusTypeColumn],
+) -> list[OrgMappingPersonalStatusRow]:
+    if not employee_ids:
+        return []
+
+    employee_rows = session.exec(
+        select(HrEmployee, AuthUser)
+        .join(AuthUser, HrEmployee.user_id == AuthUser.id)
+        .where(HrEmployee.id.in_(employee_ids))
+        .order_by(HrEmployee.employee_no, HrEmployee.id)
+    ).all()
+    employee_map = {
+        int(employee.id): (employee, user)
+        for employee, user in employee_rows
+    }
+
+    histories_by_employee: dict[int, list[HrPersonnelHistory]] = defaultdict(list)
+    history_rows = session.exec(
+        select(HrPersonnelHistory)
+        .where(
+            HrPersonnelHistory.employee_id.in_(employee_ids),
+            HrPersonnelHistory.effective_date > reference_date,
+            HrPersonnelHistory.field_name.in_(("department_id", "employment_status")),
+        )
+        .order_by(
+            HrPersonnelHistory.employee_id,
+            HrPersonnelHistory.effective_date.desc(),
+            HrPersonnelHistory.id.desc(),
+        )
+    ).all()
+    for history in history_rows:
+        histories_by_employee[int(history.employee_id)].append(history)
+
+    snapshots: list[_PersonalStatusEmployeeSnapshot] = []
+    for employee_id in employee_ids:
+        row = employee_map.get(employee_id)
+        if row is None:
+            continue
+        employee, user = row
+        snapshots.append(
+            _snapshot_employee_at_reference(
+                employee,
+                histories_by_employee.get(employee_id, []),
+                user.display_name,
+            )
+        )
+
+    department_ids = {snapshot.department_id for snapshot in snapshots}
     department_map = {
         int(department.id): department
         for department in session.exec(
-            select(OrgDepartment).where(OrgDepartment.id.in_(active_department_ids))
+            select(OrgDepartment).where(OrgDepartment.id.in_(department_ids))
         ).all()
-    } if active_department_ids else {}
+    } if department_ids else {}
 
     assignment_map: dict[tuple[int, str], OrgMappingPersonalStatusCell] = {}
-    if active_department_ids:
+    if department_ids:
         assignment_rows = session.exec(
             select(OrgMappingAssignment, OrgMappingTypeItem)
             .join(
@@ -460,7 +554,7 @@ def list_mapping_personal_status(
                 ),
             )
             .where(
-                OrgMappingAssignment.department_id.in_(active_department_ids),
+                OrgMappingAssignment.department_id.in_(department_ids),
                 OrgMappingAssignment.effective_from <= reference_date,
                 func.coalesce(OrgMappingAssignment.effective_to, _OPEN_END_DATE) >= reference_date,
             )
@@ -478,7 +572,7 @@ def list_mapping_personal_status(
             )
 
     items: list[OrgMappingPersonalStatusRow] = []
-    for snapshot, _user in active_rows:
+    for snapshot in snapshots:
         department = department_map.get(snapshot.department_id)
         mappings = {
             column.type_code: OrgMappingPersonalStatusCell(item_code="", item_name="")
@@ -500,10 +594,32 @@ def list_mapping_personal_status(
                 mappings=mappings,
             )
         )
+    return items
 
-    total_count = len(items)
-    offset = max(0, (page - 1) * limit)
-    page_items = items[offset : offset + limit]
+
+def list_mapping_personal_status(
+    session: Session,
+    *,
+    reference_date: date,
+    page: int,
+    limit: int,
+) -> OrgMappingPersonalStatusListResponse:
+    type_columns = [
+        OrgMappingPersonalStatusTypeColumn(type_code=item.code, name=item.name)
+        for item in list_mapping_types(session)
+    ]
+    page_employee_ids, total_count = _collect_personal_status_page_employee_ids(
+        session,
+        reference_date=reference_date,
+        page=page,
+        limit=limit,
+    )
+    page_items = _load_personal_status_page_rows(
+        session,
+        employee_ids=page_employee_ids,
+        reference_date=reference_date,
+        type_columns=type_columns,
+    )
     return OrgMappingPersonalStatusListResponse(
         items=page_items,
         type_columns=type_columns,

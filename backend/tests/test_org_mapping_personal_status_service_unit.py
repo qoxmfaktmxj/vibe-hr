@@ -1,7 +1,9 @@
 from datetime import date, datetime, timezone
 
+import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
+import app.services.organization_mapping_service as organization_mapping_service
 from app.models import (
     AppCode,
     AppCodeGroup,
@@ -369,3 +371,87 @@ def test_status_excludes_hired_after_reference_and_pages_distinct_employee_ids()
     assert len({row.employee_id for row in response.items}) == 1
     assert response.items[0].employee_id in {employee_one_id, employee_two_id}
     assert employee_three_no == "E-003"
+
+
+def test_status_scans_chunks_before_loading_only_requested_page_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = create_engine("sqlite://")
+    _create_tables(engine)
+
+    with Session(engine) as session:
+        _seed_type_group(session)
+        department = _seed_department(session, "D-10", "부서10")
+        department_id = int(department.id)
+        cost_item = _seed_mapping_item(
+            session,
+            type_code="COST",
+            item_code="CC-300",
+            name="원가센터 C",
+            effective_from=date(2026, 1, 1),
+        )
+        _seed_assignment(
+            session,
+            department_id=department_id,
+            item=cost_item,
+            effective_from=date(2026, 1, 1),
+        )
+
+        active_ids: list[int] = []
+        for index in range(5):
+            employee = _seed_employee(
+                session,
+                employee_no=f"E-10{index}",
+                user_login_id=f"e10{index}",
+                user_display_name=f"직원{index}",
+                department_id=department_id,
+                hire_date=date(2026, 1, 1),
+                employment_status="leave" if index < 2 else "active",
+                position_title="사원",
+            )
+            employee_id = int(employee.id)
+            if index < 2:
+                _seed_history(
+                    session,
+                    employee_id=employee_id,
+                    effective_date=date(2026, 8, 1),
+                    field_name="employment_status",
+                    before_value="active",
+                    after_value="leave",
+                )
+                active_ids.append(employee_id)
+            elif index == 2:
+                active_ids.append(employee_id)
+            else:
+                _seed_history(
+                    session,
+                    employee_id=employee_id,
+                    effective_date=date(2026, 8, 1),
+                    field_name="employment_status",
+                    before_value="leave",
+                    after_value="active",
+                )
+
+        monkeypatch.setattr(organization_mapping_service, "_PERSONAL_STATUS_CHUNK_SIZE", 2)
+
+        captured_page_ids: list[list[int]] = []
+        original_loader = organization_mapping_service._load_personal_status_page_rows
+
+        def _capture_page_rows(*args, **kwargs):
+            captured_page_ids.append(list(kwargs["employee_ids"]))
+            return original_loader(*args, **kwargs)
+
+        monkeypatch.setattr(
+            organization_mapping_service,
+            "_load_personal_status_page_rows",
+            _capture_page_rows,
+        )
+
+        response = organization_mapping_service.list_mapping_personal_status(
+            session,
+            reference_date=date(2026, 7, 31),
+            page=1,
+            limit=2,
+        )
+
+    assert response.total_count == 3
+    assert [row.employee_id for row in response.items] == active_ids[:2]
+    assert captured_page_ids == [active_ids[:2]]
