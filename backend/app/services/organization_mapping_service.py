@@ -22,8 +22,8 @@ MAPPING_TYPE_GROUP_CODE = "ORG_MAPPING_TYPE"
 _OPEN_END_DATE = date.max
 
 
-def _lookup_item(code: str, name: str) -> OrganizationLookupItem:
-    return OrganizationLookupItem(code=code, name=name)
+def _lookup_item(code: str, name: str, id: int | None = None) -> OrganizationLookupItem:
+    return OrganizationLookupItem(id=id, code=code, name=name)
 
 
 def _utc_now() -> datetime:
@@ -258,7 +258,7 @@ def list_mapping_item_options(session: Session, *, type_code: str) -> list[Organ
         )
         .order_by(OrgMappingTypeItem.sort_order, OrgMappingTypeItem.id)
     ).all()
-    return [_lookup_item(code=row.item_code, name=row.name) for row in rows]
+    return [_lookup_item(code=row.item_code, name=row.name, id=int(row.id)) for row in rows]
 
 
 def list_mapping_type_items(
@@ -613,4 +613,4 @@ def list_department_options(session: Session) -> list[OrganizationLookupItem]:
         .where(OrgDepartment.is_active == True)
         .order_by(OrgDepartment.code, OrgDepartment.id)
     ).all()
-    return [_lookup_item(code=row.code, name=row.name) for row in rows]
+    return [_lookup_item(code=row.code, name=row.name, id=int(row.id)) for row in rows]

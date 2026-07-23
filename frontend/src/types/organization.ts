@@ -32,6 +32,7 @@ export type OrganizationDepartmentDetailResponse = {
 };
 
 export type OrganizationLookupItem = {
+  id: number | null;
   code: string;
   name: string;
 };

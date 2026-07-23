@@ -295,6 +295,7 @@ def test_mapping_types_requires_type_items_query_and_returns_seeded_items_when_a
         )
         response = mapping_types(session=session, current_user=allowed)
 
+        assert [item.id for item in response.items] == [None, None]
         assert [item.code for item in response.items] == ["COST", "LEVEL"]
         assert [item.name for item in response.items] == ["원가센터", "직급"]
 
@@ -316,6 +317,9 @@ def test_mapping_type_item_department_options_return_seeded_items_when_allowed()
         item_options = mapping_item_options(session=session, current_user=user, type_code="COST")
         department_options_response = department_options(session=session, current_user=user)
 
+        assert [item.id for item in type_options.items] == [None, None]
         assert [item.code for item in type_options.items] == ["COST", "LEVEL"]
+        assert [item.id for item in item_options.items] == [1]
         assert [item.code for item in item_options.items] == ["CC-100"]
+        assert [item.id for item in department_options_response.items] == [1, 2]
         assert [item.code for item in department_options_response.items] == ["HQ", "OPS"]

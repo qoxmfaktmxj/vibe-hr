@@ -38,6 +38,7 @@ class OrganizationDepartmentDetailResponse(BaseModel):
 
 
 class OrganizationLookupItem(BaseModel):
+    id: int | None = None
     code: str
     name: str
 

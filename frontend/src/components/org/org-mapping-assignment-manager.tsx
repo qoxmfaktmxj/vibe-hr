@@ -31,23 +31,20 @@ import {
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
+import {
+  buildLookupEditorOptions,
+  createSavePayload,
+  loadDepartmentLookupOptions,
+  loadMappingItemLookupOptions,
+  type LookupEditorOption,
+} from "@/components/org/org-mapping-assignment-manager.helpers";
 import type {
-  OrgMappingAssignmentCreateRequest,
   OrgMappingAssignmentItem,
   OrgMappingAssignmentListResponse,
-  OrgMappingTypeItem,
-  OrgMappingTypeItemListResponse,
-  OrganizationDepartmentItem,
-  OrganizationDepartmentListResponse,
   OrganizationLookupItem,
 } from "@/types/organization";
 
 type RowStatus = GridRowStatus;
-
-type LookupEditorOption = {
-  value: string;
-  label: string;
-};
 
 type RowData = OrgMappingAssignmentItem & {
   _status: RowStatus;
@@ -212,35 +209,11 @@ function normalizeOptionalDate(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
-function buildDepartmentEditorOptions(departments: OrganizationDepartmentItem[]): LookupEditorOption[] {
-  return departments.map((department) => ({
-    value: String(department.id),
-    label: `${department.code} / ${department.name}${department.cost_center_code ? ` / ${department.cost_center_code}` : ""}`,
-  }));
-}
-
 function buildTypeEditorOptions(types: OrganizationLookupItem[]): LookupEditorOption[] {
   return types.map((type) => ({
     value: type.code,
     label: `${type.code} / ${type.name}`,
   }));
-}
-
-function buildItemEditorOptions(items: OrganizationLookupItem[]): LookupEditorOption[] {
-  return items.map((item) => ({
-    value: item.code,
-    label: `${item.code} / ${item.name}`,
-  }));
-}
-
-function createSavePayload(row: RowData): OrgMappingAssignmentCreateRequest {
-  return {
-    department_id: row.department_id,
-    type_code: normalizeCode(row.type_code),
-    item_id: row.item_id,
-    effective_from: normalizeRequiredDate(row.effective_from),
-    effective_to: normalizeOptionalDate(row.effective_to),
-  };
 }
 
 function applySuccessfulAssignmentSave<T extends RowData>(
@@ -335,12 +308,8 @@ export function OrgMappingAssignmentManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/org/types");
   const [rows, setRows] = useState<RowData[]>([]);
   const [typeOptions, setTypeOptions] = useState<OrganizationLookupItem[]>([]);
-  const [departmentOptions, setDepartmentOptions] = useState<OrganizationDepartmentItem[]>([]);
-  const [itemOptionsByTypeCode, setItemOptionsByTypeCode] = useState<Record<string, OrgMappingTypeItem[]>>({});
   const [departmentLookupOptions, setDepartmentLookupOptions] = useState<OrganizationLookupItem[]>([]);
-  const [itemLookupOptionsByTypeCode, setItemLookupOptionsByTypeCode] = useState<
-    Record<string, OrganizationLookupItem[]>
-  >({});
+  const [itemLookupOptionsByTypeCode, setItemLookupOptionsByTypeCode] = useState<Record<string, OrganizationLookupItem[]>>({});
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     departmentId: "",
     typeCode: "",
@@ -364,13 +333,8 @@ export function OrgMappingAssignmentManager() {
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
   const rowsRef = useRef<RowData[]>([]);
   const tempIdRef = useRef(-1);
-  const itemOptionsLoadingRef = useRef(new Set<string>());
-  const itemOptionsByTypeCodeRef = useRef<Record<string, OrgMappingTypeItem[]>>({});
+  const itemLookupOptionsLoadingRef = useRef(new Set<string>());
   const itemLookupOptionsByTypeCodeRef = useRef<Record<string, OrganizationLookupItem[]>>({});
-
-  useEffect(() => {
-    itemOptionsByTypeCodeRef.current = itemOptionsByTypeCode;
-  }, [itemOptionsByTypeCode]);
 
   useEffect(() => {
     itemLookupOptionsByTypeCodeRef.current = itemLookupOptionsByTypeCode;
@@ -379,16 +343,16 @@ export function OrgMappingAssignmentManager() {
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
   const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
-  const departmentSelectOptions = useMemo(() => {
-    void departmentLookupOptions;
-    return buildDepartmentEditorOptions(departmentOptions);
-  }, [departmentLookupOptions, departmentOptions]);
+  const departmentSelectOptions = useMemo(() => buildLookupEditorOptions(departmentLookupOptions), [departmentLookupOptions]);
   const typeSelectOptions = useMemo(() => buildTypeEditorOptions(typeOptions), [typeOptions]);
   const canSaveAction = !menuActionLoading && !loading && can("save");
-  const departmentById = useMemo(
-    () => new Map(departmentOptions.map((department) => [department.id, department])),
-    [departmentOptions],
-  );
+  const departmentById = useMemo(() => {
+    const entries: Array<[number, OrganizationLookupItem]> = [];
+    for (const department of departmentLookupOptions) {
+      if (department.id != null) entries.push([department.id, department]);
+    }
+    return new Map(entries);
+  }, [departmentLookupOptions]);
 
   const getRowKey = useCallback((row: RowData) => String(row.id), []);
 
@@ -453,91 +417,32 @@ export function OrgMappingAssignmentManager() {
     }
   }, []);
 
-  const loadDepartmentOptions = useCallback(async () => {
-    try {
-      const response = await fetch("/api/org/departments?all=true", { cache: "no-store" });
-      if (!response.ok) {
-        setDepartmentOptions([]);
-        return;
-      }
-      const data = (await response.json()) as OrganizationDepartmentListResponse;
-      setDepartmentOptions(data.departments ?? []);
-    } catch {
-      setDepartmentOptions([]);
-    }
-  }, []);
-
-  const loadDepartmentLookupOptions = useCallback(async () => {
-    try {
-      const response = await fetch("/api/org/department-options", { cache: "no-store" });
-      if (!response.ok) {
-        setDepartmentLookupOptions([]);
-        return;
-      }
-      const data = (await response.json()) as { items?: OrganizationLookupItem[] };
-      setDepartmentLookupOptions(data.items ?? []);
-    } catch {
-      setDepartmentLookupOptions([]);
-    }
-  }, []);
-
-  const ensureItemOptions = useCallback(async (typeCodeInput: string) => {
-    const typeCode = normalizeCode(typeCodeInput);
-    if (!typeCode) return;
-    if (itemOptionsByTypeCodeRef.current[typeCode] || itemOptionsLoadingRef.current.has(typeCode)) return;
-
-    itemOptionsLoadingRef.current.add(typeCode);
-    try {
-      const params = new URLSearchParams({
-        page: "1",
-        limit: "1000",
-        type_code: typeCode,
-      });
-      const response = await fetch(`/api/org/mapping-type-items?${params.toString()}`, {
-        cache: "no-store",
-      });
-      if (!response.ok) return;
-      const data = (await response.json()) as OrgMappingTypeItemListResponse;
-      const nextItems = data.items ?? [];
-      setItemOptionsByTypeCode((prev) => {
-        const next = { ...prev, [typeCode]: nextItems };
-        itemOptionsByTypeCodeRef.current = next;
-        return next;
-      });
-    } catch {
-      // Ignore transient lookup failures; save validation will block incomplete rows.
-    } finally {
-      itemOptionsLoadingRef.current.delete(typeCode);
-    }
-  }, []);
-
   const ensureItemLookupOptions = useCallback(async (typeCodeInput: string) => {
     const typeCode = normalizeCode(typeCodeInput);
-    if (!typeCode || itemLookupOptionsByTypeCodeRef.current[typeCode]) return;
+    if (!typeCode) return;
+    if (itemLookupOptionsByTypeCodeRef.current[typeCode] || itemLookupOptionsLoadingRef.current.has(typeCode)) return;
 
+    itemLookupOptionsLoadingRef.current.add(typeCode);
     try {
-      const params = new URLSearchParams({ type_code: typeCode });
-      const response = await fetch(`/api/org/mapping-item-options?${params.toString()}`, {
-        cache: "no-store",
-      });
-      if (!response.ok) return;
-      const data = (await response.json()) as { items?: OrganizationLookupItem[] };
-      const nextItems = data.items ?? [];
+      const nextItems = await loadMappingItemLookupOptions(typeCode);
+      if (!nextItems) return;
       setItemLookupOptionsByTypeCode((prev) => {
+        if (prev[typeCode]) return prev;
         const next = { ...prev, [typeCode]: nextItems };
         itemLookupOptionsByTypeCodeRef.current = next;
         return next;
       });
     } catch {
-      // Ignore transient lookup failures.
+      return;
+    } finally {
+      itemLookupOptionsLoadingRef.current.delete(typeCode);
     }
   }, []);
 
   useEffect(() => {
     void loadTypeOptions();
-    void loadDepartmentOptions();
-    void loadDepartmentLookupOptions();
-  }, [loadDepartmentLookupOptions, loadDepartmentOptions, loadTypeOptions]);
+    void loadDepartmentLookupOptions().then((items) => setDepartmentLookupOptions(items ?? []));
+  }, [loadTypeOptions]);
 
   useEffect(() => {
     const typeCodes = new Set<string>();
@@ -548,10 +453,9 @@ export function OrgMappingAssignmentManager() {
       if (typeCode) typeCodes.add(typeCode);
     }
     for (const typeCode of typeCodes) {
-      void ensureItemOptions(typeCode);
       void ensureItemLookupOptions(typeCode);
     }
-  }, [appliedFilters.typeCode, ensureItemLookupOptions, ensureItemOptions, rows]);
+  }, [appliedFilters.typeCode, ensureItemLookupOptions, rows]);
 
   const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
     gridApiRef.current?.stopEditing();
@@ -659,7 +563,7 @@ export function OrgMappingAssignmentManager() {
 
   const getItemEditorOptions = useCallback(
     (typeCodeInput: string) =>
-      buildItemEditorOptions(itemLookupOptionsByTypeCodeRef.current[normalizeCode(typeCodeInput)] ?? []),
+      buildLookupEditorOptions(itemLookupOptionsByTypeCodeRef.current[normalizeCode(typeCodeInput)] ?? []),
     [],
   );
 
@@ -753,7 +657,7 @@ export function OrgMappingAssignmentManager() {
         cellEditorParams: (params: ICellEditorParams<RowData, number>) => ({
           options: getItemEditorOptions(params.data?.type_code ?? ""),
         }),
-        valueParser: (params) => normalizeCode(params.newValue),
+        valueParser: (params) => normalizeId(params.newValue),
         valueFormatter: (params) => params.data?.item_code ?? "",
       },
       {
@@ -820,13 +724,13 @@ export function OrgMappingAssignmentManager() {
             next.item_id = 0;
             next.item_code = "";
             next.item_name = "";
-            void ensureItemOptions(nextTypeCode);
+            void ensureItemLookupOptions(nextTypeCode);
           } else if (field === "item_id") {
-            const nextItemCode = normalizeCode(event.newValue);
-            const itemOptions = itemOptionsByTypeCodeRef.current[normalizeCode(next.type_code)] ?? [];
-            const item = itemOptions.find((candidate) => candidate.item_code === nextItemCode);
-            next.item_id = item?.id ?? 0;
-            next.item_code = item?.item_code ?? nextItemCode;
+            const nextItemId = normalizeId(event.newValue);
+            const itemOptions = itemLookupOptionsByTypeCodeRef.current[normalizeCode(next.type_code)] ?? [];
+            const item = itemOptions.find((candidate) => candidate.id === nextItemId);
+            next.item_id = nextItemId;
+            next.item_code = item?.code ?? "";
             next.item_name = item?.name ?? "";
           } else if (field === "effective_from") {
             next.effective_from = normalizeRequiredDate(event.newValue);
@@ -842,7 +746,7 @@ export function OrgMappingAssignmentManager() {
         }),
       );
     },
-    [canSaveAction, commitRows, departmentById, ensureItemOptions],
+    [canSaveAction, commitRows, departmentById, ensureItemLookupOptions],
   );
 
   function addRow() {
@@ -850,13 +754,13 @@ export function OrgMappingAssignmentManager() {
     const newId = tempIdRef.current;
     tempIdRef.current -= 1;
     const now = new Date().toISOString();
-    const defaultDepartmentId = normalizeId(searchFilters.departmentId) || departmentOptions[0]?.id || 0;
+    const defaultDepartmentId = normalizeId(searchFilters.departmentId) || departmentLookupOptions[0]?.id || 0;
     const defaultTypeCode = normalizeCode(searchFilters.typeCode) || typeOptions[0]?.code || "";
     const defaultDepartment = departmentById.get(defaultDepartmentId);
-    const defaultItem = (itemOptionsByTypeCodeRef.current[defaultTypeCode] ?? [])[0];
+    const defaultItem = (itemLookupOptionsByTypeCodeRef.current[defaultTypeCode] ?? []).find((item) => item.id != null);
 
     if (defaultTypeCode) {
-      void ensureItemOptions(defaultTypeCode);
+      void ensureItemLookupOptions(defaultTypeCode);
     }
 
     const newRow: RowData = {
@@ -866,7 +770,7 @@ export function OrgMappingAssignmentManager() {
       department_name: defaultDepartment?.name ?? "",
       type_code: defaultTypeCode,
       item_id: defaultItem?.id ?? 0,
-      item_code: defaultItem?.item_code ?? "",
+      item_code: defaultItem?.code ?? "",
       item_name: defaultItem?.name ?? "",
       effective_from: now.slice(0, 10),
       effective_to: null,
@@ -1104,9 +1008,9 @@ export function OrgMappingAssignmentManager() {
             aria-label="부서"
           >
             <option value="">부서 전체</option>
-            {departmentOptions.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.code} / {department.name}
+            {departmentSelectOptions.map((department) => (
+              <option key={department.value} value={department.value}>
+                {department.label}
               </option>
             ))}
           </select>
