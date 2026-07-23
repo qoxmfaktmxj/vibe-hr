@@ -1,16 +1,13 @@
 from datetime import date, datetime, timezone
 
-import pytest
-from fastapi import HTTPException
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.api.organization import (
-    mapping_assignment_create,
-    mapping_assignment_delete,
-    mapping_assignment_update,
-    mapping_assignments,
-)
+from app.api.organization import router as organization_router
+from app.core.auth import build_access_token
+from app.core.database import get_session
 from app.models import (
     AppMenu,
     AppMenuAction,
@@ -23,7 +20,6 @@ from app.models import (
     OrgMappingAssignment,
     OrgMappingTypeItem,
 )
-from app.schemas.organization import OrgMappingAssignmentCreateRequest, OrgMappingAssignmentUpdateRequest
 
 
 def _now() -> datetime:
@@ -46,6 +42,18 @@ def _create_tables(engine) -> None:
             OrgMappingAssignment.__table__,
         ],
     )
+
+
+def _create_test_client(engine) -> TestClient:
+    app = FastAPI()
+    app.include_router(organization_router, prefix="/api/v1")
+
+    def _override_get_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override_get_session
+    return TestClient(app)
 
 
 def _seed_permission_context(
@@ -245,7 +253,7 @@ def _seed_assignment(
     return assignment
 
 
-def test_mapping_assignments_route_paginates_filters_and_requires_query_permission() -> None:
+def test_mapping_assignments_route_paginates_and_denies_query_when_permission_missing() -> None:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -255,23 +263,31 @@ def test_mapping_assignments_route_paginates_filters_and_requires_query_permissi
 
     with Session(engine) as session:
         denied_user = _seed_permission_context(session, allow_query=False, allow_save=False)
-        with pytest.raises(HTTPException, match="Action not allowed."):
-            mapping_assignments(session=session, current_user=denied_user)
+        denied_token = build_access_token(int(denied_user.id))
+
+    with _create_test_client(engine) as client:
+        denied_response = client.get(
+            "/api/v1/org/mapping-assignments?page=1&limit=1",
+            headers={"Authorization": f"Bearer {denied_token}"},
+        )
+
+    assert denied_response.status_code == 403
+    assert denied_response.json() == {"detail": "Action not allowed."}
 
     with Session(engine) as session:
         user = _seed_permission_context(session, allow_query=True, allow_save=False)
         hq = _seed_department(session, "HQ")
         branch = _seed_department(session, "BRANCH")
-        cost_item_1_id = int(
-            _seed_item(
-                session,
-                type_code="COST",
-                item_code="CC-100",
-                name="원가센터 A",
-                effective_from=date(2026, 1, 1),
-                effective_to=date(2026, 1, 31),
-                sort_order=1,
-            ).id
+        hq_id = int(hq.id)
+        branch_id = int(branch.id)
+        cost_item_1 = _seed_item(
+            session,
+            type_code="COST",
+            item_code="CC-100",
+            name="원가센터 A",
+            effective_from=date(2026, 1, 1),
+            effective_to=date(2026, 1, 31),
+            sort_order=1,
         )
         cost_item_2 = _seed_item(
             session,
@@ -293,62 +309,56 @@ def test_mapping_assignments_route_paginates_filters_and_requires_query_permissi
         )
         _seed_assignment(
             session,
-            department_id=int(hq.id),
-            item=session.get(OrgMappingTypeItem, cost_item_1_id),
+            department_id=hq_id,
+            item=cost_item_1,
             effective_from=date(2026, 1, 1),
             effective_to=date(2026, 1, 31),
         )
         _seed_assignment(
             session,
-            department_id=int(hq.id),
+            department_id=hq_id,
             item=cost_item_2,
             effective_from=date(2026, 2, 1),
             effective_to=None,
         )
         _seed_assignment(
             session,
-            department_id=int(hq.id),
+            department_id=hq_id,
             item=region_item,
             effective_from=date(2026, 1, 1),
             effective_to=None,
         )
         _seed_assignment(
             session,
-            department_id=int(branch.id),
-            item=session.get(OrgMappingTypeItem, cost_item_1_id),
+            department_id=branch_id,
+            item=cost_item_1,
             effective_from=date(2026, 1, 1),
             effective_to=None,
         )
+        token = build_access_token(int(user.id))
 
-        first_page = mapping_assignments(
-            page=1,
-            limit=1,
-            department_id=int(hq.id),
-            type_code="COST",
-            reference_date=date(2026, 1, 31),
-            session=session,
-            current_user=user,
+    with _create_test_client(engine) as client:
+        first_page = client.get(
+            f"/api/v1/org/mapping-assignments?page=1&limit=1&department_id={hq_id}&type_code=COST&reference_date=2026-01-31",
+            headers={"Authorization": f"Bearer {token}"},
         )
-        second_page = mapping_assignments(
-            page=2,
-            limit=1,
-            department_id=int(hq.id),
-            type_code="COST",
-            reference_date=None,
-            session=session,
-            current_user=user,
+        second_page = client.get(
+            f"/api/v1/org/mapping-assignments?page=2&limit=1&department_id={hq_id}&type_code=COST",
+            headers={"Authorization": f"Bearer {token}"},
         )
 
-    assert first_page.total_count == 1
-    assert first_page.page == 1
-    assert first_page.limit == 1
-    assert [item.item_code for item in first_page.items] == ["CC-100"]
-    assert first_page.items[0].department_code == "HQ"
+    assert first_page.status_code == 200
+    assert first_page.json()["total_count"] == 1
+    assert first_page.json()["page"] == 1
+    assert first_page.json()["limit"] == 1
+    assert [item["item_code"] for item in first_page.json()["items"]] == ["CC-100"]
+    assert first_page.json()["items"][0]["department_code"] == "HQ"
 
-    assert second_page.total_count == 2
-    assert second_page.page == 2
-    assert second_page.limit == 1
-    assert [item.item_code for item in second_page.items] == ["CC-200"]
+    assert second_page.status_code == 200
+    assert second_page.json()["total_count"] == 2
+    assert second_page.json()["page"] == 2
+    assert second_page.json()["limit"] == 1
+    assert [item["item_code"] for item in second_page.json()["items"]] == ["CC-200"]
 
 
 def test_mapping_assignment_routes_require_save_permission_and_support_crud() -> None:
@@ -361,18 +371,25 @@ def test_mapping_assignment_routes_require_save_permission_and_support_crud() ->
 
     with Session(engine) as session:
         denied_user = _seed_permission_context(session, allow_query=True, allow_save=False)
-        with pytest.raises(HTTPException, match="Action not allowed."):
-            mapping_assignment_create(
-                payload=OrgMappingAssignmentCreateRequest(
-                    department_id=1,
-                    type_code="COST",
-                    item_id=1,
-                    effective_from=date(2026, 7, 1),
-                    effective_to=None,
-                ),
-                session=session,
-                current_user=denied_user,
-            )
+        denied_token = build_access_token(int(denied_user.id))
+
+    denied_payload = {
+        "department_id": 1,
+        "type_code": "COST",
+        "item_id": 1,
+        "effective_from": "2026-07-01",
+        "effective_to": None,
+    }
+
+    with _create_test_client(engine) as client:
+        denied_create = client.post(
+            "/api/v1/org/mapping-assignments",
+            json=denied_payload,
+            headers={"Authorization": f"Bearer {denied_token}"},
+        )
+
+    assert denied_create.status_code == 403
+    assert denied_create.json() == {"detail": "Action not allowed."}
 
     with Session(engine) as session:
         department = _seed_department(session)
@@ -386,32 +403,40 @@ def test_mapping_assignment_routes_require_save_permission_and_support_crud() ->
             effective_to=None,
             sort_order=1,
         )
+        department_id = int(department.id)
         item_id = int(item.id)
+        token = build_access_token(int(user.id))
 
-        created = mapping_assignment_create(
-            payload=OrgMappingAssignmentCreateRequest(
-                department_id=int(department.id),
-                type_code="COST",
-                item_id=item_id,
-                effective_from=date(2026, 7, 1),
-                effective_to=None,
-            ),
-            session=session,
-            current_user=user,
+    create_payload = {
+        "department_id": department_id,
+        "type_code": "COST",
+        "item_id": item_id,
+        "effective_from": "2026-07-01",
+        "effective_to": None,
+    }
+
+    with _create_test_client(engine) as client:
+        created = client.post(
+            "/api/v1/org/mapping-assignments",
+            json=create_payload,
+            headers={"Authorization": f"Bearer {token}"},
         )
-        updated = mapping_assignment_update(
-            assignment_id=created.item.id,
-            payload=OrgMappingAssignmentUpdateRequest(effective_to=date(2026, 12, 31)),
-            session=session,
-            current_user=user,
-        )
-        deleted = mapping_assignment_delete(
-            assignment_id=created.item.id,
-            session=session,
-            current_user=user,
+        created_assignment_id = created.json()["item"]["id"]
+
+        updated = client.put(
+            f"/api/v1/org/mapping-assignments/{created_assignment_id}",
+            json={"effective_to": "2026-12-31"},
+            headers={"Authorization": f"Bearer {token}"},
         )
 
-    assert created.item.item_id == item_id
-    assert created.item.department_code == "HQ"
-    assert updated.item.effective_to == date(2026, 12, 31)
+        deleted = client.delete(
+            f"/api/v1/org/mapping-assignments/{created_assignment_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert created.status_code == 201
+    assert created.json()["item"]["item_id"] == item_id
+    assert created.json()["item"]["department_code"] == "HQ"
+    assert updated.status_code == 200
+    assert updated.json()["item"]["effective_to"] == "2026-12-31"
     assert deleted.status_code == 204
