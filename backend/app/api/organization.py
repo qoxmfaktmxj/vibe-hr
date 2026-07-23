@@ -19,6 +19,10 @@ from app.schemas.organization import (
     OrgRestructurePlanItemUpdateRequest,
     OrgRestructurePlanListResponse,
     OrgRestructurePlanUpdateRequest,
+    OrgMappingAssignmentCreateRequest,
+    OrgMappingAssignmentDetailResponse,
+    OrgMappingAssignmentListResponse,
+    OrgMappingAssignmentUpdateRequest,
     OrgMappingTypeItemCreateRequest,
     OrgMappingTypeItemDetailResponse,
     OrgMappingTypeItemListResponse,
@@ -35,12 +39,16 @@ from app.schemas.organization import (
     OrganizationDepartmentUpdateRequest,
 )
 from app.services.organization_mapping_service import (
+    create_mapping_assignment,
     create_mapping_type_item,
+    delete_mapping_assignment,
     list_department_options,
+    list_mapping_assignments,
     list_mapping_item_options,
     list_mapping_type_options,
     list_mapping_types,
     list_mapping_type_items,
+    update_mapping_assignment,
     delete_mapping_type_item,
     update_mapping_type_item,
 )
@@ -229,6 +237,77 @@ def mapping_types(
 ) -> OrganizationLookupItemsResponse:
     require_menu_action_for_user(session, user_id=current_user.id, path="/org/type-items", action_code="query")
     return OrganizationLookupItemsResponse(items=list_mapping_types(session))
+
+
+@router.get(
+    "/mapping-assignments",
+    response_model=OrgMappingAssignmentListResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignments(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=100, ge=1, le=1000),
+    department_id: int | None = Query(default=None),
+    type_code: str | None = Query(default=None),
+    reference_date: date | None = Query(default=None),
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentListResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="query")
+    items, total_count = list_mapping_assignments(
+        session,
+        page=page,
+        limit=limit,
+        department_id=department_id,
+        type_code=type_code,
+        reference_date=reference_date,
+    )
+    return OrgMappingAssignmentListResponse(items=items, total_count=total_count, page=page, limit=limit)
+
+
+@router.post(
+    "/mapping-assignments",
+    response_model=OrgMappingAssignmentDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_create(
+    payload: OrgMappingAssignmentCreateRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="save")
+    return OrgMappingAssignmentDetailResponse(item=create_mapping_assignment(session, payload))
+
+
+@router.put(
+    "/mapping-assignments/{assignment_id}",
+    response_model=OrgMappingAssignmentDetailResponse,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_update(
+    assignment_id: int,
+    payload: OrgMappingAssignmentUpdateRequest,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> OrgMappingAssignmentDetailResponse:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="save")
+    return OrgMappingAssignmentDetailResponse(item=update_mapping_assignment(session, assignment_id, payload))
+
+
+@router.delete(
+    "/mapping-assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("hr_manager", "admin"))],
+)
+def mapping_assignment_delete(
+    assignment_id: int,
+    session: Session = Depends(get_session),
+    current_user: AuthUser = Depends(get_current_user),
+) -> Response:
+    require_menu_action_for_user(session, user_id=current_user.id, path="/org/types", action_code="save")
+    delete_mapping_assignment(session, assignment_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

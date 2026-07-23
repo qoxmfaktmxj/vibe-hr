@@ -99,6 +99,48 @@ class OrgMappingTypeItemUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+class OrgMappingAssignmentItem(BaseModel):
+    id: int
+    department_id: int
+    department_code: str
+    department_name: str
+    type_code: str
+    item_id: int
+    item_code: str
+    item_name: str
+    effective_from: date
+    effective_to: date | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrgMappingAssignmentListResponse(BaseModel):
+    items: list[OrgMappingAssignmentItem]
+    total_count: int
+    page: int
+    limit: int
+
+
+class OrgMappingAssignmentDetailResponse(BaseModel):
+    item: OrgMappingAssignmentItem
+
+
+class OrgMappingAssignmentCreateRequest(BaseModel):
+    department_id: int
+    type_code: str = Field(min_length=1, max_length=50)
+    item_id: int
+    effective_from: date
+    effective_to: date | None = None
+
+
+class OrgMappingAssignmentUpdateRequest(BaseModel):
+    department_id: int | None = None
+    type_code: str | None = Field(default=None, min_length=1, max_length=50)
+    item_id: int | None = None
+    effective_from: date | None = None
+    effective_to: date | None = None
+
+
 class OrganizationDepartmentCreateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=30)
     name: str = Field(min_length=1, max_length=100)
