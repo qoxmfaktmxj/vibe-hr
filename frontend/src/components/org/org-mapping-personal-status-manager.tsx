@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
-import { type ColDef, type GridApi, type GridReadyEvent } from "ag-grid-community";
+import { type ColDef, type GridApi, type GridReadyEvent, type ValueGetterParams } from "ag-grid-community";
 import { toast } from "sonner";
 
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
@@ -112,7 +112,7 @@ export function OrgMappingPersonalStatusManager() {
       colId: `mapping-${column.type_code}`,
       minWidth: 140,
       editable: false,
-      valueGetter: (params) => params.data?.mappings[column.type_code]?.item_name ?? "",
+      valueGetter: (params: ValueGetterParams<RowData>) => params.data?.mappings[column.type_code]?.item_name ?? "",
     })),
   ], [typeColumns]);
 

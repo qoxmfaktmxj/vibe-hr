@@ -28,18 +28,13 @@ import { GET as GET_UPLOAD_TEMPLATE } from "@/app/api/org/mapping-assignments/up
 
 type RouteCase = {
   name: string;
-  handler: (request: NextRequest, context?: RouteContext) => Promise<Response>;
+  invoke: (request: NextRequest) => Promise<Response>;
   requestUrl: string;
   upstreamUrl: string;
   method: "GET" | "POST" | "PUT" | "DELETE";
   body?: Record<string, unknown>;
   upstreamStatus?: number;
   expect204?: boolean;
-  context?: RouteContext;
-};
-
-type RouteContext = {
-  params?: Promise<Record<string, string>> | Record<string, string>;
 };
 
 const basePayload = {
@@ -81,7 +76,7 @@ const uploadPayload = {
 const ROUTES: RouteCase[] = [
   {
     name: "mapping-assignments upload-template",
-    handler: GET_UPLOAD_TEMPLATE,
+    invoke: GET_UPLOAD_TEMPLATE,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-template",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-template",
     method: "GET",
@@ -89,7 +84,7 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-assignments upload-preview",
-    handler: POST_UPLOAD_PREVIEW,
+    invoke: POST_UPLOAD_PREVIEW,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-preview",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-preview",
     method: "POST",
@@ -98,7 +93,7 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-assignments upload-confirm",
-    handler: POST_UPLOAD_CONFIRM,
+    invoke: POST_UPLOAD_CONFIRM,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-confirm",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-confirm",
     method: "POST",
@@ -107,7 +102,7 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-personal-status",
-    handler: GET_MAPPING_PERSONAL_STATUS,
+    invoke: GET_MAPPING_PERSONAL_STATUS,
     requestUrl: "http://localhost/api/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
     method: "GET",
@@ -115,35 +110,35 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-type-options",
-    handler: GET_MAPPING_TYPE_OPTIONS,
+    invoke: GET_MAPPING_TYPE_OPTIONS,
     requestUrl: "http://localhost/api/org/mapping-type-options",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-options",
     method: "GET",
   },
   {
     name: "mapping-item-options",
-    handler: GET_MAPPING_ITEM_OPTIONS,
+    invoke: GET_MAPPING_ITEM_OPTIONS,
     requestUrl: "http://localhost/api/org/mapping-item-options?type_code=COST",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-item-options?type_code=COST",
     method: "GET",
   },
   {
     name: "department-options",
-    handler: GET_DEPARTMENT_OPTIONS,
+    invoke: GET_DEPARTMENT_OPTIONS,
     requestUrl: "http://localhost/api/org/department-options",
     upstreamUrl: "http://localhost:8000/api/v1/org/department-options",
     method: "GET",
   },
   {
     name: "mapping-assignments GET",
-    handler: GET_MAPPING_ASSIGNMENTS,
+    invoke: GET_MAPPING_ASSIGNMENTS,
     requestUrl: "http://localhost/api/org/mapping-assignments",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
     method: "GET",
   },
   {
     name: "mapping-assignments POST",
-    handler: POST_MAPPING_ASSIGNMENTS,
+    invoke: POST_MAPPING_ASSIGNMENTS,
     requestUrl: "http://localhost/api/org/mapping-assignments",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
     method: "POST",
@@ -151,39 +146,37 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-assignments PUT",
-    handler: PUT_MAPPING_ASSIGNMENT,
+    invoke: (request) => PUT_MAPPING_ASSIGNMENT(request, { params: { assignmentId: "7" } }),
     requestUrl: "http://localhost/api/org/mapping-assignments/7",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
     method: "PUT",
     body: basePayload,
-    context: { params: { assignmentId: "7" } },
   },
   {
     name: "mapping-assignments DELETE",
-    handler: DELETE_MAPPING_ASSIGNMENT,
+    invoke: (request) => DELETE_MAPPING_ASSIGNMENT(request, { params: { assignmentId: "7" } }),
     requestUrl: "http://localhost/api/org/mapping-assignments/7",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
     method: "DELETE",
-    context: { params: { assignmentId: "7" } },
     expect204: true,
   },
   {
     name: "mapping-types",
-    handler: GET_MAPPING_TYPES,
+    invoke: GET_MAPPING_TYPES,
     requestUrl: "http://localhost/api/org/mapping-types?reference_date=2026-01-31",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-types?reference_date=2026-01-31",
     method: "GET",
   },
   {
     name: "mapping-type-items GET",
-    handler: GET_MAPPING_TYPE_ITEMS,
+    invoke: GET_MAPPING_TYPE_ITEMS,
     requestUrl: "http://localhost/api/org/mapping-type-items?page=1&limit=1&type_code=COST&reference_date=2026-01-31",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items?page=1&limit=1&type_code=COST&reference_date=2026-01-31",
     method: "GET",
   },
   {
     name: "mapping-type-items POST",
-    handler: POST_MAPPING_TYPE_ITEMS,
+    invoke: POST_MAPPING_TYPE_ITEMS,
     requestUrl: "http://localhost/api/org/mapping-type-items",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items",
     method: "POST",
@@ -191,20 +184,18 @@ const ROUTES: RouteCase[] = [
   },
   {
     name: "mapping-type-items PUT",
-    handler: PUT_MAPPING_TYPE_ITEM,
+    invoke: (request) => PUT_MAPPING_TYPE_ITEM(request, { params: { itemId: "42" } }),
     requestUrl: "http://localhost/api/org/mapping-type-items/42",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items/42",
     method: "PUT",
     body: typeItemPayload,
-    context: { params: { itemId: "42" } },
   },
   {
     name: "mapping-type-items DELETE",
-    handler: DELETE_MAPPING_TYPE_ITEM,
+    invoke: (request) => DELETE_MAPPING_TYPE_ITEM(request, { params: { itemId: "42" } }),
     requestUrl: "http://localhost/api/org/mapping-type-items/42",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items/42",
     method: "DELETE",
-    context: { params: { itemId: "42" } },
     expect204: true,
   },
 ];
@@ -238,7 +229,7 @@ describe("/api/org mapping BFF routes", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await routeCase.handler(buildRequest(routeCase, false), routeCase.context);
+    const response = await routeCase.invoke(buildRequest(routeCase, false));
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ detail: "Not authenticated." });
@@ -276,7 +267,7 @@ describe("/api/org mapping BFF routes", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await routeCase.handler(buildRequest(routeCase, true), routeCase.context);
+    const response = await routeCase.invoke(buildRequest(routeCase, true));
 
     expect(fetchMock).toHaveBeenCalledWith(
       routeCase.upstreamUrl,
@@ -306,7 +297,7 @@ describe("/api/org mapping BFF routes", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await routeCase.handler(buildRequest(routeCase, true), routeCase.context);
+    const response = await routeCase.invoke(buildRequest(routeCase, true));
 
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual(payload);
@@ -326,7 +317,7 @@ describe("/api/org mapping BFF routes", () => {
       ),
     );
 
-    const response = await routeCase.handler(buildRequest(routeCase, true), routeCase.context);
+    const response = await routeCase.invoke(buildRequest(routeCase, true));
 
     expect(response.status).toBe(422);
     expect(await response.json()).toEqual(payload);
@@ -338,7 +329,7 @@ describe("/api/org mapping BFF routes", () => {
       const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
       vi.stubGlobal("fetch", fetchMock);
 
-      const response = await routeCase.handler(buildRequest(routeCase, true), routeCase.context);
+      const response = await routeCase.invoke(buildRequest(routeCase, true));
 
       expect(response.status).toBe(204);
       expect(await response.text()).toBe("");
