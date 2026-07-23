@@ -449,6 +449,21 @@
       ],
       "ownerModule": "ORG"
     },
+    "org.type-upload": {
+      "path": "/org/type-upload",
+      "pageFile": "frontend/src/app/org/type-upload/page.tsx",
+      "componentFile": "frontend/src/components/org/org-mapping-upload-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "upload",
+      "toolbar": [
+        "query",
+        "template",
+        "upload",
+        "download"
+      ],
+      "ownerModule": "ORG"
+    },
     "org.types": {
       "path": "/org/types",
       "pageFile": "frontend/src/app/org/types/page.tsx",

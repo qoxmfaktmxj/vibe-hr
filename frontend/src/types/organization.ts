@@ -106,6 +106,41 @@ export type OrgMappingAssignmentUpdateRequest = {
   effective_to?: string | null;
 };
 
+export type OrgMappingAssignmentUploadRow = {
+  department_code: string;
+  type_code: string;
+  item_code: string;
+  effective_from: string;
+  effective_to: string | null;
+};
+
+export type OrgMappingAssignmentUploadRequest = {
+  mode: "atomic";
+  rows: OrgMappingAssignmentUploadRow[];
+};
+
+export type OrgMappingAssignmentUploadPreviewRow = {
+  row_number: number;
+  valid: boolean;
+  errors: string[];
+  normalized: OrgMappingAssignmentUploadRow | null;
+};
+
+export type OrgMappingAssignmentUploadPreviewResponse = {
+  rows: OrgMappingAssignmentUploadPreviewRow[];
+  valid_count: number;
+  invalid_count: number;
+};
+
+export type OrgMappingAssignmentUploadConfirmResponse = {
+  inserted_count: number;
+  updated_count: number;
+};
+
+export type OrgMappingAssignmentUploadTemplateResponse = {
+  headers: string[];
+};
+
 export type OrgMappingPersonalStatusCell = {
   item_code: string;
   item_name: string;

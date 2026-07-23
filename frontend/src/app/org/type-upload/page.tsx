@@ -1,9 +1,14 @@
 import { requireMenuAccess } from "@/lib/guard";
+import { OrgMappingUploadManager } from "@/components/org/org-mapping-upload-manager";
+
+export const GRID_SCREEN = {
+  engine: "ag-grid",
+  profile: "standard-v2",
+  registryKey: "org.type-upload",
+} as const;
 
 export default async function Page() {
   await requireMenuAccess("/org/type-upload");
 
-  return (
-      <div className="p-6 text-sm text-muted-foreground">조직구분업로드 화면 준비 완료. 다음 단계에서 상세 기능을 연결합니다.</div>
-  );
+  return <OrgMappingUploadManager />;
 }

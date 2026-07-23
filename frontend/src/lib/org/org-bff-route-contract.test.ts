@@ -22,6 +22,9 @@ import {
   POST as POST_MAPPING_TYPE_ITEMS,
 } from "@/app/api/org/mapping-type-items/route";
 import { GET as GET_MAPPING_PERSONAL_STATUS } from "@/app/api/org/mapping-personal-status/route";
+import { POST as POST_UPLOAD_CONFIRM } from "@/app/api/org/mapping-assignments/upload-confirm/route";
+import { POST as POST_UPLOAD_PREVIEW } from "@/app/api/org/mapping-assignments/upload-preview/route";
+import { GET as GET_UPLOAD_TEMPLATE } from "@/app/api/org/mapping-assignments/upload-template/route";
 
 type RouteCase = {
   name: string;
@@ -64,7 +67,44 @@ const typeItemPayload = {
   is_active: true,
 };
 
+const uploadPayload = {
+  mode: "atomic",
+  rows: [{
+    department_code: "D001",
+    type_code: "COST",
+    item_code: "CC-100",
+    effective_from: "2026-01-31",
+    effective_to: null,
+  }],
+};
+
 const ROUTES: RouteCase[] = [
+  {
+    name: "mapping-assignments upload-template",
+    handler: GET_UPLOAD_TEMPLATE,
+    requestUrl: "http://localhost/api/org/mapping-assignments/upload-template",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-template",
+    method: "GET",
+    expect204: true,
+  },
+  {
+    name: "mapping-assignments upload-preview",
+    handler: POST_UPLOAD_PREVIEW,
+    requestUrl: "http://localhost/api/org/mapping-assignments/upload-preview",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-preview",
+    method: "POST",
+    body: uploadPayload,
+    expect204: true,
+  },
+  {
+    name: "mapping-assignments upload-confirm",
+    handler: POST_UPLOAD_CONFIRM,
+    requestUrl: "http://localhost/api/org/mapping-assignments/upload-confirm",
+    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-confirm",
+    method: "POST",
+    body: uploadPayload,
+    expect204: true,
+  },
   {
     name: "mapping-personal-status",
     handler: GET_MAPPING_PERSONAL_STATUS,
