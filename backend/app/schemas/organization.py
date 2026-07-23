@@ -182,7 +182,7 @@ class OrgMappingAssignmentUploadRow(BaseModel):
 
 class OrgMappingAssignmentUploadRequest(BaseModel):
     mode: Literal["atomic"]
-    rows: list[OrgMappingAssignmentUploadRow]
+    rows: list[OrgMappingAssignmentUploadRow] = Field(min_length=1, max_length=1000)
 
 
 class OrgMappingAssignmentUploadPreviewRow(BaseModel):

@@ -335,6 +335,11 @@ def _upload_preview_from_errors(
     )
 
 
+def _append_upload_error(errors: list[str], error: str) -> None:
+    if error not in errors:
+        errors.append(error)
+
+
 def _validate_upload_rows(
     session: Session,
     rows: list[OrgMappingAssignmentUploadRow],
@@ -352,50 +357,39 @@ def _validate_upload_rows(
 
         type_code = normalized["type_code"]
         item_code = normalized["item_code"]
-        item = session.exec(
+        item_versions = session.exec(
             select(OrgMappingTypeItem).where(
                 OrgMappingTypeItem.type_code == type_code,
                 OrgMappingTypeItem.item_code == item_code,
             )
-        ).first()
-        if item is None:
+        ).all()
+        item_candidates = [
+            candidate
+            for candidate in item_versions
+            if candidate.is_active
+            and candidate.effective_from <= row.effective_from
+            and (
+                candidate.effective_to is None
+                if row.effective_to is None
+                else candidate.effective_to is None or candidate.effective_to >= row.effective_to
+            )
+        ]
+        item: OrgMappingTypeItem | None = None
+        if not item_versions:
             errors_by_row[index].append("Mapping item code not found.")
-        elif not item.is_active:
+        elif not any(version.is_active for version in item_versions):
             errors_by_row[index].append("Mapping item is inactive.")
+        elif not item_candidates:
+            errors_by_row[index].append("Mapping assignment item period must contain the assignment period.")
+        elif len(item_candidates) > 1:
+            errors_by_row[index].append("Mapping item period is ambiguous.")
+        else:
+            item = item_candidates[0]
 
         if row.effective_to is not None and row.effective_to < row.effective_from:
             errors_by_row[index].append("effective_to must be on or after effective_from.")
-        elif item is not None and item.is_active:
-            if row.effective_from < item.effective_from or (
-                item.effective_to is not None
-                and (row.effective_to is None or row.effective_to > item.effective_to)
-            ):
-                errors_by_row[index].append("Mapping assignment item period must contain the assignment period.")
 
-        if department is not None and item is not None and item.is_active and not errors_by_row[index]:
-            existing_rows = session.exec(
-                select(OrgMappingAssignment).where(
-                    OrgMappingAssignment.department_id == department.id,
-                    OrgMappingAssignment.type_code == type_code,
-                )
-            ).all()
-            same_start_rows = [candidate for candidate in existing_rows if candidate.effective_from == row.effective_from]
-            if len(same_start_rows) > 1:
-                errors_by_row[index].append("Mapping assignment period overlaps existing record.")
-                continue
-            existing_assignment = same_start_rows[0] if same_start_rows else None
-            if any(
-                candidate.id != (existing_assignment.id if existing_assignment is not None else None)
-                and _periods_overlap(
-                    row.effective_from,
-                    row.effective_to,
-                    candidate.effective_from,
-                    candidate.effective_to,
-                )
-                for candidate in existing_rows
-            ):
-                errors_by_row[index].append("Mapping assignment period overlaps existing record.")
-                continue
+        if department is not None and item is not None and not errors_by_row[index]:
             prepared_rows[index] = _PreparedUploadRow(
                 row_number=index + 1,
                 department=department,
@@ -403,23 +397,64 @@ def _validate_upload_rows(
                 type_code=type_code,
                 effective_from=row.effective_from,
                 effective_to=row.effective_to,
-                existing_assignment=existing_assignment,
+                existing_assignment=None,
             )
 
-    for first_index, first in enumerate(prepared_rows):
-        if first is None:
-            continue
-        for second_index in range(first_index + 1, len(prepared_rows)):
-            second = prepared_rows[second_index]
-            if second is None:
-                continue
-            if (
-                first.department.id == second.department.id
-                and first.type_code == second.type_code
-                and _periods_overlap(first.effective_from, first.effective_to, second.effective_from, second.effective_to)
-            ):
-                errors_by_row[first_index].append("Mapping assignment period overlaps another upload row.")
-                errors_by_row[second_index].append("Mapping assignment period overlaps another upload row.")
+    prepared_by_group: dict[tuple[int, str], list[tuple[int, _PreparedUploadRow]]] = defaultdict(list)
+    for index, prepared in enumerate(prepared_rows):
+        if prepared is not None:
+            prepared_by_group[(int(prepared.department.id), prepared.type_code)].append((index, prepared))
+
+    for (department_id, type_code), group_rows in prepared_by_group.items():
+        existing_rows = session.exec(
+            select(OrgMappingAssignment).where(
+                OrgMappingAssignment.department_id == department_id,
+                OrgMappingAssignment.type_code == type_code,
+            )
+        ).all()
+        existing_by_start: dict[date, list[OrgMappingAssignment]] = defaultdict(list)
+        incoming_by_start: dict[date, list[tuple[int, _PreparedUploadRow]]] = defaultdict(list)
+        for existing in existing_rows:
+            existing_by_start[existing.effective_from].append(existing)
+        for index, prepared in group_rows:
+            incoming_by_start[prepared.effective_from].append((index, prepared))
+
+        for effective_from, incoming_rows in incoming_by_start.items():
+            if len(incoming_rows) > 1:
+                for index, _ in incoming_rows:
+                    _append_upload_error(errors_by_row[index], "Mapping assignment period overlaps another upload row.")
+            matching_existing = existing_by_start.get(effective_from, [])
+            if len(matching_existing) > 1:
+                for index, _ in incoming_rows:
+                    _append_upload_error(errors_by_row[index], "Mapping assignment period overlaps existing record.")
+            elif len(matching_existing) == 1 and len(incoming_rows) == 1:
+                incoming_rows[0][1].existing_assignment = matching_existing[0]
+
+        final_periods: list[tuple[date, date | None, int | None]] = []
+        for existing in existing_rows:
+            incoming_rows = incoming_by_start.get(existing.effective_from, [])
+            if len(incoming_rows) == 1 and len(existing_by_start[existing.effective_from]) == 1:
+                index, prepared = incoming_rows[0]
+                final_periods.append((prepared.effective_from, prepared.effective_to, index))
+            else:
+                final_periods.append((existing.effective_from, existing.effective_to, None))
+        for index, prepared in group_rows:
+            if not existing_by_start.get(prepared.effective_from):
+                final_periods.append((prepared.effective_from, prepared.effective_to, index))
+
+        for first_index, first in enumerate(final_periods):
+            for second in final_periods[first_index + 1 :]:
+                if not _periods_overlap(first[0], first[1], second[0], second[1]):
+                    continue
+                error = (
+                    "Mapping assignment period overlaps another upload row."
+                    if first[2] is not None and second[2] is not None
+                    else "Mapping assignment period overlaps existing record."
+                )
+                if first[2] is not None:
+                    _append_upload_error(errors_by_row[first[2]], error)
+                if second[2] is not None:
+                    _append_upload_error(errors_by_row[second[2]], error)
 
     preview = _upload_preview_from_errors(rows, errors_by_row)
     return preview, prepared_rows
