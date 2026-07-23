@@ -25,7 +25,7 @@ import { GET as GET_MAPPING_PERSONAL_STATUS } from "@/app/api/org/mapping-person
 
 type RouteCase = {
   name: string;
-  handler: (...args: any[]) => Promise<Response>;
+  handler: (request: NextRequest, context?: RouteContext) => Promise<Response>;
   requestUrl: string;
   upstreamUrl: string;
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -71,6 +71,7 @@ const ROUTES: RouteCase[] = [
     requestUrl: "http://localhost/api/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
     upstreamUrl: "http://localhost:8000/api/v1/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
     method: "GET",
+    expect204: true,
   },
   {
     name: "mapping-type-options",

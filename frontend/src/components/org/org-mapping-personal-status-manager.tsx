@@ -62,6 +62,7 @@ export function OrgMappingPersonalStatusManager() {
   const [rows, setRows] = useState<RowData[]>([]);
   const [typeColumns, setTypeColumns] = useState<OrgMappingPersonalStatusListResponse["type_columns"]>([]);
   const [page, setPage] = useState(1);
+  const [reloadVersion, setReloadVersion] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
@@ -93,7 +94,7 @@ export function OrgMappingPersonalStatusManager() {
 
   useEffect(() => {
     void loadRows();
-  }, [loadRows]);
+  }, [loadRows, reloadVersion]);
 
   const defaultColDef = useMemo<ColDef<RowData>>(
     () => ({ sortable: true, filter: true, resizable: true, editable: false, suppressMovable: true, minWidth: 100 }),
@@ -140,12 +141,18 @@ export function OrgMappingPersonalStatusManager() {
     XLSX.writeFile(workbook, "org-mapping-personal-status.xlsx");
   }, [rows, typeColumns]);
 
+  const handleQuery = useCallback(() => {
+    setPage(1);
+    setAppliedReferenceDate(referenceDate);
+    setReloadVersion((version) => version + 1);
+  }, [referenceDate]);
+
   const toolbarActions = [
     {
       key: "query",
       label: I18N.query,
       icon: Search,
-      onClick: () => { setPage(1); setAppliedReferenceDate(referenceDate); },
+      onClick: handleQuery,
       disabled: loading || menuActionLoading,
     },
     {
@@ -161,7 +168,7 @@ export function OrgMappingPersonalStatusManager() {
     <ManagerPageShell>
       <ManagerSearchSection
         title={I18N.title}
-        onQuery={() => { setPage(1); setAppliedReferenceDate(referenceDate); }}
+        onQuery={handleQuery}
         queryLabel={I18N.query}
         queryDisabled={loading || menuActionLoading || !can("query")}
       >
