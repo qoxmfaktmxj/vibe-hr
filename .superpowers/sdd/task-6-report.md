@@ -11,3 +11,9 @@
 - Fix code commit SHA: `bd8387d`
 - Adjustment: save now reconciles each successful DELETE/POST/PUT immediately, so retries only include still-dirty rows; editable cells, delete marking, and add/copy entry points are gated behind `can("save")`
 - Verification: `npm run validate:grid`; `npx eslint src/components/org/org-mapping-type-item-manager.tsx src/lib/org/org-mapping-type-item-save.ts src/lib/org/org-mapping-type-item-save.test.ts`; `npx vitest run src/lib/org/org-mapping-type-item-save.test.ts`; `npx tsc --noEmit`
+
+## Task 6 Follow-up Fix
+
+- Current source commit SHA: `a742432`
+- Adjustment: `canSave` now folds in `menuActionLoading` so loading denies edit/delete/create/copy/save access, and the save helper has an explicit loading-denied test
+- Verification: `npm run validate:grid`; `npx eslint src/components/org/org-mapping-type-item-manager.tsx src/lib/org/org-mapping-type-item-save.ts src/lib/org/org-mapping-type-item-save.test.ts`; `npx vitest run src/lib/org/org-mapping-type-item-save.test.ts`; `npx tsc --noEmit`
