@@ -403,6 +403,15 @@ Expected: registry and lint pass; types and existing chart Korean screenshots pa
 
 Run: `git add frontend/src/app/api/org/mapping-type-options/route.ts frontend/src/app/api/org/mapping-item-options/route.ts frontend/src/app/api/org/department-options/route.ts frontend/src/app/api/org/mapping-assignments/route.ts frontend/src/app/api/org/mapping-assignments/[assignmentId]/route.ts frontend/src/components/org/org-mapping-assignment-manager.tsx frontend/src/app/org/types/page.tsx frontend/src/types/organization.ts config/grid-screens.json frontend/tests/e2e/org-types.spec.ts; git commit -m "feat: add organization mapping assignment screen"`
 
+**Task 8 report**
+
+- Code commit: `ca12799` (`fix: route org/types lookups through protected ids`)
+- Assignment manager lookup sources now stay on protected lookup endpoints only.
+- Save payloads continue to send `department_id` and `item_id` directly from the selected protected ids.
+- Backend lookup responses now expose `id` values for protected departments and mapping items.
+- Verification passed: backend lookup pytest, `npm run validate:grid`, changed-file `eslint`, helper and BFF `vitest`, `npx tsc --noEmit`, `git diff --check`.
+- Playwright was not run, per request.
+
 ### Task 9: Personal-status reference-date projection API
 
 **Files:** Create `backend/tests/test_org_mapping_personal_status_service_unit.py`, `backend/tests/test_org_mapping_personal_status_routes_unit.py`; modify `backend/app/schemas/organization.py`, `backend/app/services/organization_mapping_service.py`, `backend/app/api/organization.py`.
