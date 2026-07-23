@@ -36,6 +36,7 @@ import type { OrgMappingTypeItem, OrgMappingTypeItemListResponse } from "@/types
 import {
   applySuccessfulOrgMappingTypeItemSave,
   collectPendingOrgMappingTypeItemRows,
+  isOrgMappingTypeItemSaveAllowed,
   type OrgMappingTypeItemSaveRow,
 } from "@/lib/org/org-mapping-type-item-save";
 
@@ -116,12 +117,6 @@ const STATUS_LABELS: Record<RowStatus, string> = {
   added: "입력",
   updated: "수정",
   deleted: "삭제",
-};
-
-const ACTION_CODE_BY_KEY: Record<string, string> = {
-  create: "create",
-  copy: "copy",
-  download: "download",
 };
 
 const AG_GRID_LOCALE_KO: Record<string, string> = {
@@ -275,7 +270,7 @@ const DateCellEditor = forwardRef<
 
 export function OrgMappingTypeItemManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/org/type-items");
-  const canSave = can("save");
+  const canSave = isOrgMappingTypeItemSaveAllowed(menuActionLoading, can("save"));
   const [rows, setRows] = useState<RowData[]>([]);
   const [typeOptions, setTypeOptions] = useState<MappingTypeOption[]>([]);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({ typeCode: "", referenceDate: "" });
@@ -872,15 +867,18 @@ export function OrgMappingTypeItemManager() {
       onClick: () => void downloadXlsx(),
       disabled: saving,
     },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+  ].filter((action) => {
+    if (action.key === "download") return can("download");
+    return canSave;
+  });
 
-  const toolbarSaveAction = can("save")
+  const toolbarSaveAction = canSave
     ? {
         key: "save",
         label: saving ? `${I18N.save}...` : I18N.save,
         icon: Save,
         onClick: () => void saveAll(),
-        disabled: saving || menuActionLoading,
+        disabled: saving,
         variant: "save" as const,
       }
     : undefined;

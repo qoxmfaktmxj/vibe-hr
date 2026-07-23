@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import {
   applySuccessfulOrgMappingTypeItemSave,
   collectPendingOrgMappingTypeItemRows,
+  isOrgMappingTypeItemSaveAllowed,
   type OrgMappingTypeItemSaveRow,
 } from "@/lib/org/org-mapping-type-item-save";
 
@@ -88,4 +89,10 @@ it("keeps already successful save rows out of the next retry pass", () => {
   expect(afterUpdate.some((row) => row.id === 3)).toBe(false);
   expect(afterUpdate.find((row) => row.id === 101)?._status).toBe("clean");
   expect(afterUpdate.find((row) => row.id === 2)?._status).toBe("clean");
+});
+
+it("blocks save access while menu actions are still loading", () => {
+  expect(isOrgMappingTypeItemSaveAllowed(true, true)).toBe(false);
+  expect(isOrgMappingTypeItemSaveAllowed(false, true)).toBe(true);
+  expect(isOrgMappingTypeItemSaveAllowed(false, false)).toBe(false);
 });

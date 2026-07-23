@@ -11,6 +11,10 @@ export type OrgMappingTypeItemSaveOutcome =
   | { type: "delete"; rowId: number }
   | { type: "upsert"; previousId: number; row: OrgMappingTypeItem };
 
+export function isOrgMappingTypeItemSaveAllowed(menuActionLoading: boolean, canSaveAction: boolean) {
+  return !menuActionLoading && canSaveAction;
+}
+
 export function collectPendingOrgMappingTypeItemRows(rows: readonly OrgMappingTypeItemSaveRow[]) {
   const deleted: OrgMappingTypeItemSaveRow[] = [];
   const added: OrgMappingTypeItemSaveRow[] = [];
