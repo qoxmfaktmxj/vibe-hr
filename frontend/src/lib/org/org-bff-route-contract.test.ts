@@ -312,6 +312,26 @@ describe("/api/org mapping BFF routes", () => {
     expect(await response.json()).toEqual(payload);
   });
 
+  it("forwards nested 422 detail for mapping-assignments upload-confirm", async () => {
+    const routeCase = ROUTES.find((candidate) => candidate.name === "mapping-assignments upload-confirm");
+    if (!routeCase) throw new Error("Upload-confirm route contract is missing.");
+    const payload = { detail: { message: "upload validation failed", rows: [], valid_count: 0, invalid_count: 1 } };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(payload), {
+          status: 422,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const response = await routeCase.handler(buildRequest(routeCase, true), routeCase.context);
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toEqual(payload);
+  });
+
   it.each(ROUTES.filter((routeCase) => routeCase.expect204))(
     "returns an empty 204 response when upstream is 204 for $name",
     async (routeCase) => {
