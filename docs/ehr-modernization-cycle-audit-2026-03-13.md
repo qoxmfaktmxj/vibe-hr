@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # EHR Modernization Cycle Audit
 
 작성일: 2026-03-13
@@ -187,3 +188,4 @@
 4. CPN gap 문서 기준으로 `P_CPN_CAL_EMP_INS`, `P_CPN_CAL_PAY_MAIN` 대응 설계 세분화
 5. BEN 승인완료분을 `pay_variable_inputs` 또는 신규 `pay_run_target_events`로 투입하는 구조 설계
 
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

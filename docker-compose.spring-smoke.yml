@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vibehr_smoke
+      POSTGRES_USER: vibehr
+      POSTGRES_PASSWORD: vibehr
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibehr -d vibehr_smoke"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend-spring
+    image: vibehr-backend-spring:smoke
+    environment:
+      SPRING_PROFILES_ACTIVE: flyway-cutover
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/vibehr_smoke
+      SPRING_DATASOURCE_USERNAME: vibehr
+      SPRING_DATASOURCE_PASSWORD: vibehr
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      VIBEHR_BFF_ASSERTION_SECRET: ${VIBEHR_BFF_ASSERTION_SECRET:?VIBEHR_BFF_ASSERTION_SECRET is required}
+      VIBEHR_BFF_ASSERTION_MAX_TTL_SECONDS: "60"
+      VIBEHR_SCHEMA_OWNER: flyway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1::8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://localhost:8080/actuator/health/readiness"]
+      interval: 5s
+      timeout: 3s
+      retries: 24

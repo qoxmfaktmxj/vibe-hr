@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  attachLoginClientCookie,
+  BFF_ASSERTION_HEADER,
+  bffReplayScopeFor,
+  createBffAssertion,
+  loginClientFor,
+  requestBodyDigest,
+} from "@/app/api/_lib/bff-assertion";
 import type { AuthUser } from "@/types/auth";
 
 type Provider = "google" | "kakao";
@@ -13,24 +21,24 @@ type GoogleProfile = {
   id?: string | number;
   email?: string;
   name?: string;
+  verified_email?: boolean;
 };
 
 type KakaoProfile = {
   id?: string | number;
   kakao_account?: {
     email?: string;
+    is_email_valid?: boolean;
+    is_email_verified?: boolean;
     profile?: {
       nickname?: string;
     };
   };
 };
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
-const APP_ORIGIN =
-  process.env.APP_ORIGIN ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? "";
 const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
 const AUTH_TOKEN_EXPIRES_MIN =
   Number.isFinite(tokenExpiresEnv) && tokenExpiresEnv > 0 ? tokenExpiresEnv : 480;
@@ -56,23 +64,38 @@ function getConfig(provider: Provider) {
   };
 }
 
-function resolveAppOrigin(request: NextRequest): string {
-  if (APP_ORIGIN) return APP_ORIGIN;
-  const xfHost = request.headers.get("x-forwarded-host");
-  if (xfHost) {
-    const xfProto = request.headers.get("x-forwarded-proto") ?? "https";
-    return `${xfProto}://${xfHost}`;
+function appOrigin(): string {
+  const value = process.env.APP_ORIGIN;
+  if (!value || value.trim() !== value) throw new Error("APP_ORIGIN must be configured as a canonical origin.");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("APP_ORIGIN must be configured as a canonical origin.");
   }
-  const host = request.headers.get("host") ?? request.nextUrl.host;
-  const proto = request.nextUrl.protocol.replace(":", "") || "https";
-  return `${proto}://${host}`;
+  if ((parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    || parsed.username
+    || parsed.password
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+    || value !== parsed.origin) {
+    throw new Error("APP_ORIGIN must be configured as a canonical origin.");
+  }
+  return parsed.origin;
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ provider: string }> }) {
-  const appOrigin = resolveAppOrigin(request);
+  let configuredAppOrigin: string;
+  try {
+    configuredAppOrigin = appOrigin();
+  } catch {
+    return NextResponse.json({ detail: "Social login is unavailable because APP_ORIGIN is not configured." }, { status: 500 });
+  }
   const { provider: raw } = await context.params;
   if (raw !== "google" && raw !== "kakao") {
-    return NextResponse.redirect(new URL("/login?error=unsupported_provider", appOrigin));
+    return NextResponse.redirect(new URL("/login?error=unsupported_provider", configuredAppOrigin));
   }
 
   const provider = raw as Provider;
@@ -82,12 +105,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
   const state = url.searchParams.get("state") ?? "";
   const err = url.searchParams.get("error");
 
-  if (err) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(err)}`, appOrigin));
-  if (!code) return NextResponse.redirect(new URL("/login?error=missing_code", appOrigin));
+  if (err) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(err)}`, configuredAppOrigin));
+  if (!code) return NextResponse.redirect(new URL("/login?error=missing_code", configuredAppOrigin));
 
   const stateCookie = request.cookies.get(`vibe_hr_oauth_state_${provider}`)?.value;
   if (!stateCookie || !state || stateCookie !== state) {
-    return NextResponse.redirect(new URL("/login?error=invalid_state", appOrigin));
+    return NextResponse.redirect(new URL("/login?error=invalid_state", configuredAppOrigin));
   }
 
   try {
@@ -108,7 +131,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
     const tokenJson = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null;
     const accessToken = tokenJson?.access_token;
     if (!tokenRes.ok || !accessToken) {
-      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", appOrigin));
+        return NextResponse.redirect(new URL("/login?error=token_exchange_failed", configuredAppOrigin));
     }
 
     const profileRes = await fetch(cfg.profileUrl, {
@@ -118,7 +141,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
     });
     const profile = (await profileRes.json().catch(() => null)) as GoogleProfile | KakaoProfile | null;
     if (!profileRes.ok || !profile) {
-      return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", appOrigin));
+        return NextResponse.redirect(new URL("/login?error=profile_fetch_failed", configuredAppOrigin));
     }
 
     const normalized =
@@ -129,6 +152,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
               provider_user_id: String(googleProfile.id ?? ""),
               email: String(googleProfile.email ?? "").trim().toLowerCase(),
               display_name: String(googleProfile.name ?? googleProfile.email ?? "Google User"),
+              email_verified: googleProfile.verified_email === true,
             };
           })()
         : (() => {
@@ -137,35 +161,57 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
               provider_user_id: String(kakaoProfile.id ?? ""),
               email: String(kakaoProfile.kakao_account?.email ?? "").trim().toLowerCase(),
               display_name: String(kakaoProfile.kakao_account?.profile?.nickname ?? "Kakao User"),
+              email_verified:
+                kakaoProfile.kakao_account?.is_email_valid === true
+                && kakaoProfile.kakao_account?.is_email_verified === true,
             };
           })();
 
     if (!normalized.provider_user_id) {
-      return NextResponse.redirect(new URL("/login?error=missing_profile_fields", appOrigin));
+        return NextResponse.redirect(new URL("/login?error=missing_profile_fields", configuredAppOrigin));
     }
 
     if (!normalized.email) {
-      return NextResponse.redirect(new URL("/login?error=email_required", appOrigin));
+        return NextResponse.redirect(new URL("/login?error=email_required", configuredAppOrigin));
+    }
+    if (!normalized.email_verified) {
+        return NextResponse.redirect(new URL("/login?error=email_unverified", configuredAppOrigin));
     }
 
-    const backendRes = await fetch(`${API_BASE_URL}/api/v1/auth/social/exchange`, {
+    const scope = bffReplayScopeFor(request);
+    const client = loginClientFor(request);
+    const backendBody = JSON.stringify({
+      provider,
+      provider_user_id: normalized.provider_user_id,
+      email: normalized.email,
+      display_name: normalized.display_name,
+    });
+    const assertion = createBffAssertion({
+      purpose: "social-exchange",
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      path: "/api/v1/auth/social/exchange",
+      clientId: client.id,
+      ...scope,
+      provider,
+      providerUserId: normalized.provider_user_id,
+      email: normalized.email,
+      displayName: normalized.display_name,
+      bodyDigest: requestBodyDigest(backendBody),
+    });
+
+    const backendRes = await fetch(`${backendApiBaseUrl()}/api/v1/auth/social/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", [BFF_ASSERTION_HEADER]: assertion },
       cache: "no-store",
-      body: JSON.stringify({
-        provider,
-        provider_user_id: normalized.provider_user_id,
-        email: normalized.email,
-        display_name: normalized.display_name,
-      }),
+      body: backendBody,
     });
 
     const backendJson = (await backendRes.json().catch(() => null)) as BackendLoginResponse | null;
     if (!backendRes.ok || !backendJson?.access_token) {
-      return NextResponse.redirect(new URL("/login?error=social_exchange_failed", appOrigin));
+      return NextResponse.redirect(new URL("/login?error=social_exchange_failed", configuredAppOrigin));
     }
 
-    const response = NextResponse.redirect(new URL("/dashboard", appOrigin));
+    const response = NextResponse.redirect(new URL("/dashboard", configuredAppOrigin));
     response.cookies.set({
       name: AUTH_COOKIE_NAME,
       value: backendJson.access_token,
@@ -181,8 +227,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
       maxAge: 0,
       path: "/",
     });
-    return response;
+    return attachLoginClientCookie(response, client);
   } catch {
-    return NextResponse.redirect(new URL("/login?error=unexpected", appOrigin));
+    return NextResponse.redirect(new URL("/login?error=unexpected", configuredAppOrigin));
   }
 }

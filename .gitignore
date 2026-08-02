@@ -46,6 +46,7 @@ frontend/test-results/
 !.env.example
 !.env.deploy
 .env.deploy.secret
+!.env.deploy.secret.example
 
 # Backend env
 backend/.env

@@ -31,7 +31,7 @@ npm run test
 ### Backend
 ```bash
 cd backend
-python3 -m pytest -q
+cd backend-spring && .\gradlew.bat test
 ```
 
 ## CI 게이트

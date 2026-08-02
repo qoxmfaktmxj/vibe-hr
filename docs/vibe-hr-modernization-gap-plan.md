@@ -1,3 +1,8 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired modernization-gap evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
+
 # VIBE-HR Modernization Gap Plan
 
 작성일: 2026-03-12  
@@ -346,3 +351,4 @@
 2. `교육`과 `평가`는 현재 VIBE-HR의 리소스/마스터 기반을 살리되, 레거시의 상태전이만 단계적으로 덧입히는 편이 좋다.
 3. 공통 결재(`hri`)와 권한/코드 체계를 먼저 표준화하지 않으면, 복리후생/교육/평가가 각자 다른 결재 모델로 흩어질 위험이 크다.
 4. 레거시 Oracle 프로시저는 그대로 옮기지 말고, 업무규칙 단위로 잘라 Python 서비스와 PostgreSQL 트랜잭션으로 재구성하는 방향을 유지해야 한다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

@@ -14,7 +14,7 @@ This file is an execution entrypoint, not a source of truth. If any rule here co
 Vibe-HR is a Korean HR modernization monorepo.
 
 - Frontend: Next.js 16, React 19, TypeScript, AG Grid
-- Backend: FastAPI, SQLModel, PostgreSQL
+- Backend: Spring Boot 4, Java 21, JPA/MyBatis, Flyway, PostgreSQL
 - Domains: HR / ORG / TIM / PAYROLL / WEL / HRI / TRA
 
 ## Source of Truth Map
@@ -52,19 +52,14 @@ Treat the following as protected paths.
 - `frontend/src/components/grid/**`
 - `frontend/src/lib/grid/**`
 - `config/grid-screens.json`
-- `backend/app/api/auth.py`
-- `backend/app/core/auth.py`
-- `backend/app/schemas/auth.py`
-- `backend/app/services/auth_service.py`
-- `backend/app/api/payroll_phase2.py`
-- `backend/app/services/payroll_phase2_service.py`
-- `backend/app/schemas/payroll_phase2.py`
-- `backend/app/api/menu.py`
-- `backend/app/services/menu_service.py`
-- `backend/app/schemas/menu.py`
+- `backend-spring/src/main/java/com/vibehr/auth/**`
+- `backend-spring/src/main/java/com/vibehr/payroll/**`
+- `backend-spring/src/main/java/com/vibehr/menu/**`
+- `backend-spring/src/main/java/com/vibehr/platform/security/**`
+- `backend-spring/src/main/resources/db/migration/**`
 - `.github/workflows/**`
 - `docker-compose.deploy.yml`
-- `backend/Dockerfile`
+- `backend-spring/Dockerfile`
 - `frontend/Dockerfile`
 
 ## Required Validation
@@ -79,8 +74,8 @@ npm run build
 
 ### Backend
 ```bash
-cd backend
-pytest
+cd backend-spring
+.\gradlew.bat test
 ```
 
 ## AG Grid Rule

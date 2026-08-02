@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 근태(TIM) 모듈 개발 계획서
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 대상 규모: 법인당 최대 6,000명
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 개요
 
@@ -760,3 +765,4 @@ tim_leave_requests 확장:
 | 연차관리 | X (본인만) | O (전체) | O |
 | 휴가신청 | O | O | O |
 | 휴가승인 | X | O | O |
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

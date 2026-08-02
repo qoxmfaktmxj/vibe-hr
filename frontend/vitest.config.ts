@@ -9,6 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Next resolves the real package at build time; Vitest needs a no-op server marker.
+      "server-only": path.resolve(__dirname, "./src/test/server-only.ts"),
     },
   },
 });

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { GET as GET_DEPARTMENT_OPTIONS } from "@/app/api/org/department-options/route";
@@ -25,6 +25,8 @@ import { GET as GET_MAPPING_PERSONAL_STATUS } from "@/app/api/org/mapping-person
 import { POST as POST_UPLOAD_CONFIRM } from "@/app/api/org/mapping-assignments/upload-confirm/route";
 import { POST as POST_UPLOAD_PREVIEW } from "@/app/api/org/mapping-assignments/upload-preview/route";
 import { GET as GET_UPLOAD_TEMPLATE } from "@/app/api/org/mapping-assignments/upload-template/route";
+
+const SPRING_TEST_URL = "http://spring-test:8080";
 
 type RouteCase = {
   name: string;
@@ -78,7 +80,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-assignments upload-template",
     invoke: GET_UPLOAD_TEMPLATE,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-template",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-template",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments/upload-template",
     method: "GET",
     expect204: true,
   },
@@ -86,7 +88,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-assignments upload-preview",
     invoke: POST_UPLOAD_PREVIEW,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-preview",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-preview",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments/upload-preview",
     method: "POST",
     body: uploadPayload,
     expect204: true,
@@ -95,7 +97,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-assignments upload-confirm",
     invoke: POST_UPLOAD_CONFIRM,
     requestUrl: "http://localhost/api/org/mapping-assignments/upload-confirm",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/upload-confirm",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments/upload-confirm",
     method: "POST",
     body: uploadPayload,
     expect204: true,
@@ -104,7 +106,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-personal-status",
     invoke: GET_MAPPING_PERSONAL_STATUS,
     requestUrl: "http://localhost/api/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-personal-status?reference_date=2026-07-31&page=1&limit=100",
     method: "GET",
     expect204: true,
   },
@@ -112,35 +114,35 @@ const ROUTES: RouteCase[] = [
     name: "mapping-type-options",
     invoke: GET_MAPPING_TYPE_OPTIONS,
     requestUrl: "http://localhost/api/org/mapping-type-options",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-options",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-type-options",
     method: "GET",
   },
   {
     name: "mapping-item-options",
     invoke: GET_MAPPING_ITEM_OPTIONS,
     requestUrl: "http://localhost/api/org/mapping-item-options?type_code=COST",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-item-options?type_code=COST",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-item-options?type_code=COST",
     method: "GET",
   },
   {
     name: "department-options",
     invoke: GET_DEPARTMENT_OPTIONS,
     requestUrl: "http://localhost/api/org/department-options",
-    upstreamUrl: "http://localhost:8000/api/v1/org/department-options",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/department-options",
     method: "GET",
   },
   {
     name: "mapping-assignments GET",
     invoke: GET_MAPPING_ASSIGNMENTS,
     requestUrl: "http://localhost/api/org/mapping-assignments",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments",
     method: "GET",
   },
   {
     name: "mapping-assignments POST",
     invoke: POST_MAPPING_ASSIGNMENTS,
     requestUrl: "http://localhost/api/org/mapping-assignments",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments",
     method: "POST",
     body: basePayload,
   },
@@ -148,7 +150,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-assignments PUT",
     invoke: (request) => PUT_MAPPING_ASSIGNMENT(request, { params: { assignmentId: "7" } }),
     requestUrl: "http://localhost/api/org/mapping-assignments/7",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments/7",
     method: "PUT",
     body: basePayload,
   },
@@ -156,7 +158,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-assignments DELETE",
     invoke: (request) => DELETE_MAPPING_ASSIGNMENT(request, { params: { assignmentId: "7" } }),
     requestUrl: "http://localhost/api/org/mapping-assignments/7",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-assignments/7",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-assignments/7",
     method: "DELETE",
     expect204: true,
   },
@@ -164,21 +166,21 @@ const ROUTES: RouteCase[] = [
     name: "mapping-types",
     invoke: GET_MAPPING_TYPES,
     requestUrl: "http://localhost/api/org/mapping-types?reference_date=2026-01-31",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-types?reference_date=2026-01-31",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-types?reference_date=2026-01-31",
     method: "GET",
   },
   {
     name: "mapping-type-items GET",
     invoke: GET_MAPPING_TYPE_ITEMS,
     requestUrl: "http://localhost/api/org/mapping-type-items?page=1&limit=1&type_code=COST&reference_date=2026-01-31",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items?page=1&limit=1&type_code=COST&reference_date=2026-01-31",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-type-items?page=1&limit=1&type_code=COST&reference_date=2026-01-31",
     method: "GET",
   },
   {
     name: "mapping-type-items POST",
     invoke: POST_MAPPING_TYPE_ITEMS,
     requestUrl: "http://localhost/api/org/mapping-type-items",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-type-items",
     method: "POST",
     body: typeItemPayload,
   },
@@ -186,7 +188,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-type-items PUT",
     invoke: (request) => PUT_MAPPING_TYPE_ITEM(request, { params: { itemId: "42" } }),
     requestUrl: "http://localhost/api/org/mapping-type-items/42",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items/42",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-type-items/42",
     method: "PUT",
     body: typeItemPayload,
   },
@@ -194,7 +196,7 @@ const ROUTES: RouteCase[] = [
     name: "mapping-type-items DELETE",
     invoke: (request) => DELETE_MAPPING_TYPE_ITEM(request, { params: { itemId: "42" } }),
     requestUrl: "http://localhost/api/org/mapping-type-items/42",
-    upstreamUrl: "http://localhost:8000/api/v1/org/mapping-type-items/42",
+    upstreamUrl: "http://spring-test:8080/api/v1/org/mapping-type-items/42",
     method: "DELETE",
     expect204: true,
   },
@@ -221,7 +223,12 @@ function buildRequest(routeCase: RouteCase, withCookie: boolean) {
 }
 
 describe("/api/org mapping BFF routes", () => {
+  beforeEach(() => {
+    vi.stubEnv("VIBEHR_BFF_BACKEND_URL", SPRING_TEST_URL);
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 

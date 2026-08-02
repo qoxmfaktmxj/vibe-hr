@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ codeId: string }> };
@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
   const { codeId } = await context.params;
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/appointment-codes/${codeId}`, {
+  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/appointment-codes/${codeId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -32,7 +32,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { codeId } = await context.params;
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/appointment-codes/${codeId}`, {
+  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/appointment-codes/${codeId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

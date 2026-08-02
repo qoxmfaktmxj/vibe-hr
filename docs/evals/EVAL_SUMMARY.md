@@ -1,3 +1,8 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This evaluation records retired runtime evidence. Do not run, restore, or update legacy commands or paths. Current verification uses the Spring-only guidance in `docs/TEST_STRATEGY.md`.
+
 Status: Draft
 Owner: 석
 Canonical: Yes
@@ -122,3 +127,4 @@ Confidence: Medium
 - 최소 3건 이상의 의미 있는 실행 작업이 누적되기 전에는 큰 정책 변경 결론을 내리지 않는다. [Proposal]
 - R2/R3 작업은 R0/R1과 별도로 본다. [User-stated]
 - 쉬운 문서 작업으로 성공률을 부풀리는 해석을 금지한다. [Proposal]
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

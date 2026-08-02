@@ -1,9 +1,14 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 보상/급여(CPN) 모듈 - Phase 1 테스트 가이드
 
 이 문서는 Vibe-HR 프로젝트의 보상/급여 모듈 **Phase 1 (급여 기초 정보 설정)**에 대한 테스트 시나리오를 정의합니다.
 다음 작업을 이어받는 개발자 또는 AI(에이전트)는 코드를 실행 환경(DB 포함)에 배포한 후, 아래 시나리오에 따라 정상 작동 여부를 반드시 확인해야 합니다.
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 🏗️ 1. 사전 준비 (Prerequisites)
 
@@ -81,3 +86,4 @@
    - 조치: `main.py` 구동 터미널 로그를 열어 Backend 에러(`500 Internal Server Error`)가 있는지 확인. `uvicorn` 실행 필요.
 3. **AG Grid `id: null` 에러 방지**
    - TypeScript 린트 에러를 방지하기 위해 생성 시 임시 부여되는 `-1`, `-2` ID 기반으로 작동하며, 저장 시 `BatchRequest` 에 `undefined`를 넘기는 구조로 변경되었습니다. (프론트엔드 `.tsx` 코드 내 주석 참조)
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

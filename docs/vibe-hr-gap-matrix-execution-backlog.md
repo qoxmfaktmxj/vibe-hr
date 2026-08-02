@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # VIBE-HR Legacy Gap Matrix and Execution Backlog
 
 작성일: 2026-03-12  
@@ -360,3 +361,4 @@ DB 명세: `C:\Users\kms\Desktop\dev\EHR_6\EHR5_DB명세.sql`
 - 복리후생과 평가는 “실질 업무 모듈 신규 구축”에 가깝다.
 - 교육은 “기존 VIBE-HR 구조를 살리되 승인/취소/결과보고 흐름을 보강”하는 방식이 가장 효율적이다.
 - 공통 결재 HRI는 재사용 가치가 높지만 후처리 연결이 아직 비어 있으므로, 근태/교육/복리후생 확장 전에 먼저 결재-후처리 표준을 정해야 한다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

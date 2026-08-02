@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  attachLoginClientCookie,
+  BffEdgeRateLimitError,
+  BFF_ASSERTION_HEADER,
+  bffReplayScopeFor,
+  createBffAssertion,
+  loginClientFor,
+  loginRequestBinding,
+  requestBodyDigest,
+} from "@/app/api/_lib/bff-assertion";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 import type { AuthUser } from "@/types/auth";
 
 type LoginResponse = {
@@ -11,9 +22,6 @@ type LoginResponse = {
   remember_ttl_min: number;
   show_countdown: boolean;
 };
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
@@ -31,29 +39,57 @@ export async function POST(request: NextRequest) {
 
   if (!enterCd || !loginId || !password) {
     return NextResponse.json(
-      { detail: "ENTER_CD, 아이디, 비밀번호를 입력해 주세요." },
+      { detail: "ENTER_CD, 아이디와 비밀번호를 입력해 주세요." },
       { status: 400 },
     );
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+  let scope;
+  try {
+    scope = bffReplayScopeFor(request);
+  } catch (error) {
+    if (error instanceof BffEdgeRateLimitError) {
+      return NextResponse.json(
+        { detail: error.message },
+        { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } },
+      );
+    }
+    return NextResponse.json({ detail: "Login service is unavailable." }, { status: 503 });
+  }
+  const client = loginClientFor(request);
+  const backendBody = JSON.stringify({ enter_cd: enterCd, login_id: loginId, password });
+  const assertion = createBffAssertion({
+    purpose: "login",
+    method: "POST",
+    path: "/api/v1/auth/login",
+    clientId: client.id,
+    ...scope,
+    requestBinding: loginRequestBinding(enterCd, loginId),
+    bodyDigest: requestBodyDigest(backendBody),
+  });
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      [BFF_ASSERTION_HEADER]: assertion,
     },
     cache: "no-store",
-    body: JSON.stringify({ enter_cd: enterCd, login_id: loginId, password }),
+    body: backendBody,
   });
 
   if (!upstreamResponse.ok) {
-    return NextResponse.json(
-      { detail: "ENTER_CD 또는 로그인 정보가 올바르지 않습니다." },
-      { status: upstreamResponse.status === 401 ? 401 : 500 },
+    const headers = new Headers();
+    const contentType = upstreamResponse.headers.get("content-type");
+    const retryAfter = upstreamResponse.headers.get("retry-after");
+    if (contentType) headers.set("content-type", contentType);
+    if (retryAfter) headers.set("retry-after", retryAfter);
+    return attachLoginClientCookie(
+      new NextResponse(upstreamResponse.body, { status: upstreamResponse.status, headers }),
+      client,
     );
   }
 
   const data = (await upstreamResponse.json()) as LoginResponse;
-
   const response = NextResponse.json(
     { user: { ...data.user, enter_cd: enterCd } },
     { status: 200 },
@@ -94,5 +130,5 @@ export async function POST(request: NextRequest) {
     maxAge,
   });
 
-  return response;
+  return attachLoginClientCookie(response, client);
 }

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { AuthUser } from "@/types/auth";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
@@ -17,7 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/me`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,

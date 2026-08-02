@@ -1,10 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 import { GET } from "@/app/api/org/chart/route";
 
+const SPRING_TEST_URL = "http://spring-test:8080";
+
 describe("/api/org/chart BFF route", () => {
+  beforeEach(() => {
+    vi.stubEnv("VIBEHR_BFF_BACKEND_URL", SPRING_TEST_URL);
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -36,7 +43,7 @@ describe("/api/org/chart BFF route", () => {
     const response = await GET(request);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/v1/org/chart",
+      "http://spring-test:8080/api/v1/org/chart",
       expect.objectContaining({
         method: "GET",
         headers: { Authorization: "Bearer token-123" },

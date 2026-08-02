@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Vibe-HR 코드 품질 개선 계획서 (로직/소스 관점)
 
 > **범위**: 인프라 보안, 배포, 마이그레이션 전략(Alembic 등)은 **제외**
@@ -428,3 +429,4 @@ APPROVAL_ROLE_POSITION_KEYWORDS: dict[str, list[str]] = {
 | PR-3 | `types/` + 그리드 컬럼 | `calendar_days`, `deduction_days`, `decision_comment` 필드 추가 |
 | PR-4 | 없음 | 응답 구조 동일 (total_count + items) |
 | PR-5 | 없음 | 결재 생성 실패 시 에러 메시지 표시만 (기존 핸들링) |
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

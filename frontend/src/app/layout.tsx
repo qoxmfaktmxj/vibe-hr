@@ -27,7 +27,7 @@ const pretendard = localFont({
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
   title: "VIBE-HR",
-  description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
+  description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   openGraph: {
     title: "VIBE-HR",
-    description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
+    description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
     images: [{ url: "/vibe-hr-thumbnail.webp", width: 1200, height: 630, type: "image/webp" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "VIBE-HR",
-    description: "VIBE-HR MVP with Next.js + FastAPI + SQLModel",
+    description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
     images: ["/vibe-hr-thumbnail.webp"],
   },
   other: {

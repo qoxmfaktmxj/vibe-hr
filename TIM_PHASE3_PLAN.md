@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # TIM Phase 3 - 휴가 관리 (Leave Management) - 상세 계획서
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 규모: 최대 2,000명, 연간 ~4만 휴가신청 처리
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## Context
 
@@ -825,3 +830,4 @@ Index("ix_tim_leave_requests_employee_dates", "employee_id", "start_date", "end_
 - 야간/휴일 근로 수당 계산
 - 연차 미사용 현황 (수당 산정 기초)
 - 근태 통계 대시보드
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

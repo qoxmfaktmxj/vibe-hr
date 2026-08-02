@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # PAP Module Rules
 
 ## 1) Table naming
@@ -22,3 +23,4 @@
 ## 4) Legacy migration policy
 - Legacy TPAP procedure/function behavior must be mapped into service methods.
 - Keep service method names explicit by use-case (request/approve/close/calculate).
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

@@ -1,20 +1,21 @@
 services:
   backend:
     build:
-      context: ./backend
-    container_name: vibehr-backend
+      context: ./backend-spring
+    image: vibehr-backend-spring:deploy
+    container_name: vibehr-backend-spring
     restart: unless-stopped
     env_file:
       - ./.env.deploy
       - ./.env.deploy.secret
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?SPRING_PROFILES_ACTIVE is required}
+      VIBEHR_SCHEMA_OWNER: ${VIBEHR_SCHEMA_OWNER:?VIBEHR_SCHEMA_OWNER is required}
     ports:
-      - "127.0.0.1:8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ./seed-archive:/app/seed-archive
+      - "127.0.0.1:8080:8080"
+    stop_grace_period: 40s
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\""]
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://localhost:8080/actuator/health/readiness"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -28,6 +29,9 @@ services:
     env_file:
       - ./.env.deploy
       - ./.env.deploy.secret
+    environment:
+      VIBEHR_BFF_BACKEND_URL: ${VIBEHR_BFF_BACKEND_URL:?VIBEHR_BFF_BACKEND_URL is required}
+      VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER: ${VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER:?VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER is required}
     depends_on:
       backend:
         condition: service_healthy

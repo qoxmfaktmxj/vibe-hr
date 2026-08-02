@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 보상/급여(CPN) 모듈 개발 계획서
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 모듈명: CPN (Compensation - 보상/급여)
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 개요
 
@@ -117,3 +122,4 @@ erDiagram
 ```
 
 > **비고**: 본 문서는 `CPN_MODULE_PLAN.md`로 프로젝트 루트에 상시 보관되며, 모듈 개발을 진행하면서 각 단계 완료 시 체크박스(`[x]`)를 갱신해 가며 사용합니다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

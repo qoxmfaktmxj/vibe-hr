@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 
 export async function GET() {
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/enter-cds`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/enter-cds`, {
     method: "GET",
     cache: "no-store",
   });

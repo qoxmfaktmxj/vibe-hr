@@ -1,3 +1,8 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test planning evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
+
 # Organization Mapping Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -634,3 +639,4 @@ Run: `git diff --name-only > .superpowers/sdd/org-reviewed-files.txt; git add ba
 ## Completion Evidence
 
 Sol approval requires exact migration head proof, rollout/rollback evidence, 403 direct-route evidence, inclusive-period and containment tests, upload zero-write tests, distinct historical personal-status pagination, four new Grid registry entries plus `/org/departments` regression, and fixed-path Korean screenshots.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

@@ -16,10 +16,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: "22"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Resolve diff base/head
         id: refs
@@ -40,7 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/check-risk-paths.py \
+          node scripts/check-risk-paths.js \
             --base "${{ steps.refs.outputs.base }}" \
             --head "${{ steps.refs.outputs.head }}" \
             --github-output "$GITHUB_OUTPUT"
@@ -69,6 +78,12 @@ jobs:
         run: |
           echo "::warning::Payroll path change detected. Why protected: financial semantics may change. How to fix: require explicit approval, verify representative seed cases, and document rollback/stop conditions. Docs: docs/GOVERNANCE.md, docs/TEST_STRATEGY.md, docs/TASK_LEDGER.md"
 
+      - name: Warn on Flyway change
+        if: steps.classify.outputs.flyway_changed == 'true'
+        shell: bash
+        run: |
+          echo "::warning::Flyway path change detected. Why protected: schema or required reference-data ownership may change. How to fix: require explicit approval, run frozen evidence and Flyway verification, and retain candidate/rollback evidence. Docs: docs/GOVERNANCE.md, docs/TEST_STRATEGY.md, docs/TASK_LEDGER.md"
+
       - name: Warn on deploy / infra change
         if: steps.classify.outputs.deploy_changed == 'true'
         shell: bash
@@ -79,7 +94,22 @@ jobs:
         if: steps.classify.outputs.backend_changed == 'true'
         shell: bash
         run: |
-          echo "::notice::Backend changes detected. Recommended validation: 'cd backend && pytest'. Docs: docs/TEST_STRATEGY.md"
+          echo "::notice::Spring backend changes detected. Recommended validation: Gradle tests, route/schema coverage, and Flyway snapshot verification. Docs: docs/TEST_STRATEGY.md"
+
+      - name: Verify Spring route and OpenAPI build contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/spring-migration/endpoint-manifest.js --verify
+          node scripts/spring-migration/spring-route-coverage.js --verify-complete
+          node scripts/spring-migration/schema-ledger.js --check-complete
+          node scripts/spring-migration/spring-schema-coverage.js --verify-complete
+          node scripts/spring-migration/mutation-ledger.js --check-complete
+          node scripts/spring-migration/flyway-verify.js
+          node scripts/spring-migration/verify-python-retirement.js
+          node scripts/spring-migration/bff-cutover-audit.js
+          cd backend-spring
+          ./gradlew --no-daemon --console=plain compileJava test bootJar
 
       - name: Draft summary
         shell: bash
@@ -96,6 +126,7 @@ jobs:
             echo "- permission_changed: ${{ steps.classify.outputs.permission_changed }}"
             echo "- auth_changed: ${{ steps.classify.outputs.auth_changed }}"
             echo "- payroll_changed: ${{ steps.classify.outputs.payroll_changed }}"
+            echo "- flyway_changed: ${{ steps.classify.outputs.flyway_changed }}"
             echo "- deploy_changed: ${{ steps.classify.outputs.deploy_changed }}"
             echo "- backend_changed: ${{ steps.classify.outputs.backend_changed }}"
             echo "- r3_changed: ${{ steps.classify.outputs.r3_changed }}"

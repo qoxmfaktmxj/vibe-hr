@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function PUT(
@@ -19,7 +18,7 @@ export async function PUT(
   }
 
   const { itemId } = await Promise.resolve(params);
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/org/mapping-type-items/${itemId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/mapping-type-items/${itemId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -43,7 +42,7 @@ export async function DELETE(
   }
 
   const { itemId } = await Promise.resolve(params);
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/org/mapping-type-items/${itemId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/mapping-type-items/${itemId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

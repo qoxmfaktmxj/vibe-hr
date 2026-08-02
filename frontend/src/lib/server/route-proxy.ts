@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { forwardBackendResponse } from "@/app/api/_lib/forward-backend-response";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type UpstreamMethod = "GET" | "POST" | "PUT" | "DELETE";
@@ -27,9 +26,8 @@ async function upstream(method: UpstreamMethod, path: string, token: string, bod
     init.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
-  const data = await response.json().catch(() => ({ detail: "Request failed" }));
-  return NextResponse.json(data, { status: response.status });
+  const response = await fetch(`${backendApiBaseUrl()}${path}`, init);
+  return forwardBackendResponse(response);
 }
 
 export function proxyGet(backendPath: string) {

@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 급여 → 회계전표(Voucher/GL) 모듈 설계 (v0.1)
 
 - Date: 2026-07-08
@@ -141,3 +142,4 @@ GET                /api/v1/pay/vouchers/mapping-gaps ?run_id=   # 매핑 누락 
 
 - 유닛: disbursement 분개(차대·금액=순지급 합), 유니크(run, type), accrual 미확정 시 거부, close 훅 draft 생성/실패 격리, export CSV 라운드트립
 - E2E: 신규 월 run → close(자동 accrual draft 확인) → confirm → paid → disbursement 생성·확정 → export 다운로드
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

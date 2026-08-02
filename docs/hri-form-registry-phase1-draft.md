@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # HRI Form Registry Phase 1 Draft
 
 ## 1. 목적
@@ -241,3 +242,4 @@
 - 새 기능을 만들 때 seed는 예외 없이 같이 넣는 것이 맞다.
 - 특히 `form type seed + sample request seed + menu seed`는 한 세트로 봐야 한다.
 - 다음 구현 시작점은 `LEAVE_REQUEST seed 등록`과 `WEL_BENEFIT_REQUEST form_code 추가`가 가장 효율적이다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

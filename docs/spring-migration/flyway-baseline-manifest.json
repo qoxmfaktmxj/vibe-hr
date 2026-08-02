@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "expected_alembic_head": "org_mapping_foundation_20260722",
+  "expected_app_table_count": 105,
+  "alembic_revisions": [
+    {
+      "file": "backend/migrations/versions/46507f02680a_add_severance_calcs_and_item_rules.py",
+      "revision": "46507f02680a",
+      "down_revision": "7e248ebed919"
+    },
+    {
+      "file": "backend/migrations/versions/470095da5995_baseline_snapshot_current_schema.py",
+      "revision": "470095da5995",
+      "down_revision": null
+    },
+    {
+      "file": "backend/migrations/versions/75d1c0e7dd53_cleanup_drop_legacy_users_table_dedupe_.py",
+      "revision": "75d1c0e7dd53",
+      "down_revision": "46507f02680a"
+    },
+    {
+      "file": "backend/migrations/versions/7e248ebed919_add_gl_accounts_mappings_vouchers_and_.py",
+      "revision": "7e248ebed919",
+      "down_revision": "470095da5995"
+    },
+    {
+      "file": "backend/migrations/versions/ea501237b804_add_severance_phase2_tax_columns.py",
+      "revision": "ea501237b804",
+      "down_revision": "ffc17a622333"
+    },
+    {
+      "file": "backend/migrations/versions/ffc17a622333_add_disbursement_voucher_type_and_cash_.py",
+      "revision": "ffc17a622333",
+      "down_revision": "75d1c0e7dd53"
+    },
+    {
+      "file": "backend/migrations/versions/org_mapping_foundation_20260722_add_mapping_tables.py",
+      "revision": "org_mapping_foundation_20260722",
+      "down_revision": "ea501237b804"
+    }
+  ],
+  "normalizations": [
+    {
+      "source": "DROP TABLE users;",
+      "canonical": "DROP TABLE IF EXISTS users;",
+      "reason": "The Alembic cleanup revision assumes the pre-Alembic legacy table exists; a Flyway clean install must reach the same final schema without that historical prerequisite."
+    },
+    {
+      "source": "DROP INDEX ix_pap_appraisal_masters_appraisal_code;",
+      "canonical": "DROP INDEX IF EXISTS ix_pap_appraisal_masters_appraisal_code;",
+      "reason": "The baseline already uses the replacement quoted index name, so this historical cleanup drop is absent on a clean install."
+    },
+    {
+      "source": "DROP INDEX ix_pap_appraisal_masters_appraisal_year;",
+      "canonical": "DROP INDEX IF EXISTS ix_pap_appraisal_masters_appraisal_year;",
+      "reason": "The baseline already uses the replacement quoted index name, so this historical cleanup drop is absent on a clean install."
+    },
+    {
+      "source": "DROP INDEX ux_auth_users_login_id;",
+      "canonical": "DROP INDEX IF EXISTS ux_auth_users_login_id;",
+      "reason": "The obsolete duplicate unique index exists only on pre-baseline databases."
+    },
+    {
+      "source": "CREATE INDEX \"ix_PAP_APPRAISAL_MASTERS_appraisal_code\" ON \"PAP_APPRAISAL_MASTERS\" (appraisal_code);",
+      "canonical": "CREATE INDEX IF NOT EXISTS \"ix_PAP_APPRAISAL_MASTERS_appraisal_code\" ON \"PAP_APPRAISAL_MASTERS\" (appraisal_code);",
+      "reason": "The baseline snapshot already owns this final index name."
+    },
+    {
+      "source": "CREATE INDEX \"ix_PAP_APPRAISAL_MASTERS_appraisal_year\" ON \"PAP_APPRAISAL_MASTERS\" (appraisal_year);",
+      "canonical": "CREATE INDEX IF NOT EXISTS \"ix_PAP_APPRAISAL_MASTERS_appraisal_year\" ON \"PAP_APPRAISAL_MASTERS\" (appraisal_year);",
+      "reason": "The baseline snapshot already owns this final index name."
+    }
+  ],
+  "canonical_sql_sha256": "e96d705057fb595d1bfd9ca21a8e97b6fa562a1096083c191468e4bddb59aa36",
+  "canonical_sql_bytes": 92256,
+  "app_table_names": [
+    "app_code_groups",
+    "app_codes",
+    "app_menu_actions",
+    "app_menu_roles",
+    "app_menus",
+    "app_role_menu_actions",
+    "app_system_setting_history",
+    "app_system_settings",
+    "auth_roles",
+    "auth_user_roles",
+    "auth_users",
+    "gl_accounts",
+    "hr_appointment_order_items",
+    "hr_appointment_orders",
+    "hr_careers",
+    "hr_contact_points",
+    "hr_employee_basic_profiles",
+    "hr_employee_info_records",
+    "hr_employees",
+    "hr_licenses",
+    "hr_military",
+    "hr_personnel_histories",
+    "hr_recruit_finalists",
+    "hr_retire_audit_logs",
+    "hr_retire_case_items",
+    "hr_retire_cases",
+    "hr_retire_checklist_items",
+    "hr_reward_punish",
+    "hr_severance_calcs",
+    "hri_approval_actor_rules",
+    "hri_approval_line_steps",
+    "hri_approval_line_templates",
+    "hri_form_type_approval_maps",
+    "hri_form_type_policies",
+    "hri_form_types",
+    "hri_req_cert_employment",
+    "hri_req_leave",
+    "hri_req_tim_attendance",
+    "hri_req_tim_correction",
+    "hri_request_attachments",
+    "hri_request_counters",
+    "hri_request_histories",
+    "hri_request_masters",
+    "hri_request_step_snapshots",
+    "mng_companies",
+    "mng_dev_inquiries",
+    "mng_dev_projects",
+    "mng_dev_requests",
+    "mng_infra_configs",
+    "mng_infra_masters",
+    "mng_manager_companies",
+    "mng_outsource_attendances",
+    "mng_outsource_contracts",
+    "org_corporations",
+    "org_departments",
+    "org_dept_change_histories",
+    "org_mapping_assignments",
+    "org_mapping_type_items",
+    "org_restructure_plan_items",
+    "org_restructure_plans",
+    "PAP_APPRAISAL_MASTERS",
+    "pap_appraisal_targets",
+    "PAP_FINAL_RESULTS",
+    "pay_allowance_deductions",
+    "pay_employee_profiles",
+    "pay_gl_mappings",
+    "pay_income_tax_brackets",
+    "pay_item_group_details",
+    "pay_item_groups",
+    "pay_payroll_codes",
+    "pay_payroll_run_employees",
+    "pay_payroll_run_events",
+    "pay_payroll_run_items",
+    "pay_payroll_run_target_events",
+    "pay_payroll_run_targets",
+    "pay_payroll_runs",
+    "pay_severance_item_rules",
+    "pay_tax_rates",
+    "pay_variable_inputs",
+    "pay_voucher_lines",
+    "pay_vouchers",
+    "tim_annual_leaves",
+    "tim_attendance_codes",
+    "tim_attendance_corrections",
+    "tim_attendance_daily",
+    "tim_department_schedule_assignments",
+    "tim_employee_daily_schedules",
+    "tim_employee_schedule_exceptions",
+    "tim_holidays",
+    "tim_leave_requests",
+    "tim_month_closes",
+    "tim_schedule_pattern_days",
+    "tim_schedule_patterns",
+    "tim_work_schedule_codes",
+    "tra_applications",
+    "tra_courses",
+    "tra_cyber_uploads",
+    "tra_elearning_windows",
+    "tra_events",
+    "tra_histories",
+    "tra_organizations",
+    "tra_required_rules",
+    "tra_required_targets",
+    "wel_benefit_requests",
+    "wel_benefit_types"
+  ]
+}

@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 공통 신청서/결재(HRI) 모듈 상세 계획서
 
 > 작성일: 2026-02-25
@@ -6,6 +7,10 @@
 > 목적: 전사 공통 신청서/결재/수신 프로세스를 표준화하고, 조직 기반 자동 결재선을 통해 운영 비용을 줄인다.
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 배경과 목표
 
@@ -496,3 +501,4 @@ CREATE TABLE HRI_REQUEST_MASTER (
 - 본 계획은 Vibe-HR에 맞춘 공통 신청서 프레임워크 구축안이다.
 - 1차는 “신청서 코드관리 + 자동 결재선 + 표준 상태머신”에 집중하고,
 - 2차에서 병렬결재/고급분기/외부연동을 확장하는 방식이 가장 안정적이다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

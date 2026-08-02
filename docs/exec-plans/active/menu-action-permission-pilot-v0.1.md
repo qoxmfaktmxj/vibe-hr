@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 Status: Draft
 Owner: 석
 Canonical: Yes
@@ -97,10 +98,10 @@ Confidence: Medium
 - `frontend/src/components/grid/grid-standard-toolbar.tsx` (필요 시)
 
 ### 백엔드
-- `backend/app/api/menu.py`
-- `backend/app/services/menu_service.py`
-- `backend/app/schemas/menu.py`
-- 관련 route/service tests (`backend/tests/*menu*`, 필요 시 신규 테스트)
+- `backend-spring/src/main/java/com/vibehr/menu/MenuController.java`
+- `backend-spring/src/main/java/com/vibehr/menu/MenuPermissionService.java`
+- `backend-spring/src/main/java/com/vibehr/menu/MenuRepositories.java`
+- 관련 controller/service tests (`backend-spring/src/test/java/com/vibehr/menu/**`)
 
 ### 문서
 - `docs/MENU_ACTION_PERMISSION_PLAN.md` (pilot 결과 반영이 필요할 경우)
@@ -153,7 +154,7 @@ Confidence: Medium
 - 역할/권한 조합별 expected action matrix 정의
 - 화면별 최소 수동 검증 시나리오 작성
 - 가능하면 backend test 또는 regression 후보 도출
-- `validate:grid`, lint, build, pytest 적용 범위 정리
+- `validate:grid`, lint, build, Gradle test 적용 범위 정리
 
 #### 산출물
 - 권한 검증 체크리스트
@@ -187,7 +188,7 @@ npm run build
 #### Backend
 ```bash
 cd backend
-pytest
+cd backend-spring && .\gradlew.bat test
 ```
 
 ### 추가 권장 검증
@@ -245,3 +246,4 @@ pilot 이후 반드시 남겨야 할 것:
 2. `docs/TASK_LEDGER.md`에 pilot task 1건 생성
 3. Phase 1 (`hr.employee`)부터 실제 구현/검증 시작
 4. Phase 1 결과를 패턴으로 고정한 뒤 Phase 2/3 확장
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

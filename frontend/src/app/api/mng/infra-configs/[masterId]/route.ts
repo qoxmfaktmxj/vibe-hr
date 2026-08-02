@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ masterId: string }> };
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const { masterId } = await context.params;
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/mng/infra-configs/${masterId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/mng/infra-configs/${masterId}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   const { masterId } = await context.params;
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/mng/infra-configs/${masterId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/mng/infra-configs/${masterId}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

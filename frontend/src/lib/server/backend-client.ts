@@ -2,9 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { cookies } from "next/headers";
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type BackendRequestOptions = {
@@ -27,7 +25,7 @@ export async function fetchBackendJson<T>(
     return null;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${backendApiBaseUrl()}${path}`, {
     cache: options.cache,
     next: options.next,
     headers: {

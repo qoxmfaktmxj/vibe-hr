@@ -1,0 +1,481 @@
+{
+  "schema_version": 1,
+  "source_file": "backend/app/bootstrap.py",
+  "source_sha256": "3942aff09372f047d37eaa9938670afb79e72817ba218baf05ed40ff8ff4a285",
+  "source_function_count": 66,
+  "verification": {
+    "all_functions_classified": true,
+    "deterministic_ownership": true
+  },
+  "counts": {
+    "archive-or-retire": 23,
+    "dev-fixture": 4,
+    "large-demo-fixture": 5,
+    "required-reference-permission-menu-data": 33,
+    "schema": 1
+  },
+  "entries": [
+    {
+      "name": "ensure_auth_user_login_id_schema",
+      "line": 973,
+      "category": "schema",
+      "java_owner": "Flyway V1__alembic_head_baseline",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_roles",
+      "line": 1012,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_departments",
+      "line": 1026,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_corporations",
+      "line": 1068,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_department",
+      "line": 1093,
+      "category": "dev-fixture",
+      "java_owner": "com.vibehr.seed.DevSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "ensure_user",
+      "line": 1101,
+      "category": "dev-fixture",
+      "java_owner": "com.vibehr.seed.DevSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "ensure_user_roles",
+      "line": 1145,
+      "category": "dev-fixture",
+      "java_owner": "com.vibehr.seed.DevSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "ensure_employee",
+      "line": 1158,
+      "category": "dev-fixture",
+      "java_owner": "com.vibehr.seed.DevSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "_build_korean_name",
+      "line": 1182,
+      "category": "large-demo-fixture",
+      "java_owner": "com.vibehr.seed.DemoSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "_build_dev_login_id",
+      "line": 1190,
+      "category": "large-demo-fixture",
+      "java_owner": "com.vibehr.seed.DemoSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "_build_position_title",
+      "line": 1197,
+      "category": "large-demo-fixture",
+      "java_owner": "com.vibehr.seed.DemoSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "_build_department_distribution",
+      "line": 1201,
+      "category": "large-demo-fixture",
+      "java_owner": "com.vibehr.seed.DemoSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "ensure_bulk_korean_employees",
+      "line": 1235,
+      "category": "large-demo-fixture",
+      "java_owner": "com.vibehr.seed.DemoSeedRunner",
+      "execution": "explicit"
+    },
+    {
+      "name": "ensure_sample_records",
+      "line": 1337,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "_get_or_create_menu",
+      "line": 1374,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "_link_menu_roles",
+      "line": 1427,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_menus",
+      "line": 1438,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_menu_actions",
+      "line": 1472,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_system_settings",
+      "line": 1509,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_common_codes",
+      "line": 1535,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "_count_rows",
+      "line": 1742,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "_seed_record_date",
+      "line": 1747,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "_recent_business_days",
+      "line": 1751,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "_build_legacy_hr_basic_seed_fields",
+      "line": 1762,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hr_basic_domain_migration",
+      "line": 1780,
+      "category": "archive-or-retire",
+      "java_owner": "retired after Alembic-to-Flyway cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hr_basic_seed_data",
+      "line": 1957,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hr_retire_checklist_seed",
+      "line": 2097,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_remove_legacy_appointment_records",
+      "line": 2137,
+      "category": "archive-or-retire",
+      "java_owner": "retired after Alembic-to-Flyway cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hr_basic_category_mapping",
+      "line": 2144,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_attendance_codes",
+      "line": 2286,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_work_schedule_codes",
+      "line": 2311,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_schedule_foundations",
+      "line": 2333,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_holidays",
+      "line": 2394,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_annual_leave_seed",
+      "line": 2414,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_tim_transaction_samples",
+      "line": 2453,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_pap_final_results",
+      "line": 2840,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pap_appraisal_masters",
+      "line": 2879,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_payroll_codes",
+      "line": 2957,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_allowance_deductions",
+      "line": 2978,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_item_groups",
+      "line": 3018,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_gl_seeds",
+      "line": 3039,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_severance_item_rule_seeds",
+      "line": 3114,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_phase2_samples",
+      "line": 3142,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "_month_start_offset",
+      "line": 3308,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "_build_wel_benefit_request_seed_rows",
+      "line": 3314,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_payroll_detail_visual_samples",
+      "line": 3365,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hri_form_types",
+      "line": 3422,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_hri_form_type_policies",
+      "line": 3460,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_hri_approval_actor_rules",
+      "line": 3491,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_hri_approval_templates",
+      "line": 3523,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_hri_form_type_template_maps",
+      "line": 3574,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_hr_recruitment_cycle_seed",
+      "line": 3609,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_org_mapping_type_group",
+      "line": 3922,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_welfare_allowance_definitions",
+      "line": 3956,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_schedule_operational_samples",
+      "line": 4007,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_payroll_run_result_samples",
+      "line": 4189,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "_serialize_seed_content",
+      "line": 4255,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "_upsert_hri_request_sample",
+      "line": 4259,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample helper",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_hri_request_samples",
+      "line": 4339,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_pay_tax_rates",
+      "line": 5063,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_pay_income_tax_brackets",
+      "line": 5083,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_wel_benefit_types",
+      "line": 5120,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_wel_benefit_requests",
+      "line": 5159,
+      "category": "archive-or-retire",
+      "java_owner": "legacy transactional sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "ensure_welfare_menu_overrides",
+      "line": 5240,
+      "category": "required-reference-permission-menu-data",
+      "java_owner": "Flyway V3__required_reference_data",
+      "execution": "versioned"
+    },
+    {
+      "name": "ensure_tra_seed_data",
+      "line": 5350,
+      "category": "archive-or-retire",
+      "java_owner": "legacy training sample data is not carried across the Java cutover",
+      "execution": "retire"
+    },
+    {
+      "name": "seed_initial_data",
+      "line": 5963,
+      "category": "archive-or-retire",
+      "java_owner": "replaced by Flyway V3 plus explicit dev-seed and demo-seed profiles",
+      "execution": "retire"
+    }
+  ]
+}

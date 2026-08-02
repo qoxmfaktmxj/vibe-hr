@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # VIBE-HR 통합 신청 페이지 / 승인 페이지 크로스체크
 
 ## 1. 목적
@@ -460,3 +461,4 @@
 - 다만 `승인/운영 화면까지 하나로 통합`은 비추천이다.
 - 실제 구현은 `HRI 공통 신청/결재 엔진 확장`으로 가는 것이 가장 효율적이다.
 - 우선순위는 `휴가 + 복리후생 + 교육 + 개인성 급여 신청` 순서가 적절하다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

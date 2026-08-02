@@ -1,8 +1,13 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # vibe-hr 성능/UX 개선 실행 계획
 
 > 정적 코드 리뷰 5개 이슈에 대한 실제 코드 검증 결과 및 변경 계획
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 이슈별 검증 결과 요약
 
@@ -308,3 +313,4 @@ const ClockDisplay = React.memo(function ClockDisplay() {
 
 > 순서는 "위험 낮고 체감 큰 것"부터 진행하도록 배치
 > 이슈 3 2단계(모듈 분리)와 이슈 4-B(theme 통일)은 시각 회귀 테스트가 필요하므로 별도 PR 권장
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

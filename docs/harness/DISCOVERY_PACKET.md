@@ -13,18 +13,18 @@ Layer 1에서 수집한 프로젝트 진단 결과를 고정한다. 이 문서�
 ## 프로젝트 요약
 Vibe-HR은 한국형 EHR/HR 업무를 웹 기반으로 현대화하는 혼합형 레거시 전환 프로젝트다. [Observed][User-stated]
 
-기술적으로는 Next.js + FastAPI + PostgreSQL 모노레포 구조를 사용하며, HR / ORG / TIM / PAYROLL / WEL / HRI / TRA 도메인을 단계적으로 재구성하고 있다. [Observed]
+기술적으로는 Next.js + Spring Boot + PostgreSQL 모노레포 구조를 사용하며, HR / ORG / TIM / PAYROLL / WEL / HRI / TRA 도메인을 단계적으로 재구성하고 있다. [Observed]
 
 현재 핵심 과제는 화면 수를 늘리는 것이 아니라, 채용→사원→발령, 조직, 근태, 급여, 승인/복리후생 같은 업무 사이클을 운영 수준으로 닫는 것이다. [Derived]
 
 ## 확인된 사실
 - 프로젝트명은 Vibe-HR이다. [Observed][User-stated]
 - Frontend는 Next.js 16 / React 19 / TypeScript / AG Grid 35를 사용한다. [Observed]
-- Backend는 FastAPI / SQLModel / PostgreSQL 중심 구조다. [Observed]
+- Backend는 Spring Boot / Java / JPA-MyBatis / Flyway / PostgreSQL 중심 구조다. [Observed]
 - 프론트/백엔드/문서가 하나의 repo 안에 있다. [Observed]
 - `vibe-hr/AGENTS.md`에 AG Grid 규칙, 검증 규칙, planner-first 성격의 실행 계약이 존재한다. [Observed]
 - `config/grid-screens.json`, `docs/GRID_SCREEN_STANDARD.md`, `docs/MENU_ACTION_PERMISSION_PLAN.md`가 핵심 기준 문서다. [Observed]
-- `validate:grid`, lint, build, pytest, 일부 Playwright E2E가 존재한다. [Observed]
+- `validate:grid`, lint, build, Gradle JUnit, 일부 Playwright E2E가 존재한다. [Observed]
 - solo 개발 단계이며 현재는 환경 분리 없이 `main` 단일 기준으로 운영한다. [User-stated]
 - 외부 연동(SAP I/F 등)은 현재 범위 밖이며 프로젝트 완료 후 검토한다. [User-stated]
 
@@ -79,7 +79,7 @@ Vibe-HR은 한국형 EHR/HR 업무를 웹 기반으로 현대화하는 혼합형
 - 부족한 점: canonical source 구분이 없다. [Derived]
 
 ### Verification Loops
-- 현재 상태: validate:grid / lint / build / pytest / 일부 E2E 존재 [Observed]
+- 현재 상태: validate:grid / lint / build / Gradle JUnit / 일부 E2E 존재 [Observed]
 - 부족한 점: 작업 유형별 필수 검증 조합, 완료 증거 포맷 [Derived]
 
 ### Eval Harness

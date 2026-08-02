@@ -75,10 +75,10 @@
 ### 완료된 것
 - backend 메뉴 액션 권한 helper 추가
 - `employee`, `organization(departments)`, `common_code` API에 `query`/`save` action gate 연결
-- pilot 범위 단위 테스트 추가 (`backend/tests/test_menu_action_permission_unit.py`)
+- pilot 범위 단위 테스트 추가 (`backend-spring/src/test/java/com/vibehr/menu/**`)
 
 ### 검증 결과
-- targeted backend permission pytest: passed (dockerized python test run) [Observed]
+- targeted Spring permission Gradle test: passed (container-backed integration coverage where applicable) [Observed]
 - `scripts/check-risk-paths.py` 실행: passed, permission-related R2 signal 확인 [Observed]
 - `guardrails.yml` actionlint: passed [Observed]
 - frontend `validate:grid`: failed, but pilot 변경과 무관한 기존 baseline 이슈 확인 [Observed]
