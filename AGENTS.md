@@ -71,19 +71,17 @@ Before changes:
 - `frontend/src/components/grid/**`
 - `frontend/src/lib/grid/**`
 - `config/grid-screens.json`
-- `backend/app/api/auth.py`
-- `backend/app/core/auth.py`
-- `backend/app/schemas/auth.py`
-- `backend/app/services/auth_service.py`
-- `backend/app/api/payroll_phase2.py`
-- `backend/app/services/payroll_phase2_service.py`
-- `backend/app/schemas/payroll_phase2.py`
-- `backend/app/api/menu.py`
-- `backend/app/services/menu_service.py`
-- `backend/app/schemas/menu.py`
+- `backend-spring/src/main/java/com/vibehr/auth/**`
+- `backend-spring/src/main/java/com/vibehr/payroll/**`
+- `backend-spring/src/main/java/com/vibehr/menu/**`
+- `backend-spring/src/main/java/com/vibehr/platform/security/**`
+- `backend-spring/src/main/resources/db/migration/**`
+- `backend-spring/src/test/java/com/vibehr/auth/**`
+- `backend-spring/src/test/java/com/vibehr/payroll/**`
+- `backend-spring/src/test/java/com/vibehr/menu/**`
 - `.github/workflows/**`
 - `docker-compose.deploy.yml`
-- `backend/Dockerfile`
+- `backend-spring/Dockerfile`
 - `frontend/Dockerfile`
 
 ## Working agreements
@@ -103,7 +101,7 @@ Before changes:
 
 <!-- OMX:AGENTS-MANUAL:START -->
 ### Project execution rules
-- Frontend work must stay inside `frontend/*` and backend work must stay inside `backend/*` unless the task explicitly spans both layers.
+- Frontend work must stay inside `frontend/*` and backend work must stay inside `backend-spring/*` unless the task explicitly spans both layers.
 - API contract changes must mention affected frontend screens and backend schemas together.
 - Shared UI or AG Grid changes must include at least one regression check on an existing screen.
 - Menu, action, and permission related work must be cross-checked against `docs/MENU_ACTION_PERMISSION_PLAN.md`.
@@ -117,7 +115,7 @@ Before changes:
 ### Verification rules
 - AG Grid screens: run `npm run validate:grid` before lint/build.
 - Frontend changes: run `npm run lint` in `frontend` when applicable.
-- Backend changes: run the appropriate FastAPI test or startup verification when applicable.
+- Backend changes: run the relevant Gradle test or Spring Boot startup verification from `backend-spring` when applicable.
 - When editing user-facing Korean text, preserve UTF-8 encoding and verify real browser rendering with a screenshot; treat CLI snapshot text as non-authoritative for Korean.
 - If validation cannot run, explicitly record why.
 <!-- OMX:AGENTS-MANUAL:END -->

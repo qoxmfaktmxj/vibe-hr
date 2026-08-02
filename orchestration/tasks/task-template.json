@@ -13,7 +13,7 @@
       "frontend/path/example.tsx"
     ],
     "backend": [
-      "backend/path/example.py"
+      "backend-spring/src/main/java/com/vibehr/example/ExampleController.java"
     ],
     "qa": [
       "test scenario to run"

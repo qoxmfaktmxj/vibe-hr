@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -11,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   const search = request.nextUrl.search || "";
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/hri/tasks/my-approvals${search}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/hri/tasks/my-approvals${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

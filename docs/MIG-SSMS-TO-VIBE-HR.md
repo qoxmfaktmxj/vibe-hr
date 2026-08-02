@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # SSMS-master -> vibe-hr 마이그레이션 설계서
 
 > **작성일:** 2026-02-25
@@ -5,6 +6,10 @@
 > **목적:** AI 팀원 간 개발 분담용 설계 문서
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired migration planning evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 개요
 
@@ -930,3 +935,4 @@ SSMS의 `TSYS972_NEW` 파일관리는 1차 마이그레이션에서 **제외**�
 - 미완료/확인 필요:
   - 통합 테스트(실서버 기동 + DB 반영 확인)
   - Python 런타임 부재로 backend 실행 검증 미수행(현재 작업 환경 기준)
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

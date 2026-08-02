@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ roleId: string }> };
@@ -18,7 +17,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ detail: "유효하지 않은 요청입니다." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles/${roleId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/${roleId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -40,7 +39,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { roleId } = await context.params;
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/menus/admin/roles/${roleId}`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/${roleId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

@@ -1,0 +1,14 @@
+spring:
+  config:
+    activate:
+      on-profile: demo-seed
+  main:
+    web-application-type: none
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+vibehr:
+  allow-fixture-seeding: ${VIBEHR_ALLOW_FIXTURE_SEEDING:false}

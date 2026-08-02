@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -14,7 +13,7 @@ export async function GET(request: NextRequest) {
   const year = searchParams.get("year") ?? new Date().getFullYear().toString();
 
   const upstreamResponse = await fetch(
-    `${API_BASE_URL}/api/v1/tim/holidays?year=${year}`,
+    `${backendApiBaseUrl()}/api/v1/tim/holidays?year=${year}`,
     {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },

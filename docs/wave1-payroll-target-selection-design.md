@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Wave 1 Payroll Target Selection and Event Ingestion Design
 
 작성일: 2026-03-12  
@@ -215,3 +216,4 @@ DB 명세: `C:\Users\kms\Desktop\dev\EHR_6\EHR5_DB명세.sql`
 2. 발령 이벤트 -> 급여 이벤트 매핑표 상세화
 3. 근태/HRI 후처리 완성 후 급여 입력 인터페이스 정의
 4. 복리후생 설계 완료 후 급여 링크 규칙 추가
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

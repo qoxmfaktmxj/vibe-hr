@@ -1,0 +1,6 @@
+spring:
+  config:
+    activate:
+      on-profile: integration
+  flyway:
+    enabled: false

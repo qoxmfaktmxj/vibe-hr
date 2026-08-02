@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Vibe-HR 리팩토링 상세 구현 계획
 
 > 작성일: 2026-02-27
@@ -386,3 +387,4 @@ export function LeaveTrendChart({ data }: LeaveTrendProps) {
 ### 롤백 전략
 - 각 작업을 별도 커밋으로 분리
 - 문제 발생 시 개별 커밋 revert 가능
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

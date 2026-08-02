@@ -11,13 +11,27 @@
 
 ## 프로젝트 개요
 
-Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝트입니다. 단순 CRUD 중심이 아니라, 기존 EHR 흐름을 Next.js + FastAPI + PostgreSQL 구조로 재구성하면서 실제 운영 시나리오에 가까운 메뉴, 권한, 시드 데이터, 승인 흐름, 급여 계산 흐름을 단계적으로 붙이고 있습니다.
+Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝트입니다. 단순 CRUD 중심이 아니라, 기존 EHR 흐름을 Next.js + Spring Boot + PostgreSQL 구조로 재구성하면서 실제 운영 시나리오에 가까운 메뉴, 권한, 시드 데이터, 승인 흐름, 급여 계산 흐름을 단계적으로 붙이고 있습니다.
 
 현재 기준으로 프로젝트의 핵심 목표는 아래와 같습니다.
 
 - 한국형 조직/인사/근태/급여 운영 시나리오를 웹 기반으로 일관되게 제공
 - 공통 Grid 패턴, 메뉴 권한, 샘플 시드, 문서화를 함께 운영
 - 레거시 EHR 흐름을 기능 단위가 아니라 업무 사이클 단위로 재구성
+
+## 현재 아키텍처 및 전환 상태
+
+- 백엔드 코드베이스는 Java 21 + Spring Boot 4.1.0 단일 런타임으로 전환되었습니다.
+- 일반적인 쓰기와 엔티티 생명주기는 JPA가 담당하고, 조인·보고서·성능상 명시적 SQL이 필요한 복잡한 읽기 projection만 MyBatis를 사용합니다.
+- Flyway V1-V5가 스키마와 필수 참조 데이터의 유일한 작성 경로이며, Next.js BFF는 Spring API만 대상으로 합니다.
+- Python 런타임과 소스는 은퇴되었습니다. 이전 기술명은 보존된 전환 증적에서만 확인할 수 있으며 실행 지침이 아닙니다.
+
+코드베이스 전환은 완료되었지만, 프로덕션 트래픽 전환과 운영 데이터베이스 컷오버는 아직 별도의 운영자 작업입니다. 실행 전에는 반드시 [컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)을 따르십시오.
+
+- [Spring 백엔드 실행 및 검증 안내](backend-spring/README.md)
+- [Spring Boot Java 전환 계획](docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md)
+- [Java/Spring 학습 가이드](backend-spring/docs/java-spring-learning-guide.md)
+- [Spring 컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)
 
 ## 현재 구현 범위
 
@@ -72,12 +86,14 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ### Backend
 
-- FastAPI 0.115
-- SQLModel 0.0.22
-- Pydantic Settings
-- PyJWT
-- psycopg 3
-- Uvicorn
+- Spring Boot 4.1.0
+- Java 21
+- Spring MVC / Spring Security
+- 일반 쓰기는 JPA / 복잡한 읽기 projection은 MyBatis
+- Flyway
+- Gradle
+
+Spring Boot가 유일한 백엔드 런타임이며, Flyway가 스키마와 필수 참조 데이터의 유일한 작성 경로입니다.
 
 ### Database / Infra
 
@@ -88,7 +104,7 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 - ESLint
 - Vitest
-- pytest
+- JUnit 5
 - Playwright E2E (`npm run test:e2e:hr`)
 - Grid 전용 검증 스크립트 `npm run validate:grid`
 
@@ -96,10 +112,12 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ```text
 frontend/   Next.js App Router, 화면, API proxy, UI 컴포넌트
-backend/    FastAPI, SQLModel, seed, 서비스 로직, 테스트
+backend-spring/ Spring Boot, JPA/MyBatis, Flyway, seed, 서비스 로직, 테스트
 config/     Grid 화면 레지스트리 및 공통 설정
 docs/       구현 계획, 점검 문서, 운영 메모
 ```
+
+프로덕션 배포는 `docker-compose.deploy.yml`로 Spring 백엔드, Next.js 프론트엔드, 리버스 프록시를 함께 구성합니다.
 
 ## UI 컬러 및 버튼 가이드
 
@@ -133,18 +151,19 @@ docs/       구현 계획, 점검 문서, 운영 메모
 
 ### 백엔드 실행
 
-```bash
-cd backend
-py -3.12 -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload --port 8000
+```powershell
+cd backend-spring
+$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/vibe_hr"
+$env:SPRING_DATASOURCE_USERNAME = "postgres"
+$env:SPRING_DATASOURCE_PASSWORD = "<local-password>"
+$env:AUTH_TOKEN_SECRET = "<openssl-rand-hex-32-output>"
+$env:VIBEHR_BFF_ASSERTION_SECRET = "<different-openssl-rand-hex-32-output>"
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
 ```
 
 ### 프론트엔드 실행
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
@@ -159,17 +178,15 @@ npm run dev
 
 ### 백엔드 기본값 예시
 
-`backend/.env`
+Spring Boot는 로컬 백엔드 설정을 환경 변수에서 읽습니다. 전체 로컬 프로필과 검증 명령은 [백엔드 안내](backend-spring/README.md)를 확인하십시오.
 
 ```env
-APP_NAME=Vibe-HR API
-ENVIRONMENT=local
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/vibe_hr
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/vibe_hr
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=<local-password>
+AUTH_TOKEN_SECRET=<openssl-rand-hex-32-output>
+VIBEHR_BFF_ASSERTION_SECRET=<different-openssl-rand-hex-32-output>
 CORS_ORIGINS=http://localhost:3000
-AUTH_TOKEN_SECRET=dev-only-change-me
-AUTH_TOKEN_ALGORITHM=HS256
-AUTH_TOKEN_EXPIRES_MIN=480
-AUTH_TOKEN_ISSUER=vibe-hr
 ```
 
 ### 프론트엔드 기본값 예시
@@ -177,11 +194,13 @@ AUTH_TOKEN_ISSUER=vibe-hr
 `frontend/.env.local`
 
 ```env
-API_BASE_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+VIBEHR_BFF_BACKEND_URL=http://127.0.0.1:8080
+VIBEHR_BFF_ASSERTION_SECRET=<same-value-as-backend-VIBEHR_BFF_ASSERTION_SECRET>
 APP_ORIGIN=http://localhost:3000
 NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 ```
+
+외부 리버스 프록시는 BFF 로그인 요청이 Spring에 도달하기 전에 클라이언트가 보낸 `x-vibehr-client-ip` 헤더를 제거하고, 신뢰할 수 있는 단일 값으로 다시 주입해야 합니다.
 
 ## 로그인 및 접속 경로
 
@@ -197,9 +216,9 @@ NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 
 ### 공유 URL
 
-- `https://hr.minosek91.cloud`
+- `https://hr.minseok91.cloud`
 
-운영 또는 공유 URL은 실제 DNS, 방화벽, 프록시 상태에 따라 접근 가능 여부가 달라질 수 있습니다. 2026-03-14 현재 이 작업 환경에서는 `hr.minosek91.cloud` DNS 해석이 되지 않아 직접 접속 확인은 하지 못했습니다. 따라서 외부 공개 상태는 실제 배포 네트워크에서 별도 확인이 필요합니다.
+기준 배포 URL은 추적 중인 배포 설정과 일치합니다. 공개 사이트 주소는 `https://hr.minseok91.cloud`입니다.
 
 ## 계정 및 로그인 주의사항
 
@@ -215,19 +234,18 @@ NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 1. `OrgCorporation`에 활성 법인이 존재하는지
 2. `/api/v1/auth/enter-cds`가 비어 있지 않은지
 3. `admin` 또는 `admin-local` 계정이 존재하는지
-4. 프론트 proxy가 `404`를 내면 `frontend/.env.local`의 `API_BASE_URL`이 `http://127.0.0.1:8000`인지
+4. 프론트 proxy가 `404`를 내면 `frontend/.env.local`의 `VIBEHR_BFF_BACKEND_URL`이 `http://127.0.0.1:8080`인지
 
 ## 시드 데이터
 
-FastAPI startup 시 `seed_initial_data()`가 자동 실행됩니다.
+Spring fixture 시드는 자동 실행되지 않으며, 로컬에서만 명시적으로 실행합니다.
 
 수동 재시드는 아래처럼 수행할 수 있습니다.
 
-```bash
-cd backend
-set DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/vibe_hr
-set PYTHONPATH=%CD%
-python scripts/seed_dev_postgres.py
+```powershell
+cd backend-spring
+$env:VIBEHR_ALLOW_FIXTURE_SEEDING = "true"
+.\gradlew.bat bootRun --args="--spring.profiles.active=local,dev-seed --vibehr.seed.confirmation=dev"
 ```
 
 의도된 seed 범위는 아래와 같습니다.
@@ -254,7 +272,7 @@ python scripts/seed_dev_postgres.py
 
 ### 프론트엔드 정적 검증
 
-```bash
+```powershell
 cd frontend
 npm run validate:grid
 npm run lint
@@ -265,10 +283,14 @@ npm run build
 
 ### 백엔드 테스트
 
-```bash
-cd backend
-.venv\Scripts\activate
-pytest
+```powershell
+cd backend-spring
+.\gradlew.bat test
+
+# Docker Desktop가 실행 중이어야 합니다.
+$env:VIBEHR_RUN_CONTAINER_TESTS = "true"
+.\gradlew.bat integrationTest
+.\gradlew.bat migrationIntegrationTest
 ```
 
 현재 저장소에는 아래와 같은 백엔드 테스트가 포함되어 있습니다.
@@ -307,40 +329,30 @@ pytest
 2. 현재월 / 전월 Run 존재 여부 확인
 3. 대상자 상세와 항목 상세 확인
 
-## 현재 README 기준으로 추가 또는 수정이 필요한 내용
+### 전환 완료 검증
 
-기존 README는 프로젝트 소개와 기본 실행법만 담고 있어 현재 상태를 설명하기에 부족합니다. 최소한 아래 내용은 항상 유지되어야 합니다.
+저장소 루트에서 전환 정합성을 확인합니다.
 
-- 현재 구현 범위와 미완료 범위
-- 실제 사용 중인 기술 스택 상세
-- 프론트 / 백엔드 / Grid 검증 / pytest 실행 방법
-- 로컬 접속 URL과 공유 URL
-- 로그인 실패 시 ENTER_CD / 법인 seed 확인 필요
-- seed 데이터 규모와 대표 샘플 케이스
-- 기준 운영 문서와 계획 문서 위치
+```powershell
+node scripts/spring-migration/spring-route-coverage.js --verify-complete
+node scripts/spring-migration/spring-schema-coverage.js
+node scripts/spring-migration/flyway-verify.js
+node scripts/spring-migration/bff-cutover-audit.js
+node scripts/spring-migration/verify-python-retirement.js
+node scripts/spring-migration/verify-delivery.js
+node --test scripts/spring-migration/*.test.js
+```
 
-특히 기존 README의 아래 내용은 그대로 두면 오해를 만들 수 있습니다.
+전환 완료 시점의 검증 스냅샷은 다음과 같습니다. 이는 코드베이스 전환 검증 결과이며, 프로덕션 배포 또는 운영 데이터베이스 컷오버 완료를 뜻하지 않습니다.
 
-- `admin / admin`만 적어두고 `ENTER_CD` 의존성을 설명하지 않은 점
-- 시드가 항상 정상 로그인 상태를 보장한다고 읽히는 점
-- 현재 구현된 화면 범위를 설명하지 않은 점
-- 테스트 명령이 프론트 / 백엔드 기준으로 정리되어 있지 않은 점
+- 백엔드: 253개 테스트 통과 (단위 176개, 통합 59개, `migrationIntegrationTest` 18개)
+- 프론트엔드: 139개 테스트 통과
+- 전환 검증기: 30개 테스트 통과
+- API 경로: 290/290 확인
+- 스키마 참조 테이블: 105/105 매핑 확인
+- `.py` 파일과 활성 Python 호출: 각 0개
 
-## 현재 점검 메모
-
-2026-03-14 로컬 점검 기준:
-
-- DB는 기동 상태
-- 백엔드 `/health` 응답 정상
-- 프론트 `/login` 응답 정상
-- 수동 `seed_initial_data()` 재실행 후 `OrgCorporation` 1건 확인
-- `HrRecruitFinalist` 6건 확인
-- `HrAppointmentOrder` 3건 / `HrAppointmentOrderItem` 3건 확인
-- `admin / admin` 로그인 정상 확인
-- `합격자 -> 사원 생성` API 실데이터 검증 완료
-- 샘플 검증 결과: `RC-SEED-0001 -> EMP-900007 / emp900007 / 인사본부 / 채용대기 / leave`
-
-즉, 채용-사원-발령 흐름을 점검할 수 있는 기본 시드는 현재 확보된 상태입니다. 다만 이 상태는 자동 startup만으로 항상 동일하게 보장된다고 단정하지 말고, 브라우저 점검 전에 `ENTER_CD`, 합격자, 발령 데이터가 실제로 존재하는지 한 번 더 확인하는 운영 습관이 필요합니다.
+실제 트래픽 전환 전에는 [컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)의 Flyway adoption, `flyway-cutover`, 스모크 및 롤백 절차를 운영자가 수행해야 합니다.
 
 ## 참고 문서
 

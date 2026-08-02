@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Non-Security Improvement Plan
 
 Updated: 2026-03-12
@@ -134,3 +135,4 @@ Repository 기준으로 실제 확인된 비보안 개선 항목만 정리하고
 - 이 문서는 보안 항목을 제외한 개선 계획만 다룬다.
 - 실제 코드 수정 전에는 각 큰 작업마다 작은 세부 계획을 추가로 자르는 것이 안전하다.
 - AG Grid 화면 수정 시에는 프로젝트의 grid 규칙 문서를 선행 확인해야 한다.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

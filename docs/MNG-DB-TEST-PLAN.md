@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # MNG 모듈 DB/통합 테스트 계획서
 
 작성일: 2026-02-26  
@@ -169,3 +170,4 @@ Python/DB 실행 불가 환경에서는 아래만 먼저 수행:
   - `python -m compileall app`: 통과
   - `npm run lint`: 통과
   - `npm run build`: 통과
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

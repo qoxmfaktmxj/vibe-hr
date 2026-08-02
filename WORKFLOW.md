@@ -19,7 +19,7 @@
 - Connect template download/upload/download actions
 
 ### Backend
-- Organize batch APIs and transaction flow
+- Work only in `backend-spring/**`; organize Spring controller, application-service, and transaction flow
 - Keep save order fixed: `DELETE -> UPDATE -> INSERT`
 - Provide permission checks (menu + action)
 
@@ -41,6 +41,7 @@
 - [ ] `npm run validate:grid` passed
 - [ ] `npm run lint` passed
 - [ ] `npm run build` passed
+- [ ] Relevant `backend-spring` Gradle tests passed
 - [ ] Toolbar order and behaviors match the common guide
 - [ ] Save order is `DELETE -> UPDATE -> INSERT`
 - [ ] Docs updated

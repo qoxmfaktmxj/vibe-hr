@@ -13,7 +13,7 @@ It is not an automatic "sub-agent engine" by itself. It is an explicit orchestra
 
 ```text
 orchestration/
-  run_orchestrator.py
+  run_orchestrator.js
   prompts/
     planner.system.md
     frontend.worker.system.md
@@ -29,28 +29,25 @@ orchestration/
 ## Quick start (mock mode)
 
 ```bash
-python orchestration/run_orchestrator.py \
+node orchestration/run_orchestrator.js \
   --task-file orchestration/tasks/tim-phase3-sample.json \
   --mode mock
 ```
 
 This generates outputs under `orchestration/runs/<task_id>_<timestamp>/`.
 
+`targets.backend` must use `backend-spring/**`. The orchestrator rejects retired `backend/**` targets before any agent job runs.
+
 ## OpenAI mode (optional)
 
-1. Install SDK
-```bash
-pip install openai
-```
-
-2. Set API key
+1. Set API key
 ```bash
 set OPENAI_API_KEY=...
 ```
 
-3. Run
+2. Run
 ```bash
-python orchestration/run_orchestrator.py \
+node orchestration/run_orchestrator.js \
   --task-file orchestration/tasks/tim-phase3-sample.json \
   --mode openai \
   --model gpt-5-mini
@@ -62,10 +59,10 @@ Use this mode when your team has an auth-protected LLM gateway.
 
 Option A: login/password -> token -> LLM
 ```bash
-python orchestration/run_orchestrator.py \
+node orchestration/run_orchestrator.js \
   --task-file orchestration/tasks/tim-phase3-sample.json \
   --mode internal-auth \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8080 \
   --auth-path /api/v1/auth/login \
   --llm-path /api/v1/llm/chat \
   --login-id admin-local \
@@ -76,7 +73,7 @@ python orchestration/run_orchestrator.py \
 
 Option B: use existing token directly
 ```bash
-python orchestration/run_orchestrator.py \
+node orchestration/run_orchestrator.js \
   --task-file orchestration/tasks/tim-phase3-sample.json \
   --mode internal-auth \
   --llm-url https://your-gateway.example.com/api/v1/llm/chat \
@@ -101,6 +98,6 @@ Notes:
 ## How this maps to sub-agents
 
 - The script treats each role as an independent "sub-agent job" with its own system prompt.
-- Worker jobs run in parallel (`ThreadPoolExecutor`) to model sub-agent fan-out.
+- Worker jobs run in parallel with a bounded Node promise pool (`--max-workers`) to model sub-agent fan-out.
 - Reviewer receives all worker outputs and performs gate checks before final summary.
 - Replace prompt files to tune behavior without changing orchestrator code.

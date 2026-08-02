@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # TRA(교육) 화면 구축 체크리스트
 
 작성일: 2026-02-27  
@@ -96,3 +97,4 @@
 - [ ] 결재 연동 완료(신청/승인/반려 흐름)
 - [ ] AG Grid 표준 검증 3종(`validate:grid`, `lint`, `build`) 통과
 - [ ] E2E 2종 이상 통과 기록
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

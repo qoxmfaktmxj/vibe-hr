@@ -1,4 +1,9 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Alembic 마이그레이션 도입 검토 (v0.1)
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired migration planning evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 - Date: 2026-07-08
 - Status: approved (2026-07-09 사용자 승인, 선행조건인 DB 단일화 완료) → 도입 착수
@@ -47,3 +52,4 @@ Alembic을 단일 스키마 변경 경로로 만들고, 드리프트 검사를 �
 1. C안(Alembic + 드리프트 검사 안전망) 채택
 2. 선행 조건: myhr/vibe_hr DB 단일화 완료 후 착수
 3. baseline stamp 방식(기존 DB 무변경) 승인
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

@@ -1,3 +1,8 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test planning evidence. Do not run, restore, or update legacy commands or paths. Use `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
+
 # Grid Retirement Mutation Regression Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -271,3 +276,4 @@ Confirm the diff contains only the new test files, this plan, and the ledger ent
 - [ ] **Step 3: Record evidence**
 
 Append a completed R1 entry to `docs/TASK_LEDGER.md` listing test counts, commands, the 12 mutation-capable/3 read-only classification, and the fact that backend mutations used disposable SQLite while Playwright workflow mutations were route-isolated.
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

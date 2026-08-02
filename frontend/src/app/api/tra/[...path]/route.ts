@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { forwardBackendResponse } from "@/app/api/_lib/forward-backend-response";
+import { InvalidCatchallPathError, safeCatchallUrl } from "@/app/api/_lib/safe-catchall-url";
 
-const API_BASE_URL = process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 async function proxyRequest(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -10,44 +11,32 @@ async function proxyRequest(request: NextRequest, { params }: { params: Promise<
   }
 
   const resolvedParams = await params;
-  const path = resolvedParams.path.join("/");
-  const targetUrl = new URL(`${API_BASE_URL}/api/v1/tra/${path}`);
-
-  request.nextUrl.searchParams.forEach((value, key) => {
-    targetUrl.searchParams.append(key, value);
-  });
-
-  const headers = new Headers();
-  headers.set("Authorization", `Bearer ${accessToken}`);
-  const reqContentType = request.headers.get("content-type");
-  if (reqContentType) {
-    headers.set("Content-Type", reqContentType);
+  let targetUrl: URL;
+  try {
+    targetUrl = safeCatchallUrl("tra", resolvedParams.path, request.nextUrl.search);
+  } catch (error) {
+    if (error instanceof InvalidCatchallPathError) {
+      return NextResponse.json({ detail: "Invalid API path." }, { status: 400 });
+    }
+    throw error;
   }
 
-  const options: RequestInit = {
-    method: request.method,
-    headers,
-    cache: "no-store",
-  };
+  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
+  const requestContentType = request.headers.get("content-type");
+  if (requestContentType) headers.set("Content-Type", requestContentType);
+  for (const name of ["range", "if-range"]) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
 
+  const options: RequestInit = { method: request.method, headers, cache: "no-store" };
   if (request.method !== "GET" && request.method !== "HEAD") {
     const bodyText = await request.text();
-    if (bodyText) {
-      options.body = bodyText;
-    }
+    if (bodyText) options.body = bodyText;
   }
 
   try {
-    const upstream = await fetch(targetUrl.toString(), options);
-    const contentType = upstream.headers.get("content-type") ?? "";
-
-    if (contentType.includes("application/json")) {
-      const data = await upstream.json().catch(() => ({ detail: "Request failed" }));
-      return NextResponse.json(data, { status: upstream.status });
-    }
-
-    const text = await upstream.text();
-    return NextResponse.json({ detail: text }, { status: upstream.status });
+    return forwardBackendResponse(await fetch(targetUrl.toString(), options));
   } catch (error) {
     console.error("TRA proxy error:", error);
     return NextResponse.json({ detail: "Failed to fetch from backend API" }, { status: 502 });

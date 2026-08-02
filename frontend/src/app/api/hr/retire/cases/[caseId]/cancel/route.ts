@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ caseId: string }> };
@@ -12,7 +11,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const { caseId } = await context.params;
   const payload = await request.json().catch(() => null);
-  const upstream = await fetch(`${API_BASE_URL}/api/v1/hr/retire/cases/${caseId}/cancel`, {
+  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/retire/cases/${caseId}/cancel`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",

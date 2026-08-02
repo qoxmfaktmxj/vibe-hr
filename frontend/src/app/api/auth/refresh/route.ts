@@ -12,8 +12,7 @@ type RefreshResponse = {
   show_countdown: boolean;
 };
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ACCESS_TTL_COOKIE = "vibe_hr_access_ttl_min";
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/refresh`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

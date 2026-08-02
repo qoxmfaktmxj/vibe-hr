@@ -5,7 +5,7 @@
   "context": [
     "Must follow AGENTS.md and WORKFLOW.md.",
     "If AG Grid screen is in scope, preserve standard toolbar order and registry requirements.",
-    "Current planning docs: TIM_PHASE3_PLAN.md, TIM_PHASE3_TEST.md."
+    "TIM_PHASE3_PLAN.md and TIM_PHASE3_TEST.md are immutable pre-cutover behavior archives; implement current backend work only in backend-spring."
   ],
   "constraints": [
     "Keep main branch releasable.",
@@ -18,9 +18,9 @@
       "frontend/src/components/**"
     ],
     "backend": [
-      "backend/app/api/**",
-      "backend/app/services/**",
-      "backend/app/schemas/**"
+      "backend-spring/src/main/java/com/vibehr/time/**",
+      "backend-spring/src/test/java/com/vibehr/time/**",
+      "backend-spring/src/main/resources/db/migration/**"
     ],
     "qa": [
       "TIM_PHASE3_TEST.md scenarios",

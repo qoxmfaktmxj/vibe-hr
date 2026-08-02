@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ACCESS_TTL_COOKIE = "vibe_hr_access_ttl_min";
@@ -70,7 +68,7 @@ async function refreshIfNeeded(request: NextRequest): Promise<{
 
   if (remainingSec > thresholdMin * 60) return {};
 
-  const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+  const refreshResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/refresh`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

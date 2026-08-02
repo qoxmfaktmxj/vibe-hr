@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 퇴직금 계산·정산 설계 (v0.1)
 
 - Date: 2026-07-08
@@ -122,3 +123,4 @@ GET/POST /api/v1/pay/severance-item-rules  (+batch)
 
 - 유닛: 구간 경계(5/10/20년, 환산급여 각 구간), 1년 미만(세액 0), 국세청 예시 케이스 1건 이상 수기 대조, 조정액 변경 시 세액 재계산, confirmed 후 불변
 - 기존 confirmed calc 2건은 재계산하지 않음 (신규 컬럼 0 유지 — 확정분 소급 금지)
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

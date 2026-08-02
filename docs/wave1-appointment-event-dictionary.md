@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # Wave 1 Appointment Event Dictionary
 
 작성일: 2026-03-12  
@@ -172,3 +173,4 @@ DB 명세: `C:\Users\kms\Desktop\dev\EHR_6\EHR5_DB명세.sql`
 2. `appointment_kind='temporary'` 종료 후 복귀 규칙 정의
 3. `HrPersonnelHistory` 와 별도 `hr_appointment_events` 설계서 작성
 4. 급여 대상자 선정 설계서에서 읽을 이벤트 필드 확정
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

@@ -10,20 +10,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Backend tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd backend
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
-          python -m pytest -q
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -31,8 +17,67 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Korean PDF fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends fontconfig fonts-nanum
+          fc-match NanumGothic | grep -qi nanum
+
+      - name: Verify migration inventories and BFF cutover
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/spring-migration/deploy-security.sh
+          pwsh -File scripts/spring-migration/smoke-spring-compose.behavior.test.ps1
+          find scripts orchestration -name '*.test.js' -print0 | xargs -0 node --test
+          node scripts/spring-migration/retirement-snapshot.js
+          node scripts/spring-migration/endpoint-manifest.js --verify
+          node scripts/spring-migration/spring-route-coverage.test.js
+          node scripts/spring-migration/spring-route-coverage.js --verify-complete
+          node scripts/spring-migration/schema-ledger.test.js
+          node scripts/spring-migration/schema-ledger.js --check-complete
+          node scripts/spring-migration/spring-schema-coverage.test.js
+          node scripts/spring-migration/spring-schema-coverage.js --verify-complete
+          node scripts/spring-migration/mutation-ledger.test.js
+          node scripts/spring-migration/mutation-ledger.js --check-complete
+          node scripts/spring-migration/flyway-baseline.js --verify
+          node scripts/spring-migration/flyway-seed-ledger.js --verify
+          node scripts/spring-migration/verify-python-retirement.js
+          node scripts/spring-migration/bff-cutover-audit.js
+          node scripts/spring-migration/verify-delivery.js
+
+      - name: Verify Spring build and unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd backend-spring
+          ./gradlew --no-daemon --console=plain clean compileJava test bootJar
+
+      - name: Verify Spring Testcontainers integration
+        shell: bash
+        env:
+          VIBEHR_RUN_CONTAINER_TESTS: "true"
+        run: |
+          set -euo pipefail
+          cd backend-spring
+          ./gradlew --no-daemon --console=plain integrationTest
+          ./gradlew --no-daemon --console=plain migrationIntegrationTest
+
       - name: Frontend tests
         shell: bash
+        env:
+          VIBEHR_BFF_BACKEND_URL: http://backend:8080
         run: |
           set -euo pipefail
           cd frontend
@@ -42,6 +87,12 @@ jobs:
           npm run build
           npm run test
 
+      - name: Verify Spring-only delivery image and compose smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          pwsh -File scripts/spring-migration/smoke-spring-compose.ps1
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
@@ -50,73 +101,195 @@ jobs:
       DEPLOY_USER: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || vars.DEPLOY_USER }}
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || vars.DEPLOY_PORT || '22' }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
       - name: Validate deploy configuration
         shell: bash
         run: |
           set -euo pipefail
-
           missing=()
-
           [[ -z "${DEPLOY_HOST}" ]] && missing+=("DEPLOY_HOST (Secret or Variable)")
           [[ -z "${DEPLOY_USER}" ]] && missing+=("DEPLOY_USER (Secret or Variable)")
           [[ -z "${DEPLOY_SSH_KEY}" ]] && missing+=("DEPLOY_SSH_KEY (Secret)")
-
+          [[ -z "${DEPLOY_KNOWN_HOSTS}" ]] && missing+=("DEPLOY_KNOWN_HOSTS (Secret)")
+          if [[ ! "${DEPLOY_PORT}" =~ ^[0-9]+$ ]] || (( 10#${DEPLOY_PORT} < 1 || 10#${DEPLOY_PORT} > 65535 )); then
+            missing+=("DEPLOY_PORT (must be an integer from 1 to 65535)")
+          fi
           if [[ ${#missing[@]} -gt 0 ]]; then
             echo "::error::Missing required deploy settings: ${missing[*]}"
-            echo "::error::Set them in Settings > Secrets and variables > Actions."
             exit 1
           fi
 
-      - name: SSH preflight (connectivity/auth)
+      - name: Secure SSH preflight and staged Spring deployment
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
           keyfile=$(mktemp)
-          trap 'rm -f "$keyfile"' EXIT
+          known_hosts=$(mktemp)
+          trap 'rm -f "$keyfile" "$known_hosts"' EXIT
           printf '%s\n' "${DEPLOY_SSH_KEY}" > "$keyfile"
-          chmod 600 "$keyfile"
+          printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > "$known_hosts"
+          chmod 600 "$keyfile" "$known_hosts"
 
-          echo "[preflight] checking TCP connectivity to ${DEPLOY_HOST}:${DEPLOY_PORT}"
-          timeout 10 bash -c "</dev/tcp/${DEPLOY_HOST}/${DEPLOY_PORT}" || {
-            echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from GitHub runner (network/firewall/host down)."
+          known_host="${DEPLOY_HOST}"
+          if [[ "${DEPLOY_PORT}" != "22" ]]; then
+            known_host="[${DEPLOY_HOST}]:${DEPLOY_PORT}"
+          fi
+          ssh-keygen -F "$known_host" -f "$known_hosts" >/dev/null || {
+            echo "::error::DEPLOY_KNOWN_HOSTS does not contain an exact host key entry for ${known_host}."
             exit 1
           }
 
-          echo "[preflight] checking SSH authentication"
-          ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -i "$keyfile" -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
+          ssh_options=(
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=${known_hosts}"
+            -o GlobalKnownHostsFile=/dev/null
+            -i "$keyfile"
+            -p "${DEPLOY_PORT}"
+          )
+          timeout 10 bash -c ': >"/dev/tcp/$1/$2"' bash "${DEPLOY_HOST}" "${DEPLOY_PORT}" || {
+            echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from the GitHub runner."
+            exit 1
+          }
+          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.DEPLOY_HOST }}
-          username: ${{ env.DEPLOY_USER }}
-          key: ${{ env.DEPLOY_SSH_KEY }}
-          port: ${{ env.DEPLOY_PORT }}
-          script: |
-            set -e
-            cd /root/.openclaw/workspace/vibe-hr
+          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          repository=/root/.openclaw/workspace/vibe-hr
+          cd "$repository"
 
-            # 배포 서버는 항상 원격 main 기준으로 정렬 (로컬 divergence 방지)
-            git fetch origin
-            git checkout main
-
-            # 혹시 남아있는 서버 로컬 커밋/수정본 백업용 브랜치 생성(실패해도 무시)
-            git branch "backup/deploy-$(date +%Y%m%d-%H%M%S)" >/dev/null 2>&1 || true
-
-            # 원격 main으로 강제 동기화
-            git reset --hard origin/main
-            git clean -fd
-
-            if [ ! -f .env.deploy.secret ]; then
-              echo "[warn] .env.deploy.secret not found. creating empty file (fill secrets on server)."
-              touch .env.deploy.secret
+          restore_operator_config() {
+            if [[ -n "${backup_dir:-}" && -f "${backup_dir}/docker-compose.deploy.yml" ]]; then
+              cp "$backup_dir/docker-compose.deploy.yml" docker-compose.deploy.yml
+              cp "$backup_dir/.env.deploy" .env.deploy
+              cp "$backup_dir/.env.deploy.secret" .env.deploy.secret
             fi
+          }
+          wait_for_candidate() {
+            local url="$1"
+            for _ in $(seq 1 30); do
+              curl --fail --silent --show-error "$url" >/dev/null && return 0
+              sleep 2
+            done
+            return 1
+          }
+          rollback_release() {
+            echo "[deploy] restoring the previous Spring images and configuration" >&2
+            restore_operator_config
+            cat > "$backup_dir/rollback.override.yml" <<EOF
+          services:
+            backend:
+              image: ${rollback_backend}
+            frontend:
+              image: ${rollback_frontend}
+          EOF
+            if ! docker compose -f docker-compose.deploy.yml -f "$backup_dir/rollback.override.yml" up -d --no-build --remove-orphans --force-recreate; then
+              echo "[deploy] rollback compose failed" >&2
+              return 1
+            fi
+            if ! wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness; then
+              echo "[deploy] rollback readiness check failed" >&2
+              return 1
+            fi
+            if ! wait_for_candidate http://127.0.0.1:8080/openapi.json; then
+              echo "[deploy] rollback OpenAPI check failed" >&2
+              return 1
+            fi
+            if ! wait_for_candidate http://127.0.0.1:3000/login; then
+              echo "[deploy] rollback frontend check failed" >&2
+              return 1
+            fi
+          }
+          fail() {
+            echo "[deploy] $*" >&2
+            if [[ "${rollback_ready:-false}" == "true" ]]; then
+              if ! rollback_release; then
+                echo "::error::Spring rollback recovery failed" >&2
+              fi
+            else
+              restore_operator_config
+            fi
+            exit 1
+          }
+          require_env() { local variable="$1"; [[ -n "${!variable:-}" ]] || fail "missing required environment variable: ${variable}"; }
+          require_canonical_app_origin() {
+            local value="${APP_ORIGIN:-}"
+            [[ "$value" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || fail "APP_ORIGIN must be a canonical HTTP(S) origin"
+          }
 
-            # 무중단 우선: 먼저 build+up 시도(실패 시 기존 컨테이너 유지)
-            docker compose -f docker-compose.deploy.yml up -d --build --remove-orphans --force-recreate
-            docker compose -f docker-compose.deploy.yml ps
+          [[ -f .env.deploy.secret ]] || fail ".env.deploy.secret is required; refusing to create an empty secret file"
+          backup_dir=$(mktemp -d /tmp/vibehr-deploy.XXXXXX)
+          timestamp=$(date +%Y%m%d-%H%M%S)
+          candidate_name="vibehr-backend-candidate-${timestamp}"
+          candidate_port=$((19000 + RANDOM % 1000))
+          candidate_url="http://127.0.0.1:${candidate_port}"
+          cleanup_candidate() { docker rm --force "$candidate_name" >/dev/null 2>&1 || true; }
+          on_exit() {
+            status=$?
+            cleanup_candidate
+            if [[ "$status" -ne 0 ]]; then
+              restore_operator_config
+            fi
+            trap - EXIT
+            exit "$status"
+          }
+          trap on_exit EXIT
+
+          cp docker-compose.deploy.yml "$backup_dir/docker-compose.deploy.yml"
+          cp .env.deploy "$backup_dir/.env.deploy"
+          cp .env.deploy.secret "$backup_dir/.env.deploy.secret"
+          previous_frontend=$(docker inspect --format '{{.Image}}' vibehr-frontend 2>/dev/null) || fail "no running frontend release is available for automatic rollback"
+          previous_backend=$(docker inspect --format '{{.Image}}' vibehr-backend-spring 2>/dev/null) || fail "no running Spring backend release is available; a non-Spring release is not a rollback target"
+          rollback_backend="vibehr-backend-spring:rollback-${timestamp}"
+          rollback_frontend="vibehr-frontend:rollback-${timestamp}"
+          docker image tag "$previous_backend" "$rollback_backend" || fail "unable to retain the previous Spring backend image"
+          docker image tag "$previous_frontend" "$rollback_frontend" || fail "unable to retain the previous frontend image"
+          rollback_ready=true
+
+          git fetch origin || fail "unable to fetch the deployment revision"
+          git checkout main || fail "unable to check out the deployment branch"
+          git branch "backup/deploy-${timestamp}" >/dev/null 2>&1 || true
+          git reset --hard origin/main || fail "unable to update to the deployment revision"
+
+          source scripts/spring-migration/load-deploy-env.sh || fail "deployment dotenv parser is unavailable"
+          load_deploy_env .env.deploy || fail "tracked deployment environment is invalid"
+          load_deploy_env .env.deploy.secret || fail "deployment secret environment is invalid"
+          require_env SPRING_DATASOURCE_URL
+          require_env SPRING_DATASOURCE_USERNAME
+          require_env SPRING_DATASOURCE_PASSWORD
+          require_env AUTH_TOKEN_SECRET
+          require_env VIBEHR_BFF_ASSERTION_SECRET
+          require_env VIBEHR_BFF_BACKEND_URL
+          [[ "$SPRING_DATASOURCE_URL" == jdbc:postgresql://* ]] || fail "SPRING_DATASOURCE_URL must be a PostgreSQL JDBC URL"
+          is_valid_deploy_secret "$AUTH_TOKEN_SECRET" || fail "AUTH_TOKEN_SECRET must be exactly 64 hexadecimal characters from openssl rand -hex 32"
+          is_valid_deploy_secret "$VIBEHR_BFF_ASSERTION_SECRET" || fail "VIBEHR_BFF_ASSERTION_SECRET must be exactly 64 hexadecimal characters from openssl rand -hex 32"
+          are_distinct_deploy_secrets "$AUTH_TOKEN_SECRET" "$VIBEHR_BFF_ASSERTION_SECRET" || fail "AUTH_TOKEN_SECRET and VIBEHR_BFF_ASSERTION_SECRET must be distinct generated values"
+          require_env VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER
+          [[ "$VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER" == "x-vibehr-client-ip" ]] || fail "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER must be x-vibehr-client-ip and set only by the sanitizing reverse proxy"
+          require_canonical_app_origin
+          [[ "$VIBEHR_BFF_BACKEND_URL" == "http://backend:8080" ]] || fail "VIBEHR_BFF_BACKEND_URL must remain the Docker-internal Spring URL"
+          [[ "${VIBEHR_ALLOW_FIXTURE_SEEDING:-false}" != "true" ]] || fail "fixture seeding is forbidden on a deployment target"
+          docker compose -f docker-compose.deploy.yml config -q || fail "deployment compose configuration is invalid"
+
+          docker compose -f docker-compose.deploy.yml build backend frontend || fail "unable to build the Spring deployment images"
+          docker run --detach --rm --name "$candidate_name" \
+            --env-file .env.deploy --env-file .env.deploy.secret \
+            -e SPRING_PROFILES_ACTIVE=flyway-cutover \
+            -e VIBEHR_SCHEMA_OWNER=flyway \
+            -p "127.0.0.1:${candidate_port}:8080" \
+            vibehr-backend-spring:deploy >/dev/null || fail "candidate container could not start"
+          wait_for_candidate "$candidate_url/actuator/health/readiness" || fail "candidate readiness check failed"
+          wait_for_candidate "$candidate_url/openapi.json" || fail "candidate OpenAPI check failed"
+          cleanup_candidate
+
+          docker compose -f docker-compose.deploy.yml up -d --no-build --remove-orphans --force-recreate || fail "promotion compose failed"
+          wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness || fail "promotion readiness check failed"
+          wait_for_candidate http://127.0.0.1:8080/openapi.json || fail "promotion OpenAPI check failed"
+          wait_for_candidate http://127.0.0.1:3000/login || fail "promotion frontend check failed"
+          docker compose -f docker-compose.deploy.yml ps || fail "unable to inspect the promoted release"
+          rm -rf "$backup_dir"
+          REMOTE

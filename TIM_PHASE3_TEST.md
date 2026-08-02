@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # TIM Phase 3 - 휴가 관리 테스트 가이드
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 환경: 로컬 개발 (backend:8000, frontend:3000)
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 환경 준비
 
@@ -815,3 +820,4 @@ SELECT COUNT(*) FROM hr_annual_leaves WHERE year = 2026;
 5. **디버깅:**
    - Backend 로그: INFO level에서 수행 시간 출력
    - Frontend: Network 탭에서 API 응답 시간 확인
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

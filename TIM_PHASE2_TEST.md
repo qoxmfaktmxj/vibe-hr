@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # TIM Phase 2 - 일상근태 테스트 가이드
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 테스트 환경: 로컬 개발 환경 (backend:8000, frontend:3000)
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 환경 준비
 
@@ -671,3 +676,4 @@ ORDER BY work_date DESC LIMIT 50;
 - [ ] 403 Forbidden
 - [ ] 409 Conflict
 ```
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

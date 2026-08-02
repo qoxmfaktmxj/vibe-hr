@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # 사내복리후생(WEL) 모듈 구현 계획
 
 ## 개요
@@ -14,6 +15,10 @@
 > - `is_deduction = False` → `pay_items`에 지급 항목으로 연결
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation planning evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## Phase 1: 공통 기반 테이블 (1개)
 
@@ -545,3 +550,4 @@ PR/머지 전 반드시 아래를 통과한다.
 - [ ] `config/grid-screens.json` + 각 page `GRID_SCREEN` 메타데이터 정합성 확인
 - [ ] `npm run validate:grid` 통과
 - [ ] `npm run lint && npm run build` 통과
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

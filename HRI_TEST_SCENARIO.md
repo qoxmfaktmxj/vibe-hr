@@ -1,3 +1,4 @@
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->
 # HRI 모듈 테스트 시나리오 (DB 접근 가능 AI 전달용)
 
 > 작성일: 2026-02-25
@@ -5,6 +6,10 @@
 > 목적: DB 접근 가능한 AI가 HRI 모듈을 E2E로 점검하고, 결함 수정까지 이어갈 수 있도록 테스트 절차를 표준화한다.
 
 ---
+
+> **IMMUTABLE PRE-CUTOVER ARCHIVE - NON-EXECUTABLE**
+>
+> This document preserves retired implementation and test evidence. Do not run, restore, or update legacy commands or paths. Use `README.md`, `backend-spring/README.md`, and `docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md` for current Spring-only guidance.
 
 ## 1. 테스트 목표
 
@@ -333,3 +338,4 @@ No-Go 조건:
 - 수정 후 반드시 재검증 결과를 첨부
 - 스키마 변경 시 DDL/마이그레이션 영향도 함께 보고
 ```
+<!-- IMMUTABLE PRE-CUTOVER ARCHIVE: historical FastAPI/Alembic evidence only; not an executable Spring operating instruction. -->

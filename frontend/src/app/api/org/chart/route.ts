@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL =
-  process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamUrl = new URL(`${API_BASE_URL}/api/v1/org/chart`);
+  const upstreamUrl = new URL(`${backendApiBaseUrl()}/api/v1/org/chart`);
   upstreamUrl.search = request.nextUrl.searchParams.toString();
 
   const upstreamResponse = await fetch(upstreamUrl.toString(), {

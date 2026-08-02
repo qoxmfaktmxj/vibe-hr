@@ -1,0 +1,163 @@
+{
+  "schema_version": 2,
+  "source_bootstrap_sha256": "3942aff09372f047d37eaa9938670afb79e72817ba218baf05ed40ff8ff4a285",
+  "source_dump_sha256": "454731a3499d0c687b4150e9dff9317aa14dc3e3d5ad046f622838aa0cd6766d",
+  "required_ledger_function_count": 33,
+  "fixed_timestamp": "2026-01-01 00:00:00",
+  "required_reference_table_count": 33,
+  "required_reference_row_count": 1377,
+  "reconciliation": {
+    "strategy": "python-bootstrap-natural-key-upsert",
+    "stale_menu_retirement": true,
+    "table_natural_keys": {
+      "auth_roles": [
+        "code"
+      ],
+      "org_departments": [
+        "code"
+      ],
+      "org_corporations": [
+        "enter_cd"
+      ],
+      "app_code_groups": [
+        "code"
+      ],
+      "app_codes": [
+        "group_id",
+        "code"
+      ],
+      "app_menus": [
+        "code"
+      ],
+      "app_menu_roles": [
+        "menu_id",
+        "role_id"
+      ],
+      "app_menu_actions": [
+        "menu_id",
+        "action_code"
+      ],
+      "app_system_settings": [
+        "key"
+      ],
+      "hr_retire_checklist_items": [
+        "code"
+      ],
+      "tim_attendance_codes": [
+        "code"
+      ],
+      "tim_work_schedule_codes": [
+        "code"
+      ],
+      "tim_schedule_patterns": [
+        "code"
+      ],
+      "tim_schedule_pattern_days": [
+        "pattern_id",
+        "weekday"
+      ],
+      "tim_department_schedule_assignments": [
+        "department_id"
+      ],
+      "tim_holidays": [
+        "holiday_date"
+      ],
+      "PAP_FINAL_RESULTS": [
+        "result_code"
+      ],
+      "PAP_APPRAISAL_MASTERS": [
+        "appraisal_year",
+        "appraisal_code"
+      ],
+      "pay_payroll_codes": [
+        "code"
+      ],
+      "pay_allowance_deductions": [
+        "code"
+      ],
+      "pay_item_groups": [
+        "code"
+      ],
+      "gl_accounts": [
+        "code"
+      ],
+      "pay_gl_mappings": [
+        "pay_item_code",
+        "effective_from"
+      ],
+      "pay_severance_item_rules": [
+        "pay_item_code"
+      ],
+      "hri_form_types": [
+        "form_code"
+      ],
+      "hri_form_type_policies": [
+        "form_type_id",
+        "policy_key",
+        "effective_from"
+      ],
+      "hri_approval_actor_rules": [
+        "role_code"
+      ],
+      "hri_approval_line_templates": [
+        "template_code"
+      ],
+      "hri_approval_line_steps": [
+        "template_id",
+        "step_order"
+      ],
+      "hri_form_type_approval_maps": [
+        "form_type_id",
+        "template_id",
+        "effective_from"
+      ],
+      "pay_tax_rates": [
+        "year",
+        "rate_type"
+      ],
+      "pay_income_tax_brackets": [
+        "year",
+        "annual_taxable_from"
+      ],
+      "wel_benefit_types": [
+        "code"
+      ]
+    }
+  },
+  "tables": [
+    "PAP_APPRAISAL_MASTERS",
+    "PAP_FINAL_RESULTS",
+    "app_code_groups",
+    "app_codes",
+    "app_menu_actions",
+    "app_menu_roles",
+    "app_menus",
+    "app_system_settings",
+    "auth_roles",
+    "gl_accounts",
+    "hr_retire_checklist_items",
+    "hri_approval_actor_rules",
+    "hri_approval_line_steps",
+    "hri_approval_line_templates",
+    "hri_form_type_approval_maps",
+    "hri_form_type_policies",
+    "hri_form_types",
+    "org_corporations",
+    "org_departments",
+    "pay_allowance_deductions",
+    "pay_gl_mappings",
+    "pay_income_tax_brackets",
+    "pay_item_groups",
+    "pay_payroll_codes",
+    "pay_severance_item_rules",
+    "pay_tax_rates",
+    "tim_attendance_codes",
+    "tim_department_schedule_assignments",
+    "tim_holidays",
+    "tim_schedule_pattern_days",
+    "tim_schedule_patterns",
+    "tim_work_schedule_codes",
+    "wel_benefit_types"
+  ],
+  "sql_sha256": "564baf8e350c4e1a001ca992c1cd60c85d7d465c08def23c990b5fa8b9c99ab4"
+}

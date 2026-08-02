@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: flyway-cutover
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    clean-disabled: true
+
+vibehr:
+  migration:
+    owner: ${VIBEHR_SCHEMA_OWNER:unapproved}
