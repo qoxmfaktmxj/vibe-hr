@@ -30,6 +30,14 @@ jobs:
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Install Korean PDF fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends fontconfig fonts-nanum
+          fc-match NanumGothic | grep -qi nanum
+
       - name: Resolve diff base/head
         id: refs
         shell: bash

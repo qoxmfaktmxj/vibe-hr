@@ -30,13 +30,41 @@ function verifyCutoverRunbook(runbook) {
   return failures;
 }
 
+function verifyKoreanPdfFontWorkflow(workflowName, workflow) {
+  const testCommand = /\.\/gradlew[^\r\n]*\b(?:test|integrationTest|migrationIntegrationTest)\b/;
+  const testMatch = testCommand.exec(workflow);
+  if (!testMatch) return [];
+
+  const failures = [];
+  const fontStepStart = workflow.indexOf("- name: Install Korean PDF fonts");
+  if (fontStepStart < 0 || fontStepStart > testMatch.index) {
+    return [`${workflowName} runs backend Gradle tests without an earlier Korean PDF font setup step`];
+  }
+
+  const nextStepStart = workflow.indexOf("\n      - ", fontStepStart + 1);
+  const fontStep = workflow.slice(fontStepStart, nextStepStart < 0 ? workflow.length : nextStepStart);
+  for (const required of [
+    "set -euo pipefail",
+    "sudo apt-get update",
+    "sudo apt-get install --yes --no-install-recommends fontconfig fonts-nanum",
+    "fc-match NanumGothic | grep -qi nanum",
+  ]) {
+    if (!fontStep.includes(required)) failures.push(`${workflowName} Korean PDF font setup is missing ${required}`);
+  }
+  return failures;
+}
+
 function verifyDelivery(argv = process.argv) {
   const compose = fs.readFileSync(path.join(repositoryRoot, "docker-compose.deploy.yml"), "utf8");
   const dockerfile = fs.readFileSync(path.join(repositoryRoot, "backend-spring", "Dockerfile"), "utf8");
   const frontendDockerfile = fs.readFileSync(path.join(repositoryRoot, "frontend", "Dockerfile"), "utf8");
   const smokeCompose = fs.readFileSync(path.join(repositoryRoot, "docker-compose.spring-smoke.yml"), "utf8");
   const smokeScript = fs.readFileSync(path.join(repositoryRoot, "scripts", "spring-migration", "smoke-spring-compose.ps1"), "utf8");
-  const deployWorkflow = fs.readFileSync(path.join(repositoryRoot, ".github", "workflows", "deploy.yml"), "utf8");
+  const workflowDirectory = path.join(repositoryRoot, ".github", "workflows");
+  const workflows = fs.readdirSync(workflowDirectory)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .map((file) => [file, fs.readFileSync(path.join(workflowDirectory, file), "utf8")]);
+  const deployWorkflow = fs.readFileSync(path.join(workflowDirectory, "deploy.yml"), "utf8");
   const docsController = fs.readFileSync(path.join(repositoryRoot, "backend-spring", "src", "main", "java", "com", "vibehr", "platform", "openapi", "DocumentationController.java"), "utf8");
   const rootLayout = fs.readFileSync(path.join(repositoryRoot, "frontend", "src", "app", "layout.tsx"), "utf8");
   const deployEnvironment = fs.readFileSync(path.join(repositoryRoot, ".env.deploy"), "utf8");
@@ -45,6 +73,9 @@ function verifyDelivery(argv = process.argv) {
   const failures = [];
 
   failures.push(...verifyCutoverRunbook(cutoverRunbook));
+  for (const [workflowName, workflow] of workflows) {
+    failures.push(...verifyKoreanPdfFontWorkflow(workflowName, workflow));
+  }
 
   const legacyRollbackArtifact = path.join(repositoryRoot, `docker-compose.rollback-${"python"}.yml`);
   if (fs.existsSync(legacyRollbackArtifact)) failures.push("legacy non-Spring rollback compose remains in the candidate");
@@ -186,4 +217,4 @@ if (require.main === module) {
   process.stdout.write("Delivery verification: Spring-only rollback, staged cutover runbook, safe dotenv loading, layered non-root image contract, no-Python image check, and Nanum Korean PDF font check passed.\n");
 }
 
-module.exports = { verifyCutoverRunbook, verifyDelivery };
+module.exports = { verifyCutoverRunbook, verifyDelivery, verifyKoreanPdfFontWorkflow };

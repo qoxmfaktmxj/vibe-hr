@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { verifyCutoverRunbook } = require("./verify-delivery");
+const { verifyCutoverRunbook, verifyKoreanPdfFontWorkflow } = require("./verify-delivery");
 
 test("cutover runbook verifier rejects stale coexistence guidance", () => {
   const failures = verifyCutoverRunbook(`
@@ -32,4 +32,31 @@ The adoption command stops at the exact V1/V2 ownership transfer.
   assert.match(message, /separate `flyway-cutover` stage applies V3, V4, and V5/);
   assert.match(message, /After starting `flyway-cutover`/);
   assert.match(message, /106-table live schema check/);
+});
+
+test("workflow verifier requires a fail-closed Korean font setup before Gradle tests", () => {
+  const failures = verifyKoreanPdfFontWorkflow("example.yml", `
+steps:
+  - name: Verify backend
+    run: ./gradlew test
+`);
+
+  assert.match(failures.join("\n"), /without an earlier Korean PDF font setup step/);
+});
+
+test("workflow verifier accepts the required Korean font setup before Gradle tests", () => {
+  const failures = verifyKoreanPdfFontWorkflow("example.yml", `
+steps:
+      - name: Install Korean PDF fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends fontconfig fonts-nanum
+          fc-match NanumGothic | grep -qi nanum
+      - name: Verify backend
+        run: ./gradlew test
+`);
+
+  assert.deepEqual(failures, []);
 });
