@@ -34,6 +34,7 @@ const files = routeFiles(bffRoot).sort();
 if (files.length < minimumBffRouteCount) fail(`expected at least ${minimumBffRouteCount} BFF route files, found ${files.length}`);
 
 const legacyTarget = /localhost:8000|NEXT_PUBLIC_API_BASE_URL|process\.env\.API_BASE_URL/;
+const springTargetedProxy = /backendApiBaseUrl\(\)|backendApiUrl\(/;
 for (const file of frontendSourceFiles(path.join(repositoryRoot, "frontend", "src"))) {
   const source = fs.readFileSync(file, "utf8");
   if (legacyTarget.test(source)) fail(`${path.relative(repositoryRoot, file).split(path.sep).join("/")} still contains a Python-era API target`);
@@ -44,9 +45,9 @@ for (const file of files) {
   const source = fs.readFileSync(file, "utf8");
   const relative = path.relative(repositoryRoot, file).split(path.sep).join("/");
   if (legacyTarget.test(source)) fail(`${relative} still contains a Python-era API target`);
-  if (!source.includes("backendApiBaseUrl()") && !source.includes("safeCatchallUrl")) continue;
+  if (!springTargetedProxy.test(source) && !source.includes("safeCatchallUrl")) continue;
   proxyFiles.push(relative);
-  if (source.includes("backendApiBaseUrl()") && !source.includes('from "@/app/api/_lib/backend-target"')) {
+  if (springTargetedProxy.test(source) && !source.includes('from "@/app/api/_lib/backend-target"')) {
     fail(`${relative} does not import the central BFF target`);
   }
 }
@@ -56,13 +57,17 @@ for (const relative of [
   "frontend/src/app/api/tim/annual-leave/employee/[employeeId]/route.ts",
 ]) {
   const source = fs.readFileSync(path.join(repositoryRoot, relative), "utf8");
-  if (!source.includes("backendApiBaseUrl()") || !source.includes('export async function GET')) {
+  if (!springTargetedProxy.test(source) || !source.includes('export async function GET')) {
     fail(`${relative} is not a Spring-targeted GET proxy`);
   }
 }
 
 const welfareBatch = fs.readFileSync(path.join(bffRoot, "wel", "benefit-types", "route.ts"), "utf8");
-if (!welfareBatch.includes("/api/v1/wel/benefit-types/batch") || !welfareBatch.includes("export async function POST")) {
+if (
+  (!welfareBatch.includes("/api/v1/wel/benefit-types/batch")
+    && !welfareBatch.includes('backendApiUrl("/wel/benefit-types/batch")'))
+  || !welfareBatch.includes("export async function POST")
+) {
   fail("WEL benefit-type batch proxy is missing");
 }
 
