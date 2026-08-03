@@ -80,7 +80,7 @@ function verifyDelivery(argv = process.argv) {
   const legacyRollbackArtifact = path.join(repositoryRoot, `docker-compose.rollback-${"python"}.yml`);
   if (fs.existsSync(legacyRollbackArtifact)) failures.push("legacy non-Spring rollback compose remains in the candidate");
 
-  for (const required of ["context: ./backend-spring", "VIBEHR_BFF_BACKEND_URL: ${VIBEHR_BFF_BACKEND_URL:?VIBEHR_BFF_BACKEND_URL is required}", "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER: ${VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER:?VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER is required}", "/actuator/health/readiness", "SPRING_PROFILES_ACTIVE"]) {
+  for (const required of ["context: ./backend-spring", "VIBEHR_BFF_BACKEND_URL: ${VIBEHR_BFF_BACKEND_URL:?VIBEHR_BFF_BACKEND_URL is required}", "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER: ${VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER:?VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER is required}", "host.docker.internal:host-gateway", "/actuator/health/readiness", "SPRING_PROFILES_ACTIVE"]) {
     if (!compose.includes(required)) failures.push(`deploy compose is missing ${required}`);
   }
   if (compose.includes("context: ./backend\n")) failures.push("default deploy compose still builds the Python backend");
@@ -130,6 +130,7 @@ function verifyDelivery(argv = process.argv) {
     "require_canonical_app_origin",
     "candidate readiness check failed",
     "candidate OpenAPI check failed",
+    "--add-host host.docker.internal:host-gateway",
     "no running Spring backend release is available",
     "a non-Spring release is not a rollback target",
     "127.0.0.1:3000/login",

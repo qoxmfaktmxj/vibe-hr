@@ -280,6 +280,7 @@ jobs:
             --env-file .env.deploy --env-file .env.deploy.secret \
             -e SPRING_PROFILES_ACTIVE=flyway-cutover \
             -e VIBEHR_SCHEMA_OWNER=flyway \
+            --add-host host.docker.internal:host-gateway \
             -p "127.0.0.1:${candidate_port}:8080" \
             vibehr-backend-spring:deploy >/dev/null || fail "candidate container could not start"
           wait_for_candidate "$candidate_url/actuator/health/readiness" || fail "candidate readiness check failed"

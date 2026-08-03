@@ -1,3 +1,20 @@
+## TASK VH-R3-SPRING-PRODUCTION-CUTOVER-20260803
+- Date: 2026-08-03
+- Status: executing with explicit production approval
+- Mode: High-risk controlled production cutover
+- Risk Class: R3 (database ownership transfer, authentication secrets, deployment and traffic switch)
+- Approval Status: user explicitly approved immediate Spring Boot production cutover
+- Owner: Codex implementation lane
+
+### Scope
+- Fast-forward the reviewed reconciliation/V3 correction onto the current design `main` revision.
+- Stop Python writes, take a final backup, restore to a separate Spring production database, and run guarded reconciliation plus Flyway V1-V5.
+- Verify an isolated Spring candidate before replacing the Python backend and switching the Next.js BFF to Spring.
+- Retain the original Python images, operator configuration, original database, and final backup as rollback assets.
+
+### Stop Conditions
+- Any permanent successful V3 history, fingerprint/history/checksum mismatch, protected data checksum change, unsafe sequence, destructive reconciliation requirement, candidate validation failure, or production smoke failure stops promotion or triggers routing/container rollback.
+
 ## TASK VH-R3-PRODUCTION-DRIFT-RECONCILIATION-20260803
 - Date: 2026-08-03
 - Status: clone end-to-end verification completed; production cutover remains stopped pending separate approval

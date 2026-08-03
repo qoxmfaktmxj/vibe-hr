@@ -13,6 +13,8 @@ services:
       VIBEHR_SCHEMA_OWNER: ${VIBEHR_SCHEMA_OWNER:?VIBEHR_SCHEMA_OWNER is required}
     ports:
       - "127.0.0.1:8080:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     stop_grace_period: 40s
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent --show-error http://localhost:8080/actuator/health/readiness"]
