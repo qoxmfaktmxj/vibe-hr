@@ -33,6 +33,8 @@ Use JPA for aggregate-oriented writes and ordinary entity lifecycle behavior. Us
 
 Flyway is the sole runtime schema and required-reference-data writer and remains disabled outside the explicit cutover profile. The profile requires `VIBEHR_SCHEMA_OWNER=flyway`, validates the checked-in baseline, and rejects unadopted databases. Python/Alembic references are frozen migration evidence, not executable runtime instructions. See `docs/spring-migration/CUTOVER_RUNBOOK.md` before using it.
 
+The reviewed 2026-08-03 production-copy catalog drift has a separate fail-closed `pre-adoption-reconciliation` command profile. It requires an exact confirmation token, Alembic head, source fingerprint, and advisory lock, preserves the original tables in an archive schema, and verifies protected row checksums plus the frozen V1 manifest before commit. See [`PRODUCTION_DRIFT_RECONCILIATION_20260803.md`](../docs/spring-migration/PRODUCTION_DRIFT_RECONCILIATION_20260803.md); do not run it against production without separate approval.
+
 ## Public OpenAPI contracts
 
 Springdoc 3.0.3 serves the compatibility paths: `GET` and `HEAD` for `/openapi.json`, `/docs`, `/docs/oauth2-redirect`, and `/redoc`. `/docs` forwards to Swagger UI, and `/redoc` is a lightweight ReDoc page bound to `/openapi.json`.

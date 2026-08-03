@@ -13,6 +13,8 @@ Status: execution runbook. Production cutover is not complete until the smoke ch
 
 ## Flyway Adoption
 
+If a restored production copy has source fingerprint `e9cf20a655e8f4a06b4e93db40661843ab94d363a906be19e8450397a7a12ec1`, first follow `PRODUCTION_DRIFT_RECONCILIATION_20260803.md` and run the guarded `pre-adoption-reconciliation` profile against that copy. Do not run it against production without separate approval. Any other fingerprint must be investigated, not added to an allow-list.
+
 Run this only after the preconditions are satisfied and from a database backup/copy first. It is deliberately non-default and refuses ambiguous ownership.
 
 ```powershell

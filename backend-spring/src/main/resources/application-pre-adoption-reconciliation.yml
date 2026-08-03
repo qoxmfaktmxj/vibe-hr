@@ -1,0 +1,11 @@
+spring:
+  config:
+    activate:
+      on-profile: pre-adoption-reconciliation
+  main:
+    web-application-type: none
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none

@@ -55,13 +55,16 @@ public final class PostgreSqlSchemaManifest {
 
     public static void assertMatchesCheckedInManifest(Connection connection) throws SQLException {
         JsonNode expected = loadCheckedInManifest();
-        ObjectNode actual = capture(connection);
         String expectedFingerprint = expected.path("metadata_sha256").asText();
-        String actualFingerprint = sha256(canonicalJson(actual));
+        String actualFingerprint = fingerprint(connection);
         if (!Objects.equals(expectedFingerprint, actualFingerprint)) {
             throw new IllegalStateException("PostgreSQL schema metadata drift detected; expected "
                     + expectedFingerprint + " but found " + actualFingerprint + ". Adoption was not started.");
         }
+    }
+
+    public static String fingerprint(Connection connection) throws SQLException {
+        return sha256(canonicalJson(capture(connection)));
     }
 
     public static JsonNode loadCheckedInManifest() {

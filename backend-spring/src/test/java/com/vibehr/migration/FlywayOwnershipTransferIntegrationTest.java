@@ -110,6 +110,38 @@ class FlywayOwnershipTransferIntegrationTest {
     }
 
     @Test
+    void knownProductionDriftReconcilesThenAdoptsAndCutsOverWithoutChangingProtectedRows() throws Exception {
+        provisionAlembicHead();
+        runSqlResource("db/reconciliation/known-production-drift-fixture.sql");
+
+        try (Connection connection = connection()) {
+            assertThat(PostgreSqlSchemaManifest.fingerprint(connection))
+                    .isEqualTo(PreAdoptionReconciliationService.SOURCE_FINGERPRINT);
+        }
+
+        PreAdoptionReconciliationService.ReconciliationReport report =
+                new PreAdoptionReconciliationService(dataSource()).reconcile(
+                        PreAdoptionReconciliationService.CONFIRMATION,
+                        PreAdoptionReconciliationService.SOURCE_FINGERPRINT);
+        assertThat(report.before()).isEqualTo(report.after());
+        assertThat(report.before().values()).allSatisfy(evidence -> assertThat(evidence.rowCount()).isEqualTo(1));
+        try (Connection connection = connection()) {
+            PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
+            assertThat(relationExists(connection, "alembic_version")).isTrue();
+        }
+
+        assertThat(new FlywayAdoptionService(dataSource()).adopt())
+                .isEqualTo(FlywayAdoptionService.AdoptionResult.ADOPTED);
+        migrateFresh();
+        try (Connection connection = connection()) {
+            assertThat(applicationTableCount(connection)).isEqualTo(106);
+            assertThat(flywayHistoryCount(connection)).isEqualTo(5);
+            assertThat(relationExists(connection, "alembic_version")).isFalse();
+            PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
+        }
+    }
+
+    @Test
     void alreadyAdoptedRejectsMissingExtraDuplicatedFailedAndTamperedHistory() throws Exception {
         assertAlreadyAdoptedHistoryRejected("delete from flyway_schema_history where version = '2'");
         assertAlreadyAdoptedHistoryRejected("delete from flyway_schema_history where version = '1'");
@@ -450,6 +482,24 @@ class FlywayOwnershipTransferIntegrationTest {
             throw exception;
         } finally {
             connection.setAutoCommit(originalAutoCommit);
+        }
+    }
+
+    private void runSqlResource(String path) throws Exception {
+        String sql;
+        try (InputStream resource = getClass().getClassLoader().getResourceAsStream(path)) {
+            if (resource == null) throw new IllegalStateException("Missing integration SQL resource " + path + ".");
+            sql = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            try {
+                statement.execute(sql);
+                connection.commit();
+            } catch (Exception exception) {
+                connection.rollback();
+                throw exception;
+            }
         }
     }
 
