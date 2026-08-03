@@ -1,6 +1,6 @@
 ## TASK VH-R3-PRODUCTION-DRIFT-RECONCILIATION-20260803
 - Date: 2026-08-03
-- Status: blocked at V3; production cutover remains stopped
+- Status: clone end-to-end verification completed; production cutover remains stopped pending separate approval
 - Mode: Restored-backup verification
 - Risk Class: R3 (schema ownership transfer and production-data compatibility)
 - Approval Status: approved explicitly by the user for clone/source work only; production execution not approved
@@ -8,18 +8,20 @@
 
 ### Scope
 - Mechanically compare the restored production schema with the frozen V1 catalog manifest and determine whether production or V1 is canonical.
-- Add an exact-fingerprint, exact-head, advisory-locked, transactional reconciliation command without changing V1-V3 or the frozen manifest.
+- Add an exact-fingerprint, exact-head, advisory-locked, transactional reconciliation command without changing V1/V2 or the frozen schema manifest.
 - Preserve source tables in an archive schema, prove protected row/checksum equality, and exercise reconciliation through Flyway V1-V5 on PostgreSQL 16.
+- Confirm no known permanent database has successful V3 history, then correct V3's pre-first-application source-ID mapping without changing valid assignments.
 
 ### Evidence
 - Restored clone source fingerprint `e9cf20a655e8f4a06b4e93db40661843ab94d363a906be19e8450397a7a12ec1`; fresh same-version V1 and reconciled clone both matched `fd4fb016274fc2ae5bb637c2e958a968ae625de229f0bbc9cf7b3677a6db613e`.
 - Five protected tables retained identical row counts/checksums; all five canonical sequences produced a next value above max ID.
-- Known schema-drift fixture passed `reconciliation -> V1/V2 adoption -> V3-V5` in disposable PostgreSQL 16.
-- Restored clone adoption passed exact V1/V2 history and V2 checksum `-1027260723`.
-- Restored clone V3 failed closed and rolled back: 50 departments each have two valid active effective schedule assignments, while V3's ID mapping assumes one active row per department.
+- Read-only permanent-database audit found no successful V3 row: production has no Flyway table and the retained evidence database has V1/V2 only.
+- A new restore `vibehr_reconcile_v3fix_20260803` passed reconciliation, exact V1/V2 adoption (`V2=-1027260723`), corrected V3 (`720383589`), V4/V5, 106-table validation, Hibernate validation, readiness, OpenAPI, and signed authentication/permission smoke.
+- The actual scheduling shape (50 departments, 100 active assignments) retained exact checksum `a18af37c745f60c0e7904915e990a065` across V3-V5; 1,377 canonical source rows remained intact.
+- `migrationIntegrationTest`, full unit tests, `flyway-verify`, and route coverage `290/290` passed. All 102 owned sequences have calculated next values above max IDs.
 
 ### Remaining Risk / Stop Condition
-- Resolving the V3 ambiguity requires either a reviewed reversible pre-V3 data bridge or approval to replace frozen V3. No production DB, container, Compose, Nginx, or secret was changed.
+- Any newly discovered successful V3 in a permanent database invalidates this checksum-change path and requires a stop/guarded-bridge review. No production DB, container, Compose, Nginx, secret, push, or PR was changed.
 - See `docs/spring-migration/PRODUCTION_DRIFT_RECONCILIATION_20260803.md`.
 
 ## TASK VH-R3-DELIVERY-HARDENING-20260803

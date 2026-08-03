@@ -16851,9 +16851,14 @@ resolved AS (
 INSERT INTO pg_temp.vibehr_reference_seed_ids (source_table, source_id, actual_id)
 SELECT 'tim_department_schedule_assignments', source."id", target."id"
 FROM resolved AS source
-JOIN public."tim_department_schedule_assignments" AS target
-  ON target."department_id" IS NOT DISTINCT FROM source."department_id"
-  AND target."is_active" = true
+JOIN LATERAL (
+  SELECT candidate."id"
+  FROM public."tim_department_schedule_assignments" AS candidate
+  WHERE candidate."department_id" IS NOT DISTINCT FROM source."department_id"
+  AND candidate."is_active" = true
+  ORDER BY candidate."priority" DESC, candidate."effective_from" DESC, candidate."id" DESC
+  LIMIT 1
+) AS target ON true
 ON CONFLICT (source_table, source_id) DO UPDATE
 SET actual_id = EXCLUDED.actual_id;
 

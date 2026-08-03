@@ -10,6 +10,7 @@ Status: execution runbook. Production cutover is not complete until the smoke ch
 - Retain the previous Spring backend/frontend image tags and the database backup for the observation window. A non-Spring release is not a rollback target.
 - Create `.env.deploy.secret` from `.env.deploy.secret.example` only on the deployment host. The tracked example is intentionally invalid. It must contain the three Spring datasource variables plus separate random `AUTH_TOKEN_SECRET` and `VIBEHR_BFF_ASSERTION_SECRET` values of at least 32 bytes, with no whitespace or placeholder text.
 - Store the exact SSH host-key line for the deployment host in the GitHub Actions `DEPLOY_KNOWN_HOSTS` secret. For a non-default SSH port, the entry must use `[host]:port` syntax. Do not use `ssh-keyscan` during deployment.
+- Before using the corrected V3, query every known permanent database for successful V3 history. V3 checksum `720383589` is permitted only while no permanent database has any successful V3 row. If one exists with any checksum, stop; do not change or repair history and do not run a bridge without separate approval.
 
 ## Flyway Adoption
 
@@ -34,6 +35,8 @@ order by installed_rank;
 ```
 
 The adoption command stops at the exact V1/V2 ownership transfer. The separate `flyway-cutover` stage applies V3, V4, and V5 on startup after adoption succeeds.
+
+The corrected V3 preserves all active department schedule assignments and resolves only its temporary source-ID map with `priority DESC, effective_from DESC, id DESC`. Its approved SHA-256 is `9e964bf96d864a7ef8f0a3114d3a6f27a6c187fed94031c8e0d92a6da51f0dcc` and Flyway checksum is `720383589`; any difference is a stop condition.
 
 ## Verification Stages
 

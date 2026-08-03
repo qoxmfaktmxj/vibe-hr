@@ -45,13 +45,13 @@ const REQUIRED_ARTIFACTS = Object.freeze([
   ["docs/spring-migration/schema-ledger.md", "27743512b11bc88ee867b6dcd312a66484620c57acc4e9defeaca6646d63821d"],
   ["docs/spring-migration/schema-default-decision-registry.json", "720bdfe5760b250c2cbb8996f2fa82568765b72a4dff05d6b76bb62c3004c1a9"],
   ["docs/spring-migration/flyway-baseline-manifest.json", "894c502b41d2133b5d0efdd6a89c70d5238ea9a45d69dd3bdf151d5250c11748"],
-  ["docs/spring-migration/flyway-reference-seed-manifest.json", "b72803e9c628d2083acf1da82200627f168760118f1ffede056316a9a650654a"],
+  ["docs/spring-migration/flyway-reference-seed-manifest.json", "ea9ab1e883bc626bab758ca527201263e770dfe01ac7769c4eabeefe6a1cf4ff"],
   ["docs/spring-migration/flyway-required-reference-source.sql", "454731a3499d0c687b4150e9dff9317aa14dc3e3d5ad046f622838aa0cd6766d"],
   ["docs/spring-migration/flyway-seed-ownership-ledger.json", "8763eb0208741dd8f91ff44284de1c7dbe15824d51ad24e9cc667748c12f1fab"],
   ["docs/spring-migration/flyway-seed-ownership-ledger.md", "96258d78b125ae7b114bd8e158e9881157a2f7582b19cba9c1cd9867d1e526d6"],
   ["backend-spring/src/main/resources/db/migration/V1__alembic_head_baseline.sql", "e96d705057fb595d1bfd9ca21a8e97b6fa562a1096083c191468e4bddb59aa36"],
   ["backend-spring/src/main/resources/db/migration/V2__retire_alembic_version_marker.sql", "198202661fca40cfe4036cb4488a6b4b354cafaf35e22b53c08b5dcb75b6f192"],
-  ["backend-spring/src/main/resources/db/migration/V3__required_reference_data.sql", "564baf8e350c4e1a001ca992c1cd60c85d7d465c08def23c990b5fa8b9c99ab4"],
+  ["backend-spring/src/main/resources/db/migration/V3__required_reference_data.sql", "9e964bf96d864a7ef8f0a3114d3a6f27a6c187fed94031c8e0d92a6da51f0dcc"],
 ].map(([pathValue, sha256Value]) => Object.freeze({ path: pathValue, sha256: sha256Value })));
 
 function sha256(contents) {

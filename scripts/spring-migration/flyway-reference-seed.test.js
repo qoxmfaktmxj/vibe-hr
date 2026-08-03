@@ -59,6 +59,7 @@ assert.ok(artifact.sql.includes("Python replaces steps only for canonical templa
 assert.ok(!artifact.sql.includes("ON CONFLICT DO NOTHING"));
 assert.ok(!artifact.sql.includes('"app_menus"_ids'));
 assert.ok(!artifact.sql.includes("SELECT 'app_menu_roles', source.\"id\""));
+assert.match(artifact.sql, /JOIN LATERAL \(\n  SELECT candidate\."id"[\s\S]*ORDER BY candidate\."priority" DESC, candidate\."effective_from" DESC, candidate\."id" DESC\n  LIMIT 1\n\) AS target ON true/);
 
 function assertParseSafeTypedCtes(sql) {
   assert.match(sql, /WITH source_rows \([^)]*\) AS \(/);

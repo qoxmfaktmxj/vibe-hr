@@ -211,7 +211,37 @@ ALTER TABLE public.tra_required_targets ALTER COLUMN completion_status TYPE VARC
 
 INSERT INTO public.org_departments
     (id, code, name, parent_id, is_active, created_at, updated_at, organization_type, cost_center_code, description)
-VALUES (7, 'FIXTURE', 'fixture', NULL, true, timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00', 'HQ', 'C-1', 'fixture');
+SELECT department_id,
+       CASE department_id
+           WHEN 1 THEN 'HQ-HR'
+           WHEN 2 THEN 'HQ-ENG'
+           WHEN 3 THEN 'HQ-SALES'
+           WHEN 4 THEN 'HQ-FIN'
+           WHEN 5 THEN 'HQ-OPS'
+           ELSE 'ORG-' || lpad((department_id - 5)::text, 4, '0')
+       END,
+       'fixture-' || department_id,
+       NULL,
+       true,
+       timestamp '2026-08-03 00:00:00',
+       timestamp '2026-08-03 00:00:00',
+       CASE WHEN department_id <= 5 THEN 'HEADQUARTERS' ELSE 'TEAM' END,
+       'C-' || department_id,
+       'fixture'
+FROM generate_series(1, 50) AS department_id;
+INSERT INTO public.tim_schedule_patterns
+    (id, code, name, description, is_active, created_at, updated_at)
+VALUES (1, 'PTN_DEPT_STD', 'fixture', NULL, true, timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00');
+INSERT INTO public.tim_department_schedule_assignments
+    (id, department_id, pattern_id, effective_from, effective_to, priority, is_active, created_at, updated_at)
+SELECT department_id, department_id, 1, date '2026-01-01', NULL::date, 100, true,
+       timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00'
+FROM generate_series(1, 50) AS department_id
+UNION ALL
+SELECT 50 + department_id, department_id, 1, date '2026-03-01', NULL::date,
+       100 + (department_id % 3) * 20, true,
+       timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00'
+FROM generate_series(1, 50) AS department_id;
 INSERT INTO public.auth_users
     (id, login_id, email, password_hash, display_name, is_active, created_at, updated_at)
 VALUES (9, 'fixture', 'fixture@example.test', 'fixture-only', 'fixture', true, timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00');
@@ -232,7 +262,9 @@ INSERT INTO public.wel_benefit_requests
 VALUES (23, 'W-FIXTURE', 'FIT', 'fixture', 'E-FIXTURE', 'fixture', 'fixture', 'REQUESTED', 1000, timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00', timestamp '2026-08-03 00:00:00', 11);
 
 SELECT setval('public.hri_approval_actor_rules_id_seq', 13, true);
-SELECT setval('public.org_departments_id_seq', 7, true);
+SELECT setval('public.org_departments_id_seq', 50, true);
+SELECT setval('public.tim_schedule_patterns_id_seq', 1, true);
+SELECT setval('public.tim_department_schedule_assignments_id_seq', 100, true);
 SELECT setval('public.hr_attendance_daily_id_seq', 17, true);
 SELECT setval('public.hr_leave_requests_id_seq', 19, true);
 SELECT setval('public.wel_benefit_requests_id_seq', 23, true);

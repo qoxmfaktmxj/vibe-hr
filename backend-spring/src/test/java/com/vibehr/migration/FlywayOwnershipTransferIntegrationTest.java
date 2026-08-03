@@ -7,6 +7,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.vibehr.VibeHrApplication;
 import java.io.InputStream;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.mock.env.MockEnvironment;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -118,13 +122,22 @@ class FlywayOwnershipTransferIntegrationTest {
             assertThat(PostgreSqlSchemaManifest.fingerprint(connection))
                     .isEqualTo(PreAdoptionReconciliationService.SOURCE_FINGERPRINT);
         }
+        String assignmentsBefore;
+        try (Connection connection = connection()) {
+            assignmentsBefore = deterministicTableEvidence(connection, "tim_department_schedule_assignments");
+            assertThat(longValue(connection, "select count(*) from tim_department_schedule_assignments")).isEqualTo(100);
+            assertThat(longValue(connection, "select count(distinct department_id) from tim_department_schedule_assignments where is_active")).isEqualTo(50);
+        }
 
         PreAdoptionReconciliationService.ReconciliationReport report =
                 new PreAdoptionReconciliationService(dataSource()).reconcile(
                         PreAdoptionReconciliationService.CONFIRMATION,
                         PreAdoptionReconciliationService.SOURCE_FINGERPRINT);
         assertThat(report.before()).isEqualTo(report.after());
-        assertThat(report.before().values()).allSatisfy(evidence -> assertThat(evidence.rowCount()).isEqualTo(1));
+        assertThat(report.before().get("org_departments").rowCount()).isEqualTo(50);
+        assertThat(report.before()).allSatisfy((table, evidence) -> {
+            if (!"org_departments".equals(table)) assertThat(evidence.rowCount()).isEqualTo(1);
+        });
         try (Connection connection = connection()) {
             PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
             assertThat(relationExists(connection, "alembic_version")).isTrue();
@@ -137,8 +150,14 @@ class FlywayOwnershipTransferIntegrationTest {
             assertThat(applicationTableCount(connection)).isEqualTo(106);
             assertThat(flywayHistoryCount(connection)).isEqualTo(5);
             assertThat(relationExists(connection, "alembic_version")).isFalse();
+            assertThat(deterministicTableEvidence(connection, "tim_department_schedule_assignments"))
+                    .isEqualTo(assignmentsBefore);
+            assertThat(longValue(connection, "select count(*) from tim_department_schedule_assignments where is_active")).isEqualTo(100);
+            // The 1,377 canonical rows plus 50 preserved extra assignments and one noncanonical actor rule.
+            assertThat(requiredReferenceRowCount(connection)).isEqualTo(EXPECTED_REFERENCE_ROWS + 51);
             PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
         }
+        validateWholeApplicationModel();
     }
 
     @Test
@@ -500,6 +519,28 @@ class FlywayOwnershipTransferIntegrationTest {
                 connection.rollback();
                 throw exception;
             }
+        }
+    }
+
+    private String deterministicTableEvidence(Connection connection, String tableName) throws Exception {
+        String quoted = "\"" + tableName.replace("\"", "\"\"") + "\"";
+        return stringValue(connection, "select count(*) || ':' || md5(coalesce(string_agg(to_jsonb(t)::text, E'\\n' order by id), '')) from "
+                + quoted + " t");
+    }
+
+    private void validateWholeApplicationModel() {
+        try (ConfigurableApplicationContext ignored = new SpringApplicationBuilder(VibeHrApplication.class)
+                .web(WebApplicationType.NONE)
+                .run(
+                        "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                        "--spring.datasource.username=" + POSTGRES.getUsername(),
+                        "--spring.datasource.password=" + POSTGRES.getPassword(),
+                        "--spring.flyway.enabled=false",
+                        "--spring.jpa.hibernate.ddl-auto=validate",
+                        "--vibehr.auth.secret=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        "--vibehr.bff-assertion.secret=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+                        "--vibehr.bff-assertion.replay-cleanup-delay-ms=86400000")) {
+            // Context creation is the whole-application Hibernate validation assertion.
         }
     }
 

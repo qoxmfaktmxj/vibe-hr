@@ -27,7 +27,7 @@ The hard-coded complete-mode allowlist is intentionally empty. Add only explicit
 
 - Canonical source routes: 281
 - Canonical operational routes: 9
-- Spring Java files scanned: 138
+- Spring Java files scanned: 140
 - Spring controllers found: 20
 - Unresolved Spring annotations: 0
 

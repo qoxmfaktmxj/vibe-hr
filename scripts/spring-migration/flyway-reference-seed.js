@@ -30,7 +30,15 @@ const TABLES = [
   config("tim_work_schedule_codes", ["code"], ["name", "sort_order"]),
   config("tim_schedule_patterns", ["code"]),
   config("tim_schedule_pattern_days", ["pattern_id", "weekday"], [], [foreign("pattern_id", "tim_schedule_patterns")]),
-  config("tim_department_schedule_assignments", ["department_id"], [], [foreign("department_id", "org_departments"), foreign("pattern_id", "tim_schedule_patterns")], false, 'target."is_active" = true'),
+  config(
+    "tim_department_schedule_assignments",
+    ["department_id"],
+    [],
+    [foreign("department_id", "org_departments"), foreign("pattern_id", "tim_schedule_patterns")],
+    false,
+    'target."is_active" = true',
+    ["priority", "effective_from", "id"],
+  ),
   config("tim_holidays", ["holiday_date"], ["name", "holiday_type"]),
   config("PAP_FINAL_RESULTS", ["result_code"], ["result_name", "score_grade", "is_active", "sort_order", "description"]),
   config("PAP_APPRAISAL_MASTERS", ["appraisal_year", "appraisal_code"], ["appraisal_name", "final_result_id", "appraisal_type", "start_date", "end_date", "is_active", "sort_order", "description"], [foreign("final_result_id", "PAP_FINAL_RESULTS")]),
@@ -51,8 +59,8 @@ const TABLES = [
   config("wel_benefit_types", ["code"], ["name", "module_path", "is_deduction", "pay_item_code", "is_active", "sort_order"]),
 ];
 
-function config(table, naturalKey, updateColumns = [], foreignKeys = [], rowByRow = false, matchExtra = null) {
-  return { table, naturalKey, updateColumns, foreignKeys, rowByRow, matchExtra };
+function config(table, naturalKey, updateColumns = [], foreignKeys = [], rowByRow = false, matchExtra = null, canonicalOrder = []) {
+  return { table, naturalKey, updateColumns, foreignKeys, rowByRow, matchExtra, canonicalOrder };
 }
 
 function foreign(column, table) {
@@ -189,8 +197,14 @@ function resolvedSelect(configuration, columns) {
 
 function matchPredicate(configuration, target = "target", source = "source") {
   const terms = configuration.naturalKey.map((column) => `${target}.${quote(column)} IS NOT DISTINCT FROM ${source}.${quote(column)}`);
-  if (configuration.matchExtra) terms.push(configuration.matchExtra);
+  if (configuration.matchExtra) terms.push(configuration.matchExtra.replaceAll("target.", `${target}.`));
   return terms.join("\n  AND ");
+}
+
+function mappingJoin(configuration, target) {
+  if (configuration.canonicalOrder.length === 0) return `JOIN ${target} AS target\n  ON ${matchPredicate(configuration)}`;
+  const order = configuration.canonicalOrder.map((column) => `candidate.${quote(column)} DESC`).join(", ");
+  return `JOIN LATERAL (\n  SELECT candidate.${quote("id")}\n  FROM ${target} AS candidate\n  WHERE ${matchPredicate(configuration, "candidate")}\n  ORDER BY ${order}\n  LIMIT 1\n) AS target ON true`;
 }
 
 function renderUpsert(configuration, rows, metadata) {
@@ -205,7 +219,7 @@ function renderUpsert(configuration, rows, metadata) {
     : `${seed}${resolved}\nUPDATE ${target} AS target\nSET ${configuration.updateColumns.map((column) => `${quote(column)} = source.${quote(column)}`).join(", ")}\nFROM resolved AS source\nWHERE ${matchPredicate(configuration)};\n\n`;
   const insert = `${seed}${resolved}\nINSERT INTO ${target} (${insertColumns.map(quote).join(", ")})\nSELECT ${insertColumns.map((column) => `source.${quote(column)}`).join(", ")}\nFROM resolved AS source\nWHERE NOT EXISTS (\n  SELECT 1\n  FROM ${target} AS target\n  WHERE ${matchPredicate(configuration)}\n);\n\n`;
   const mapping = columns.includes("id")
-    ? `${seed}${resolved}\nINSERT INTO ${ID_MAP_TABLE} (source_table, source_id, actual_id)\nSELECT '${configuration.table}', source.${quote("id")}, target.${quote("id")}\nFROM resolved AS source\nJOIN ${target} AS target\n  ON ${matchPredicate(configuration)}\nON CONFLICT (source_table, source_id) DO UPDATE\nSET actual_id = EXCLUDED.actual_id;`
+    ? `${seed}${resolved}\nINSERT INTO ${ID_MAP_TABLE} (source_table, source_id, actual_id)\nSELECT '${configuration.table}', source.${quote("id")}, target.${quote("id")}\nFROM resolved AS source\n${mappingJoin(configuration, target)}\nON CONFLICT (source_table, source_id) DO UPDATE\nSET actual_id = EXCLUDED.actual_id;`
     : "";
   return `${update}${insert}${mapping}`;
 }
@@ -313,6 +327,9 @@ function manifest(sql, sourceDump, tables, rowCount) {
       strategy: "python-bootstrap-natural-key-upsert",
       stale_menu_retirement: true,
       table_natural_keys: Object.fromEntries(TABLES.map((configuration) => [configuration.table, configuration.naturalKey])),
+      deterministic_mapping_order: Object.fromEntries(TABLES
+        .filter((configuration) => configuration.canonicalOrder.length > 0)
+        .map((configuration) => [configuration.table, configuration.canonicalOrder.map((column) => `${column} DESC`)])),
     },
     tables,
     sql_sha256: sha256(sql),

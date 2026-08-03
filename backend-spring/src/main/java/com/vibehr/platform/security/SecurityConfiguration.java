@@ -23,7 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 @EnableScheduling
-@Profile("!pre-adoption-reconciliation")
+@Profile("!pre-adoption-reconciliation & !flyway-adoption")
 public class SecurityConfiguration {
 
     @Bean

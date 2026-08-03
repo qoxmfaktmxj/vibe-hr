@@ -1,16 +1,28 @@
 # Production Drift Reconciliation — 2026-08-03
 
-Status: clone reconciliation verified; production execution prohibited; V3 cutover blocked by valid scheduling data.
+Status: restored-clone end-to-end verification passed; production execution and push/PR remain prohibited.
 
 ## Evidence boundary
 
-- Source: `/var/backups/vibe-hr/20260803-pre-spring-cutover.dump` restored into `vibehr_reconcile_verify_20260803`.
+- Source: `/var/backups/vibe-hr/20260803-pre-spring-cutover.dump` restored again into the new database `vibehr_reconcile_v3fix_20260803`.
 - The restored `vibehr` schema was renamed to `public` only inside the verification database.
+- The prior evidence database `vibehr_reconcile_verify_20260803` was retained unchanged at its V1/V2 state.
 - Production database access remained read-only and no production container, Compose, Nginx, or secret was changed.
 - Exact Alembic head: `org_mapping_foundation_20260722`.
 - Source catalog fingerprint: `e9cf20a655e8f4a06b4e93db40661843ab94d363a906be19e8450397a7a12ec1`.
 - Frozen V1 fingerprint: `fd4fb016274fc2ae5bb637c2e958a968ae625de229f0bbc9cf7b3677a6db613e`.
 - A fresh V1 on the same PostgreSQL 16.12 instance produced the frozen fingerprint exactly. PostgreSQL environment is not the cause.
+
+## Permanent-database V3 history decision
+
+Read-only inspection found no successful V3 history in any known permanent Vibe-HR database:
+
+- Production `platform_db`: no `flyway_schema_history` table.
+- Prior evidence database `vibehr_reconcile_verify_20260803`: V1 baseline and V2 only; no V3.
+- The server's `postgres` maintenance database: no Flyway history.
+- Repository deployment/runtime configuration and running containers expose no separate staging or shared-development Vibe-HR datasource.
+
+The corrected V3 was therefore handled as a pre-first-permanent-application migration correction. The successful V3 row in `vibehr_reconcile_v3fix_20260803` belongs only to this disposable restored-copy verification and is not permanent deployment history. Before production approval, repeat the read-only history query for any newly disclosed database; any successful permanent V3 row is a hard stop and forbids changing its checksum.
 
 ## Mechanical drift decision table
 
@@ -64,13 +76,47 @@ This command is for a restored clone only. Production execution requires separat
 
 Sequence next/max evidence: actor rules `5/4`, departments `51/50`, attendance `30075/30074`, leave `6004/6003`, welfare `3006/3005`.
 
-## Adoption result and cutover blocker
+## V3 migration correction
 
-Flyway adoption succeeded with exactly V1 `BASELINE` and V2 `SQL`; V2 checksum is `-1027260723`, and `alembic_version` is absent.
+The prior V3 ID-map query joined each canonical department seed row to every active assignment in that department. With two valid active rows, one source ID was emitted twice and PostgreSQL rejected the `ON CONFLICT` statement.
 
-V3 rolled back completely with PostgreSQL `21000`: `ON CONFLICT DO UPDATE command cannot affect row a second time` at the `tim_department_schedule_assignments` ID mapping. The clone has two active assignments for every department: 100 rows across 50 departments, effective `2026-01-01` and `2026-03-01`. This is a valid application contract: runtime resolution orders active effective assignments by priority, effective date, and ID. V3 instead joins reference rows to every active target using only department and active status, emitting each source ID twice.
+The generator now uses a `JOIN LATERAL` canonical lookup with the same Spring contract: `priority DESC, effective_from DESC, id DESC LIMIT 1`. This affects only the temporary source-ID mapping used by later seed references. It does not update, deactivate, delete, or insert an existing assignment.
 
-Changing those business rows, choosing an arbitrary winner, or modifying frozen V3 exceeds this task's safety constraints. Validation stopped at V1/V2. V3-V5, Hibernate validation, readiness, OpenAPI, and authenticated smoke are not claimed.
+- Old V3 SHA-256: `564baf8e350c4e1a001ca992c1cd60c85d7d465c08def23c990b5fa8b9c99ab4`
+- Corrected V3 SHA-256: `9e964bf96d864a7ef8f0a3114d3a6f27a6c187fed94031c8e0d92a6da51f0dcc`
+- Corrected Flyway V3 checksum: `720383589`
+- Corrected seed-manifest SHA-256: `ea9ab1e883bc626bab758ca527201263e770dfe01ac7769c4eabeefe6a1cf4ff`
+
+V1, V2, and the schema metadata manifest/fingerprints were not modified. Only V3, its generator/unit test, the explicit seed manifest, and the two frozen retirement checksum allow-lists were updated. The 1,377 canonical required-reference source-row contract remains unchanged.
+
+## End-to-end clone result
+
+Reconciliation again produced exact frozen V1 fingerprint `fd4fb016274fc2ae5bb637c2e958a968ae625de229f0bbc9cf7b3677a6db613e`. The five protected reconciliation tables retained the normalized row counts/checksums shown above. The scheduling contract also remained exact:
+
+| Evidence | Before V3 | After V5 |
+| --- | --- | --- |
+| Departments with active assignments | `50` | `50` |
+| Assignment rows / active rows | `100 / 100` | `100 / 100` |
+| Full assignment checksum | `a18af37c745f60c0e7904915e990a065` | identical |
+
+V3's existing required-reference contract canonicalized nine `org_departments` rows: eight metadata-only changes and the pre-existing seed-owned `HQ-FIN` name `2222` to `재무본부`. This behavior is unchanged by the mapping correction and is reported separately from protected transactional/assignment preservation.
+
+Flyway adoption produced exactly V1 `BASELINE` and V2 `SQL`, removed `alembic_version`, and retained V2 checksum `-1027260723`. Cutover then produced the exact successful chain:
+
+| Version | Description | Checksum |
+| --- | --- | --- |
+| V1 | verified Alembic `org_mapping_foundation_20260722` | baseline / null |
+| V2 | retire Alembic version marker | `-1027260723` |
+| V3 | required reference data | `720383589` |
+| V4 | BFF assertion replay store | `1252995053` |
+| V5 | BFF assertion replay capacity | `-890170560` |
+
+- Application tables excluding Flyway history: `106`.
+- All `102` owned sequences passed calculated-next-value `> max(owner column)`; minimum margin was `1`. No `nextval` was called.
+- Whole-application Hibernate `ddl-auto=validate`: passed in integration and restored-clone candidate startup.
+- Candidate readiness: `UP`; `/openapi.json`: OpenAPI `3.1.0`, `216` paths; Spring source route coverage `290/290`.
+- Read-only auth/permission smoke: signed BFF login and JWT issuance passed; employee menu tree returned `200`; employee access to admin permission matrix returned `403`; unauthenticated protected access returned `401`.
+- Fresh V1-V5 installation, drift fixture reconciliation/adoption/cutover, `migrationIntegrationTest`, unit tests, and `flyway-verify`: passed.
 
 ## Rollback and restore
 
@@ -78,11 +124,4 @@ Changing those business rows, choosing an arbitrary winner, or modifying frozen 
 - After adoption, do not reverse DDL or edit Flyway history. Recreate the verification DB from `/var/backups/vibe-hr/20260803-pre-spring-cutover.dump`.
 - Never use Flyway `repair`, `clean`, reverse DDL, or partial dual-write routing.
 
-## Approval needed
-
-Choose and explicitly approve one design before continuing the clone cutover:
-
-1. A reviewed pre-V3 bridge that temporarily makes the 50 older assignments inactive during V3 and restores exact checksums immediately afterward; or
-2. A policy exception to replace V3 with a corrected, newly checksummed migration before any production adoption.
-
-No production action should occur until the chosen design passes the same restored-backup test.
+Production remains stopped. Apply only after separate approval and only in this order: final read-only permanent-history audit; final backup/restore validation; guarded reconciliation; exact V1/V2 adoption/history check; V3-V5 candidate startup; 106-table/Hibernate/readiness/OpenAPI/auth checks; then and only then traffic promotion. Stop on any permanent prior V3, fingerprint/history/checksum mismatch, protected checksum/row-count change, unsafe sequence, migration/validation/smoke failure, or need for destructive DDL/data conversion.

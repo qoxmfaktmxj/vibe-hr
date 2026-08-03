@@ -122,6 +122,13 @@
       "wel_benefit_types": [
         "code"
       ]
+    },
+    "deterministic_mapping_order": {
+      "tim_department_schedule_assignments": [
+        "priority DESC",
+        "effective_from DESC",
+        "id DESC"
+      ]
     }
   },
   "tables": [
@@ -159,5 +166,5 @@
     "tim_work_schedule_codes",
     "wel_benefit_types"
   ],
-  "sql_sha256": "564baf8e350c4e1a001ca992c1cd60c85d7d465c08def23c990b5fa8b9c99ab4"
+  "sql_sha256": "9e964bf96d864a7ef8f0a3114d3a6f27a6c187fed94031c8e0d92a6da51f0dcc"
 }
