@@ -27,7 +27,7 @@ const FALLBACK_CORPORATIONS: LoginCorporationItem[] = [
 
 function AuthCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card className="overflow-hidden border-[var(--vibe-border-emphasis)] bg-card/95 shadow-2xl backdrop-blur dark:bg-card/95">
+    <Card className="overflow-hidden border-[var(--vibe-border-emphasis)] bg-card shadow-[var(--vibe-shadow-floating)]">
       {children}
     </Card>
   );
@@ -36,16 +36,10 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 function AuthCardIntro() {
   return (
     <CardHeader className="space-y-3 px-8 pb-4 pt-8 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-[#EEF2FF]">
-        <Image
-          src="/vibehr_mark.svg"
-          alt="VIBE-HR"
-          width={48}
-          height={48}
-          priority
-        />
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+        <span className="vibe-mark h-9 w-9" aria-hidden="true" />
       </div>
-      <h1 className="text-3xl font-black tracking-tight text-[#111318]">VIBE-HR</h1>
+      <h1 className="text-2xl font-black tracking-[-0.03em] text-foreground">VIBE-HR</h1>
     </CardHeader>
   );
 }

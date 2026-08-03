@@ -6,6 +6,21 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const DEFAULT_APP_ORIGIN = "http://localhost:3000";
+const THEME_BOOTSTRAP = `(() => {
+  try {
+    const raw = localStorage.getItem("vibe_hr_theme_preferences");
+    if (!raw) return;
+    const preference = JSON.parse(raw);
+    const root = document.documentElement;
+    root.classList.toggle("dark", Boolean(preference.darkMode));
+    root.dataset.palette = preference.paletteMode === "vivid" ? "vivid" : "default";
+    root.dataset.primaryTone = ["blue", "skyblue", "gray", "green", "red"].includes(preference.primaryTone)
+      ? preference.primaryTone
+      : "blue";
+  } catch {
+    // 저장된 테마가 손상된 경우 기본 토큰을 사용합니다.
+  }
+})();`;
 
 function resolveMetadataBase(): URL {
   const appOrigin = process.env.APP_ORIGIN ?? process.env.NEXT_PUBLIC_APP_ORIGIN ?? DEFAULT_APP_ORIGIN;
@@ -64,7 +79,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={pretendard.variable}>
+    <html lang="ko" className={pretendard.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
       <body className="antialiased">
         <Providers initialUser={null} initialMenus={[]}>
           {children}

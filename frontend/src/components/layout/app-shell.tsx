@@ -2,7 +2,6 @@
 
 import { Home, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -116,10 +115,7 @@ function getFallbackLabel(path: string): string {
   return path;
 }
 
-export function AppShell({ title: _title, description: _description, children }: AppShellProps) {
-  void _title;
-  void _description;
-
+export function AppShell({ title, description, children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useAuth();
@@ -155,6 +151,8 @@ export function AppShell({ title: _title, description: _description, children }:
     (path: string) => menuLabelByPath.get(path) ?? getFallbackLabel(path),
     [menuLabelByPath],
   );
+
+  const pageTitle = title === "VIBE-HR" ? resolveLabel(pathname) : title;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -301,29 +299,23 @@ export function AppShell({ title: _title, description: _description, children }:
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="border-b border-border/80 bg-card/95 text-card-foreground backdrop-blur-sm">
-          <div className="grid grid-cols-3 items-center border-b border-border px-4 py-2 lg:px-6">
-            <div className="flex items-center gap-2">
-              <span className="h-8 w-8" aria-hidden="true" />
-            </div>
-
-            <div className="flex justify-center">
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold transition hover:bg-accent"
-                aria-label="대시보드로 이동"
-                title="대시보드로 이동"
-              >
-                <Image
-                  src="/vibehr_mark.svg"
-                  alt="VIBE-HR"
-                  width={16}
-                  height={16}
-                  className="h-4 w-4"
+          <div className="flex min-h-15 items-center justify-between gap-4 border-b border-border px-4 py-2.5 lg:px-6">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/dashboard"
+                  className="vibe-mark h-5 w-5 shrink-0 lg:hidden"
+                  aria-label="대시보드로 이동"
+                  title="대시보드로 이동"
                 />
-                <span className="text-primary">VIBE-HR</span>
-              </Link>
+                <h1 className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
+                  {pageTitle}
+                </h1>
+              </div>
+              {description ? (
+                <p className="mt-0.5 truncate text-xs text-[color:var(--vibe-nav-text-muted)]">{description}</p>
+              ) : null}
             </div>
-
             <div className="flex items-center justify-end gap-2">
               <SessionCountdown />
               <ThemeSettingsPopoverNoSsr />
@@ -351,41 +343,44 @@ export function AppShell({ title: _title, description: _description, children }:
             {openTabs.map((tab) => {
               const active = pathname === tab.path;
               return (
-                <button
+                <div
                   key={tab.path}
-                  type="button"
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold transition-colors ${
+                  className={`inline-flex items-center rounded-md border text-xs font-semibold transition-colors ${
                     active
                       ? "border-primary/40 bg-primary/12 text-[color:var(--vibe-nav-text-strong)]"
                       : "border-border bg-card text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
                   }`}
-                  onClick={() => router.push(tab.path)}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setContextMenu({ x: event.clientX, y: event.clientY, targetPath: tab.path });
-                  }}
                 >
-                  <span className="max-w-28 truncate">{tab.label}</span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${tab.label} 탭 닫기`}
-                    className="rounded p-0.5 hover:bg-accent"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      closeTab(tab.path);
+                  <button
+                    type="button"
+                    className="max-w-28 truncate px-2 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+                    onClick={() => router.push(tab.path)}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setContextMenu({ x: event.clientX, y: event.clientY, targetPath: tab.path });
                     }}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
+                      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
                         event.preventDefault();
-                        event.stopPropagation();
-                        closeTab(tab.path);
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        setContextMenu({ x: rect.left, y: rect.bottom + 4, targetPath: tab.path });
                       }
                     }}
+                    aria-current={active ? "page" : undefined}
+                    aria-haspopup="menu"
+                    title={`${tab.label} 탭`}
+                  >
+                    {tab.label}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${tab.label} 탭 닫기`}
+                    className="mr-1 rounded p-0.5 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/70"
+                    onClick={() => closeTab(tab.path)}
                   >
                     <X className="h-3 w-3" />
-                  </span>
-                </button>
+                  </button>
+                </div>
               );
             })}
 
@@ -402,9 +397,12 @@ export function AppShell({ title: _title, description: _description, children }:
           className="fixed z-[80] min-w-40 rounded-md border border-border bg-card p-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(event) => event.stopPropagation()}
+          role="menu"
+          aria-label="탭 관리 메뉴"
         >
           <button
             type="button"
+            role="menuitem"
             className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={() => closeLeftTabs(contextMenu.targetPath)}
           >
@@ -412,6 +410,7 @@ export function AppShell({ title: _title, description: _description, children }:
           </button>
           <button
             type="button"
+            role="menuitem"
             className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={() => closeRightTabs(contextMenu.targetPath)}
           >
@@ -419,6 +418,7 @@ export function AppShell({ title: _title, description: _description, children }:
           </button>
           <button
             type="button"
+            role="menuitem"
             className="block w-full rounded px-2 py-1.5 text-left text-xs text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
             onClick={closeAllTabs}
           >

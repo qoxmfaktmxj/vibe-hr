@@ -6,6 +6,8 @@ import {
   Building2,
   CalendarDays,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   IdCard,
   Clock,
   Minus,
@@ -18,7 +20,6 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type UIEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -298,6 +299,65 @@ function MenuGroupItem({
   );
 }
 
+function DomainRailItem({
+  node,
+  active,
+  onSelect,
+  compact = false,
+}: {
+  node: MenuNode;
+  active: boolean;
+  onSelect: () => void;
+  compact?: boolean;
+}) {
+  const content = (
+    <>
+      <span className="shrink-0">{renderIcon(node.icon, "h-5 w-5")}</span>
+      <span className={compact ? "truncate text-xs font-semibold" : "sr-only"}>{node.name}</span>
+    </>
+  );
+
+  const className = compact
+    ? `flex min-w-18 flex-col items-center gap-1 rounded-lg px-2 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+      active
+          ? "bg-[var(--vibe-rail-active)] text-white"
+          : "text-[color:var(--vibe-rail-muted)] hover:bg-[var(--vibe-rail-hover)] hover:text-white"
+      }`
+    : `flex h-11 w-11 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+      active
+          ? "bg-[var(--vibe-rail-active)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+          : "text-[color:var(--vibe-rail-muted)] hover:bg-[var(--vibe-rail-hover)] hover:text-white"
+      }`;
+
+  if (node.path) {
+    return (
+      <Link
+        href={node.path}
+        onClick={onSelect}
+        className={className}
+        aria-current={active ? "page" : undefined}
+        aria-label={node.name}
+        title={node.name}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={className}
+      aria-pressed={active}
+      aria-label={node.name}
+      title={node.name}
+    >
+      {content}
+    </button>
+  );
+}
+
 export function DashboardSidebar() {
   const { user } = useAuth();
   const { menus } = useMenu();
@@ -306,6 +366,8 @@ export function DashboardSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [menuExpanded, setMenuExpanded] = useState(true);
+  const [contextPanelCollapsed, setContextPanelCollapsed] = useState(false);
+  const [selectedDomainCode, setSelectedDomainCode] = useState<string | null>(null);
 
   // 열림 상태를 그룹 code의 Set으로 관리
   // - SSR/CSR hydration mismatch 방지: 초기값은 빈 Set (서버와 동일)
@@ -378,6 +440,21 @@ export function DashboardSidebar() {
   const roleLabels = user?.roles?.join(", ") ?? "";
   const initials = getInitials(displayName) || "U";
 
+  useEffect(() => {
+    const routeDomain = menus.find((node) => hasActiveDescendant(node, pathname));
+    if (routeDomain) setSelectedDomainCode(routeDomain.code);
+  }, [menus, pathname]);
+
+  const activeDomain = useMemo(
+    () => menus.find((node) => node.code === selectedDomainCode) ?? menus[0] ?? null,
+    [menus, selectedDomainCode],
+  );
+
+  const contextNodes = useMemo(() => {
+    if (!activeDomain) return [];
+    return activeDomain.children.length > 0 ? activeDomain.children : [activeDomain];
+  }, [activeDomain]);
+
   const profileRows = useMemo<ProfileInfoCard[]>(
     () => [
       { label: "이름", value: displayName, icon: UserRound, tone: "primary" },
@@ -440,24 +517,27 @@ export function DashboardSidebar() {
   const sidebarContent = (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-3 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card shadow-sm">
-            <Image
-              src="/vibehr_mark.svg"
-              alt="VIBE-HR"
-              width={20}
-              height={20}
-              className="h-5 w-5"
-              priority
-            />
+        <div className="flex items-center justify-between gap-2 border-b border-border/80 px-4 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold text-[color:var(--vibe-nav-text-muted)]">업무 영역</p>
+            <p className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
+              {activeDomain?.name ?? "메뉴"}
+            </p>
           </div>
-          <div>
-            <p className="text-lg font-bold leading-tight text-[color:var(--vibe-nav-text-strong)]">VIBE-HR</p>
-            <p className="text-xs text-[color:var(--vibe-nav-text-muted)]">인사 관리 시스템</p>
-          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="hidden h-7 w-7 lg:inline-flex"
+            onClick={() => setContextPanelCollapsed(true)}
+            title="세부 메뉴 접기"
+            aria-label="세부 메뉴 접기"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
 
-        <div className="mt-3 flex items-center justify-end px-3">
+        <div className="mt-2 flex items-center justify-end px-3">
           <Button
             type="button"
             size="icon"
@@ -478,7 +558,7 @@ export function DashboardSidebar() {
                     }
                   }
                 }
-                collectAll(menus);
+                collectAll(contextNodes);
                 setOpenCodes(allCodes);
               }
               setMenuExpanded((prev) => !prev);
@@ -495,7 +575,7 @@ export function DashboardSidebar() {
           onScroll={handleMenuScroll}
           className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-3"
         >
-          {menus.map((node) =>
+          {contextNodes.map((node) =>
             node.children.length > 0 ? (
               <MenuGroupItem
                 key={node.code}
@@ -533,6 +613,47 @@ export function DashboardSidebar() {
     </>
   );
 
+  const domainRail = (
+    <nav className="vibe-rail flex shrink-0" aria-label="업무 영역">
+      <Link
+        href="/dashboard"
+        className="vibe-mark vibe-mark--rail mx-auto mt-3 h-7 w-7 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        aria-label="VIBE-HR 대시보드"
+        title="VIBE-HR 대시보드"
+      />
+      <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-2 pb-3">
+        {menus.map((node) => (
+          <DomainRailItem
+            key={node.code}
+            node={node}
+            active={activeDomain?.code === node.code}
+            onSelect={() => {
+              setSelectedDomainCode(node.code);
+              setContextPanelCollapsed(false);
+            }}
+          />
+        ))}
+      </div>
+    </nav>
+  );
+
+  const mobileDomainRail = (
+    <nav className="vibe-rail vibe-rail--mobile flex shrink-0 items-start gap-1 overflow-x-auto p-2" aria-label="업무 영역">
+      {menus.map((node) => (
+        <DomainRailItem
+          key={node.code}
+          node={node}
+          active={activeDomain?.code === node.code}
+          compact
+          onSelect={() => {
+            setSelectedDomainCode(node.code);
+            setContextPanelCollapsed(false);
+          }}
+        />
+      ))}
+    </nav>
+  );
+
   return (
     <>
       <button
@@ -548,17 +669,19 @@ export function DashboardSidebar() {
       {mobileOpen ? (
         <div className="fixed inset-0 z-[60] lg:hidden">
           <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]">
-            <div className="flex justify-end p-3">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(21rem,calc(100vw-2.5rem))] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)] shadow-[var(--vibe-shadow-floating)]">
+            <div className="flex items-center justify-between border-b border-[var(--vibe-rail-border)] bg-[var(--vibe-rail-bg)] px-3 py-2 text-white">
+              <span className="text-sm font-bold">VIBE-HR</span>
               <button
                 type="button"
-                className="rounded-md border bg-card p-2"
+                className="rounded-md p-2 text-white hover:bg-[var(--vibe-rail-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
                 onClick={() => setMobileOpen(false)}
                 aria-label="메뉴 닫기"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
+            {mobileDomainRail}
             {sidebarContent}
           </aside>
         </div>
@@ -633,9 +756,24 @@ export function DashboardSidebar() {
         </div>
       ) : null}
 
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-[var(--vibe-sidebar-bg)] lg:flex lg:flex-col">
-        {sidebarContent}
-      </aside>
+      <div className="hidden shrink-0 lg:flex">
+        {domainRail}
+        {contextPanelCollapsed ? (
+          <button
+            type="button"
+            className="flex w-8 items-start justify-center border-r border-border bg-[var(--vibe-sidebar-bg)] pt-4 text-[color:var(--vibe-nav-text-muted)] transition-colors hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+            onClick={() => setContextPanelCollapsed(false)}
+            title="세부 메뉴 펼치기"
+            aria-label="세부 메뉴 펼치기"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : (
+          <aside className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]">
+            {sidebarContent}
+          </aside>
+        )}
+      </div>
     </>
   );
 }

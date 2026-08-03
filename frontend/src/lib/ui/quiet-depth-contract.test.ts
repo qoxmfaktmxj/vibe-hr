@@ -45,12 +45,28 @@ describe("Quiet Depth UI contract", () => {
     expect(source).not.toContain("bg-[var(--vibe-background-light)]");
   });
 
-  test("sidebar active and brand states use the enterprise hierarchy", () => {
+  test("sidebar separates theme-aware domain rail from contextual navigation", () => {
     const source = readSource("components", "dashboard", "dashboard-sidebar.tsx");
 
     expect(source).toContain("shadow-[inset_3px_0_0_var(--primary)]");
-    expect(source).toContain("rounded-xl border border-border/70 bg-card shadow-sm");
-    expect(source).not.toContain("rounded-lg bg-primary/10");
+    expect(source).toContain("function DomainRailItem");
+    expect(source).toContain('className="vibe-rail flex shrink-0"');
+    expect(source).toContain('className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]"');
+    expect(source).toContain("vibe-mark--rail");
+  });
+
+  test("login uses the chroma material and restores theme before hydration", () => {
+    const login = readSource("app", "login", "page.tsx");
+    const layout = readSource("app", "layout.tsx");
+    const styles = readSource("app", "globals.css");
+
+    expect(login).toContain("사람과 조직의 흐름을");
+    expect(login).toContain("하나로.");
+    expect(login).toContain("login-brand-canvas");
+    expect(layout).toContain("vibe_hr_theme_preferences");
+    expect(layout).toContain("suppressHydrationWarning");
+    expect(styles).toContain('url("/images/vibe-chroma-material.avif")');
+    expect(styles).toContain("--vibe-rail-bg:");
   });
 
   test("Vivid inactive navigation stays neutral in light and dark themes", () => {

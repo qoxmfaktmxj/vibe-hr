@@ -1,10 +1,6 @@
 <svg width="900" height="240" viewBox="0 0 900 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(24 24)">
-    <circle cx="54" cy="44" r="25" fill="#3C6DEE"/>
-    <circle cx="138" cy="44" r="25" fill="#BAC1B8"/>
-    <path d="M18 84H174C174 129.922 140.578 165 98 165C55.4218 165 22 129.922 22 84H18Z" fill="#E9EFF5"/>
+  <g transform="translate(24 24) scale(.89)">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M30 40H82L128 152L174 40H226L154 216H102L30 40ZM99 82H123V108H133V82H157V174H133V140H123V174H99V82Z" fill="#3C6DEE"/>
   </g>
-  <text x="252" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="78" font-weight="800" letter-spacing="1.5">
-    <tspan fill="#3C6DEE">VIBE</tspan><tspan fill="#BAC1B8">-HR</tspan>
-  </text>
+  <text x="268" y="144" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="82" font-weight="800" letter-spacing="-2" fill="#111827">VIBE-HR</text>
 </svg>

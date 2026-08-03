@@ -1,5 +1,3 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="72" cy="68" r="32" fill="#3C6DEE"/>
-  <circle cx="184" cy="68" r="32" fill="#BAC1B8"/>
-  <path d="M28 116H228C228 176.751 183.751 224 128 224C72.2487 224 28 176.751 28 116Z" fill="#E9EFF5"/>
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M30 40H82L128 152L174 40H226L154 216H102L30 40ZM99 82H123V108H133V82H157V174H133V140H123V174H99V82Z" fill="#3C6DEE"/>
 </svg>
