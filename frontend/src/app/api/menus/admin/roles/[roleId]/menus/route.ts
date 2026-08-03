@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ roleId: string }> };
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const { roleId } = await context.params;
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/${roleId}/menus`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/menus/admin/roles/")}${roleId}/menus`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -35,7 +35,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ detail: "유효하지 않은 요청입니다." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/${roleId}/menus`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/menus/admin/roles/")}${roleId}/menus`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,

@@ -1,4 +1,4 @@
-import { backendApiBaseUrl } from "./backend-target";
+import { backendApiBaseUrl, backendApiPath } from "./backend-target";
 
 export class InvalidCatchallPathError extends Error {
   constructor() {
@@ -46,7 +46,7 @@ export function safeCatchallUrl(domain: "pay" | "pap" | "tra", segments: string[
     return encodeURIComponent(decodeForValidation(segment));
   });
   const target = new URL(backendApiBaseUrl());
-  target.pathname = `/api/v1/${domain}/${encodedSegments.join("/")}`;
+  target.pathname = backendApiPath(`/${domain}/${encodedSegments.join("/")}`);
   target.search = search;
   return target;
 }

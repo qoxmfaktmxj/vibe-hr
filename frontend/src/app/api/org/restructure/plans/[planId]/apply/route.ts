@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function POST(
@@ -15,7 +15,7 @@ export async function POST(
   const { planId } = await params;
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}/apply`,
+    `${backendApiUrl("/org/restructure/plans/")}${planId}/apply`,
     {
       method: "POST",
       headers: {

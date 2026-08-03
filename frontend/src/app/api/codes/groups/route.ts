@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const search = request.nextUrl.searchParams.toString();
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups${search ? `?${search}` : ""}`, {
+  const res = await fetch(`${backendApiUrl("/codes/groups")}${search ? `?${search}` : ""}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups`, {
+  const res = await fetch(backendApiUrl("/codes/groups"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

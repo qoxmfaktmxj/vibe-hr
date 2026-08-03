@@ -13,7 +13,7 @@ const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
 export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
   try {
     const [user, cookieStore] = await Promise.all([
-      fetchBackendJson<AuthUser>("/api/v1/auth/me", {
+      fetchBackendJson<AuthUser>("/auth/me", {
         next: { revalidate: 60 },
       }),
       cookies(),
@@ -30,7 +30,7 @@ export const getAuthUser = cache(async (): Promise<AuthUser | null> => {
 
 export const getMenuTree = cache(async (): Promise<MenuNode[]> => {
   try {
-    const data = await fetchBackendJson<MenuTreeResponse>("/api/v1/menus/tree", {
+    const data = await fetchBackendJson<MenuTreeResponse>("/menus/tree", {
       cache: "no-store",
     });
     return data?.menus ?? [];

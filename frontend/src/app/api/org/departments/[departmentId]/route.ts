@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ departmentId: string }> };
@@ -17,7 +17,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/departments/${departmentId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/org/departments/")}${departmentId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -39,7 +39,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { departmentId } = await context.params;
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/departments/${departmentId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/org/departments/")}${departmentId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

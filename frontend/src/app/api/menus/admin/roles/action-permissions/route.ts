@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/action-permissions`, {
+  const upstreamResponse = await fetch(backendApiUrl("/menus/admin/roles/action-permissions"), {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -30,7 +30,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/admin/roles/action-permissions`, {
+  const upstreamResponse = await fetch(backendApiUrl("/menus/admin/roles/action-permissions"), {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,

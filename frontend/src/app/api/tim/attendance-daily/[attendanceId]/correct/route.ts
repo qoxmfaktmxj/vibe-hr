@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ attendanceId: string }> };
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const payload = await request.json().catch(() => ({}));
   const { attendanceId } = await context.params;
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/attendance-daily/${attendanceId}/correct`, {
+  const upstream = await fetch(`${backendApiUrl("/tim/attendance-daily/")}${attendanceId}/correct`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",

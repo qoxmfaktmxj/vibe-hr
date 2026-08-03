@@ -1,4 +1,4 @@
 import { proxyGet } from "@/lib/mng-proxy";
 
-export const GET = proxyGet("/api/v1/mng/dev-staff/revenue-summary");
+export const GET = proxyGet("/mng/dev-staff/revenue-summary");
 

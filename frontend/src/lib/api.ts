@@ -17,7 +17,7 @@ export async function getDashboardSummary(): Promise<DashboardSummaryResult> {
   }
 
   try {
-    const summary = await fetchBackendJson<DashboardSummary>("/api/v1/dashboard/summary", {
+    const summary = await fetchBackendJson<DashboardSummary>("/dashboard/summary", {
       cache: "no-store",
       accessToken,
     });

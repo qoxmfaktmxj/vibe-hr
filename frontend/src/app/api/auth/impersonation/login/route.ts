@@ -7,7 +7,7 @@ type LoginResponse = {
   user: AuthUser;
 };
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "전환 대상 사용자 ID가 필요합니다." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/impersonation/login`, {
+  const upstreamResponse = await fetch(backendApiUrl("/auth/impersonation/login"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

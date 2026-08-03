@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function PUT(
@@ -14,7 +14,7 @@ export async function PUT(
 
   const { id } = await params;
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/wel/requests/${id}/withdraw`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/wel/requests/")}${id}/withdraw`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

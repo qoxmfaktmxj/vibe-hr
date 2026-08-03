@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function POST(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/recruit/finalists/generate-employee-no`, {
+  const upstream = await fetch(backendApiUrl("/hr/recruit/finalists/generate-employee-no"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

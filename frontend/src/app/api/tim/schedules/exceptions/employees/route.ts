@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!token) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   const search = request.nextUrl.search || "";
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/schedules/exceptions/employees${search}`, {
+  const upstream = await fetch(`${backendApiUrl("/tim/schedules/exceptions/employees")}${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid payload" }, { status: 400 });
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/schedules/exceptions/employees/batch`, {
+  const upstream = await fetch(backendApiUrl("/tim/schedules/exceptions/employees/batch"), {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     cache: "no-store",
