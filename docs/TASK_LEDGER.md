@@ -17,6 +17,7 @@
 
 ### Cutover Hotfix
 - Production smoke exposed Hibernate 7 closing a native `getResultStream()` used by the non-transactional employee permission check before `findFirst()` advanced it. The authorization lookup was changed to a bounded result-list read, with its unit tests updated, before backend re-promotion.
+- The attendance status UI sends the frozen FastAPI-compatible `start_date`, `end_date`, and optional `employee_id` query names. Explicit Spring `@RequestParam` bindings and a reflection contract test were added after smoke exposed implicit camelCase binding.
 
 ## TASK VH-R3-PRODUCTION-DRIFT-RECONCILIATION-20260803
 - Date: 2026-08-03

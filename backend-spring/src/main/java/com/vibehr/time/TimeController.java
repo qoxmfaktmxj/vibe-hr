@@ -121,8 +121,8 @@ class TimeController {
     }
 
     @GetMapping("/tim/attendance-daily")
-    TimAttendanceDailyListResponse attendanceDaily(Authentication authentication, @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate, @RequestParam(required = false) Integer employeeId,
+    TimAttendanceDailyListResponse attendanceDaily(Authentication authentication, @RequestParam(name = "start_date") LocalDate startDate,
+            @RequestParam(name = "end_date") LocalDate endDate, @RequestParam(name = "employee_id", required = false) Integer employeeId,
             @RequestParam(name = "status", required = false) String status, @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "50") @Min(1) @Max(200) int limit) {
         authorization.requireAnyRole(authentication, "hr_manager", "admin");

@@ -9,6 +9,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 class TimeRouteContractTest {
     @Test
@@ -35,6 +36,17 @@ class TimeRouteContractTest {
             add(actual, "POST", method.getAnnotation(PostMapping.class) == null ? null : method.getAnnotation(PostMapping.class).value());
         }
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected).hasSize(36);
+    }
+
+    @Test
+    void attendanceDailyKeepsTheFrontendSnakeCaseQueryContract() {
+        Method method = java.util.Arrays.stream(TimeController.class.getDeclaredMethods())
+                .filter(candidate -> candidate.getName().equals("attendanceDaily"))
+                .findFirst().orElseThrow();
+
+        assertThat(method.getParameters()[1].getAnnotation(RequestParam.class).name()).isEqualTo("start_date");
+        assertThat(method.getParameters()[2].getAnnotation(RequestParam.class).name()).isEqualTo("end_date");
+        assertThat(method.getParameters()[3].getAnnotation(RequestParam.class).name()).isEqualTo("employee_id");
     }
 
     private void add(List<String> routes, String verb, String[] paths) {
