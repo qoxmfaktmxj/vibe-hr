@@ -15,6 +15,9 @@
 ### Stop Conditions
 - Any permanent successful V3 history, fingerprint/history/checksum mismatch, protected data checksum change, unsafe sequence, destructive reconciliation requirement, candidate validation failure, or production smoke failure stops promotion or triggers routing/container rollback.
 
+### Cutover Hotfix
+- Production smoke exposed Hibernate 7 closing a native `getResultStream()` used by the non-transactional employee permission check before `findFirst()` advanced it. The authorization lookup was changed to a bounded result-list read, with its unit tests updated, before backend re-promotion.
+
 ## TASK VH-R3-PRODUCTION-DRIFT-RECONCILIATION-20260803
 - Date: 2026-08-03
 - Status: clone end-to-end verification completed; production cutover remains stopped pending separate approval

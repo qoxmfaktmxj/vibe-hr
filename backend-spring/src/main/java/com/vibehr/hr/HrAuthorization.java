@@ -34,7 +34,9 @@ class HrAuthorization {
     }
 
     void requireEmployeeMenuAction(int userId, String action) {
-        Object menu = entityManager.createNativeQuery("select id from app_menus where path = '/hr/employee' and is_active = true order by id limit 1").getResultStream().findFirst().orElse(null);
+        @SuppressWarnings("unchecked")
+        List<Object> menus = entityManager.createNativeQuery("select id from app_menus where path = '/hr/employee' and is_active = true order by id limit 1").getResultList();
+        Object menu = menus.isEmpty() ? null : menus.getFirst();
         if (menu == null) throw ApiException.notFound("Menu not found.");
         Number menuId = (Number) menu;
         Number access = (Number) entityManager.createNativeQuery("select count(*) from app_menu_roles mr join auth_user_roles ur on ur.role_id = mr.role_id where mr.menu_id = :menuId and ur.user_id = :userId")

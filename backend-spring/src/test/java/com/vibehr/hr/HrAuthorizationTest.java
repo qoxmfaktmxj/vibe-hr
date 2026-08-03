@@ -15,7 +15,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
@@ -48,7 +47,7 @@ class HrAuthorizationTest {
         Query defaults = mock(Query.class);
         Query overrides = mock(Query.class);
         stubEmployeeActionQueries(entityManager, menu, access, defaults, overrides);
-        when(menu.getResultStream()).thenReturn(Stream.of(9));
+        when(menu.getResultList()).thenReturn(List.of(9));
         when(access.getSingleResult()).thenReturn(1L);
         when(defaults.getResultList()).thenReturn(List.<Object[]>of(new Object[] { "save", true }));
         when(overrides.getResultList()).thenReturn(List.of(false));
@@ -68,7 +67,7 @@ class HrAuthorizationTest {
         Query defaults = mock(Query.class);
         Query overrides = mock(Query.class);
         stubEmployeeActionQueries(entityManager, menu, access, defaults, overrides);
-        when(menu.getResultStream()).thenReturn(Stream.of(9));
+        when(menu.getResultList()).thenReturn(List.of(9));
         when(access.getSingleResult()).thenReturn(1L);
         when(defaults.getResultList()).thenReturn(List.<Object[]>of(new Object[] { "save", false }));
         when(overrides.getResultList()).thenReturn(List.of(false, true));
