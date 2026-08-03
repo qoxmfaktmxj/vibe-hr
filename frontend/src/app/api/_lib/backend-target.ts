@@ -2,6 +2,7 @@ import "server-only";
 
 const TARGET_VARIABLE = "VIBEHR_BFF_BACKEND_URL";
 const ROOT_HTTP_URL = /^https?:\/\/[^/?#@]+$/;
+const API_PREFIX = "/api/v1";
 
 export function backendApiBaseUrl(): string {
   const value = process.env.VIBEHR_BFF_BACKEND_URL;
@@ -22,4 +23,22 @@ export function backendApiBaseUrl(): string {
     throw new Error(`${TARGET_VARIABLE} must contain only a scheme, host, and optional port.`);
   }
   return url.toString().replace(/\/$/, "");
+}
+
+function assertBackendPath(path: string): void {
+  if (!path.startsWith("/") || path.startsWith("//")) {
+    throw new Error("Backend path must start with a single slash.");
+  }
+  if (path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)) {
+    throw new Error("Backend path must be versionless.");
+  }
+}
+
+export function backendApiPath(path: string): string {
+  assertBackendPath(path);
+  return `${API_PREFIX}${path}`;
+}
+
+export function backendApiUrl(path: string): string {
+  return `${backendApiBaseUrl()}${backendApiPath(path)}`;
 }

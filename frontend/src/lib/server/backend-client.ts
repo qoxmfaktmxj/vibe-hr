@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type BackendRequestOptions = {
@@ -25,7 +25,7 @@ export async function fetchBackendJson<T>(
     return null;
   }
 
-  const response = await fetch(`${backendApiBaseUrl()}${path}`, {
+  const response = await fetch(backendApiUrl(path), {
     cache: options.cache,
     next: options.next,
     headers: {

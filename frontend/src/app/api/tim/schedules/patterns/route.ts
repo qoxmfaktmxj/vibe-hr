@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!token) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/schedules/patterns`, {
+  const upstream = await fetch(backendApiUrl("/tim/schedules/patterns"), {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",

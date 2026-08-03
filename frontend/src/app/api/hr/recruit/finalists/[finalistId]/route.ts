@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ finalistId: string }> };
@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
   const { finalistId } = await context.params;
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/recruit/finalists/${finalistId}`, {
+  const upstream = await fetch(`${backendApiUrl("/hr/recruit/finalists/")}${finalistId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,

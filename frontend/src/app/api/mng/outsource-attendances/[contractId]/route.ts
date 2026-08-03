@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ contractId: string }> };
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const { contractId } = await context.params;
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/mng/outsource-attendances/${contractId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/mng/outsource-attendances/")}${contractId}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 import { forwardBackendResponse } from "@/app/api/_lib/forward-backend-response";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
@@ -26,7 +26,7 @@ async function upstream(method: UpstreamMethod, path: string, token: string, bod
     init.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${backendApiBaseUrl()}${path}`, init);
+  const response = await fetch(backendApiUrl(path), init);
   return forwardBackendResponse(response);
 }
 

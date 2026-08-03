@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/hri/requests/draft`, {
+  const upstreamResponse = await fetch(backendApiUrl("/hri/requests/draft"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

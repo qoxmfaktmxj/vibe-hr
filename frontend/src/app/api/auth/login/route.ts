@@ -10,7 +10,7 @@ import {
   loginRequestBinding,
   requestBodyDigest,
 } from "@/app/api/_lib/bff-assertion";
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 import type { AuthUser } from "@/types/auth";
 
 type LoginResponse = {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     requestBinding: loginRequestBinding(enterCd, loginId),
     bodyDigest: requestBodyDigest(backendBody),
   });
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/login`, {
+  const upstreamResponse = await fetch(backendApiUrl("/auth/login"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

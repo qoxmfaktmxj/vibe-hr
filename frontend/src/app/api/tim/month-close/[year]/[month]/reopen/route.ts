@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function POST(
@@ -12,7 +12,7 @@ export async function POST(
 
   const { year, month } = await params;
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/month-close/${year}/${month}/reopen`, {
+  const upstream = await fetch(`${backendApiUrl("/tim/month-close/")}${year}/${month}/reopen`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: "{}",

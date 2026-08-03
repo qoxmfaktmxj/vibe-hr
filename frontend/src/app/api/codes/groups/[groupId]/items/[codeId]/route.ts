@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type Context = { params: Promise<{ groupId: string; codeId: string }> };
@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, context: Context) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups/${groupId}/items/${codeId}`, {
+  const res = await fetch(`${backendApiUrl("/codes/groups/")}${groupId}/items/${codeId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -31,7 +31,7 @@ export async function DELETE(request: NextRequest, context: Context) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { groupId, codeId } = await context.params;
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups/${groupId}/items/${codeId}`, {
+  const res = await fetch(`${backendApiUrl("/codes/groups/")}${groupId}/items/${codeId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

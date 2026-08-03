@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const search = request.nextUrl.search || "";
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/leave-requests${search}`, {
+  const upstream = await fetch(`${backendApiUrl("/tim/leave-requests")}${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/leave-requests`, {
+  const upstream = await fetch(backendApiUrl("/tim/leave-requests"), {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function PUT(
@@ -19,7 +19,7 @@ export async function PUT(
   }
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}/items/${itemId}`,
+    `${backendApiUrl("/org/restructure/plans/")}${planId}/items/${itemId}`,
     {
       method: "PUT",
       headers: {
@@ -47,7 +47,7 @@ export async function DELETE(
   const { planId, itemId } = await params;
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}/items/${itemId}`,
+    `${backendApiUrl("/org/restructure/plans/")}${planId}/items/${itemId}`,
     {
       method: "DELETE",
       headers: { Authorization: `Bearer ${accessToken}` },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type Context = { params: Promise<{ groupId: string }> };
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, context: Context) {
 
   const { groupId } = await context.params;
   const search = request.nextUrl.searchParams.toString();
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups/${groupId}/items${search ? `?${search}` : ""}`, {
+  const res = await fetch(`${backendApiUrl("/codes/groups/")}${groupId}/items${search ? `?${search}` : ""}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, context: Context) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const res = await fetch(`${backendApiBaseUrl()}/api/v1/codes/groups/${groupId}/items`, {
+  const res = await fetch(`${backendApiUrl("/codes/groups/")}${groupId}/items`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

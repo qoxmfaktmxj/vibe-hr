@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   const search = request.nextUrl.search || "";
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/menus/actions/current${search}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/menus/actions/current")}${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

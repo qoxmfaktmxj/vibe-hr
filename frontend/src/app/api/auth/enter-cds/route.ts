@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 
 export async function GET() {
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/enter-cds`, {
+  const upstreamResponse = await fetch(backendApiUrl("/auth/enter-cds"), {
     method: "GET",
     cache: "no-store",
   });

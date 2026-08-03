@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function PUT(
@@ -18,7 +18,7 @@ export async function PUT(
     return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/org/restructure/plans/")}${planId}`, {
     method: "PUT",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -43,7 +43,7 @@ export async function DELETE(
 
   const { planId } = await params;
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/org/restructure/plans/")}${planId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

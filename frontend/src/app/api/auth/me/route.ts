@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import type { AuthUser } from "@/types/auth";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const ENTER_CD_COOKIE = "vibe_hr_enter_cd";
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
   }
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/auth/me`, {
+  const upstreamResponse = await fetch(backendApiUrl("/auth/me"), {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,

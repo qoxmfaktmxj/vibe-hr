@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ employeeId: string; recordId: string }> };
@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   const payload = await request.json().catch(() => null);
   if (!payload) return NextResponse.json({ detail: "Invalid request payload." }, { status: 400 });
 
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/basic/${employeeId}/records/${recordId}${search}`, {
+  const upstream = await fetch(`${backendApiUrl("/hr/basic/")}${employeeId}/records/${recordId}${search}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",
@@ -31,7 +31,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { employeeId, recordId } = await context.params;
   const search = request.nextUrl.search || "";
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/hr/basic/${employeeId}/records/${recordId}${search}`, {
+  const upstream = await fetch(`${backendApiUrl("/hr/basic/")}${employeeId}/records/${recordId}${search}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

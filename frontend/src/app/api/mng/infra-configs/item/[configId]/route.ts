@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 type RouteContext = { params: Promise<{ configId: string }> };
@@ -12,7 +12,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   }
 
   const { configId } = await context.params;
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/mng/infra-configs/${configId}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/mng/infra-configs/")}${configId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",

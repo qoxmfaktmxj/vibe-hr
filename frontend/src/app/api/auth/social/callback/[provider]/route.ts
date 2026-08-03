@@ -36,7 +36,7 @@ type KakaoProfile = {
   };
 };
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 const tokenExpiresEnv = Number(process.env.AUTH_TOKEN_EXPIRES_MIN ?? "480");
@@ -199,7 +199,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pro
       bodyDigest: requestBodyDigest(backendBody),
     });
 
-    const backendRes = await fetch(`${backendApiBaseUrl()}/api/v1/auth/social/exchange`, {
+    const backendRes = await fetch(backendApiUrl("/auth/social/exchange"), {
       method: "POST",
       headers: { "Content-Type": "application/json", [BFF_ASSERTION_HEADER]: assertion },
       cache: "no-store",

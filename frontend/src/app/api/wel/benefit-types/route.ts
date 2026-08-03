@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   const search = request.nextUrl.search || "";
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/wel/benefit-types${search}`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/wel/benefit-types")}${search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.text();
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/wel/benefit-types/batch`, {
+  const upstreamResponse = await fetch(backendApiUrl("/wel/benefit-types/batch"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

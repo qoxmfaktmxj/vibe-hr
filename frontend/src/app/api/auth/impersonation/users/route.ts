@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const limit = request.nextUrl.searchParams.get("limit") ?? "20";
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/auth/impersonation/users?query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`,
+    `${backendApiUrl("/auth/impersonation/users?query=")}${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`,
     {
       method: "GET",
       headers: {

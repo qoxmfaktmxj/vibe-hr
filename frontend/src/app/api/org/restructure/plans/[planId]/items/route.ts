@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function GET(
@@ -15,7 +15,7 @@ export async function GET(
   const { planId } = await params;
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}/items`,
+    `${backendApiUrl("/org/restructure/plans/")}${planId}/items`,
     {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -43,7 +43,7 @@ export async function POST(
   }
 
   const upstreamResponse = await fetch(
-    `${backendApiBaseUrl()}/api/v1/org/restructure/plans/${planId}/items`,
+    `${backendApiUrl("/org/restructure/plans/")}${planId}/items`,
     {
       method: "POST",
       headers: {

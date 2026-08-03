@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
 export async function POST(
@@ -15,7 +15,7 @@ export async function POST(
   const { id } = await params;
   const payload = await request.json().catch(() => ({}));
 
-  const upstreamResponse = await fetch(`${backendApiBaseUrl()}/api/v1/wel/requests/${id}/reject`, {
+  const upstreamResponse = await fetch(`${backendApiUrl("/wel/requests/")}${id}/reject`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     cache: "no-store",

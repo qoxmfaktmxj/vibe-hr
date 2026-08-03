@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { backendApiBaseUrl } from "@/app/api/_lib/backend-target";
+import { backendApiUrl } from "@/app/api/_lib/backend-target";
 
 const AUTH_COOKIE_NAME = "vibe_hr_token";
 
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!accessToken) return NextResponse.json({ detail: "Not authenticated." }, { status: 401 });
 
   const { employeeId } = await params;
-  const upstream = await fetch(`${backendApiBaseUrl()}/api/v1/tim/annual-leave/employee/${employeeId}${request.nextUrl.search}`, {
+  const upstream = await fetch(`${backendApiUrl("/tim/annual-leave/employee/")}${employeeId}${request.nextUrl.search}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
