@@ -1,6 +1,6 @@
 ## TASK VH-R3-SPRING-PRODUCTION-CUTOVER-20260803
 - Date: 2026-08-03
-- Status: executing with explicit production approval
+- Status: completed; Spring Boot is serving production traffic
 - Mode: High-risk controlled production cutover
 - Risk Class: R3 (database ownership transfer, authentication secrets, deployment and traffic switch)
 - Approval Status: user explicitly approved immediate Spring Boot production cutover
@@ -19,9 +19,32 @@
 - Production smoke exposed Hibernate 7 closing a native `getResultStream()` used by the non-transactional employee permission check before `findFirst()` advanced it. The authorization lookup was changed to a bounded result-list read, with its unit tests updated, before backend re-promotion.
 - The attendance status UI sends the frozen FastAPI-compatible `start_date`, `end_date`, and optional `employee_id` query names. Explicit Spring `@RequestParam` bindings and a reflection contract test were added after smoke exposed implicit camelCase binding.
 
+### Production Evidence
+- Final pre-cutover backup: `/var/backups/vibe-hr/20260803-final-pre-spring-cutover.dump`; the original `platform_db.vibehr` schema remains at Alembic head `org_mapping_foundation_20260722` with no Flyway history.
+- The restored and reconciled Spring database is `vibehr_spring_prod_20260803`. Flyway history is exactly V1-V5 with V2 `-1027260723`, corrected V3 `720383589`, V4 `1252995053`, and V5 `-890170560`; all rows are successful.
+- Hibernate validation, readiness, OpenAPI 3.1.0 with 216 paths, and the 106-application-table migration gate passed. The 102 owned sequences were verified above their current maximum IDs before promotion.
+- Protected production counts remained `4 / 50 / 30074 / 6003 / 3005` for approval actor rules, departments, attendance daily, leave requests, and welfare requests. The 100 scheduling assignments remained active and retained the reviewed pre/post checksum through V5.
+- External `https://hr.minseok91.cloud` smoke passed login, current principal, menu tree/admin role authorization, employee grid, attendance query, payroll run query, and payroll PDF download. Employee access to an admin route returned the expected denial during cutover verification.
+- The active containers are `vibehr-backend-spring` on loopback port 8080 and `vibehr-frontend` on loopback port 3000. The retired Python port 8000 is closed.
+- Nginx now removes/reinjects the trusted BFF client address as `X-VibeHR-Client-IP $remote_addr`; configuration validation and reload succeeded.
+- Source revisions promoted to `main`: `21f1aec`, `d1305f7`, `ee2394c`, `7f74be3`, and `20003f4`.
+
+### Rollback Assets / Observation Window
+- Retain `/var/backups/vibe-hr/20260803-spring-cutover`, the final database dump, the untouched legacy database, `vibe-hr-backend:pre-spring-20260803`, `vibe-hr-frontend:pre-spring-20260803`, and the retained Spring rollback image until the observation window is closed explicitly.
+- Rollback changes routing/containers only and restores the retained Spring release. Database ownership is not reversed and no reverse DDL is permitted. The legacy Python image/database are disaster-recovery evidence, not an automatic application rollback target.
+
+### Verification Commands
+- `./gradlew --no-daemon --console=plain test`: PASS after both production hotfixes.
+- `VIBEHR_RUN_CONTAINER_TESTS=true ./gradlew --no-daemon --console=plain migrationIntegrationTest`: PASS after the final promoted revision.
+- `node scripts/spring-migration/flyway-verify.js`: PASS; exact Alembic head, 66 bootstrap ownership records, and 1,377 required reference rows verified.
+- `node scripts/spring-migration/verify-delivery.js`: PASS.
+
+### Remaining Risk
+- The production frontend build reports 30 dependency audit findings (3 low, 7 moderate, 14 high, 6 critical). These were pre-existing dependency findings and require a separate dependency remediation cycle rather than an unreviewed cutover-time upgrade.
+
 ## TASK VH-R3-PRODUCTION-DRIFT-RECONCILIATION-20260803
 - Date: 2026-08-03
-- Status: clone end-to-end verification completed; production cutover remains stopped pending separate approval
+- Status: clone end-to-end verification completed; later superseded by the separately approved production cutover above
 - Mode: Restored-backup verification
 - Risk Class: R3 (schema ownership transfer and production-data compatibility)
 - Approval Status: approved explicitly by the user for clone/source work only; production execution not approved
@@ -42,7 +65,7 @@
 - `migrationIntegrationTest`, full unit tests, `flyway-verify`, and route coverage `290/290` passed. All 102 owned sequences have calculated next values above max IDs.
 
 ### Remaining Risk / Stop Condition
-- Any newly discovered successful V3 in a permanent database invalidates this checksum-change path and requires a stop/guarded-bridge review. No production DB, container, Compose, Nginx, secret, push, or PR was changed.
+- Any newly discovered successful V3 in a permanent database invalidates this checksum-change path and requires a stop/guarded-bridge review. This clone-only task itself made no production DB, container, Compose, Nginx, secret, push, or PR change; those later changes are recorded under the separately approved cutover task above.
 - See `docs/spring-migration/PRODUCTION_DRIFT_RECONCILIATION_20260803.md`.
 
 ## TASK VH-R3-DELIVERY-HARDENING-20260803
