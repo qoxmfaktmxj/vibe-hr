@@ -42,7 +42,7 @@ const pretendard = localFont({
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
   title: "VIBE-HR",
-  description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
+  description: "사람과 조직의 흐름을 하나로 연결하는 VIBE-HR 인사관리 시스템",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -54,13 +54,13 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
   openGraph: {
     title: "VIBE-HR",
-    description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
+    description: "사람과 조직의 흐름을 하나로 연결하는 VIBE-HR 인사관리 시스템",
     images: [{ url: "/vibe-hr-thumbnail.webp", width: 1200, height: 630, type: "image/webp" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "VIBE-HR",
-    description: "VIBE-HR MVP with Next.js + Spring Boot + JPA",
+    description: "사람과 조직의 흐름을 하나로 연결하는 VIBE-HR 인사관리 시스템",
     images: ["/vibe-hr-thumbnail.webp"],
   },
   other: {

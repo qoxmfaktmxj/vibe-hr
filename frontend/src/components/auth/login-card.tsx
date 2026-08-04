@@ -37,7 +37,7 @@ function AuthCardIntro() {
   return (
     <CardHeader className="space-y-3 px-8 pb-4 pt-8 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-        <span className="vibe-mark h-9 w-9" aria-hidden="true" />
+        <Image src="/vibehr_mark.svg" alt="" width={36} height={36} className="h-9 w-9" aria-hidden="true" />
       </div>
       <h1 className="text-2xl font-black tracking-[-0.03em] text-foreground">VIBE-HR</h1>
     </CardHeader>
