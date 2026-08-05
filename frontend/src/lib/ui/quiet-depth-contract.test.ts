@@ -52,7 +52,7 @@ describe("Quiet Depth UI contract", () => {
     expect(source).toContain("function DomainRailItem");
     expect(source).toContain('className="vibe-rail flex shrink-0"');
     expect(source).toContain('className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]"');
-    expect(source).toContain("vibe-mark--rail");
+    expect(source).toContain('/brand/vibehr-mark-white.svg');
   });
 
   test("login uses the chroma material and restores theme before hydration", () => {
@@ -60,9 +60,10 @@ describe("Quiet Depth UI contract", () => {
     const layout = readSource("app", "layout.tsx");
     const styles = readSource("app", "globals.css");
 
-    expect(login).toContain("사람과 조직의 흐름을");
-    expect(login).toContain("하나로.");
+    expect(login).toContain("사람이 중심이 되는 HR의 시작");
+    expect(login).toContain("구성원과 조직이 필요한 정보를 한곳에서 편리하게 관리합니다.");
     expect(login).toContain("login-brand-canvas");
+    expect(login).toContain("whitespace-nowrap");
     expect(layout).toContain("vibe_hr_theme_preferences");
     expect(layout).toContain("suppressHydrationWarning");
     expect(styles).toContain('url("/images/vibe-chroma-material.avif")');

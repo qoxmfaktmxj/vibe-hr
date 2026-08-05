@@ -309,17 +309,6 @@
   }
 }
 
-.vibe-mark {
-  display: inline-block;
-  background-color: var(--vibe-mark-color, var(--primary));
-  mask: url("/vibehr_mark.svg") center / contain no-repeat;
-  -webkit-mask: url("/vibehr_mark.svg") center / contain no-repeat;
-}
-
-.vibe-mark--rail {
-  --vibe-mark-color: #ffffff;
-}
-
 .vibe-rail {
   width: 4rem;
   flex-direction: column;
@@ -335,17 +324,12 @@
 
 .login-shell {
   min-height: 100dvh;
+  isolation: isolate;
+  overflow: hidden;
   background: var(--vibe-login-canvas);
 }
 
-.login-brand-canvas {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background: var(--vibe-rail-bg);
-}
-
-.login-brand-canvas::before {
+.login-shell::before {
   position: absolute;
   inset: 0;
   z-index: -2;
@@ -353,22 +337,26 @@
   background-image: url("/images/vibe-chroma-material.avif");
   background-position: center;
   background-size: cover;
-  filter: grayscale(1) contrast(1.08) brightness(0.82);
+  filter: grayscale(1) contrast(1.08) brightness(0.78);
 }
 
-.login-brand-canvas::after {
+.login-shell::after {
   position: absolute;
   inset: 0;
   z-index: -1;
   content: "";
   background:
-    linear-gradient(90deg, rgb(5 13 26 / 0.06), rgb(5 13 26 / 0.74)),
-    linear-gradient(0deg, rgb(5 13 26 / 0.58), transparent 55%),
-    linear-gradient(135deg, color-mix(in srgb, var(--primary) 38%, transparent), transparent 70%);
+    linear-gradient(90deg, rgb(5 13 26 / 0.12), rgb(5 13 26 / 0.58) 56%, rgb(5 13 26 / 0.76)),
+    linear-gradient(0deg, rgb(5 13 26 / 0.72), transparent 58%),
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 28%, transparent), transparent 68%);
+}
+
+.login-brand-canvas {
+  z-index: 0;
 }
 
 .login-form-canvas {
-  background: color-mix(in srgb, var(--card) 92%, var(--vibe-login-canvas));
+  background: transparent;
 }
 
 @media (max-width: 1023px) {

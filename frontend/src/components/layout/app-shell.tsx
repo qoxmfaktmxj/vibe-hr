@@ -2,6 +2,7 @@
 
 import { Home, X } from "lucide-react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -304,10 +305,19 @@ export function AppShell({ title, description, children }: AppShellProps) {
               <div className="flex items-center gap-2">
                 <Link
                   href="/dashboard"
-                  className="vibe-mark h-5 w-5 shrink-0 lg:hidden"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center lg:hidden"
                   aria-label="대시보드로 이동"
                   title="대시보드로 이동"
-                />
+                >
+                  <Image
+                    src="/brand/vibehr-mark-color.svg"
+                    alt=""
+                    width={20}
+                    height={20}
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  />
+                </Link>
                 <h1 className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
                   {pageTitle}
                 </h1>

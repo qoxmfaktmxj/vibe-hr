@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import { LoginCard } from "@/components/auth/login-card";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -18,25 +20,34 @@ export default async function LoginPage({
   const initialErrorMessage = params.error ? ERROR_MESSAGES[params.error] ?? "소셜 로그인에 실패했습니다." : null;
 
   return (
-    <main className="login-shell grid w-full lg:grid-cols-[minmax(0,1.27fr)_minmax(26rem,0.98fr)]">
-      <section className="login-brand-canvas hidden min-h-[100dvh] items-end p-10 lg:flex xl:p-16" aria-label="VIBE-HR 소개">
-        <div className="max-w-md text-white">
-          <span className="vibe-mark vibe-mark--rail mb-8 h-12 w-12" aria-hidden="true" />
+    <main className="login-shell relative w-full">
+      <section
+        className="login-brand-canvas pointer-events-none absolute inset-0 hidden min-h-[100dvh] items-end p-10 lg:flex xl:p-16"
+        aria-label="VIBE-HR 소개"
+      >
+        <div className="text-white">
+          <Image
+            src="/brand/vibehr-mark-white.svg"
+            alt=""
+            width={48}
+            height={48}
+            className="mb-8 h-12 w-12"
+            aria-hidden="true"
+          />
           <p className="text-sm font-semibold text-white/75">VIBE-HR</p>
-          <h2 className="mt-3 text-4xl font-bold tracking-[-0.04em] xl:text-5xl">
-            <span className="block">사람과 조직의 흐름을</span>
-            <span className="block">하나로.</span>
+          <h2 className="mt-3 whitespace-nowrap text-[clamp(1.75rem,3vw,3rem)] font-bold tracking-[-0.03em]">
+            사람이 중심이 되는 HR의 시작
           </h2>
-          <p className="mt-5 max-w-sm text-base leading-7 text-white/80">
-            인사 데이터와 일상의 업무를 한 화면에서 연결합니다.
+          <p className="mt-5 max-w-md text-base leading-7 text-white/80">
+            구성원과 조직이 필요한 정보를 한곳에서 편리하게 관리합니다.
           </p>
         </div>
       </section>
 
-      <section className="login-form-canvas flex min-h-[100dvh] items-center justify-center p-5 sm:p-8 lg:p-10">
+      <section className="login-form-canvas relative z-10 ml-auto flex min-h-[100dvh] w-full items-center justify-center px-5 py-8 sm:px-8 lg:w-[min(42rem,54vw)] lg:px-10 xl:px-14">
         <div className="w-full max-w-[460px]">
           <LoginCard initialErrorMessage={initialErrorMessage} />
-          <p className="mt-7 text-center text-xs font-medium tracking-[0.08em] text-muted-foreground">
+          <p className="mt-7 text-center text-xs font-medium tracking-[0.08em] text-white/70">
             2026 VIBE-HR SYSTEMS, 사람을 위한 인사관리
           </p>
         </div>

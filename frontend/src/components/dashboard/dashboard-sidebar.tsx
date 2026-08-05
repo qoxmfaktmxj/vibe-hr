@@ -20,6 +20,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type UIEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -617,10 +618,19 @@ export function DashboardSidebar() {
     <nav className="vibe-rail flex shrink-0" aria-label="업무 영역">
       <Link
         href="/dashboard"
-        className="vibe-mark vibe-mark--rail mx-auto mt-3 h-7 w-7 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        className="mx-auto mt-3 flex h-10 w-10 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         aria-label="VIBE-HR 대시보드"
         title="VIBE-HR 대시보드"
-      />
+      >
+        <Image
+          src="/brand/vibehr-mark-white.svg"
+          alt=""
+          width={28}
+          height={28}
+          className="h-7 w-7"
+          aria-hidden="true"
+        />
+      </Link>
       <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-2 pb-3">
         {menus.map((node) => (
           <DomainRailItem
