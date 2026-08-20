@@ -618,16 +618,16 @@ export function DashboardSidebar() {
     <nav className="vibe-rail flex shrink-0" aria-label="업무 영역">
       <Link
         href="/dashboard"
-        className="mx-auto mt-3 flex h-10 w-10 items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        className="mx-auto mt-3 flex h-10 w-10 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         aria-label="VIBE-HR 대시보드"
         title="VIBE-HR 대시보드"
       >
         <Image
-          src="/brand/vibehr-mark-white.svg"
+          src="/vibehr_mark.svg"
           alt=""
-          width={28}
-          height={28}
-          className="h-7 w-7"
+          width={32}
+          height={32}
+          className="h-8 w-8"
           aria-hidden="true"
         />
       </Link>

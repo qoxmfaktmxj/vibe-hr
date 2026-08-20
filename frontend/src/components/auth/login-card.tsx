@@ -152,7 +152,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
             autoComplete="organization"
             value={selectedEnterCd}
             onChange={(event) => setSelectedEnterCd(event.target.value)}
-            disabled={isLoadingEnterCd || isSubmitting}
+            disabled={isSubmitting}
             required
           >
             {corporations.map((corporation) => (
@@ -181,6 +181,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
               id="loginId"
               name="loginId"
               type="text"
+              defaultValue="admin"
               className="h-12 border-border pl-10 text-base"
               placeholder="아이디를 입력하세요"
               autoComplete="username"
@@ -203,6 +204,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
               id="password"
               name="password"
               type="password"
+              defaultValue="admin"
               className="h-12 border-border pl-10 text-base"
               placeholder="비밀번호를 입력하세요"
               autoComplete="current-password"

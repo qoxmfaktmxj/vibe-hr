@@ -52,7 +52,17 @@ describe("Quiet Depth UI contract", () => {
     expect(source).toContain("function DomainRailItem");
     expect(source).toContain('className="vibe-rail flex shrink-0"');
     expect(source).toContain('className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]"');
-    expect(source).toContain('/brand/vibehr-mark-white.svg');
+    expect(source).toContain('src="/vibehr_mark.svg"');
+    expect(source).toContain('className="h-8 w-8"');
+    expect(source).not.toContain('src="/brand/vibehr-mark-white.svg"');
+  });
+
+  test("login starts with the demo administrator credentials", () => {
+    const source = readSource("components", "auth", "login-card.tsx");
+
+    expect(source.match(/defaultValue="admin"/g)).toHaveLength(2);
+    expect(source).toContain("disabled={isSubmitting}");
+    expect(source).not.toContain("disabled={isLoadingEnterCd || isSubmitting}");
   });
 
   test("login uses the chroma material and restores theme before hydration", () => {
