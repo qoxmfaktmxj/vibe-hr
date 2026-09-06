@@ -212,3 +212,9 @@
 - Existing lint warnings are outside the approved change scope.
 - Publication is a reviewed feature branch and PR; no main merge or deployment is implied by this record.
 - Rollback: revert the frontend change commit; no schema or infrastructure rollback is required.
+
+### Publication CI Recovery
+- The first PR check failed on the generated Spring schema inventory. The same failure was reproduced on untouched base commit b256036.
+- Regenerated inventory changes only java_source_file_count from 138 to 140; table mappings and Java, SQL, migration and immutable snapshot sources are unchanged.
+- Complete schema verification, mutation ledger and all Flyway verification checks passed against a Git archive exported with original LF bytes. This avoids Windows checkout line-ending conversion being misread as immutable evidence drift.
+- Python retirement and BFF cutover audits also passed. This R0 documentation correction is included to restore the existing delivery check.
