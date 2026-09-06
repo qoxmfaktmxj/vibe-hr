@@ -1,36 +1,29 @@
 "use client";
 
 import {
-  BadgeCheck,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  IdCard,
-  Clock,
   Minus,
   Plus,
-  Mail,
   PanelLeft,
-  Settings,
-  Shield,
-  UserRound,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type UIEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type UIEvent, type MouseEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { EmployeeProfileDialog } from "@/components/dashboard/employee-profile-dialog";
 import { renderMenuIcon } from "@/lib/menu-icon-render";
-import type { EmployeeItem } from "@/types/employee";
 import type { MenuNode } from "@/types/menu";
+import { cn } from "@/lib/utils";
+
+import styles from "./dashboard-sidebar.module.css";
 
 function renderIcon(iconName: string | null, className: string) {
   return renderMenuIcon(iconName, className);
@@ -43,71 +36,6 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-function toEmploymentStatusLabel(status: EmployeeItem["employment_status"]): string {
-  switch (status) {
-    case "leave":
-      return "휴직";
-    case "resigned":
-      return "퇴사";
-    default:
-      return "재직";
-  }
-}
-
-type ProfileTone = "primary" | "emerald" | "violet" | "rose" | "amber";
-
-type ProfileInfoCard = {
-  label: string;
-  value: string;
-  icon: LucideIcon;
-  tone: ProfileTone;
-  mono?: boolean;
-};
-
-function formatProfileDateTime(value: Date): string {
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(value);
-}
-
-function getProfileToneCardClass(tone: ProfileTone): string {
-  if (tone === "emerald") {
-    return "border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20";
-  }
-  if (tone === "violet") {
-    return "border-violet-200/70 bg-violet-50/50 dark:border-violet-900/40 dark:bg-violet-950/20";
-  }
-  if (tone === "rose") {
-    return "border-rose-200/70 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20";
-  }
-  if (tone === "amber") {
-    return "border-amber-200/70 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20";
-  }
-  return "border-primary/30 bg-primary/5 dark:border-primary/40 dark:bg-primary/10";
-}
-
-function getProfileToneIconClass(tone: ProfileTone): string {
-  if (tone === "emerald") {
-    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
-  }
-  if (tone === "violet") {
-    return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
-  }
-  if (tone === "rose") {
-    return "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
-  }
-  if (tone === "amber") {
-    return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
-  }
-  return "bg-primary/15 text-primary dark:bg-primary/25";
 }
 
 function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean }) {
@@ -256,12 +184,15 @@ function MenuGroupItem({
 }) {
   const active = hasActiveDescendant(node, currentPath);
   const isOpen = openCodes.has(node.code);
+  const childrenId = useId();
 
   return (
     <div>
       <button
         type="button"
         onClick={() => onToggle(node.code)}
+        aria-expanded={isOpen}
+        aria-controls={childrenId}
         className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
           active
             ? "text-[color:var(--vibe-nav-text-strong)]"
@@ -274,8 +205,13 @@ function MenuGroupItem({
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {isOpen ? (
-        <div className="mt-0.5 space-y-0.5 ml-4 border-l border-border pl-3">
+      <div
+        id={childrenId}
+        aria-hidden={!isOpen}
+        inert={isOpen ? undefined : true}
+        className={cn(styles.menuGroupBody, isOpen && styles.menuGroupBodyOpen)}
+      >
+        <div className={cn(styles.menuGroupBodyInner, "mt-0.5 space-y-0.5")}>
           {node.children.map((child) =>
             child.children.length > 0 ? (
               <MenuGroupItem
@@ -295,7 +231,7 @@ function MenuGroupItem({
             ),
           )}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -313,22 +249,17 @@ function DomainRailItem({
 }) {
   const content = (
     <>
-      <span className="shrink-0">{renderIcon(node.icon, "h-5 w-5")}</span>
-      <span className={compact ? "truncate text-xs font-semibold" : "sr-only"}>{node.name}</span>
+      <span className={styles.railIcon}>{renderIcon(node.icon, "h-5 w-5")}</span>
+      <span className={styles.railLabel}>{node.name}</span>
     </>
   );
 
-  const className = compact
-    ? `flex min-w-18 flex-col items-center gap-1 rounded-lg px-2 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-      active
-          ? "bg-[var(--vibe-rail-active)] text-white"
-          : "text-[color:var(--vibe-rail-muted)] hover:bg-[var(--vibe-rail-hover)] hover:text-white"
-      }`
-    : `flex h-11 w-11 items-center justify-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-      active
-          ? "bg-[var(--vibe-rail-active)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
-          : "text-[color:var(--vibe-rail-muted)] hover:bg-[var(--vibe-rail-hover)] hover:text-white"
-      }`;
+  const className = cn(
+    styles.railItem,
+    compact && styles.railItemMobile,
+    styles.railButton,
+    active && styles.railItemActive,
+  );
 
   if (node.path) {
     return (
@@ -347,15 +278,15 @@ function DomainRailItem({
 
   return (
     <button
-      type="button"
-      onClick={onSelect}
-      className={className}
-      aria-pressed={active}
-      aria-label={node.name}
-      title={node.name}
-    >
-      {content}
-    </button>
+    type="button"
+    onClick={onSelect}
+    className={className}
+    aria-pressed={active}
+    aria-label={node.name}
+    title={node.name}
+  >
+    {content}
+  </button>
   );
 }
 
@@ -366,9 +297,19 @@ export function DashboardSidebar() {
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const mobileTriggerRef = useRef<HTMLButtonElement>(null);
+  const profileReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const openingMobileProfileRef = useRef(false);
   const [menuExpanded, setMenuExpanded] = useState(true);
   const [contextPanelCollapsed, setContextPanelCollapsed] = useState(false);
   const [selectedDomainCode, setSelectedDomainCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeMobileMenu = () => { if (desktop.matches) setMobileOpen(false); };
+    desktop.addEventListener("change", closeMobileMenu);
+    return () => desktop.removeEventListener("change", closeMobileMenu);
+  }, []);
 
   // 열림 상태를 그룹 code의 Set으로 관리
   // - SSR/CSR hydration mismatch 방지: 초기값은 빈 Set (서버와 동일)
@@ -432,13 +373,8 @@ export function DashboardSidebar() {
   const handleMenuScroll = useCallback((event: UIEvent<HTMLElement>) => {
     saveSidebarScrollTop(event.currentTarget.scrollTop);
   }, []);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileEmployee, setProfileEmployee] = useState<EmployeeItem | null>(null);
-  const [profileLoadedAt, setProfileLoadedAt] = useState<Date | null>(null);
 
   const displayName = user?.display_name ?? "User";
-  const roleLabels = user?.roles?.join(", ") ?? "";
   const initials = getInitials(displayName) || "U";
 
   useEffect(() => {
@@ -456,86 +392,23 @@ export function DashboardSidebar() {
     return activeDomain.children.length > 0 ? activeDomain.children : [activeDomain];
   }, [activeDomain]);
 
-  const profileRows = useMemo<ProfileInfoCard[]>(
-    () => [
-      { label: "이름", value: displayName, icon: UserRound, tone: "primary" },
-      { label: "이메일", value: user?.email ?? "-", icon: Mail, tone: "primary" },
-      { label: "권한", value: roleLabels || "-", icon: Shield, tone: "violet" },
-      { label: "로그인ID", value: profileEmployee?.login_id ?? "-", icon: IdCard, tone: "primary", mono: true },
-      { label: "사번", value: profileEmployee?.employee_no ?? "-", icon: BadgeCheck, tone: "primary", mono: true },
-      { label: "부서", value: profileEmployee?.department_name ?? "-", icon: Building2, tone: "violet" },
-      { label: "직책", value: profileEmployee?.position_title ?? "-", icon: BriefcaseBusiness, tone: "violet" },
-      { label: "입사일", value: profileEmployee?.hire_date ?? "-", icon: CalendarDays, tone: "emerald", mono: true },
-      {
-        label: "재직상태",
-        value: profileEmployee ? toEmploymentStatusLabel(profileEmployee.employment_status) : "-",
-        icon: Clock,
-        tone: "amber",
-      },
-      {
-        label: "로그인 활성",
-        value: profileEmployee ? (profileEmployee.is_active ? "Y" : "N") : "-",
-        icon: Settings,
-        tone: "rose",
-        mono: true,
-      },
-    ],
-    [displayName, profileEmployee, roleLabels, user?.email],
-  );
-
-  const loadMyProfile = useCallback(async () => {
-    setProfileLoading(true);
-    setProfileError(null);
-
-    try {
-      const response = await fetch("/api/employees/me", { cache: "no-store" });
-      if (!response.ok) {
-        const json = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(json?.detail ?? "프로필 정보를 불러오지 못했습니다.");
-      }
-
-      const json = (await response.json()) as { employee?: EmployeeItem };
-      setProfileEmployee(json.employee ?? null);
-      setProfileLoadedAt(new Date());
-    } catch (error) {
-      setProfileEmployee(null);
-      setProfileLoadedAt(null);
-      setProfileError(
-        error instanceof Error
-          ? error.message
-          : "프로필 정보를 불러오지 못했습니다.",
-      );
-    } finally {
-      setProfileLoading(false);
-    }
-  }, []);
-
-  const openProfile = useCallback(() => {
+  const openProfile = useCallback((event: MouseEvent<HTMLButtonElement>) => {
+    openingMobileProfileRef.current = mobileOpen;
+    profileReturnFocusRef.current = mobileOpen ? mobileTriggerRef.current : event.currentTarget;
+    setMobileOpen(false);
     setProfileOpen(true);
-    void loadMyProfile();
-  }, [loadMyProfile]);
+  }, [mobileOpen]);
 
   const sidebarContent = (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2 border-b border-border/80 px-4 py-4">
+        <div className="flex items-center gap-2 border-b border-border/80 px-4 py-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold text-[color:var(--vibe-nav-text-muted)]">업무 영역</p>
             <p className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
               {activeDomain?.name ?? "메뉴"}
             </p>
           </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="hidden h-7 w-7 lg:inline-flex"
-            onClick={() => setContextPanelCollapsed(true)}
-            title="세부 메뉴 접기"
-            aria-label="세부 메뉴 접기"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </Button>
         </div>
 
         <div className="mt-2 flex items-center justify-end px-3">
@@ -543,7 +416,7 @@ export function DashboardSidebar() {
             type="button"
             size="icon"
             variant="outline"
-            className="h-6 w-6"
+            className="h-9 w-9"
             onClick={() => {
               if (menuExpanded) {
                 // 전체 접기: openCodes 비우기
@@ -596,7 +469,7 @@ export function DashboardSidebar() {
         </nav>
       </div>
 
-      <div className="shrink-0 border-t border-border bg-[var(--vibe-sidebar-bg)] p-3">
+      <div className="shrink-0 border-t border-border bg-[var(--vibe-sidebar-bg)] p-3 lg:hidden">
         <button
           type="button"
           className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-accent"
@@ -615,7 +488,7 @@ export function DashboardSidebar() {
   );
 
   const domainRail = (
-    <nav className="vibe-rail flex shrink-0" aria-label="업무 영역">
+    <nav className="vibe-rail flex shrink-0" style={{ width: "4.75rem" }} aria-label="업무 영역">
       <Link
         href="/dashboard"
         className="mx-auto mt-3 flex h-10 w-10 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
@@ -631,7 +504,7 @@ export function DashboardSidebar() {
           aria-hidden="true"
         />
       </Link>
-      <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-2 pb-3">
+      <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pb-3">
         {menus.map((node) => (
           <DomainRailItem
             key={node.code}
@@ -643,6 +516,24 @@ export function DashboardSidebar() {
             }}
           />
         ))}
+      </div>
+
+      <div className={cn(styles.railFooter, "hidden lg:block")}>
+        <button
+          type="button"
+          onClick={openProfile}
+          className={cn(styles.railItem, styles.railButton, styles.profileTrigger)}
+          aria-label="내 정보 보기"
+          title="내 정보 보기"
+          data-full-label="내 정보 보기"
+        >
+          <span className={styles.railIcon}>
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className={styles.profileAvatarFallback}>{initials}</AvatarFallback>
+            </Avatar>
+          </span>
+          <span className={styles.railLabel}>내 정보</span>
+        </button>
       </div>
     </nav>
   );
@@ -666,20 +557,24 @@ export function DashboardSidebar() {
 
   return (
     <>
-      <button
-        type="button"
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-lg lg:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="메뉴 열기"
-      >
-        <PanelLeft className="h-4 w-4" aria-hidden="true" />
-        메뉴
-      </button>
-
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-[60] lg:hidden">
-          <button className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} aria-label="메뉴 닫기" />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(21rem,calc(100vw-2.5rem))] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)] shadow-[var(--vibe-shadow-floating)]">
+      <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DialogTrigger asChild>
+          <button ref={mobileTriggerRef} type="button" className="fixed bottom-5 right-5 z-50 flex min-h-11 items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-lg lg:hidden" aria-label="메뉴 열기">
+            <PanelLeft className="h-4 w-4" aria-hidden="true" />메뉴
+          </button>
+        </DialogTrigger>
+        <DialogContent
+          showClose={false}
+          onCloseAutoFocus={(event) => {
+            if (openingMobileProfileRef.current) event.preventDefault();
+          }}
+          className="fixed inset-0 z-[60] lg:hidden left-0 top-0 right-auto h-[100dvh] w-[min(21rem,calc(100vw-2.5rem))] translate-x-0 translate-y-0 rounded-r-3xl rounded-l-none border-r border-border bg-[var(--vibe-sidebar-bg)] p-0 shadow-[var(--vibe-shadow-floating)]"
+        >
+          <div className="flex h-full min-h-0 flex-col">
+            <DialogTitle className="sr-only">업무 영역 메뉴</DialogTitle>
+            <DialogDescription className="sr-only">
+              업무 영역을 선택하고 세부 메뉴를 확인할 수 있습니다.
+            </DialogDescription>
             <div className="flex items-center justify-between border-b border-[var(--vibe-rail-border)] bg-[var(--vibe-rail-bg)] px-3 py-2 text-white">
               <span className="text-sm font-bold">VIBE-HR</span>
               <button
@@ -693,96 +588,43 @@ export function DashboardSidebar() {
             </div>
             {mobileDomainRail}
             {sidebarContent}
-          </aside>
-        </div>
-      ) : null}
-
-      {profileOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            aria-label="프로필 닫기"
-            onClick={() => setProfileOpen(false)}
-          />
-          <div className="relative z-10 w-full max-w-5xl rounded-3xl border border-border bg-card p-6 shadow-2xl">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 border border-border">
-                  <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">{initials}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-2xl font-bold tracking-tight text-[color:var(--vibe-nav-text-strong)]">내 정보</p>
-                  <p className="mt-1 text-sm text-[color:var(--vibe-nav-text-muted)]">조회 전용 프로필 정보입니다.</p>
-                  <p className="mt-1 text-xs text-[color:var(--vibe-nav-text-muted)]">
-                    최근 조회: {profileLoadedAt ? formatProfileDateTime(profileLoadedAt) : "-"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="rounded-md border p-2 text-[color:var(--vibe-nav-text-muted)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
-                onClick={() => setProfileOpen(false)}
-                aria-label="프로필 닫기"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {profileLoading ? <p className="mb-4 text-sm text-[color:var(--vibe-nav-text-muted)]">불러오는 중...</p> : null}
-            {profileError ? <p className="mb-4 text-sm text-red-500">{profileError}</p> : null}
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {profileRows.map((row) => {
-                const Icon = row.icon;
-                const displayValue = row.value || "-";
-                return (
-                  <article
-                    key={row.label}
-                    className={`rounded-2xl border p-4 transition hover:shadow-sm ${getProfileToneCardClass(row.tone)}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold tracking-wide text-[color:var(--vibe-nav-text-muted)]">{row.label}</p>
-                        <p
-                          className={`mt-2 break-words text-sm font-semibold text-[color:var(--vibe-nav-text-strong)] ${
-                            row.mono ? "font-mono" : ""
-                          }`}
-                        >
-                          {displayValue}
-                        </p>
-                      </div>
-                      <span
-                        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${getProfileToneIconClass(row.tone)}`}
-                      >
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <EmployeeProfileDialog open={profileOpen} returnFocusRef={profileReturnFocusRef} onOpenChange={(nextOpen) => {
+        setProfileOpen(nextOpen);
+        if (!nextOpen) openingMobileProfileRef.current = false;
+      }} />
 
       <div className="hidden shrink-0 lg:flex">
         {domainRail}
-        {contextPanelCollapsed ? (
-          <button
-            type="button"
-            className="flex w-8 items-start justify-center border-r border-border bg-[var(--vibe-sidebar-bg)] pt-4 text-[color:var(--vibe-nav-text-muted)] transition-colors hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
-            onClick={() => setContextPanelCollapsed(false)}
-            title="세부 메뉴 펼치기"
-            aria-label="세부 메뉴 펼치기"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        ) : (
-          <aside className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]">
-            {sidebarContent}
-          </aside>
-        )}
+        <button
+          type="button"
+          className={cn(
+            styles.panelToggle,
+            "flex items-start justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+          )}
+          onClick={() => setContextPanelCollapsed((prev) => !prev)}
+          title={contextPanelCollapsed ? "세부 메뉴 펼치기" : "세부 메뉴 접기"}
+          aria-label={contextPanelCollapsed ? "세부 메뉴 펼치기" : "세부 메뉴 접기"}
+        >
+          {contextPanelCollapsed ? (
+            <ChevronRight className={cn(styles.panelToggleIcon, "h-4 w-4")} aria-hidden="true" />
+          ) : (
+            <ChevronLeft className={cn(styles.panelToggleIcon, "h-4 w-4")} aria-hidden="true" />
+          )}
+        </button>
+        <aside
+          className={cn(
+            "flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]",
+            styles.desktopContextPanel,
+            contextPanelCollapsed && styles.desktopContextPanelCollapsed,
+          )}
+          inert={contextPanelCollapsed ? true : undefined}
+        >
+          <div className={styles.desktopContextPanelInner}>{sidebarContent}</div>
+        </aside>
       </div>
     </>
   );

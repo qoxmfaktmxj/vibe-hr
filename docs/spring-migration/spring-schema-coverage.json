@@ -5,7 +5,7 @@
     "schema_ledger_file": "docs/spring-migration/schema-ledger.json",
     "java_source_root": "backend-spring/src/main/java",
     "expected_sqlmodel_table_count": 105,
-    "java_source_file_count": 138
+    "java_source_file_count": 140
   },
   "coverage": {
     "status": "partial_migration_inventory",

@@ -116,7 +116,6 @@
   --vibe-rail-active: rgb(255 255 255 / 0.16);
   --vibe-rail-hover: rgb(255 255 255 / 0.1);
   --vibe-rail-border: rgb(255 255 255 / 0.1);
-  --vibe-login-canvas: #e8eef7;
 
   /* WCAG 격상 — 페이지 캔버스(#eef3fa) 위에서 사용 */
   --muted-foreground-on-bg: #475569;
@@ -291,7 +290,6 @@
   --vibe-rail-active: rgb(255 255 255 / 0.16);
   --vibe-rail-hover: rgb(255 255 255 / 0.1);
   --vibe-rail-border: rgb(255 255 255 / 0.1);
-  --vibe-login-canvas: #091321;
 
   /* WCAG 격상 — 다크 모드는 모든 토큰이 5:1+ 통과 */
   --muted-foreground-on-bg: #94a3b8;
@@ -322,52 +320,8 @@
   border-right: 0;
 }
 
-.login-shell {
-  min-height: 100dvh;
-  isolation: isolate;
-  overflow: hidden;
-  background: var(--vibe-login-canvas);
-}
-
-.login-shell::before {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  content: "";
-  background-image: url("/images/vibe-chroma-material.avif");
-  background-position: center;
-  background-size: cover;
-  filter: grayscale(1) contrast(1.08) brightness(0.78);
-}
-
-.login-shell::after {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  content: "";
-  background:
-    linear-gradient(90deg, rgb(5 13 26 / 0.12), rgb(5 13 26 / 0.58) 56%, rgb(5 13 26 / 0.76)),
-    linear-gradient(0deg, rgb(5 13 26 / 0.72), transparent 58%),
-    linear-gradient(135deg, color-mix(in srgb, var(--primary) 28%, transparent), transparent 68%);
-}
-
-.login-brand-canvas {
-  z-index: 0;
-}
-
-.login-form-canvas {
-  background: transparent;
-}
-
-@media (max-width: 1023px) {
-  .login-brand-canvas {
-    display: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .vibe-rail *,
-  .login-shell * {
+  .vibe-rail * {
     scroll-behavior: auto;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
