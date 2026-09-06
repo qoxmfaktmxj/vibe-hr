@@ -1,0 +1,197 @@
+.railItem {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 4.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 1rem;
+  padding: 0.55rem 0.35rem 0.6rem;
+  color: var(--vibe-rail-muted);
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.railItem::before {
+  position: absolute;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  left: 0.18rem;
+  width: 0.22rem;
+  border-radius: 999px;
+  background: var(--primary);
+  content: "";
+  opacity: 0;
+  transform: scaleY(0.6);
+  transition:
+    opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.railItem:hover,
+.railItem:focus-visible {
+  background: var(--vibe-rail-hover);
+  color: #fff;
+}
+
+.railItemActive {
+  background: var(--vibe-rail-active);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.railItemActive::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.railItemMobile {
+  min-width: 4.75rem;
+  min-height: auto;
+  width: auto;
+  padding: 0.5rem 0.5rem 0.55rem;
+}
+
+.railIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.railLabel {
+  max-width: 4.25rem;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-align: center;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.railItemMobile .railLabel {
+  max-width: none;
+}
+
+.railButton {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.railButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.menuGroupBody {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.menuGroupBodyOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.menuGroupBodyInner {
+  margin-left: 1rem;
+  border-left: 1px solid var(--border);
+  padding-left: 0.75rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktopContextPanel {
+  width: 13rem;
+  min-width: 13rem;
+  max-width: 13rem;
+  overflow: hidden;
+  transition:
+    width 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    min-width 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-width 210ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.desktopContextPanelCollapsed {
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-0.5rem);
+}
+
+.desktopContextPanelInner {
+  display: flex;
+  width: 13rem;
+  min-width: 13rem;
+  flex-direction: column;
+  height: 100%;
+}
+
+.panelToggle {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  border-right: 1px solid var(--border);
+  background: var(--vibe-sidebar-bg);
+  color: var(--vibe-nav-text-muted);
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.panelToggle:hover {
+  background: color-mix(in srgb, var(--vibe-sidebar-bg) 84%, var(--primary));
+  color: var(--vibe-nav-text-strong);
+}
+
+.panelToggle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 72%, white);
+}
+
+.panelToggleIcon {
+  margin-top: 1rem;
+}
+
+.railFooter {
+  margin-top: auto;
+  padding: 0.5rem 0.5rem 0.75rem;
+}
+
+.profileTrigger {
+  width: 100%;
+}
+
+.profileAvatarFallback {
+  background: var(--vibe-rail-active);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .railItem,
+  .railItem::before,
+  .menuGroupBody,
+  .desktopContextPanel,
+  .panelToggle {
+    transition-duration: 1ms;
+  }
+}

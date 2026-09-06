@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import type { AuthUser } from "@/types/auth";
+import { LoginRequestError } from "@/components/auth/login-errors";
 
 type LoginPayload = {
   enterCd: string;
@@ -75,7 +76,7 @@ export function AuthProvider({
     });
 
     if (!response.ok) {
-      throw new Error("로그인에 실패했습니다.");
+      throw new LoginRequestError(response.status);
     }
 
     const data = await parseJson<{ user: AuthUser }>(response);

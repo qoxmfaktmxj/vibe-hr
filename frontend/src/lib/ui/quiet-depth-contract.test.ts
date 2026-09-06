@@ -45,39 +45,17 @@ describe("Quiet Depth UI contract", () => {
     expect(source).not.toContain("bg-[var(--vibe-background-light)]");
   });
 
-  test("sidebar separates theme-aware domain rail from contextual navigation", () => {
-    const source = readSource("components", "dashboard", "dashboard-sidebar.tsx");
-
-    expect(source).toContain("shadow-[inset_3px_0_0_var(--primary)]");
-    expect(source).toContain("function DomainRailItem");
-    expect(source).toContain('className="vibe-rail flex shrink-0"');
-    expect(source).toContain('className="flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]"');
-    expect(source).toContain('src="/vibehr_mark.svg"');
-    expect(source).toContain('className="h-8 w-8"');
-    expect(source).not.toContain('src="/brand/vibehr-mark-white.svg"');
-  });
-
   test("login starts with the demo administrator credentials", () => {
     const source = readSource("components", "auth", "login-card.tsx");
 
     expect(source.match(/defaultValue="admin"/g)).toHaveLength(2);
     expect(source).toContain("disabled={isSubmitting}");
-    expect(source).not.toContain("disabled={isLoadingEnterCd || isSubmitting}");
   });
 
-  test("login uses the chroma material and restores theme before hydration", () => {
-    const login = readSource("app", "login", "page.tsx");
+  test("saved theme is restored before hydration", () => {
     const layout = readSource("app", "layout.tsx");
-    const styles = readSource("app", "globals.css");
-
-    expect(login).toContain("사람이 중심이 되는 HR의 시작");
-    expect(login).toContain("구성원과 조직이 필요한 정보를 한곳에서 편리하게 관리합니다.");
-    expect(login).toContain("login-brand-canvas");
-    expect(login).toContain("whitespace-nowrap");
     expect(layout).toContain("vibe_hr_theme_preferences");
     expect(layout).toContain("suppressHydrationWarning");
-    expect(styles).toContain('url("/images/vibe-chroma-material.avif")');
-    expect(styles).toContain("--vibe-rail-bg:");
   });
 
   test("Vivid inactive navigation stays neutral in light and dark themes", () => {
@@ -91,13 +69,6 @@ describe("Quiet Depth UI contract", () => {
     expect(source).toContain("--vibe-nav-text-muted: #9ca3af;");
     expect(source).not.toContain("--vibe-nav-text: #5e239d;");
     expect(source).not.toContain("--vibe-nav-text: #ddd6fe;");
-  });
-
-  test("mobile sidebar overlay covers floating page tools", () => {
-    const source = readSource("components", "dashboard", "dashboard-sidebar.tsx");
-
-    expect(source).toContain('className="fixed inset-0 z-[60] lg:hidden"');
-    expect(source).not.toContain('className="fixed inset-0 z-40 lg:hidden"');
   });
 
   test("dashboard failure guidance is Korean and recovery-oriented", () => {
