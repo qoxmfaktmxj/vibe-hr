@@ -170,3 +170,45 @@
 - V1/V2/V3 remain intentionally non-reversible; recovery continues to require the verified backup-and-stop procedure.
 - The direct workspace retirement verifier currently sees the isolated `backend-spring/.gradle-cutover-fix` cache created by this verification lane. It is not source or runtime content, but it must be removed before that direct workspace command is green. The execution policy prevented its deletion during this task; the artifact-free mirror passed.
 - An additional local Terra CLI review could not run because the installed CLI is too old for `gpt-5.6-terra`; runtime, integration, and static verification above completed successfully.
+
+## TASK VH-R2-EMPLOYEE-EXPERIENCE-20260906
+- Date: 2026-09-06
+- Status: implementation verified and reviewed
+- Type: frontend design and usability improvement
+- Risk Class: R2 common UI, with authentication-facing feedback and session display safeguards
+- Approval Status: user explicitly approved all critique recommendations, further score improvements, and push
+- Branch: codex/employee-experience-design
+
+### Scope
+- Login brand composition, Korean labels, social consent/account-creation guidance, password visibility, and status-based error recovery.
+- Header hierarchy, account/settings/help controls, touch and keyboard tab management, labeled navigation and responsive dialogs.
+- Person-first profile, grouped facts, employment status, controlled scrolling, focus restoration, loading/error/empty states and request cancellation.
+- Session retry and stale-read protection after successful renewal. Spring authentication, authorization, schema, payroll and deployment configuration remain unchanged.
+
+### Evidence
+- Baseline relevant unit suite: 22 tests passed before implementation.
+- Final validate:grid: PASS for all registered screens.
+- Final npm run lint: PASS, 0 errors and 15 existing warnings in unchanged business modules.
+- Final npm run test: PASS, 19 files and 146 tests.
+- Final npx tsc --noEmit: PASS.
+- Dedicated Playwright experience suite: PASS, 30 tests, 0 failed/skipped/flaky. Includes existing business grids and tab navigation, mobile/short-height scrolling, focus, reduced motion, request failure and retry boundaries.
+- Final npm run build: PASS, including TypeScript and 190 generated routes.
+- Independent code review: APPROVE after regression fixes.
+- Independent Nielsen review: 37/40; visual review: 94/100. Initial provisional score 22, intermediate 32. Details in frontend/docs/EMPLOYEE_EXPERIENCE_REVIEW.md.
+
+### Changes And Simplification
+- Frontend auth/login, app-shell/account/theme/session, sidebar/profile and their scoped styles; existing Dialog motion-reduction override.
+- Replaced repeated profile tone cards and orphaned login CSS with focused components and grouped definition lists.
+- Replaced brittle legacy style-string assertions with browser behavior coverage while retaining relevant existing contracts.
+- Added isolated synthetic test backend/config and frontend/DESIGN.md. No new dependencies.
+
+### Iteration And Recovery
+- First browser pass exposed viewport, focus and transition issues; subsequent targeted regressions and full passes resolved them.
+- A timing-sensitive renewal test was corrected to switch failure only after POST and use a controlled browser clock; its final case proves zero stale-countdown logouts and recovery.
+- Local 8080 was identified as Oracle, so QA used owned loopback 3100/3101 fixtures without changing existing services or databases.
+
+### Remaining Limits And Rollback
+- QA uses synthetic backend data and does not certify production Spring/OAuth/security behavior or all real organization data.
+- Existing lint warnings are outside the approved change scope.
+- Publication is a reviewed feature branch and PR; no main merge or deployment is implied by this record.
+- Rollback: revert the frontend change commit; no schema or infrastructure rollback is required.
