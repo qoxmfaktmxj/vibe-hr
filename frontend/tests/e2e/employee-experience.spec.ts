@@ -479,3 +479,60 @@ test("malformed remaining time is recoverable and is not treated as expiration",
   await expect(page.getByRole("button", { name: "로그인 시간 다시 확인", exact: true })).toBeEnabled();
   await expect(page).toHaveURL(/\/dashboard$/);
 });
+
+test("conservatory water motion pauses and resumes without blocking login", async ({ page }) => {
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  const first = await scene.getAttribute("data-frame");
+  await expect.poll(() => scene.getAttribute("data-frame")).not.toBe(first);
+  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toBeInViewport();
+  await page.getByRole("button", { name: "배경 일시 정지", exact: true }).click();
+  await expect(scene).toHaveAttribute("data-motion", "paused");
+  const frozen = await scene.getAttribute("data-frame");
+  await page.waitForTimeout(150);
+  expect(await scene.getAttribute("data-frame")).toBe(frozen);
+  await page.getByRole("button", { name: "배경 재생", exact: true }).click();
+  await expect.poll(() => scene.getAttribute("data-frame")).not.toBe(frozen);
+  await signIn(page);
+});
+
+test("reduced motion keeps the scenic image static and the form usable", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-motion", "paused");
+  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+});
+
+test("static scenic fallback preserves login when WebGL is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", { value: function (type: string, ...args: unknown[]) {
+      if (type === "webgl" || type === "webgl2") return null;
+      return Reflect.apply(original, this, [type, ...args]);
+    } });
+  });
+  await page.goto("/login");
+  await expect(page.locator('img[src*="conservatory-login"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toHaveCount(0);
+  await capture(page, "login-static-fallback.png");
+  await signIn(page);
+});
+
+test("lost WebGL context returns to the static background", async ({ page }) => {
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  const supported = await scene.evaluate((element) => {
+    const extension = (element as HTMLCanvasElement).getContext("webgl2")?.getExtension("WEBGL_lose_context");
+    extension?.loseContext();
+    return Boolean(extension);
+  });
+  expect(supported).toBe(true);
+  await expect(scene).toHaveAttribute("data-ready", "false");
+  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toHaveCount(0);
+  await expect(page.locator('img[src*="conservatory-login"]')).toBeVisible();
+});

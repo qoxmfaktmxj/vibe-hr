@@ -38,7 +38,7 @@ function AuthCard({ children }: { children: React.ReactNode }) {
 function AuthCardIntro() {
   return (
     <CardHeader className="space-y-3 px-6 pb-4 pt-6 text-left">
-      <Image src="/vibehr_mark.svg" alt="" width={32} height={32} className="h-8 w-8 lg:hidden" aria-hidden="true" />
+      <Image src="/vibehr_mark.svg" alt="" width={32} height={32} className="h-8 w-8" aria-hidden="true" />
       <div className="space-y-2">
         <h1 className="text-[clamp(1.8rem,2.4vw,2.1rem)] font-black tracking-[-0.04em] text-foreground">
           VIBE-HR 로그인

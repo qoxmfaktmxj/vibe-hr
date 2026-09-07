@@ -1,0 +1,12 @@
+{
+  "asset": "pearl-matcap.webp",
+  "source_kind": "independently generated material texture",
+  "generated_by": "Codex built-in image generation",
+  "prompt": "Use case: stylized-concept. Asset type: square sphere MATCAP texture for a live Three.js pearl material, no UI. Generate a physically convincing lustrous ivory pearl sphere viewed exactly front-on with orthographic projection. The perfectly round sphere must fill the entire square edge-to-edge, touching the midpoint of all four edges; center exactly (50%,50%), radius exactly 50% of canvas width. Outside the circular sphere use neutral warm gray. No floor, contact shadow, pedestal, scene, text or other objects. Lighting is soft bright studio light from the upper left: one luminous broad white highlight at about (35%,30%) and soft creamy mids, with enough gently shaded lavender-gray lower right rim to read as a rounded three-dimensional sphere. The surface is polished nacre with subtle delicate pink, pale gold, ice blue and a touch of pale mint iridescence only following rounded light bands near the edges. Nearly white overall, like a pearl in a pastel pink architectural conservatory. Photorealistic smooth pearl sheen and soft reflection gradients, not chrome, not transparent glass, not matte clay. Avoid obvious spiral swirls, rainbow candy patterns, concentric colored rings, saturated green, hard black shadow or a flat white disc. Output a clean square material texture, high quality, ready to sample as a matcap.",
+  "original": "exec-1648040f-1d92-4043-ab86-104ff51865a6.png",
+  "transformation": "Resized to 512 square and WebP encoded for matcap texture sampling",
+  "created": "2026-09-06",
+  "usage": "MeshMatcapMaterial on the actual 3D pearl sphere, loaded as an sRGB texture with async invalidation and disposal; retained after in-scene comparison",
+  "sha256": "9f67b8286f260ac0eb48b7a153bcd66aba689373a34128380014c8fa9e69f5e6",
+  "original_location": "Local Codex generation archive"
+}

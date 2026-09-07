@@ -1,0 +1,22 @@
+{
+  "asset": "Worn Rock Natural 01",
+  "publisher": "Poly Haven",
+  "authors": ["Dimitrios Savva", "Rob Tuytel"],
+  "license": "CC0-1.0",
+  "license_url": "https://polyhaven.com/license",
+  "source_page": "https://polyhaven.com/a/worn_rock_natural_01",
+  "retrieved": "2026-09-06",
+  "files": {
+    "rock-color.jpg": {
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/worn_rock_natural_01/worn_rock_natural_01_diff_1k.jpg",
+      "md5": "f410522eec19eb12e2b96ad4386b8493",
+      "modification": "None. Original 1K color map. Display tint applied by independently authored material."
+    },
+    "rock-normal.jpg": {
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/worn_rock_natural_01/worn_rock_natural_01_nor_gl_1k.jpg",
+      "md5": "8645b86f5cb360b626086a4dc286340a",
+      "modification": "None. Original 1K OpenGL normal map."
+    }
+  },
+  "scene_geometry": "Independent procedural geometry and heightfield simulation. No original Unseen application bundle or GLB models included."
+}
