@@ -1,4 +1,4 @@
-import { LoginBrand } from "@/components/auth/login-brand";
+import { LoginScene } from "@/components/auth/login-scene";
 import { socialLoginErrorMessageFor } from "@/components/auth/login-errors";
 import { LoginCard } from "@/components/auth/login-card";
 import styles from "@/components/auth/login.module.css";
@@ -13,13 +13,11 @@ export default async function LoginPage({
 
   return (
     <main className={styles.shell}>
-      <div className={styles.brandPanel}>
-        <LoginBrand />
-      </div>
-
+      <LoginScene />
       <section className={styles.formPanel}>
         <div className={styles.formWrap}>
           <LoginCard initialErrorMessage={initialErrorMessage} />
+          <p className={styles.tagline}>사람이 중심이 되는 HR의 시작</p>
           <p className={styles.footerNote}>
             2026 VIBE-HR SYSTEMS, 사람을 위한 인사관리
           </p>

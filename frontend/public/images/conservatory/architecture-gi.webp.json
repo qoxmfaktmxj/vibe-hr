@@ -1,0 +1,77 @@
+{
+  "asset": "architecture-gi.webp",
+  "source_kind": "independently authored 3D scene render",
+  "generated_by": "Three.js 0.183.2 and three-gpu-pathtracer 0.0.24, offline GPU rendering",
+  "geometry": "Independent primitive construction using coarse reference measurements. No original vertex buffers, texture atlases or application bundle included.",
+  "rendered_surfaces": "Static architecture and surrounding terrain. Live water, pearl and foreground stones excluded from this lighting plate.",
+  "camera": {
+    "position": [
+      -2.5776012,
+      2.8385067,
+      7.5180285
+    ],
+    "target": [
+      -8.3081424,
+      2.8385067,
+      -5.6805063
+    ],
+    "vertical_fov_degrees": 52,
+    "aspect": "10/7",
+    "width": 2240,
+    "height": 1568
+  },
+  "render_settings": {
+    "samples": 128,
+    "bounces": 5,
+    "tone_mapping": "ACESFilmicToneMapping",
+    "exposure": 2.1,
+    "denoise": {
+      "sigma": 2.5,
+      "kSigma": 2,
+      "threshold": 0.065
+    },
+    "pre_tonemap_rgb_grade": [
+      0.97,
+      1.12,
+      1.18
+    ],
+    "environment_intensity": 0.2,
+    "key_light": {
+      "kind": "area",
+      "position": [
+        -18,
+        35,
+        10
+      ],
+      "target": [
+        -9,
+        2,
+        -12
+      ],
+      "width": 1.5,
+      "height": 1.5,
+      "intensity": 960
+    },
+    "fill_light": {
+      "kind": "area",
+      "position": [
+        -2,
+        5,
+        6
+      ],
+      "target": [
+        -13,
+        5,
+        -5
+      ],
+      "width": 8,
+      "height": 3,
+      "intensity": 3
+    }
+  },
+  "reference_style": "https://unseen.co/",
+  "integration": "Fixed wide-frustum projection onto the actual architecture meshes. Actual viewing camera and reflective water remain real-time. Runtime material grade and visibility masks are defined in source.",
+  "reproduction": ".omx/fidelity-90/bake/entry.ts, build.cjs and capture.cjs",
+  "created": "2026-09-06",
+  "sha256": "b24148385122aac160a2b54c7ea8c4caf1787655bdc6c1dbed30966d8800bdee"
+}

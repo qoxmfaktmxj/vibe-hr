@@ -218,3 +218,83 @@
 - Regenerated inventory changes only java_source_file_count from 138 to 140; table mappings and Java, SQL, migration and immutable snapshot sources are unchanged.
 - Complete schema verification, mutation ledger and all Flyway verification checks passed against a Git archive exported with original LF bytes. This avoids Windows checkout line-ending conversion being misread as immutable evidence drift.
 - Python retirement and BFF cutover audits also passed. This R0 documentation correction is included to restore the existing delivery check.
+
+## TASK VH-R1-SCENIC-LOGIN-20260906
+- Date: 2026-09-06
+- Status: implemented, verified and independently reviewed
+- Risk Class: R1 isolated frontend presentation
+- Approval Status: user approved both selected background directions and requested implementation
+- Branch: codex/reference-backgrounds
+
+### Scope And Changed Files
+- `frontend/src/app/login/page.tsx`: centered existing login form over the architectural scene.
+- `frontend/src/components/auth/login-scene.tsx`: local image, native WebGL water distortion, pause, reduced motion, hidden-tab suspension and static fallback.
+- `frontend/src/components/auth/login.module.css`: scene composition, readable form and responsive motion control.
+- `frontend/src/components/auth/login-card.tsx`: display the existing monogram at desktop as well as mobile widths.
+- `frontend/src/components/auth/login-brand.tsx`: removed the orphaned brand panel after the layout replacement.
+- `frontend/public/images/conservatory-login.webp` and its JSON sidecar: new generated scene and generation provenance.
+- `frontend/tests/e2e/employee-experience.spec.ts`: four browser regressions covering scene controls, reduced motion and WebGL fallback.
+- `frontend/DESIGN.md` and this ledger: current design and completion evidence.
+
+### Evidence
+- `npm run validate:grid`: PASS for all registered screens.
+- `npm run lint`: PASS, 0 errors and 15 existing warnings in unchanged modules.
+- `npm run test`: PASS, 19 files and 146 tests.
+- `npx tsc --noEmit`: PASS.
+- Dedicated Playwright experience suite: PASS, 34 tests, 0 failed, skipped or flaky. Existing login, profile, navigation, grid, theme and session regressions remain green.
+- `npm run build`: PASS, including TypeScript and 190 generated routes.
+- Desktop and mobile screenshots reviewed after the control stacking correction. Visual verdict 92/100; independent code review APPROVE.
+- Evidence: `.omx/reference-backgrounds/verification.md` and `.omx/reference-backgrounds/hr-final-results.json`.
+
+### Simplification And Remaining Limits
+- Replaced the split brand panel and its decorative geometry with one scene and the existing form. No new dependencies or authentication behavior changes.
+- The background is a newly generated image with water distortion. It is not the original reference site's complete 3D environment.
+- Browser coverage uses the isolated synthetic backend and does not certify production Spring/OAuth behavior. Hardware GPU performance was not measured.
+- Companion landing hero work is verified separately in the landing-minseok91 repository; its existing unrelated work was preserved.
+- Local implementation only. No PR publication, merge or deployment is implied by this entry.
+
+## TASK VH-R1-REFERENCE-FIDELITY-20260906
+- Date: 2026-09-06
+- Status: implemented, independently accepted and verified; main publication authorized
+- Risk Class: R1 presentation and scene rendering
+- Approval: user set a persistent goal of at least90-percent similarity to Unseen and Igloo, including cursor interactions, and explicitly approved Three.js and all necessary packages.
+
+### Implementation
+- HR `login-scene.tsx` now loads an actual spatial renderer and title overlay; `conservatory-scene.ts` owns room geometry, real water reflection/refraction, pointer raycasts, wave propagation and camera parallax.
+- `liquid-title.ts` renders actual glyph contours in a deforming shader. `login.module.css` places the form on the right at desktop and keeps a scrollable complete form on mobile over a viewport-sized scene.
+- Three.js and its development types are added to the package/lock files. Local CC0 stone textures and provenance are under `frontend/public/images/conservatory/`.
+- `playwright.scene.config.ts` and `scene-fidelity.spec.ts` add controlled rendered-pixel interaction evidence. The existing context-loss regression now targets the actual WebGL2 context.
+- Static architectural GI is now an offline pathtrace of the independently authored actual geometry. The registered projection uses a depth visibility mask; a separately generated pearl matcap adds surface lighting. The discarded generated architecture-light experiment is preserved in the local research archive.
+
+### Verified Checkpoint
+- Before projected-lighting experiment: grid validator PASS; lint0errors/15existing warnings;146unit tests PASS; TypeScript PASS; production build PASS with190generated routes.
+- Hardware Playwright combined suite:35tests PASS,0failed/skipped/flaky in `.omx/fidelity-90/hr-checkpoint-suite.json`.
+- Real GTX1060 D3D11 probe: approximately60fps, actualcamera movement, pointer/water intersection and nonzero propagating wave energy. Software-headless timeouts were diagnosed separately; no test assertions were relaxed to hide them.
+- Controlled screenshots prove title-outline and water-image changes due to cursor input. These checks prove behavior, not90-percent reference fidelity.
+
+### Completion Gates
+- Both actual3D scenes passed the same independent reference rubric at90/100. Earlier92/93image-background scores were not used for this acceptance.
+- Current desktop/mobile, shifted camera, hover, movement and settled evidence was inspected. Original mobile references and candidate mobile traces use native browser touch events.
+- Rendering lifecycle, asset provenance, TypeScript, lint, builds and relevant browser checks passed. Authentication semantics, backend, grid conventions and deployment configuration retain their existing contracts.
+- On2026-09-07 the user explicitly requested both repositories be published to main after completion. GitHub PR/CI state and the fetched main commit are the publication source of truth.
+
+### Earlier Optics Checkpoint
+- An earlier independently reviewed HR scene scored86/100. Subsequent work corrected pearl iridescence, external rock detail, broader water undulation and ambient particle softness.
+- `hr-materials-suite.json`:35 hardware browser tests passed,0failed/skipped/flaky, including loaded pearl texture, title-outline/water pixel comparison and visible pause-button position.
+- `hr-software-scene-regressions.json`:4 default headless scene regressions passed, covering motion controls, reduced motion and WebGL fallback/context loss.
+- `npm run build`:PASS on optics engine43A593F58F52B800 and lighting helperA4DC171F0034C368. Output is recorded in `.omx/fidelity-90/hr-optics-build.log`.
+- Independent optics delta code review:APPROVE, no findings and zero TypeScript diagnostics. Evidence: `.omx/fidelity-90/hr-optics-runtime-review.json`.
+- Hardware motion probe:60fps; isolated water energy decays from4.793479 at1second to0.159903 at8seconds with fixed camera. These are functional/performance measurements, not visual similarity percentages.
+- This earlier checkpoint was superseded by the final acceptance below.
+
+### Final Acceptance And Verification
+- Independent final audit: HR90/100, companion landing90/100, every category at least80percent. The rubric covers composition/geometry, materials/light, cursor/camera response, continuous atmosphere and typography integration. Scores are visual judgments, not pixel equality percentages.
+- Current HR scene uses measured architecture and camera framing, source-calibrated independent idle motion, an authored pearl matcap, detailed exterior/stone materials,84 soft motes and a propagating water heightfield. Squared vec2 offsets replace undefined negative-base GLSL pow in the pearl tint.
+- `npm run validate:grid`, `npm run lint`, `npm run test`, `npx tsc --noEmit` and `npm run build`:PASS. Unit coverage is146tests across19files; lint has0errors and15existing warnings.
+- Full UI/browser checkpoint:35passed. After the mathematically equivalent pearl shader repair, the rendered interaction test and production build passed again.
+- Additional runtime probes on the actual Next app confirm hidden/offscreen suspension and resume, route-unmount GPU disposal, stopped draw work and harmless completion of a delayed pearl texture after navigation.
+- Local GTX1060 D3D11 rendering measured approximately60fps. Source-calibrated camera range/speed and water decay were measured separately from visual scoring.
+- Browser auth/profile/grid checks use synthetic backend fixtures. They do not certify production Spring/OAuth behavior. Mobile form input intentionally belongs to the form; exact original noise phases, mineral patterns and all optical details are not claimed.
+- The companion landing includes actual70-piece igloo geometry,1200 snow particles, local hover displacement, continuously attached terrain material and low overlapping middle ridges. Its production build, lint,19 functional probes,3 resource lifecycle probes and6 portable Playwright cases passed.
+- Implementation audit, current hash associations and named source/candidate captures are retained under the local `.omx/fidelity-90/` evidence archive. Public assets include source/license records and generation prompts with local absolute user paths removed.
+- Rollback is a revert of the frontend presentation change; no database or infrastructure rollback is required.

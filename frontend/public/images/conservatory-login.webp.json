@@ -1,0 +1,8 @@
+{
+  "asset": "conservatory-login.webp",
+  "generated_by": "Codex built-in image generation",
+  "reference_url": "https://www.awwwards.com/sites/unseen-studio",
+  "reference_role": "Visual composition and material reference, not a shipped source asset",
+  "prompt": "Create a high-resolution widescreen 16:9 BACKGROUND ART asset for a polished HR login, using the supplied screenshot as the visual reference. Render a fresh, richly detailed architectural scene extremely close to the reference's camera, scale, materials and atmosphere: warm pale blush plaster architecture; large arch opening on the left to a soft lavender landscape; pale central steps rising out of a shallow reflective pool; tall rectangular openings in the right wall; an opalescent sphere on the platform and a natural pale stone near the water. Water covers roughly the lower 45 percent and has subtle blue/pink reflections and very fine ripples. Soft realistic daylight, quiet premium architectural visualization, level horizon, physically plausible soft shadows, high-end render. Preserve the reference's spacious architectural composition, with visual detail mostly outside the central login-panel area. Important: ONLY the scenic background. Absolutely no letters, logos, typography, captions, copyright marks, cursors, UI, buttons, borders, website frame, split-panel mockup or tilted decorative polygons. No new abstract brand symbol. Output one wide landscape image, as detailed and clean as possible.",
+  "sha256": "96003bc18a32554782142a436f6d2e9be7335041bfadaa0d7bb4dbb6f43ee74c"
+}
