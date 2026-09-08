@@ -480,20 +480,13 @@ test("malformed remaining time is recoverable and is not treated as expiration",
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
-test("conservatory water motion pauses and resumes without blocking login", async ({ page }) => {
+test("conservatory motion control stays hidden without blocking login", async ({ page }) => {
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
   await expect(scene).toHaveAttribute("data-ready", "true");
   const first = await scene.getAttribute("data-frame");
   await expect.poll(() => scene.getAttribute("data-frame")).not.toBe(first);
-  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toBeInViewport();
-  await page.getByRole("button", { name: "배경 일시 정지", exact: true }).click();
-  await expect(scene).toHaveAttribute("data-motion", "paused");
-  const frozen = await scene.getAttribute("data-frame");
-  await page.waitForTimeout(150);
-  expect(await scene.getAttribute("data-frame")).toBe(frozen);
-  await page.getByRole("button", { name: "배경 재생", exact: true }).click();
-  await expect.poll(() => scene.getAttribute("data-frame")).not.toBe(frozen);
+  await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toBeHidden();
   await signIn(page);
 });
 
