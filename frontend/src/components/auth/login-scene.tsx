@@ -22,6 +22,10 @@ export function LoginScene() {
     let title: ReturnType<typeof import("./liquid-title").createLiquidTitle> | undefined;
     let disposed = false;
     let lost = false;
+    let loading = false;
+    let sceneReady = false;
+    let idleCallback: number | undefined;
+    let loadTimer: number | undefined;
     let visible = true;
     let frame = 0;
     let previous = 0;
@@ -32,7 +36,7 @@ export function LoginScene() {
 
     const canAnimate = () => !disposed && !lost && visible && !document.hidden && !reduced.matches && !pausedRef.current;
     const draw = (delta: number) => {
-      if (!world || !title || lost || disposed) return;
+      if (!sceneReady || !world || !title || lost || disposed) return;
       world.render(time, delta);
       title.render(time, delta);
       world.renderOverlay(title.scene, title.camera);
@@ -43,12 +47,12 @@ export function LoginScene() {
       frame = 0;
       if (!canAnimate()) return;
       const delta = previous ? Math.min((now - previous) / 1000, .05) : 0;
-      if (previous && now - previous > 65) slowFrames++;
+      if (previous && now - previous > 36) slowFrames++;
       else slowFrames = Math.max(0, slowFrames - 1);
-      if (slowFrames >= 8 && resolutionScale > .45) {
+      if (slowFrames >= 24 && resolutionScale > .45) {
         resolutionScale = Math.max(.45, resolutionScale * .75);
         slowFrames = 0;
-        world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.5) * resolutionScale);
+        world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.25) * resolutionScale);
       }
       previous = now;
       time += delta;
@@ -59,13 +63,17 @@ export function LoginScene() {
       cancelAnimationFrame(frame);
       frame = 0;
       previous = 0;
+      if (!sceneReady) {
+        scheduleLoad();
+        return;
+      }
       title?.setReducedMotion(reduced.matches);
       draw(0);
       if (world && canAnimate()) frame = requestAnimationFrame(tick);
     };
     const resize = () => {
       bounds = canvas.getBoundingClientRect();
-      world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.5) * resolutionScale);
+      world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.25) * resolutionScale);
       title?.resize(bounds.width, bounds.height);
       sync();
     };
@@ -105,26 +113,48 @@ export function LoginScene() {
     document.addEventListener("visibilitychange", sync);
     reduced.addEventListener("change", sync);
 
-    void Promise.all([import("./conservatory-scene"), import("./liquid-title"), document.fonts.ready]).then(([sceneModule, titleModule]) => {
-      if (disposed) return;
-      world = sceneModule.createConservatoryScene(canvas, sync);
-      title = titleModule.createLiquidTitle(getComputedStyle(shell).fontFamily);
-      resize();
-      canvas.dataset.ready = "true";
-      setReady(true);
-    }).catch(() => {
-      if (disposed) return;
-      cancelAnimationFrame(frame);
-      world?.dispose();
-      title?.dispose();
-      world = undefined;
-      title = undefined;
-      canvas.dataset.ready = "false";
-      setReady(false);
-    });
+    function scheduleLoad() {
+      if (loading || idleCallback !== undefined || loadTimer !== undefined || !canAnimate()) return;
+      const load = () => {
+        idleCallback = undefined;
+        loadTimer = undefined;
+        if (!canAnimate()) return;
+        loading = true;
+        void Promise.all([import("./conservatory-scene"), import("./liquid-title"), document.fonts.ready]).then(async ([sceneModule, titleModule]) => {
+          if (!canAnimate()) { loading = false; return; }
+          world = sceneModule.createConservatoryScene(canvas!);
+          title = titleModule.createLiquidTitle(getComputedStyle(shell!).fontFamily);
+          await world.ready;
+          if (disposed || lost) return;
+          sceneReady = true;
+          resize();
+          canvas!.dataset.ready = "true";
+          setReady(true);
+        }).catch(() => {
+          if (disposed) return;
+          cancelAnimationFrame(frame);
+          world?.dispose();
+          title?.dispose();
+          world = undefined;
+          title = undefined;
+          sceneReady = false;
+          canvas!.dataset.ready = "false";
+          canvas!.dataset.motion = "paused";
+          setReady(false);
+        });
+      };
+      if (typeof window.requestIdleCallback === "function") {
+        idleCallback = window.requestIdleCallback(load, { timeout: 1500 });
+      } else {
+        loadTimer = window.setTimeout(load, 250);
+      }
+    }
+    scheduleLoad();
 
     return () => {
       disposed = true;
+      if (idleCallback !== undefined) window.cancelIdleCallback(idleCallback);
+      if (loadTimer !== undefined) window.clearTimeout(loadTimer);
       cancelAnimationFrame(frame);
       sizeObserver.disconnect();
       visibilityObserver.disconnect();
@@ -143,7 +173,7 @@ export function LoginScene() {
     <>
       <div className={styles.scene} aria-hidden="true">
         <Image src="/images/conservatory-login.webp" fill priority sizes="100vw" alt="" className={styles.sceneImage} />
-        <canvas ref={canvasRef} className={styles.sceneCanvas} data-testid="login-scene" />
+        <canvas ref={canvasRef} className={styles.sceneCanvas} data-testid="login-scene" data-ready="false" data-motion="paused" />
       </div>
       <div className={`${styles.sceneHeading} ${ready ? styles.sceneHeadingReady : ""}`}>
         <p>사람이 중심이 되는</p>

@@ -491,13 +491,72 @@ test("conservatory motion control stays hidden without blocking login", async ({
 });
 
 test("reduced motion keeps the scenic image static and the form usable", async ({ page }) => {
+  const textures: string[] = [];
+  page.on("request", request => {
+    if (request.url().includes("/images/conservatory/")) textures.push(request.url());
+  });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
-  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-ready", "false");
   await expect(scene).toHaveAttribute("data-motion", "paused");
   await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+  await signIn(page);
+  expect(textures).toEqual([]);
+});
+
+test("scene waits for its textures while the login form stays usable", async ({ page }) => {
+  let releaseTexture!: () => void;
+  const textureGate = new Promise<void>(resolve => { releaseTexture = resolve; });
+  let textureRequested!: () => void;
+  const textureStarted = new Promise<void>(resolve => { textureRequested = resolve; });
+  await page.route("**/images/conservatory/rock-normal.webp", async route => {
+    textureRequested();
+    await textureGate;
+    await route.continue();
+  });
+  try {
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await textureStarted;
+    const scene = page.getByTestId("login-scene");
+    await expect(scene).toHaveAttribute("data-ready", "false");
+    await page.getByLabel("아이디", { exact: true }).fill("still-usable");
+    await expect(page.getByLabel("아이디", { exact: true })).toHaveValue("still-usable");
+    await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+    releaseTexture();
+    await expect(scene).toHaveAttribute("data-ready", "true");
+  } finally {
+    releaseTexture();
+  }
+});
+
+test("failed scene texture preserves the static background and login", async ({ page }) => {
+  await page.route("**/images/conservatory/architecture-gi.webp", route => route.abort("failed"));
+  await page.goto("/login");
+  await expect(page.getByTestId("login-scene")).toHaveAttribute("data-ready", "false");
+  await expect(page.locator('img[src*="conservatory-login"]')).toBeVisible();
+  await signIn(page);
+});
+
+test("changing the motion preference starts and stops the scene", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "false");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-motion", "playing");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(scene).toHaveAttribute("data-motion", "paused");
+});
+
+test("scene loads when requestIdleCallback is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "requestIdleCallback", { value: undefined });
+  });
+  await page.goto("/login");
+  await expect(page.getByTestId("login-scene")).toHaveAttribute("data-ready", "true");
 });
 
 test("static scenic fallback preserves login when WebGL is unavailable", async ({ page }) => {

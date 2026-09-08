@@ -8,7 +8,7 @@
 
 .scene { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
 .sceneImage { object-fit: cover; object-position: center; }
-.sceneCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; }
+.sceneCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .35s ease-out; }
 .sceneCanvas[data-ready="true"] { opacity: 1; }
 .sceneHeading {
   position: fixed;
@@ -23,6 +23,10 @@
 .sceneHeading p:first-child { font-size: clamp(20px, 2.1vw, 30px); font-weight: 400; }
 .sceneHeading p:last-child { font-size: clamp(60px, 7vw, 112px); font-weight: 500; line-height: 1.4; letter-spacing: -.04em; }
 .sceneHeadingReady { color: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sceneCanvas { transition: none; }
+}
 
 .formPanel {
   position: relative;

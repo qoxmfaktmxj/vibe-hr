@@ -4,14 +4,9 @@ async function prepare(page: Page) {
   await page.clock.install({ time: new Date("2026-09-06T00:00:00Z") });
   await page.clock.pauseAt(new Date("2026-09-06T01:00:00Z"));
   await page.goto("/login");
+  // 지연 로딩 타이머만 넘기고, 장면이 준비된 뒤에는 동일한 시간 간격으로 비교한다.
+  await page.clock.fastForward(1600);
   await expect(page.getByTestId("login-scene")).toHaveAttribute("data-ready", "true");
-  await page.evaluate(async () => {
-    await Promise.all(["rock-color.jpg", "rock-normal.jpg", "architecture-gi.webp", "pearl-matcap.webp"].map(async (name) => {
-      const image = new Image();
-      image.src = `/images/conservatory/${name}`;
-      await image.decode();
-    }));
-  });
 }
 
 async function comparePixels(page: Page, before: Buffer, after: Buffer) {

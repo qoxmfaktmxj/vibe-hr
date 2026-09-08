@@ -7,7 +7,7 @@ export function createArchitectureLighting(
   baseCamera: THREE.PerspectiveCamera,
   wallMaterial: THREE.MeshStandardMaterial,
   stairMaterial: THREE.MeshStandardMaterial,
-  onInvalidate?: () => void,
+  loadingManager: THREE.LoadingManager,
 ) {
   let disposed = false;
   const projector = baseCamera.clone();
@@ -53,14 +53,13 @@ export function createArchitectureLighting(
     inverseAcesInput: { value: new THREE.Matrix3().set(.59719,.35458,.04823,.076,.90834,.01566,.0284,.13383,.83777).invert() },
     inverseAcesOutput: { value: new THREE.Matrix3().set(1.60475,-.53108,-.07367,-.10208,1.10813,-.00605,-.00327,-.07276,1.07602).invert() },
   };
-  const texture = new THREE.TextureLoader().load("/images/conservatory/architecture-gi.webp", (loaded) => {
+  const texture = new THREE.TextureLoader(loadingManager).load("/images/conservatory/architecture-gi.webp", (loaded) => {
     if (disposed) return;
     // The bake is display RGB; grading precedes the explicit sRGB transfer below.
     loaded.colorSpace = THREE.NoColorSpace;
     loaded.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
     uniforms.architectureGi.value = loaded;
     uniforms.architectureStrength.value = .93;
-    onInvalidate?.();
   });
 
   for (const material of [wallMaterial, stairMaterial]) {

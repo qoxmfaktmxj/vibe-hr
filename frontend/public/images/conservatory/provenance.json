@@ -7,15 +7,17 @@
   "source_page": "https://polyhaven.com/a/worn_rock_natural_01",
   "retrieved": "2026-09-06",
   "files": {
-    "rock-color.jpg": {
+    "rock-color.webp": {
       "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/worn_rock_natural_01/worn_rock_natural_01_diff_1k.jpg",
-      "md5": "f410522eec19eb12e2b96ad4386b8493",
-      "modification": "None. Original 1K color map. Display tint applied by independently authored material."
+      "source_md5": "f410522eec19eb12e2b96ad4386b8493",
+      "modification": "Original 1K JPEG re-encoded to WebP with sharp 0.35.3, quality 95, effort 6. Dimensions and map orientation retained.",
+      "sha256": "f01665401541626f722b08ae07597c3379e06a287e34228c9def07c55781a597"
     },
-    "rock-normal.jpg": {
+    "rock-normal.webp": {
       "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/worn_rock_natural_01/worn_rock_natural_01_nor_gl_1k.jpg",
-      "md5": "8645b86f5cb360b626086a4dc286340a",
-      "modification": "None. Original 1K OpenGL normal map."
+      "source_md5": "8645b86f5cb360b626086a4dc286340a",
+      "modification": "Original 1K JPEG re-encoded to WebP with sharp 0.35.3, quality 98, effort 6. Dimensions and map orientation retained.",
+      "sha256": "7dba02962f7f75ed60feac71199c89d2785012d97b6ed56919041ec71472e2a0"
     }
   },
   "scene_geometry": "Independent procedural geometry and heightfield simulation. No original Unseen application bundle or GLB models included."

@@ -6,6 +6,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { createArchitectureLighting } from "./conservatory/architecture-lighting";
 
 export interface ConservatoryScene {
+  readonly ready: Promise<void>;
   resize(width: number, height: number, pixelRatio: number): void;
   render(timeSeconds: number, deltaSeconds: number): void;
   renderOverlay(scene: THREE.Scene, camera: THREE.Camera): void;
@@ -196,7 +197,7 @@ const waterShader = {
       distortion += normalize(rockOffset + .001) * sin((rockDistance-1.)*24.-time*1.6) * exp(-abs(rockDistance-1.)*6.) * .0017;
       distortion += gradient * .10;
       vec2 projected = mirrorUv.xy / mirrorUv.w;
-      float softness=.0011+.0022*smoothstep(-.6,.7,swell);
+      float softness=.0007+.0013*smoothstep(-.6,.7,swell);
       vec3 reflected=texture2D(tDiffuse,projected+distortion).rgb*.36;
       reflected+=texture2D(tDiffuse,projected+distortion+vec2(softness,softness*.45)).rgb*.16;
       reflected+=texture2D(tDiffuse,projected+distortion-vec2(softness,softness*.45)).rgb*.16;
@@ -222,8 +223,8 @@ const waterShader = {
 };
 
 /** An independently authored room, terrain and water simulation, with no downloaded site models. */
-export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?: () => void): ConservatoryScene {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
+export function createConservatoryScene(canvas: HTMLCanvasElement): ConservatoryScene {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: "high-performance" });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;
@@ -268,8 +269,13 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
   const plaster = keep(new THREE.MeshStandardMaterial({ color: "#dcb2a8", roughness: 0.91, map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.005 }));
   const stepMaterial = keep(new THREE.MeshStandardMaterial({ color: "#edddd4", roughness: 0.79, map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.009 }));
   const stoneMaterial = keep(new THREE.MeshStandardMaterial({ color: "#e4c9c0", roughness: 0.92, map: stoneTexture, bumpMap: stoneTexture, bumpScale: 0.04, emissive: "#bfa09b", emissiveIntensity: .16 }));
-  const loader = new THREE.TextureLoader();
-  keep(loader.load("/images/conservatory/rock-color.jpg", (texture) => {
+  const loadingManager = new THREE.LoadingManager();
+  const ready = new Promise<void>((resolve, reject) => {
+    loadingManager.onLoad = () => resolve();
+    loadingManager.onError = () => reject(new Error("Scene texture unavailable"));
+  });
+  const loader = new THREE.TextureLoader(loadingManager);
+  keep(loader.load("/images/conservatory/rock-color.webp", (texture) => {
     if (disposed) return;
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -283,9 +289,8 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
     landscapeTexture.repeat.set(16, 6);
     landscapeMaterial.map = landscapeTexture;
     landscapeMaterial.needsUpdate = true;
-    onInvalidate?.();
   }));
-  keep(loader.load("/images/conservatory/rock-normal.jpg", (texture) => {
+  keep(loader.load("/images/conservatory/rock-normal.webp", (texture) => {
     if (disposed) return;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(1.8, 1.1);
@@ -298,7 +303,6 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
     landscapeMaterial.normalScale.set(.90, .90);
     landscapeMaterial.bumpMap = null;
     landscapeMaterial.needsUpdate = true;
-    onInvalidate?.();
   }));
   stoneMaterial.onBeforeCompile = (shader) => {
     shader.vertexShader = `varying vec3 vStonePosition;\n${shader.vertexShader}`;
@@ -376,7 +380,6 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
     texture.colorSpace = THREE.SRGBColorSpace;
     pearlMaterial.matcap = texture;
     pearlMaterial.needsUpdate = true;
-    onInvalidate?.();
   }));
   const pearl = addMesh(new THREE.SphereGeometry(1, 64, 48), pearlMaterial, -8.0474332, 3.5038119, -12.1320441);
   pearl.name = "live-pearl";
@@ -555,7 +558,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
   };
   scene.add(new THREE.Points(dustGeometry, dustMaterial));
 
-  keep(createArchitectureLighting(renderer, scene, camera, plaster, stepMaterial, onInvalidate));
+  keep(createArchitectureLighting(renderer, scene, camera, plaster, stepMaterial, loadingManager));
 
   const heightA = new Float32Array(FIELD_SIZE * FIELD_SIZE);
   const heightB = new Float32Array(heightA.length);
@@ -589,7 +592,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
         vec3 c=texture2D(sceneTexture,vUv).rgb;
         float grain=fract(sin(dot(gl_FragCoord.xy+floor(time*24.),vec2(12.9898,78.233)))*43758.5453)-.5;
         float vignette=1.-.035*dot((vUv-.5)*1.4,(vUv-.5)*1.4);
-        gl_FragColor=vec4(c*vignette+grain*.023,1.);
+        gl_FragColor=vec4(c*vignette+grain*.009,1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
@@ -644,6 +647,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
   }
 
   return {
+    ready,
     diagnostics,
     resize(width, height, pixelRatio) {
       const dpr = Math.min(pixelRatio, 1.25);
@@ -652,6 +656,11 @@ export function createConservatoryScene(canvas: HTMLCanvasElement, onInvalidate?
       camera.aspect = width / height;
       camera.setFocalLength(width >= 768 ? 36 : 42);
       const w = Math.max(1, Math.round(width * dpr)), h = Math.max(1, Math.round(height * dpr));
+      const samples = width >= 768 && dpr >= 1 ? Math.min(2, renderer.capabilities.maxSamples) : 0;
+      if (mainTarget.samples !== samples) {
+        mainTarget.dispose();
+        mainTarget.samples = samples;
+      }
       mainTarget.setSize(w, h);
       refractionTarget.setSize(Math.max(1, Math.round(w * 0.5)), Math.max(1, Math.round(h * 0.5)));
       water.getRenderTarget().setSize(Math.min(w, 1024), Math.min(h, 768));
