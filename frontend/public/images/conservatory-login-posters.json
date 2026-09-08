@@ -1,0 +1,40 @@
+{
+  "generated_by": "현재 Three.js 장면의 첫 프레임 렌더링",
+  "reproduction": "node scripts/render-conservatory-posters.mjs",
+  "animation_time": 0,
+  "pixel_ratio": 1.25,
+  "webp_quality": 84,
+  "content": "로그인 UI와 글자를 제외한 실제 장면. 데스크톱과 모바일 카메라 구도를 각각 사용한다.",
+  "sources": [
+    {
+      "filename": "src/components/auth/conservatory-scene.ts",
+      "sha256": "06288e1867cd8859d86a9a1d83a72bbdc444ddec14df9abd083e9be379723ceb"
+    },
+    {
+      "filename": "src/components/auth/conservatory/architecture-lighting.ts",
+      "sha256": "1f1abba12eb788181f067deae19156d3955f0a1da7a768f805eb207a2738d466"
+    },
+    {
+      "filename": "src/components/auth/conservatory/vegetation-quality.ts",
+      "sha256": "429a0b6ee6db192a33ac66dbed5ad647f062e4791ab3b0cbe15569f944644ef5"
+    }
+  ],
+  "output": [
+    {
+      "filename": "conservatory-login-desktop.webp",
+      "width": 1800,
+      "height": 1125,
+      "vegetation_count": 48000,
+      "bytes": 68950,
+      "sha256": "1ce16fa2b2f000287ea50d01912f7cbb80028b733a510de6c9bc78aa02465b9f"
+    },
+    {
+      "filename": "conservatory-login-mobile.webp",
+      "width": 487,
+      "height": 1055,
+      "vegetation_count": 30000,
+      "bytes": 16196,
+      "sha256": "d67f2de26ee61069ac9b06dc71c3e4fe53a8a0102ace7c00a0b31bd8040fb147"
+    }
+  ]
+}

@@ -38,7 +38,7 @@ export function LoginScene() {
     const draw = (delta: number) => {
       if (!sceneReady || !world || !title || lost || disposed) return;
       world.render(time, delta);
-      title.render(time, delta);
+      title.render(delta);
       world.renderOverlay(title.scene, title.camera);
       canvas.dataset.frame = String(time);
       canvas.dataset.motion = canAnimate() ? "playing" : "paused";
@@ -47,12 +47,15 @@ export function LoginScene() {
       frame = 0;
       if (!canAnimate()) return;
       const delta = previous ? Math.min((now - previous) / 1000, .05) : 0;
-      if (previous && now - previous > 36) slowFrames++;
+      const slowFrameLimit = world && world.vegetationCount > 30_000 ? 24 : 36;
+      if (previous && now - previous > slowFrameLimit) slowFrames++;
       else slowFrames = Math.max(0, slowFrames - 1);
-      if (slowFrames >= 24 && resolutionScale > .45) {
-        resolutionScale = Math.max(.45, resolutionScale * .75);
+      if (slowFrames >= 24) {
         slowFrames = 0;
-        world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.25) * resolutionScale);
+        if (!world?.reduceVegetation() && resolutionScale > .45) {
+          resolutionScale = Math.max(.45, resolutionScale * .75);
+          world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.25) * resolutionScale);
+        }
       }
       previous = now;
       time += delta;
@@ -123,7 +126,7 @@ export function LoginScene() {
         void Promise.all([import("./conservatory-scene"), import("./liquid-title"), document.fonts.ready]).then(async ([sceneModule, titleModule]) => {
           if (!canAnimate()) { loading = false; return; }
           world = sceneModule.createConservatoryScene(canvas!);
-          title = titleModule.createLiquidTitle(getComputedStyle(shell!).fontFamily);
+          title = titleModule.createLiquidTitle(getComputedStyle(shell!).fontFamily, world.renderer);
           await world.ready;
           if (disposed || lost) return;
           sceneReady = true;
@@ -133,8 +136,8 @@ export function LoginScene() {
         }).catch(() => {
           if (disposed) return;
           cancelAnimationFrame(frame);
-          world?.dispose();
           title?.dispose();
+          world?.dispose();
           world = undefined;
           title = undefined;
           sceneReady = false;
@@ -164,21 +167,24 @@ export function LoginScene() {
       canvas.removeEventListener("webglcontextlost", contextLost);
       document.removeEventListener("visibilitychange", sync);
       reduced.removeEventListener("change", sync);
-      world?.dispose();
       title?.dispose();
+      world?.dispose();
     };
   }, []);
 
   return (
     <>
       <div className={styles.scene} aria-hidden="true">
-        <Image src="/images/conservatory-login.webp" fill priority sizes="100vw" alt="" className={styles.sceneImage} />
+        <picture>
+          <source media="(max-width: 767px)" srcSet="/images/conservatory-login-mobile.webp" />
+          <Image src="/images/conservatory-login-desktop.webp" fill loading="eager" fetchPriority="high" sizes="100vw" alt="" className={styles.sceneImage} />
+        </picture>
         <canvas ref={canvasRef} className={styles.sceneCanvas} data-testid="login-scene" data-ready="false" data-motion="paused" />
       </div>
-      <div className={`${styles.sceneHeading} ${ready ? styles.sceneHeadingReady : ""}`}>
-        <p>사람이 중심이 되는</p>
-        <p>VIBE-HR</p>
-      </div>
+      <svg className={`${styles.sceneHeading} ${ready ? styles.sceneHeadingReady : ""}`} viewBox="0 0 1280 512" role="img" aria-label="사람이 중심이 되는 VIBE-HR">
+        <text x="640" y="130" textAnchor="middle" fontSize="54" fontWeight="400">사람이 중심이 되는</text>
+        <text x="640" y="348" textAnchor="middle" fontSize="216" fontWeight="500">VIBE-HR</text>
+      </svg>
       {ready ? <button type="button" className={styles.motionToggle} aria-label={paused ? "배경 재생" : "배경 일시 정지"} aria-pressed={paused} onClick={() => {
         pausedRef.current = !pausedRef.current;
         setPaused(pausedRef.current);

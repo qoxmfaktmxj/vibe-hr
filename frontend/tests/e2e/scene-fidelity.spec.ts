@@ -57,10 +57,18 @@ test("cursor changes title outlines and water pixels at the same animation time"
     await interactive.clock.runFor(20);
   }
   const waterActive = await interactive.screenshot({ clip: waterBox, path: test.info().outputPath("water-cursor.png") });
+  const titleTrail = await interactive.screenshot({ clip: titleBox, path: test.info().outputPath("title-trail.png") });
   const title = await comparePixels(page, titleBaseline, titleActive);
   const water = await comparePixels(page, waterBaseline, waterActive);
-  await test.info().attach("rendered-cursor-response", { body: JSON.stringify({ title, water }, null, 2), contentType: "application/json" });
+  const trail = await comparePixels(page, titleBaseline, titleTrail);
+  await interactive.getByLabel("아이디", { exact: true }).hover();
+  await interactive.clock.runFor(6000);
+  const titleSettled = await interactive.screenshot({ clip: titleBox, path: test.info().outputPath("title-settled.png") });
+  const settled = await comparePixels(page, titleBaseline, titleSettled);
+  await test.info().attach("rendered-cursor-response", { body: JSON.stringify({ title, water, trail, settled }, null, 2), contentType: "application/json" });
   expect(title.changedInk, "Mouse input must change the drawn glyph outlines, not just the background").toBeGreaterThan(100);
   expect(water.changedPixels, "The water region must visibly respond to pointer input").toBeGreaterThan(1500);
+  expect(trail.changedInk, "글자 밖으로 이동한 뒤에도 유체 흔적이 잠시 남아야 한다").toBeGreaterThan(40);
+  expect(settled.changedInk, "유체가 가라앉으면 글자 윤곽이 원래대로 돌아와야 한다").toBeLessThan(40);
   await interactive.close();
 });

@@ -9,7 +9,10 @@ The login, navigation and account surfaces use the existing VIBE monogram, Cobal
 - Application colors: existing semantic tokens in `src/app/globals.css`. New account and profile text uses navigation foreground tokens for both light and dark themes.
 - Login scene: independently authored Three.js architecture, stairs, pearl, rocks and outdoor terrain guided by Unseen Studio. Registered offline GI illuminates actual room meshes; a generated matcap lights the pearl. Water uses live reflection/refraction and a propagating heightfield. The original VIBE monogram remains in the form. Local texture provenance and generation prompts are stored in `public/images/conservatory/`.
 - Layout: the desktop form sits on the right, leaving room for the scene and its deforming VIBE-HR title. Mobile stacks the title and complete form with vertical scrolling. The background camera uses viewport dimensions even when the form is taller than the screen.
-- Background motion: pointer input affects the actual camera, water simulation and title outlines. Visible pause, reduced-motion preference and hidden/offscreen handling stop animation. A static image remains available when WebGL is unavailable or its context is lost. Repeated slow frames lower rendering resolution while preserving geometry and interactions.
+- 배경 표현: 계단의 윗면과 앞면은 명암을 구분하고, 진주의 방향성 그림자는 구운 조명 위에 합성한다. 벽은 표면 굴곡을 표현하고, 바위는 기존 노멀맵과 형상 변형을 사용한다. 식생은 군집별 크기와 색을 가진 인스턴스로 배치한다.
+- 식생 품질: 모바일, 터치 기기, 좁은 화면, Intel 내장 GPU와 GPU 판별이 어려운 환경은 30,000개를 사용한다. NVIDIA RTX/GTX 또는 Radeon RX가 확인되고 논리 코어가 8개 이상이며 보고된 메모리가 8GB 이상인 PC는 48,000개로 시작한다. 메모리 API가 없는 경우에는 나머지 조건으로 판별한다. 고밀도 상태에서 24ms보다 느린 프레임이 반복되면 30,000개로 낮추고, 이후에도 36ms보다 느린 프레임이 반복되면 해상도를 낮춘다. 같은 로그인 화면에서는 밀도를 다시 올리지 않는다.
+- 배경 움직임: 커서에 따른 카메라와 물의 반응은 유지하고, 자동 카메라 흔들림과 발광 입자는 사용하지 않는다. 글자는 128x128 속도장과 압력 보정으로 변형되며, 입력이 멈추면 감쇠한 뒤 계산을 중단한다. 모션 감소 설정과 화면 비활성화는 애니메이션을 중단한다. 재생 버튼은 숨긴 상태를 유지한다.
+- 정적 배경: `node scripts/render-conservatory-posters.mjs`로 실제 장면의 첫 프레임을 데스크톱과 모바일 구도에 맞춰 렌더링한다. 파일과 소스 해시는 `public/images/conservatory-login-posters.json`에 기록한다. 장면의 재질, 카메라 또는 조명이 바뀌면 다시 생성한다. 처음부터 모션 감소 설정이 켜져 있거나 WebGL 사용이 불가능하면 이 이미지를 표시한다. 반복해서 느린 프레임이 발생하면 렌더링 해상도를 낮춘다.
 - Depth: solid readable form and profile surfaces. Profile details use two definition-list sections on desktop and one column on mobile.
 
 ## Component responsibilities

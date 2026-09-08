@@ -12,20 +12,19 @@
 .sceneCanvas[data-ready="true"] { opacity: 1; }
 .sceneHeading {
   position: fixed;
-  top: 37%;
+  top: min(37vh, 440px);
   left: 35%;
   width: min(48%, 690px);
   transform: translateX(-50%);
   text-align: center;
-  color: #292726;
+  fill: #1b1b1a;
   pointer-events: none;
+  transition: opacity .35s ease-out;
 }
-.sceneHeading p:first-child { font-size: clamp(20px, 2.1vw, 30px); font-weight: 400; }
-.sceneHeading p:last-child { font-size: clamp(60px, 7vw, 112px); font-weight: 500; line-height: 1.4; letter-spacing: -.04em; }
-.sceneHeadingReady { color: transparent; }
+.sceneHeadingReady { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sceneCanvas { transition: none; }
+  .sceneCanvas, .sceneHeading { transition: none; }
 }
 
 .formPanel {
@@ -60,9 +59,7 @@
 
 @media (max-width: 999px) {
   .formPanel { justify-content: center; padding: 15rem 1rem 1.5rem; }
-  .sceneHeading { top: 4rem; left: 50%; width: calc(100% - 24px); }
-  .sceneHeading p:first-child { font-size: 20px; }
-  .sceneHeading p:last-child { font-size: 64px; }
+  .sceneHeading { top: 40px; left: 50%; width: min(calc(100% - 24px), 460px); }
   .tagline { margin-top: 1rem; font-size: .8125rem; }
   .footerNote { font-size: .625rem; }
 }

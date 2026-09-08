@@ -506,6 +506,73 @@ test("reduced motion keeps the scenic image static and the form usable", async (
   expect(textures).toEqual([]);
 });
 
+test("mobile static background uses its own camera framing without downloading the desktop poster", async ({ page }) => {
+  const posters: string[] = [];
+  page.on("request", request => {
+    if (request.url().includes("conservatory-login-")) posters.push(request.url());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/login");
+  const background = page.locator('img[src*="conservatory-login"]');
+  await expect.poll(() => background.evaluate(node => (node as HTMLImageElement).currentSrc)).toContain("conservatory-login-mobile.webp");
+  await background.evaluate(node => (node as HTMLImageElement).decode());
+  expect(posters.some(url => url.includes("conservatory-login-desktop"))).toBe(false);
+  await expect(page.getByRole("button", { name: "로그인", exact: true })).toBeInViewport();
+});
+
+async function sceneHardware(page: Page, renderer: string) {
+  await page.addInitScript(rendererName => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { value: 12 });
+    Object.defineProperty(navigator, "deviceMemory", { value: 8 });
+    Object.defineProperty(navigator, "maxTouchPoints", { value: 0 });
+    const getParameter = WebGL2RenderingContext.prototype.getParameter;
+    WebGL2RenderingContext.prototype.getParameter = function (parameter: number) {
+      return parameter === 0x9246 ? rendererName : getParameter.call(this, parameter);
+    };
+  }, renderer);
+}
+
+test("Intel integrated graphics uses 30000 grass instances", async ({ page }) => {
+  await sceneHardware(page, "ANGLE (Intel, Intel UHD Graphics 630)");
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+});
+
+test("mobile scene uses 30000 grass instances even with a powerful GPU", async ({ page }) => {
+  await sceneHardware(page, "NVIDIA GeForce RTX 4060");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+});
+
+test("capable PC lowers grass density before resolution when frames stay slow", async ({ page }) => {
+  await sceneHardware(page, "NVIDIA GeForce RTX 4060");
+  await page.addInitScript(() => {
+    const host = window as Window & { slowSceneFrames?: boolean };
+    const schedule = window.requestAnimationFrame.bind(window);
+    let timestamp = 0;
+    let slowFrameCount = 0;
+    window.requestAnimationFrame = callback => schedule(() => {
+      timestamp += host.slowSceneFrames ? 40 : 16;
+      if (host.slowSceneFrames && ++slowFrameCount >= 28) host.slowSceneFrames = false;
+      callback(timestamp);
+    });
+  });
+  await page.goto("/login");
+  const scene = page.getByTestId("login-scene");
+  await expect(scene).toHaveAttribute("data-ready", "true");
+  await expect(scene).toHaveAttribute("data-grass-count", "48000");
+  const width = await scene.getAttribute("width");
+  await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = true; });
+  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+  await expect(scene).toHaveAttribute("width", width!);
+});
+
 test("scene waits for its textures while the login form stays usable", async ({ page }) => {
   let releaseTexture!: () => void;
   const textureGate = new Promise<void>(resolve => { releaseTexture = resolve; });

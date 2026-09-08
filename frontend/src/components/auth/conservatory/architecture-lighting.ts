@@ -8,6 +8,7 @@ export function createArchitectureLighting(
   wallMaterial: THREE.MeshStandardMaterial,
   stairMaterial: THREE.MeshStandardMaterial,
   loadingManager: THREE.LoadingManager,
+  pearl: { center: THREE.Vector3; radius: number; lightDirection: THREE.Vector3 },
 ) {
   let disposed = false;
   const projector = baseCamera.clone();
@@ -48,6 +49,10 @@ export function createArchitectureLighting(
     architectureDepth: { value: depthTexture },
     architectureProjector: { value: projector.projectionMatrix.clone().multiply(projector.matrixWorldInverse) },
     architectureCamera: { value: projector.position.clone() },
+    architectureSurface: { value: wallMaterial.bumpMap },
+    pearlCenter: { value: pearl.center },
+    pearlRadius: { value: pearl.radius },
+    pearlLight: { value: pearl.lightDirection },
     architectureStrength: { value: 0 },
     architectureExposure: { value: renderer.toneMappingExposure },
     inverseAcesInput: { value: new THREE.Matrix3().set(.59719,.35458,.04823,.076,.90834,.01566,.0284,.13383,.83777).invert() },
@@ -85,6 +90,10 @@ export function createArchitectureLighting(
       shader.fragmentShader = `
         uniform sampler2D architectureGi;
         uniform sampler2D architectureDepth;
+        uniform sampler2D architectureSurface;
+        uniform vec3 pearlCenter;
+        uniform vec3 pearlLight;
+        uniform float pearlRadius;
         uniform vec3 architectureCamera;
         uniform vec3 architectureGradeGain;
         uniform vec3 architectureGradeOffset;
@@ -113,6 +122,12 @@ export function createArchitectureLighting(
         }
         ${shader.fragmentShader}`;
       shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `
+        vec3 toPearl=pearlCenter-vArchitecturePosition;
+        float alongLight=dot(toPearl,pearlLight);
+        float shadowDistance=length(toPearl-pearlLight*alongLight);
+        float penumbra=.035+max(alongLight,0.)*.04;
+        float pearlShadow=(1.-smoothstep(pearlRadius-penumbra,pearlRadius+penumbra,shadowDistance))*smoothstep(0.,.1,alongLight);
+        outgoingLight*=mix(vec3(1.),vec3(.42,.43,.53),pearlShadow);
         vec2 bakeUv=vArchitectureProjection.xy/vArchitectureProjection.w*.5+.5;
         float inBake=smoothstep(0.,.004,bakeUv.x)*smoothstep(0.,.004,1.-bakeUv.x)*smoothstep(0.,.004,bakeUv.y)*smoothstep(0.,.004,1.-bakeUv.y);
         inBake*=step(.1,vArchitectureProjection.w)*step(vArchitectureProjection.w,200.);
@@ -132,19 +147,22 @@ export function createArchitectureLighting(
           float visible=mix(mix(a,b,fraction.x),mix(c,d,fraction.x),fraction.y);
           float facing=smoothstep(.0005,.008,dot(normalize(vArchitectureNormal),normalize(architectureCamera-vArchitecturePosition)));
           vec3 displayColor=texture2D(architectureGi,bakeUv).rgb*architectureGradeGain+architectureGradeOffset;
-          bool smallReveal=vArchitecturePosition.x> -10.83&&vArchitecturePosition.x< -9.56&&vArchitecturePosition.y>2.51&&vArchitecturePosition.y<6.72;
-          bool tallReveal=vArchitecturePosition.x> -8.33&&vArchitecturePosition.x< -6.52&&vArchitecturePosition.y>4.08&&vArchitecturePosition.y<9.37;
-          if(architectureStairs<.5&&abs(vArchitectureNormal.z)<.5&&vArchitecturePosition.z< -13.70&&vArchitecturePosition.z> -14.95&&(smallReveal||tallReveal)) {
-            displayColor+=vec3(.12,.055,.012);
-          }
           if(architectureStairs>.5) {
-            vec3 shadowFloor=vec3(.34,.32,.36);
-            vec3 shadowDelta=displayColor-shadowFloor;
-            displayColor=.5*(displayColor+shadowFloor+sqrt(shadowDelta*shadowDelta+.001225));
+            float tread=step(.5,vArchitectureNormal.y);
+            displayColor*=mix(vec3(.84,.89,.96),vec3(1.025,1.015,1.),tread);
           }
           displayColor=clamp(displayColor,0.,1.);
+          displayColor*=mix(vec3(1.),vec3(.55,.53,.60),pearlShadow);
           outgoingLight=mix(outgoingLight,architectureRadiance(displayColor),architectureStrength*inBake*visible*facing);
         }
+        vec3 surfaceNormal=normalize(vArchitectureNormal);
+        vec2 surfaceUv=mix(vec2(vArchitecturePosition.x+vArchitecturePosition.z,vArchitecturePosition.y),vArchitecturePosition.xz,step(.5,abs(surfaceNormal.y)))*.18;
+        float surfaceHeight=texture2D(architectureSurface,surfaceUv).r;
+        float surfaceDx=texture2D(architectureSurface,surfaceUv+vec2(1./256.,0.)).r-surfaceHeight;
+        float surfaceDy=texture2D(architectureSurface,surfaceUv+vec2(0.,1./256.)).r-surfaceHeight;
+        float pores=smoothstep(.92,.98,texture2D(architectureSurface,surfaceUv*6.7).r);
+        float relief=(surfaceDx-surfaceDy)*2.4+(surfaceHeight-.86)*.34-pores*.12;
+        outgoingLight*=clamp(1.+relief*mix(1.,.45,architectureStairs),.84,1.10);
         #include <opaque_fragment>
       `);
     };

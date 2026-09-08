@@ -1,6 +1,7 @@
 import * as THREE from "three";
+import { createTitleFluid } from "./conservatory/title-fluid";
 
-export function createLiquidTitle(fontFamily: string) {
+export function createLiquidTitle(fontFamily: string, renderer: THREE.WebGLRenderer) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
   camera.position.z = 2;
@@ -17,56 +18,41 @@ export function createLiquidTitle(fontFamily: string) {
   context.fillText("VIBE-HR", 640, 348);
   const texture = new THREE.CanvasTexture(artwork);
   texture.minFilter = THREE.LinearFilter;
-  const pointer = new THREE.Vector2(-3, -3);
-  const previous = pointer.clone();
+  const fluid = createTitleFluid(renderer);
   const material = new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     depthTest: false,
     uniforms: {
       textMap: { value: texture },
-      pointer: { value: pointer },
-      time: { value: 0 },
-      impulse: { value: 0 },
-      motion: { value: 1 },
+      flowMap: { value: fluid.texture },
     },
     vertexShader: `
       varying vec2 vUv;
-      uniform float time, motion;
       void main() {
         vUv = uv;
-        vec3 p = position;
-        p.y += sin(uv.x * 6.0 - time * .7) * .003 * motion;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.);
       }
     `,
     fragmentShader: `
       varying vec2 vUv;
       uniform sampler2D textMap;
-      uniform vec2 pointer;
-      uniform float time, impulse, motion;
+      uniform sampler2D flowMap;
       void main() {
-        vec2 delta = vUv - pointer;
-        float distance = length(delta * vec2(1., .65));
-        float local = exp(-distance * distance * 26.) * impulse;
-        vec2 shift = vec2(
-          sin(vUv.y * 16. + time * 2.1),
-          cos(vUv.x * 14. - time * 1.7)
-        ) * local * .014;
-        shift.y += sin(vUv.x * 7. - time * .75) * .003 * motion;
-        float alpha = texture2D(textMap, vUv + shift).a;
-        vec3 ink = mix(vec3(.105, .105, .1), vec3(.48, .44, .5), local * .65);
-        gl_FragColor = vec4(ink, alpha * (1. - local * .2));
+        vec2 flow=texture2D(flowMap,vUv).xy;
+        vec2 shift=clamp(flow*.004,vec2(-.028),vec2(.028));
+        float alpha=texture2D(textMap,vUv-shift).a;
+        float sheen=clamp(length(flow)*.045,0.,.32);
+        vec3 ink=mix(vec3(.105,.105,.1),vec3(.40,.35,.39),sheen);
+        gl_FragColor=vec4(ink,alpha);
       }
     `,
   });
-  const geometry = new THREE.PlaneGeometry(1, 1, 64, 16);
+  const geometry = new THREE.PlaneGeometry(1, 1);
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
   const bounds = { x: 0, y: 0, width: 1, height: 1 };
-  let energy = 0;
   let reduced = false;
-  let active = false;
 
   return {
     scene,
@@ -86,27 +72,22 @@ export function createLiquidTitle(fontFamily: string) {
       mesh.position.set(bounds.x + bounds.width / 2 - width / 2, height / 2 - bounds.y - bounds.height / 2, 0);
     },
     setPointer(x: number, y: number, isActive: boolean) {
-      active = isActive && x >= bounds.x - 80 && x <= bounds.x + bounds.width + 80 && y >= bounds.y - 50 && y <= bounds.y + bounds.height + 50;
-      if (!active || reduced) return;
-      pointer.set((x - bounds.x) / bounds.width, 1 - (y - bounds.y) / bounds.height);
-      const distance = previous.x < -1 ? 0 : pointer.distanceTo(previous);
-      energy = Math.min(1, energy + distance * 7 + .05);
-      previous.copy(pointer);
+      const active = !reduced && isActive && x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y && y <= bounds.y + bounds.height;
+      fluid.setPointer((x - bounds.x) / bounds.width, 1 - (y - bounds.y) / bounds.height, active);
     },
     setReducedMotion(value: boolean) {
       reduced = value;
-      material.uniforms.motion.value = value ? 0 : 1;
-      if (value) energy = 0;
+      if (value) fluid.reset();
     },
-    render(time: number, delta: number) {
-      energy *= Math.exp(-delta * (active ? 1.1 : 3));
-      material.uniforms.time.value = time;
-      material.uniforms.impulse.value = reduced ? 0 : energy;
+    render(delta: number) {
+      if (!reduced) fluid.update(delta);
+      material.uniforms.flowMap.value = fluid.texture;
     },
     dispose() {
       geometry.dispose();
       material.dispose();
       texture.dispose();
+      fluid.dispose();
     },
   };
 }

@@ -4,9 +4,13 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { createArchitectureLighting } from "./conservatory/architecture-lighting";
+import { LOW_VEGETATION_COUNT, selectVegetationCount } from "./conservatory/vegetation-quality";
 
 export interface ConservatoryScene {
   readonly ready: Promise<void>;
+  readonly renderer: THREE.WebGLRenderer;
+  readonly vegetationCount: number;
+  reduceVegetation(): boolean;
   resize(width: number, height: number, pixelRatio: number): void;
   render(timeSeconds: number, deltaSeconds: number): void;
   renderOverlay(scene: THREE.Scene, camera: THREE.Camera): void;
@@ -21,7 +25,6 @@ export interface ConservatoryScene {
 }
 
 const FIELD_SIZE = 128;
-const DUST_COUNT = 84;
 const WATER_WIDTH = 50;
 const WATER_DEPTH = 50;
 const WATER_X = -11.93;
@@ -33,11 +36,6 @@ function seededRandom(seed: number) {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-}
-
-function idleNoise(time: number, firstPhase: number, secondPhase: number) {
-  return .3 * (Math.sin(time * .21 + firstPhase) - Math.sin(firstPhase))
-    + .2 * (Math.sin(time * .37 + secondPhase) - Math.sin(secondPhase));
 }
 
 function reliefNoise(x: number, y: number) {
@@ -244,8 +242,6 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   const slowPointer = new THREE.Vector2();
   const pointerRotation = new THREE.Euler();
   const pointerQuaternion = new THREE.Quaternion();
-  const idleOffset = new THREE.Vector3();
-  let idleTime = 0;
   const raycaster = new THREE.Raycaster();
   const waterPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -WATER_Y);
   const hit = new THREE.Vector3();
@@ -265,10 +261,11 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   keep(environmentTarget);
 
   const plasterTexture = keep(surfaceTexture(false));
+  plasterTexture.repeat.set(.22, .22);
   const stoneTexture = keep(surfaceTexture(true));
-  const plaster = keep(new THREE.MeshStandardMaterial({ color: "#dcb2a8", roughness: 0.91, map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.005 }));
+  const plaster = keep(new THREE.MeshStandardMaterial({ color: "#dcb2a8", roughness: 0.91, map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.025 }));
   const stepMaterial = keep(new THREE.MeshStandardMaterial({ color: "#edddd4", roughness: 0.79, map: plasterTexture, bumpMap: plasterTexture, bumpScale: 0.009 }));
-  const stoneMaterial = keep(new THREE.MeshStandardMaterial({ color: "#e4c9c0", roughness: 0.92, map: stoneTexture, bumpMap: stoneTexture, bumpScale: 0.04, emissive: "#bfa09b", emissiveIntensity: .16 }));
+  const stoneMaterial = keep(new THREE.MeshStandardMaterial({ color: "#e4c9c0", roughness: 0.86, map: stoneTexture, bumpMap: stoneTexture, bumpScale: 0.04, emissive: "#bfa09b", emissiveIntensity: .025 }));
   const loadingManager = new THREE.LoadingManager();
   const ready = new Promise<void>((resolve, reject) => {
     loadingManager.onLoad = () => resolve();
@@ -295,7 +292,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(1.8, 1.1);
     stoneMaterial.normalMap = texture;
-    stoneMaterial.normalScale.set(0.32, 0.32);
+    stoneMaterial.normalScale.set(0.85, 0.85);
     stoneMaterial.needsUpdate = true;
     const landscapeNormal = keep(texture.clone());
     landscapeNormal.repeat.set(16, 6);
@@ -311,7 +308,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
     shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", `
       #include <map_fragment>
       float stoneLuma = dot(diffuseColor.rgb, vec3(.21,.72,.07));
-      diffuseColor.rgb = mix(vec3(stoneLuma), diffuseColor.rgb, .12) * .80 + vec3(.14,.115,.105);
+      diffuseColor.rgb = mix(vec3(stoneLuma), diffuseColor.rgb, .30) * .90 + vec3(.065,.05,.04);
       float mineralPhase=vStonePosition.x*2.5+vStonePosition.y*4.+sin(vStonePosition.z*3.)*.45+sin(vStonePosition.x*8.+vStonePosition.y*5.)*.12;
       float vein=1.-smoothstep(.03,.16,abs(sin(mineralPhase)));
       vein*=smoothstep(.1,.7,sin(vStonePosition.z*2.1+vStonePosition.y*3.7)*.5+.5);
@@ -359,7 +356,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   stairs.name = "architecture-stairs";
   box(70, 0.15, 75, -11.93, -0.1053, 4.8929, keep(new THREE.MeshStandardMaterial({ color: "#aea4b5", roughness: 0.78 }))).name = "architecture-pool-floor";
 
-  const pearlMaterial = keep(new THREE.MeshMatcapMaterial({ color: new THREE.Color(1.3, 1.3, 1.3) }));
+  const pearlMaterial = keep(new THREE.MeshMatcapMaterial({ color: new THREE.Color(1.15, 1.15, 1.15) }));
   pearlMaterial.onBeforeCompile = (shader) => {
     shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `
       vec2 nacrePoint=(uv-.5)*2.;
@@ -371,7 +368,7 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
       float goldBand=exp(-dot(goldOffset*goldOffset,1./vec2(.14,.55)));
       float violetBand=exp(-dot(violetOffset*violetOffset,1./vec2(.19,.58)));
       vec3 nacreTint=cyanBand*vec3(-.18,.06,.17)+goldBand*vec3(.14,.07,-.18)+violetBand*vec3(.07,-.13,.17);
-      outgoingLight*=1.+nacreTint*nacreRim*1.5;
+      outgoingLight*=1.+nacreTint*nacreRim*1.9;
       #include <opaque_fragment>
     `);
   };
@@ -383,17 +380,8 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   }));
   const pearl = addMesh(new THREE.SphereGeometry(1, 64, 48), pearlMaterial, -8.0474332, 3.5038119, -12.1320441);
   pearl.name = "live-pearl";
-  const contactMaterial = keep(new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    uniforms: {},
-    vertexShader: "varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
-    fragmentShader: "varying vec2 vUv;void main(){vec2 p=(vUv-.5)*2.;float a=exp(-dot(p,p)*5.)*.32;gl_FragColor=vec4(.25,.17,.23,a);}",
-  }));
-  const contact = addMesh(new THREE.PlaneGeometry(2.5, 1.8), contactMaterial, -7.95, 2.5174, -12.05);
-  contact.rotation.x = -Math.PI / 2;
-  contact.castShadow = false;
-  contact.receiveShadow = false;
+  // 구의 그림자는 구운 조명 위에 해석적으로 적용한다.
+  pearl.castShadow = false;
 
   const rock = (x: number, y: number, z: number, width: number, height: number, depth: number, seed: number) => {
     const rawGeometry = new THREE.IcosahedronGeometry(1, 5);
@@ -407,7 +395,9 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
       const px = positions.getX(i), py = positions.getY(i), pz = positions.getZ(i);
       const broad = Math.sin(px * 4.5 + seed) * Math.sin(py * 3.7 + seed * 0.4) * Math.sin(pz * 3.9 + seed * 0.7);
       const fine = Math.sin(px * 16 + py * 5 + seed) * Math.sin(pz * 13 + py * 8);
-      const radius = 1 + broad * 0.16 + fine * 0.029;
+      const strata = (reliefNoise(px * 5 + pz, py * 6 + seed) - .5) * .12;
+      const fissure = Math.pow(1 - Math.abs(Math.sin(px * 6 + pz * 4 + seed)), 5) * .065;
+      const radius = 1 + broad * .16 + fine * .035 + strata - fissure;
       positions.setXYZ(i, px * radius, py * radius, pz * radius);
       uvs[i * 2] = Math.atan2(pz, px) / (Math.PI * 2) + 0.5;
       uvs[i * 2 + 1] = Math.asin(THREE.MathUtils.clamp(py, -1, 1)) / Math.PI + 0.5;
@@ -465,33 +455,56 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   cliff.computeVertexNormals();
   landscapeMaterial.side = THREE.DoubleSide;
   addMesh(cliff, landscapeMaterial, 0, 0, 0);
-  const grassGeometry = keep(new THREE.PlaneGeometry(.032, .085, 1, 2));
-  grassGeometry.translate(0, .0425, 0);
+  const grassGeometry = keep(new THREE.PlaneGeometry(.045, .12, 1, 2));
+  grassGeometry.translate(0, .06, 0);
   const grassTime = { value: 0 };
   const grassMaterial = keep(new THREE.MeshBasicMaterial({ color: "#c893ab", side: THREE.DoubleSide }));
   grassMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.grassTime = grassTime;
-    shader.vertexShader = `uniform float grassTime;\n${shader.vertexShader}`;
+    shader.vertexShader = `uniform float grassTime; varying vec2 vGrassUv;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", `
       #include <begin_vertex>
+      vGrassUv=uv;
       transformed.x*=1.-uv.y*.9;
       transformed.x+=sin(grassTime*.6+instanceMatrix[3].z*2.1+instanceMatrix[3].x)*.004*uv.y;
     `);
+    shader.fragmentShader = `varying vec2 vGrassUv;\n${shader.fragmentShader}`;
+    shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `
+      #include <color_fragment>
+      diffuseColor.rgb*=mix(.76,1.04,smoothstep(0.,1.,vGrassUv.y));
+    `);
   };
-  const grass = keep(new THREE.InstancedMesh(grassGeometry, grassMaterial, 6000));
+  const gl = renderer.getContext();
+  const gpuInfo = gl.getExtension("WEBGL_debug_renderer_info");
+  const vegetationCount = selectVegetationCount({
+    mobile: window.innerWidth < 1000 || navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches,
+    renderer: gpuInfo ? String(gl.getParameter(gpuInfo.UNMASKED_RENDERER_WEBGL) ?? "") : "",
+    logicalCores: navigator.hardwareConcurrency,
+    memoryGb: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
+  });
+  const grass = keep(new THREE.InstancedMesh(grassGeometry, grassMaterial, vegetationCount));
+  canvas.dataset.grassCount = String(grass.count);
+  const reduceVegetation = () => {
+    if (grass.count <= LOW_VEGETATION_COUNT) return false;
+    grass.count = LOW_VEGETATION_COUNT;
+    canvas.dataset.grassCount = String(grass.count);
+    return true;
+  };
   const grassRandom = seededRandom(824);
   const grassDummy = new THREE.Object3D();
   const grassColor = new THREE.Color();
   for (let i = 0; i < grass.count; i++) {
     const z = -27.5 + grassRandom() * 45;
-    const v = .65 + grassRandom() * .35;
+    const v = .16 + grassRandom() * .84;
+    const cluster = reliefNoise(z * .55, v * 12);
+    if (grassRandom() > .35 + cluster * .65) { i--; continue; }
     exteriorSurface(z, v, grassDummy.position);
-    grassDummy.position.x += .025;
+    grassDummy.position.x += .055;
     grassDummy.rotation.set((grassRandom() - .5) * .3, grassRandom() * Math.PI, (grassRandom() - .5) * .25);
-    grassDummy.scale.setScalar(.55 + grassRandom() * .7);
+    grassDummy.scale.setScalar(.65 + cluster * .85 + grassRandom() * .55);
     grassDummy.updateMatrix();
     grass.setMatrixAt(i, grassDummy.matrix);
-    grassColor.setHSL(.94 + grassRandom() * .08, .18 + grassRandom() * .1, .66 + grassRandom() * .14);
+    grassColor.setHSL(.94 + grassRandom() * .045, .16 + cluster * .10, .66 + cluster * .10 + grassRandom() * .07);
     grass.setColorAt(i, grassColor);
   }
   grass.instanceMatrix.needsUpdate = true;
@@ -530,35 +543,11 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   const fill = new THREE.DirectionalLight("#ffe2de", 0.2);
   fill.position.set(-2, 8, 9);
   scene.add(fill);
-  const dustRandom = seededRandom(517);
-  const dustPositions = new Float32Array(DUST_COUNT * 3);
-  const dustColors = new Float32Array(DUST_COUNT * 3);
-  const dustSizes = new Float32Array(DUST_COUNT);
-  for (let i = 0; i < DUST_COUNT; i++) {
-    dustPositions.set([-15 + dustRandom() * 12, 2 + dustRandom() * 8, -12 + dustRandom() * 22], i * 3);
-    const c = new THREE.Color().setHSL(dustRandom(), .35, .84);
-    dustColors.set([c.r, c.g, c.b], i * 3);
-    dustSizes[i] = i % 9 === 0 ? 1.8 + dustRandom() * .8 : .35 + dustRandom() * 1.05;
-  }
-  const dustBase = dustPositions.slice();
-  const dustGeometry = keep(new THREE.BufferGeometry());
-  dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
-  dustGeometry.setAttribute("color", new THREE.BufferAttribute(dustColors, 3));
-  dustGeometry.setAttribute("moteScale", new THREE.BufferAttribute(dustSizes, 1));
-  const dustMaterial = keep(new THREE.PointsMaterial({ size: .12, transparent: true, opacity: .28, vertexColors: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  dustMaterial.onBeforeCompile = (shader) => {
-    shader.vertexShader = `attribute float moteScale;\n${shader.vertexShader}`;
-    shader.vertexShader = shader.vertexShader.replace("gl_PointSize = size;", "gl_PointSize = size * moteScale;");
-    shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `
-      vec2 motePoint=(gl_PointCoord-.5)*2.;
-      float moteRadius=length(motePoint);
-      diffuseColor.a*=exp(-dot(motePoint,motePoint)*4.5)*(1.-smoothstep(.45,1.,moteRadius));
-      #include <opaque_fragment>
-    `);
-  };
-  scene.add(new THREE.Points(dustGeometry, dustMaterial));
-
-  keep(createArchitectureLighting(renderer, scene, camera, plaster, stepMaterial, loadingManager));
+  keep(createArchitectureLighting(renderer, scene, camera, plaster, stepMaterial, loadingManager, {
+    center: pearl.position,
+    radius: 1,
+    lightDirection: sun.position.clone().sub(pearl.position).normalize(),
+  }));
 
   const heightA = new Float32Array(FIELD_SIZE * FIELD_SIZE);
   const heightB = new Float32Array(heightA.length);
@@ -648,8 +637,12 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
 
   return {
     ready,
+    renderer,
+    get vegetationCount() { return grass.count; },
+    reduceVegetation,
     diagnostics,
     resize(width, height, pixelRatio) {
+      if (width < 1000) reduceVegetation();
       const dpr = Math.min(pixelRatio, 1.25);
       renderer.setPixelRatio(dpr);
       renderer.setSize(width, height, false);
@@ -685,29 +678,11 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
       pointerRotation.set(0, 0, -.05 * (smoothPointer.x - slowPointer.x));
       camera.quaternion.multiply(pointerQuaternion.setFromEuler(pointerRotation));
       camera.translateZ(10);
-      if (dt > 0) idleTime = Math.max(0, time);
-      idleOffset.set(
-        idleNoise(idleTime * .75, .2, 1.7) * .195,
-        idleNoise(idleTime * .75, 1.3, .4) * .199,
-        idleNoise(idleTime * .75, 2.4, 3.2) * .055,
-      );
-      camera.position.add(idleOffset.applyQuaternion(camera.quaternion));
-      pointerRotation.set(
-        idleNoise(idleTime * 2, .8, 2.2) * .0084,
-        idleNoise(idleTime * 2, 2.1, .3) * .00757,
-        idleNoise(idleTime * 2, 3.4, 1.6) * .0012,
-      );
-      camera.quaternion.multiply(pointerQuaternion.setFromEuler(pointerRotation));
       exciteWater();
       simulate(dt);
       waterMaterial.uniforms.time.value = time;
       grassTime.value = time;
       pearl.rotation.y = time * 0.018;
-      for (let i = 0; i < DUST_COUNT; i++) {
-        dustPositions[i * 3] = dustBase[i * 3] + Math.sin(time * .10 + i) * .16;
-        dustPositions[i * 3 + 1] = dustBase[i * 3 + 1] + Math.sin(time * .08 + i * 2.) * .11;
-      }
-      dustGeometry.attributes.position.needsUpdate = true;
       water.visible = false;
       renderer.setRenderTarget(refractionTarget);
       renderer.render(scene, camera);
