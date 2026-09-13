@@ -293,6 +293,7 @@ function DomainRailItem({
 export function DashboardSidebar() {
   const { user } = useAuth();
   const { menus } = useMenu();
+  const navigationMenus = useMemo(() => menus.filter((node) => node.path !== "/dashboard"), [menus]);
   const pathname = usePathname();
 
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -300,7 +301,6 @@ export function DashboardSidebar() {
   const mobileTriggerRef = useRef<HTMLButtonElement>(null);
   const profileReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const openingMobileProfileRef = useRef(false);
-  const [menuExpanded, setMenuExpanded] = useState(true);
   const [contextPanelCollapsed, setContextPanelCollapsed] = useState(false);
   const [selectedDomainCode, setSelectedDomainCode] = useState<string | null>(null);
 
@@ -378,19 +378,46 @@ export function DashboardSidebar() {
   const initials = getInitials(displayName) || "U";
 
   useEffect(() => {
-    const routeDomain = menus.find((node) => hasActiveDescendant(node, pathname));
+    const routeDomain = navigationMenus.find((node) => hasActiveDescendant(node, pathname));
     if (routeDomain) setSelectedDomainCode(routeDomain.code);
-  }, [menus, pathname]);
+  }, [navigationMenus, pathname]);
 
   const activeDomain = useMemo(
-    () => menus.find((node) => node.code === selectedDomainCode) ?? menus[0] ?? null,
-    [menus, selectedDomainCode],
+    () => navigationMenus.find((node) => node.code === selectedDomainCode) ?? navigationMenus[0] ?? null,
+    [navigationMenus, selectedDomainCode],
   );
 
   const contextNodes = useMemo(() => {
     if (!activeDomain) return [];
     return activeDomain.children.length > 0 ? activeDomain.children : [activeDomain];
   }, [activeDomain]);
+
+  const contextGroupCodes = useMemo(() => {
+    const codes: string[] = [];
+    function collect(nodes: MenuNode[]) {
+      for (const node of nodes) {
+        if (node.children.length > 0) {
+          codes.push(node.code);
+          collect(node.children);
+        }
+      }
+    }
+    collect(contextNodes);
+    return codes;
+  }, [contextNodes]);
+  const menuExpanded = contextGroupCodes.some((code) => openCodes.has(code));
+
+  const toggleContextGroups = () => {
+    setOpenCodes((previous) => {
+      const next = new Set(previous);
+      const shouldCollapse = contextGroupCodes.some((code) => previous.has(code));
+      for (const code of contextGroupCodes) {
+        if (shouldCollapse) next.delete(code);
+        else next.add(code);
+      }
+      return next;
+    });
+  };
 
   const openProfile = useCallback((event: MouseEvent<HTMLButtonElement>) => {
     openingMobileProfileRef.current = mobileOpen;
@@ -403,45 +430,25 @@ export function DashboardSidebar() {
     <>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-border/80 px-4 py-4">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-[color:var(--vibe-nav-text-muted)]">업무 영역</p>
             <p className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
               {activeDomain?.name ?? "메뉴"}
             </p>
           </div>
-        </div>
-
-        <div className="mt-2 flex items-center justify-end px-3">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="h-9 w-9"
-            onClick={() => {
-              if (menuExpanded) {
-                // 전체 접기: openCodes 비우기
-                setOpenCodes(new Set());
-              } else {
-                // 전체 펼치기: 모든 그룹 code 추가
-                const allCodes = new Set<string>();
-                function collectAll(nodes: MenuNode[]) {
-                  for (const n of nodes) {
-                    if (n.children.length > 0) {
-                      allCodes.add(n.code);
-                      collectAll(n.children);
-                    }
-                  }
-                }
-                collectAll(contextNodes);
-                setOpenCodes(allCodes);
-              }
-              setMenuExpanded((prev) => !prev);
-            }}
-            title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
-            aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
-          >
-            {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-          </Button>
+          {contextGroupCodes.length > 0 && (
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-9 w-9 shrink-0"
+              onClick={toggleContextGroups}
+              title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
+              aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
+            >
+              {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+            </Button>
+          )}
         </div>
 
         <nav
@@ -505,7 +512,7 @@ export function DashboardSidebar() {
         />
       </Link>
       <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pb-3">
-        {menus.map((node) => (
+        {navigationMenus.map((node) => (
           <DomainRailItem
             key={node.code}
             node={node}
@@ -540,7 +547,7 @@ export function DashboardSidebar() {
 
   const mobileDomainRail = (
     <nav className="vibe-rail vibe-rail--mobile flex shrink-0 items-start gap-1 overflow-x-auto p-2" aria-label="업무 영역">
-      {menus.map((node) => (
+      {navigationMenus.map((node) => (
         <DomainRailItem
           key={node.code}
           node={node}

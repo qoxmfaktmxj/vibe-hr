@@ -655,3 +655,40 @@ test("lost WebGL context returns to the static background", async ({ page }) => 
   await expect(page.getByRole("button", { name: "배경 일시 정지", exact: true })).toHaveCount(0);
   await expect(page.locator('img[src*="conservatory-login"]')).toBeVisible();
 });
+
+for (const mobile of [false, true]) {
+  test(`sidebar home and scoped group controls work on ${mobile ? "mobile" : "desktop"}`, async ({ page, request }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "sidebar-domains" } });
+    await signIn(page);
+    if (mobile) await page.getByRole("button", { name: "메뉴 열기", exact: true }).click();
+    const rail = page.getByRole("navigation", { name: "업무 영역", exact: true });
+    await expect(rail.getByRole("link", { name: "대시보드", exact: true })).toHaveCount(0);
+    await expect(rail.getByRole("button", { name: "대시보드", exact: true })).toHaveCount(0);
+    const expand = page.getByRole("button", { name: "메뉴 전체 펼치기", exact: true });
+    const collapse = page.getByRole("button", { name: "메뉴 전체 접기", exact: true });
+    await expect(expand).toBeVisible();
+    await expect(expand.locator("..").getByText("업무 영역", { exact: true })).toBeVisible();
+    await expand.click();
+    await expect(page.getByRole("button", { name: "기본 관리", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await rail.getByRole("button", { name: "다른 업무", exact: true }).click();
+    await expect(expand).toBeVisible();
+    await expand.click();
+    await collapse.click();
+    await expect(page.getByRole("button", { name: "다른 그룹", exact: true })).toHaveAttribute("aria-expanded", "false");
+    await rail.getByRole("button", { name: "고객관리", exact: true }).click();
+    await expect(collapse).toBeVisible();
+    await expect(page.getByRole("button", { name: "기본 관리", exact: true })).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("button", { name: "기본 관리", exact: true }).click();
+    await expect(expand).toBeVisible();
+    await expand.focus();
+    await page.keyboard.press("Enter");
+    await expect(collapse).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath(`sidebar-${mobile ? "mobile" : "desktop"}.png`) });
+    if (mobile) await page.getByRole("button", { name: "메뉴 닫기", exact: true }).click();
+    await page.goto("/mng/companies");
+    await page.getByRole("navigation", { name: "열린 업무" }).getByRole("button", { name: "홈", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+}

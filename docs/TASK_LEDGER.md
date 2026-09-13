@@ -313,3 +313,12 @@
 - Repository has no VERSION convention; its existing package version is retained for this presentation patch.
 - Risks: close inspection can reveal repeated tuft forms; existing image-position and GPU precision warnings remain. Rollback is a revert of the frontend presentation commit, with no database or infrastructure work.
 - Final browser verification: 42/42 existing UI regression tests passed in 2.2 minutes with D3D11 Chromium. A temporary config extended playwright.experience.config.ts with launch arguments --use-angle=d3d11, --enable-gpu, --ignore-gpu-blocklist; retained in .omx/state/pink-meadow/playwright.meadow.local.ts. Basic headless mode had 40 passed and 2 timeouts (density reduction and live motion preference). Both targeted retries and the complete hardware run passed unchanged code. The environment distinction remains a known validation limit.
+
+## 2026-09-13 Sidebar home and group controls
+- Task ID: sidebar-home-controls. Risk: R2, explicitly authorized by the user's request to remove only the dashboard menu and verify/relocate the plus/minus controls.
+- The sidebar filters the /dashboard entry for presentation only. The menu provider, access checks, dashboard page, Home tab and logo route retain their contracts.
+- The scoped expand/collapse button now sits next to the domain title and is omitted when no collapsible groups exist. Its icon derives from actual open group codes. Toggling changes only the current domain's group codes, preserving other domain state.
+- Changed: dashboard-sidebar.tsx and synthetic browser fixture/tests. Removed the separate menuExpanded state and redundant toolbar row.
+- Verification: lint passed with 15 existing warnings; unit tests 155 passed; production build and TypeScript passed. Two new desktop/mobile scenarios passed in default headless mode. Two existing scenarios timed out during login in default mode; all four targeted browser scenarios passed with Windows D3D11 in 59.9 seconds.
+- Browser checks cover hidden dashboard rail entries, Home return to /dashboard, title-adjacent control location, manual and aggregate toggles, keyboard activation, other-domain state preservation, existing menu panel keyboard behavior, and mobile profile/menu flow. Screenshots retained under .omx/state/sidebar-controls/.
+- Design detector returned no findings; desktop/mobile visual review passed. No backend or grid module changed. Rollback is a revert of this sidebar presentation diff.
