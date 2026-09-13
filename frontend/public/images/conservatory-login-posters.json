@@ -8,15 +8,15 @@
   "sources": [
     {
       "filename": "src/components/auth/conservatory-scene.ts",
-      "sha256": "06288e1867cd8859d86a9a1d83a72bbdc444ddec14df9abd083e9be379723ceb"
+      "sha256": "f0fc43567fdb279c574888deed40d9826537e94e43361850e683dde778f8814d"
     },
     {
       "filename": "src/components/auth/conservatory/architecture-lighting.ts",
-      "sha256": "1f1abba12eb788181f067deae19156d3955f0a1da7a768f805eb207a2738d466"
+      "sha256": "a64cfb7a5470e7213e3b61c3f8ea64924f8d6e1be0e5fa979fa2fa4305e09301"
     },
     {
       "filename": "src/components/auth/conservatory/vegetation-quality.ts",
-      "sha256": "429a0b6ee6db192a33ac66dbed5ad647f062e4791ab3b0cbe15569f944644ef5"
+      "sha256": "3c665f8df031079c82a474b6cdb30203ea85da1adf39084fa5f553464448f083"
     }
   ],
   "output": [
@@ -24,17 +24,17 @@
       "filename": "conservatory-login-desktop.webp",
       "width": 1800,
       "height": 1125,
-      "vegetation_count": 48000,
-      "bytes": 68950,
-      "sha256": "1ce16fa2b2f000287ea50d01912f7cbb80028b733a510de6c9bc78aa02465b9f"
+      "vegetation_count": 900,
+      "bytes": 69242,
+      "sha256": "5e0e48c12e6908a518616570eaf69563a332c540510b7ab162cd5820732eb38d"
     },
     {
       "filename": "conservatory-login-mobile.webp",
       "width": 487,
       "height": 1055,
-      "vegetation_count": 30000,
-      "bytes": 16196,
-      "sha256": "d67f2de26ee61069ac9b06dc71c3e4fe53a8a0102ace7c00a0b31bd8040fb147"
+      "vegetation_count": 450,
+      "bytes": 16276,
+      "sha256": "7744f7fb8a72aa4e959d1187d9daef110a86be5ed6ce5ef0a800dc4aa803b0db"
     }
   ]
 }

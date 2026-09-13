@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member",
+  "profile-failure", "empty-profile", "member", "sidebar-domains",
 ]);
 let scenario = "default";
 const user = { id: 1, email: "employee@example.test", display_name: "테스트 사용자", roles: ["admin"] };
@@ -77,7 +77,11 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
-      return json(response, 200, { menus });
+      return json(response, 200, { menus: scenario === "sidebar-domains" ? [...menus, {
+        id: 20, code: "other", name: "다른 업무", path: null, icon: "Folder", sort_order: 3,
+        children: [{ id: 21, code: "other.group", name: "다른 그룹", path: null, icon: "Folder", sort_order: 1,
+          children: [{ id: 22, code: "other.leaf", name: "다른 화면", path: "/settings/icons", icon: "Folder", sort_order: 1, children: [] }] }],
+      }] : menus });
     case "GET /api/v1/menus/actions/current":
       return json(response, 200, {
         menu_code: "mng.companies", path: "/mng/companies", allowed_actions: actions,

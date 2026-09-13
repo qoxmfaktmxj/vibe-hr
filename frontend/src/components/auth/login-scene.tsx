@@ -47,7 +47,7 @@ export function LoginScene() {
       frame = 0;
       if (!canAnimate()) return;
       const delta = previous ? Math.min((now - previous) / 1000, .05) : 0;
-      const slowFrameLimit = world && world.vegetationCount > 30_000 ? 24 : 36;
+      const slowFrameLimit = world && world.vegetationCount > 450 ? 24 : 36;
       if (previous && now - previous > slowFrameLimit) slowFrames++;
       else slowFrames = Math.max(0, slowFrames - 1);
       if (slowFrames >= 24) {

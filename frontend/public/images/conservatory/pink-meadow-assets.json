@@ -1,0 +1,17 @@
+{
+  "generator": "Built-in image_gen",
+  "generated_on": "2026-09-13",
+  "purpose": "Dense pink meadow base and alpha-tested muhly tufts for the login scene",
+  "assets": [
+    {
+      "file": "pink-meadow.webp",
+      "processing": "Resize to 1024x1024 and encode WebP quality 88 with sharp.",
+      "prompt": "Use case: stylized-concept. Asset type: seamless albedo texture for a distant pink muhly grass meadow on a 3D hillside. Generate a square edge-to-edge continuous carpet of extremely dense soft feathery pink muhly grasses viewed from above, orthographic texture scan, pale dusty rose, mauve and blush strands, irregular organic overlapping tufts, tiny delicate individual fibers and broad soft tonal variation. Dense natural coverage with no bare soil gaps. Diffuse overcast lighting, no directional shadows, no perspective horizon, no sky, no buildings, no text, no border. Seamlessly tileable on all edges, consistent scale across image. Restrained low contrast pastel colors for an elegant dreamy conservatory. This is only a vegetation material texture, not a scene illustration."
+    },
+    {
+      "file": "pink-muhly-tuft.webp",
+      "processing": "Fit within 512x512 and encode WebP quality 90, alpha quality 100 with sharp. Generated transparency preserved.",
+      "prompt": "Use case: stylized-concept. Asset type: single vegetation billboard sprite for a WebGL pink muhly meadow. A small dense tuft of soft pink muhly grass, fine feathery pink plumes, many thin delicately curved stems growing from one narrow base at bottom center, upright graceful fan shape, dusty pastel rose and mauve colors. Front view, orthographic, soft diffuse neutral lighting. Isolated cutout on a genuinely transparent background with alpha, no ground, no pot, no shadow, no sky, no border, no text, no other objects. Entire tuft visible with slight transparent padding, dense lower half and airy finely feathered upper silhouette. Natural botanical realism, not triangular, not a tree."
+    }
+  ]
+}

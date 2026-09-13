@@ -31,7 +31,7 @@ const routes = new Map([
   ["/", { type: "text/html", body: '<!doctype html><html><body style="margin:0"><canvas></canvas><script src="/scene.js"></script></body></html>' }],
   ["/scene.js", { type: "text/javascript", body: bundle.outputFiles[0].contents }],
 ]);
-for (const name of ["rock-color.webp", "rock-normal.webp", "architecture-gi.webp", "pearl-matcap.webp"]) {
+for (const name of ["rock-color.webp", "rock-normal.webp", "architecture-gi.webp", "pearl-matcap.webp", "pink-meadow.webp", "pink-muhly-tuft.webp"]) {
   routes.set(`/images/conservatory/${name}`, { type: "image/webp", body: await readFile(path.join(frontend, "public/images/conservatory", name)) });
 }
 const server = createServer((request, response) => {
