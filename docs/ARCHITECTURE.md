@@ -57,3 +57,7 @@ Public operational endpoints are `/health`, `/api/v1/health`, and Actuator healt
 - Keep migrations forward-only and reviewable; do not manually alter Flyway history.
 - Use Java unit tests for domain behavior and tagged Testcontainers tests for PostgreSQL-dependent behavior.
 - Record commands, outcomes, and remaining risks in `docs/TASK_LEDGER.md`.
+
+## Employee grid query extension
+
+The employee list at GET /api/v1/employees now accepts optional repeated positions and employment_statuses parameters and an inclusive ISO-date hire_date_to parameter. Existing employee_no, name, department, employment_status, active, page, limit and all parameters retain their behavior. The employee screen and its all-row spreadsheet download share the frontend query builder. HrController preserves the employee reader/menu query gate; HrApplicationService and HrGridMapper apply the same bound filters to rows and total_count. No database migration or authentication-policy change is involved. Deploy frontend and backend together to activate the new search controls.

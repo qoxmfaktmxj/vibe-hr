@@ -33,6 +33,10 @@ import { useEmployeeMasterReloadFlow } from "@/components/hr/use-employee-master
 import { EmployeeMasterSearchSection } from "@/components/hr/employee-master-search-section";
 import type { EmployeeGridRow } from "@/components/hr/employee-master-types";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Columns3, Trash2, Undo2 } from "lucide-react";
 import {
   buildEmployeeQuery,
   cloneFilters,
@@ -203,12 +207,13 @@ function isRevertedToOriginal(row: EmployeeGridRow): boolean {
 }
 
 function toGridRow(employee: EmployeeItem): EmployeeGridRow {
+  const normalized = { ...employee, hire_date: employee.hire_date?.slice(0, 10) ?? "" };
   return {
-    ...employee,
+    ...normalized,
     password: "",
     _status: "clean",
     // _prevStatus stays on the row model contract for delete/restore transitions.
-    _original: snapshotOriginal(employee),
+    _original: snapshotOriginal(normalized),
   };
 }
 
@@ -259,6 +264,10 @@ export function EmployeeMasterManager() {
   const [totalCount, setTotalCount] = useState(() => restoredViewState?.totalCount ?? 0);
   const [initialLoading, setInitialLoading] = useState(() => (restoredViewState?.rows.length ?? 0) === 0);
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<number[]>([]);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>(["login_id", "is_active", "password"]);
   const [syncedPageKey, setSyncedPageKey] = useState<string | null>(() => restoredViewState?.syncedPageKey ?? null);
 
   const gridApiRef = useRef<GridApi<EmployeeGridRow> | null>(null);
@@ -349,6 +358,9 @@ export function EmployeeMasterManager() {
     return summarizeGridStatuses(rows, (row) => row._status);
   }, [rows]);
   const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
+  const changedCount = rows.filter((row) => row._status !== "clean").length;
+  const selectedItems = rows.filter((row) => selectedIds.includes(row.id));
+  const detailRow = rows.find((row) => row.id === detailId);
 
   const {
     discardDialogOpen,
@@ -525,6 +537,7 @@ export function EmployeeMasterManager() {
 
   useEffect(() => {
     if (!employeePageData) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the fetched snapshot with the editable grid working copy.
     setInitialLoading(false);
     setTotalCount(employeePageData.total_count ?? employeePageData.employees.length);
     if (hasDirtyRows && syncedPageKey === pageQueryKey) {
@@ -538,6 +551,7 @@ export function EmployeeMasterManager() {
 
   useEffect(() => {
     if (!employeePageError) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- End initial loading when the external request fails.
     setInitialLoading(false);
     toast.error(employeePageError.message || I18N.initError);
   }, [employeePageError]);
@@ -555,7 +569,6 @@ export function EmployeeMasterManager() {
   /* -- 컬럼 정의 ------------------------------------------------ */
   const columnDefs = useMemo<ColDef<EmployeeGridRow>[]>(() => {
     // getGridStatusCellClass is applied inside buildEmployeeMasterColumnDefs to preserve standard-v2 status styling.
-    // eslint-disable-next-line react-hooks/refs
     return buildEmployeeMasterColumnDefs({
       labels: {
         colDeleteMark: I18N.colDeleteMark,
@@ -579,9 +592,13 @@ export function EmployeeMasterManager() {
       holidayDateKeys,
       employmentStatusValues,
       employmentLabelByCode,
-      onToggleDelete: toggleDeleteById,
+      onOpenDetail: setDetailId,
+    }).map((column) => {
+      const editable = column.editable;
+      const { width, flex, ...rest } = column;
+      return { ...rest, initialWidth: width, initialFlex: flex ?? undefined, editable: (params) => !saving && !loading && !menuActionLoading && can("save") && (typeof editable === "function" ? editable(params) : editable === true) };
     });
-  }, [departmentNameById, departments, employmentLabelByCode, employmentStatusValues, holidayDateKeys, positionNames, toggleDeleteById]);
+  }, [can, departmentNameById, departments, employmentLabelByCode, employmentStatusValues, holidayDateKeys, loading, menuActionLoading, positionNames, saving]);
 
   const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(() => EMPLOYEE_MASTER_DEFAULT_COL_DEF, []);
 
@@ -656,6 +673,7 @@ export function EmployeeMasterManager() {
 
   /* -- 조회: 전체 화면 로딩 없이 데이터만 재조회 ------- */
   function handleQuery() {
+    clearSaveFeedback();
     const nextFilters: SearchFilters = {
       ...searchFilters,
       positions: [...searchFilters.positions],
@@ -693,10 +711,10 @@ export function EmployeeMasterManager() {
   }, []);
 
   const departmentsReady = departments.length > 0;
-  const { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile } = useEmployeeMasterActions({
+  const { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile, saveFeedback, clearSaveFeedback } = useEmployeeMasterActions({
     rows,
     appliedQuery: buildEmployeeQuery(appliedFilters),
-    saving,
+    saving: saving || loading,
     departmentsReady,
     gridApiRef,
     containerRef,
@@ -732,7 +750,8 @@ export function EmployeeMasterManager() {
   const filteredToolbarSaveAction = can("save")
     ? {
         ...toolbarSaveAction,
-        disabled: Boolean(toolbarSaveAction.disabled) || menuActionLoading,
+        label: saving ? "저장 중..." : changedCount ? `변경 ${changedCount}건 저장` : "저장",
+        disabled: Boolean(toolbarSaveAction.disabled) || menuActionLoading || changedCount === 0,
       }
     : undefined;
 
@@ -752,10 +771,12 @@ export function EmployeeMasterManager() {
   }
 
   return (
-    <ManagerPageShell containerRef={containerRef} onPasteCapture={handlePasteCapture}>
+    <ManagerPageShell className="employee-workspace" containerRef={containerRef} onPasteCapture={saving || !can("create") ? undefined : handlePasteCapture}>
       {/* ManagerSearchSection is rendered through EmployeeMasterSearchSection to keep standard-v2 composition. */}
       <EmployeeMasterSearchSection
         filters={searchFilters}
+        appliedFilters={appliedFilters}
+        onReset={() => { clearSaveFeedback(); setSearchFilters(cloneFilters(EMPTY_SEARCH_FILTERS)); requestReloadAction({ type: "query", filters: cloneFilters(EMPTY_SEARCH_FILTERS) }); }}
         holidayDateKeys={holidayDateKeys}
         positionFilterOptions={positionFilterOptions}
         statusOptions={statusOptions}
@@ -772,6 +793,8 @@ export function EmployeeMasterManager() {
       />
 
       <ManagerGridSection
+        className="employee-grid"
+        headerClassName="[&>div:first-child]:flex-wrap [&>div:first-child]:shrink-0"
         headerLeft={(
           <>
             <GridPaginationControls
@@ -785,12 +808,22 @@ export function EmployeeMasterManager() {
               disabled={loading || saving}
               className="mt-0 justify-start"
             />
-            <span className="text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
+            <span className="whitespace-nowrap text-xs text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
             <GridChangeSummaryBadges summary={changeSummary} />
+            {selectedItems.length > 0 && <span className="whitespace-nowrap text-xs text-primary">선택 {selectedItems.length}건</span>}
           </>
         )}
         headerRight={(
           <>
+            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 className="h-3.5 w-3.5" />열 보기</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={hiddenColumns.length === 0} onSelect={() => { gridApiRef.current?.setColumnsVisible(hiddenColumns, true); setHiddenColumns([]); }}>전체 표시</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {[["login_id", "로그인 ID"], ["email", "이메일"], ["is_active", "계정 활성"], ["password", "비밀번호 입력"], ["position_title", "직책"], ["hire_date", "입사일"]].map(([field, label]) => <DropdownMenuCheckboxItem key={field} checked={!hiddenColumns.includes(field)} onCheckedChange={(visible) => { gridApiRef.current?.setColumnsVisible([field], visible); setHiddenColumns((previous) => visible ? previous.filter((item) => item !== field) : [...previous, field]); }}>{label}</DropdownMenuCheckboxItem>)}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {can("save") && selectedItems.length > 0 && <><Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status !== "deleted")} onClick={() => setDeleteTargets(selectedItems.filter((row) => row._status !== "deleted").map((row) => row.id))}><Trash2 className="h-3.5 w-3.5" />선택 삭제</Button>
+              <Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status === "deleted")} onClick={() => selectedItems.filter((row) => row._status === "deleted").forEach((row) => toggleDeleteById(row.id, false))}><Undo2 className="h-3.5 w-3.5" />삭제 취소</Button></>}
             <GridToolbarActions actions={filteredToolbarActions} saveAction={filteredToolbarSaveAction} />
             <input
               ref={uploadInputRef}
@@ -808,6 +841,8 @@ export function EmployeeMasterManager() {
         contentClassName="flex min-h-0 flex-1 flex-col"
       >
 
+      {saveFeedback && (saveFeedback.tone === "error" || !hasDirtyRows) && <p role="status" className={`employee-feedback px-6 pb-2 text-sm ${saveFeedback.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>{saveFeedback.text}</p>}
+
       <div className="min-h-0 flex flex-1 flex-col px-6 pb-4">
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<EmployeeGridRow>
@@ -815,8 +850,10 @@ export function EmployeeMasterManager() {
             rowData={rows}
             columnDefs={columnDefs}
             defaultColDef={defaultColDef}
-            rowSelection={{ mode: "multiRow", enableClickSelection: true, checkboxes: false, headerCheckbox: false }}
-            singleClickEdit={true}
+            rowSelection={{ mode: "multiRow", enableClickSelection: false, selectAll: "filtered" }}
+            selectionColumnDef={{ pinned: "left", width: 44, resizable: false }}
+            onSelectionChanged={(event) => setSelectedIds(event.api.getSelectedRows().map((row: EmployeeGridRow) => row.id))}
+            singleClickEdit={false}
             animateRows={false}
             rowClassRules={rowClassRules}
             getRowClass={getRowClass}
@@ -832,6 +869,18 @@ export function EmployeeMasterManager() {
         </div>
       </div>
       </ManagerGridSection>
+      <ConfirmDialog open={deleteTargets.length > 0} onOpenChange={(open) => { if (!open) setDeleteTargets([]); }} title={`${deleteTargets.length}건을 삭제 표시할까요?`} description="기존 사원은 저장해야 삭제가 반영되며 저장 전에는 삭제 취소가 가능합니다. 아직 저장하지 않은 신규 행은 목록에서 바로 제거됩니다." confirmLabel="삭제 표시" busy={saving || loading} onConfirm={() => { if (!saving && !loading && !menuActionLoading && can("save")) deleteTargets.forEach((id) => toggleDeleteById(id, true)); setDeleteTargets([]); }}>
+        <ul className="max-h-40 overflow-y-auto px-6 pb-4 text-sm">{rows.filter((row) => deleteTargets.includes(row.id)).map((row) => <li key={row.id}>{row.employee_no || "신규"} / {row.display_name || "이름 미입력"}</li>)}</ul>
+      </ConfirmDialog>
+      <Dialog open={!!detailRow} onOpenChange={(open) => { if (!open) setDetailId(null); }}>
+        <DialogContent className="employee-detail-panel left-auto right-0 top-0 h-dvh max-w-md translate-x-0 translate-y-0 overflow-y-auto rounded-none bg-card data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-top-0 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100">
+          <DialogHeader><DialogTitle>사원 상세</DialogTitle><DialogDescription>목록 위치를 유지하면서 사원 정보를 확인합니다.</DialogDescription></DialogHeader>
+          {detailRow && <div className="space-y-6 p-6"><div><p className="text-xl font-semibold">{detailRow.display_name || "신규 사원"}</p><p className="mt-1 text-sm text-muted-foreground">{detailRow.employee_no || "저장 후 발급"}</p></div>
+            {detailRow._status !== "clean" && <p className="text-sm text-primary">저장 전 변경 내용이 포함되어 있습니다.</p>}
+            <dl className="space-y-4">{[["부서", departmentNameById.get(detailRow.department_id) ?? detailRow.department_name], ["직책", detailRow.position_title], ["입사일", detailRow.hire_date?.slice(0, 10)], ["재직상태", employmentLabelByCode.get(detailRow.employment_status) ?? detailRow.employment_status], ["이메일", detailRow.email], ["로그인 ID", detailRow.login_id], ["계정 활성", detailRow.is_active ? "Y" : "N"]].map(([label, value]) => <div key={label} className="border-b border-border pb-3"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm">{value || "-"}</dd></div>)}</dl>
+          </div>}
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={discardDialogOpen}
         onOpenChange={handleDiscardDialogOpenChange}

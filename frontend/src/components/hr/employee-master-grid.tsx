@@ -13,6 +13,7 @@ import type {
 } from "ag-grid-community";
 
 import { CustomDatePicker } from "@/components/ui/custom-date-picker";
+import { Eye } from "lucide-react";
 import { getGridStatusCellClass } from "@/lib/grid/grid-status";
 import type { GridRowStatus } from "@/lib/hr/grid-change-tracker";
 import type { DepartmentItem, EmployeeItem } from "@/types/employee";
@@ -45,7 +46,7 @@ type BuildEmployeeMasterColumnDefsArgs = {
   holidayDateKeys: string[];
   employmentStatusValues: EmployeeItem["employment_status"][];
   employmentLabelByCode: Map<string, string>;
-  onToggleDelete: (rowId: number, checked: boolean) => void;
+  onOpenDetail: (rowId: number) => void;
 };
 
 function normalizeDateKey(value: unknown): string {
@@ -106,13 +107,13 @@ export function buildEmployeeMasterColumnDefs({
   holidayDateKeys,
   employmentStatusValues,
   employmentLabelByCode,
-  onToggleDelete,
+  onOpenDetail,
 }: BuildEmployeeMasterColumnDefsArgs): ColDef<EmployeeGridRow>[] {
   return [
     {
-      headerName: lockHeader(labels.colDeleteMark),
-      headerTooltip: "직접 입력 수정 불가(삭제 체크로만 변경)",
-      width: 56,
+      headerName: "상세",
+      colId: "detail",
+      width: 52,
       pinned: "left",
       sortable: false,
       filter: false,
@@ -121,25 +122,18 @@ export function buildEmployeeMasterColumnDefs({
       cellRenderer: (params: ICellRendererParams<EmployeeGridRow>) => {
         const row = params.data;
         if (!row) return null;
-        const checked = row._status === "deleted";
         return (
           <div className="flex h-full items-center justify-center">
-            <input
-              type="checkbox"
-              checked={checked}
-              className="h-4 w-4 cursor-pointer accent-[var(--vibe-accent-red)]"
-              onChange={(event) => onToggleDelete(row.id, event.target.checked)}
-              onClick={(event) => event.stopPropagation()}
-            />
+            <button type="button" aria-label={`${row.display_name || "신규 사원"} 상세 보기`} className="rounded p-1 text-muted-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring" onClick={(event) => { event.stopPropagation(); onOpenDetail(row.id); }}><Eye className="h-4 w-4" /></button>
           </div>
         );
       },
     },
     {
-      headerName: lockHeader(labels.colStatus),
+      headerName: "변경",
       headerTooltip: "시스템 상태 컬럼(자동 계산)",
       field: "_status",
-      width: 80,
+      width: 72,
       editable: false,
       cellClass: (params) => getGridStatusCellClass(params.value as GridRowStatus),
       valueFormatter: (params) => statusLabels[(params.value as GridRowStatus) ?? "clean"],
@@ -149,25 +143,32 @@ export function buildEmployeeMasterColumnDefs({
       headerTooltip: "신규 행에서만 수정 가능",
       field: "employee_no",
       width: 120,
+      pinned: "left",
       editable: (params) => params.data?._status === "added",
     },
     {
       headerName: lockHeader(labels.colLoginId),
       headerTooltip: "신규 행에서만 수정 가능",
       field: "login_id",
+      tooltipField: "login_id",
       width: 130,
+      initialHide: true,
       editable: (params) => params.data?._status === "added",
     },
     {
       headerName: labels.colName,
       field: "display_name",
-      width: 120,
+      tooltipField: "display_name",
+      minWidth: 120,
+      flex: 1,
       editable: (params) => params.data?._status !== "deleted",
     },
     {
       headerName: labels.colDepartment,
       field: "department_id",
-      width: 140,
+      minWidth: 130,
+      tooltipValueGetter: (params) => departmentNameById.get(Number(params.data?.department_id)) ?? "",
+      flex: 1.2,
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: "agSelectCellEditor",
       cellEditorParams: { values: departments.map((department) => department.id) },
@@ -177,7 +178,7 @@ export function buildEmployeeMasterColumnDefs({
     {
       headerName: labels.colPosition,
       field: "position_title",
-      width: 120,
+      width: 100,
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: "agSelectCellEditor",
       cellEditorParams: { values: positionNames.length > 0 ? positionNames : ["사원"] },
@@ -186,6 +187,7 @@ export function buildEmployeeMasterColumnDefs({
       headerName: labels.colHireDate,
       field: "hire_date",
       width: 120,
+      valueFormatter: (params) => normalizeDateKey(params.value),
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: HireDateCellEditor,
       cellEditorParams: { holidays: holidayDateKeys },
@@ -195,7 +197,7 @@ export function buildEmployeeMasterColumnDefs({
     {
       headerName: labels.colEmploymentStatus,
       field: "employment_status",
-      width: 110,
+      width: 100,
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: "agSelectCellEditor",
       cellEditorParams: { values: employmentStatusValues },
@@ -208,13 +210,16 @@ export function buildEmployeeMasterColumnDefs({
     {
       headerName: labels.colEmail,
       field: "email",
-      width: 180,
+      tooltipField: "email",
+      minWidth: 176,
+      flex: 1.6,
       editable: (params) => params.data?._status !== "deleted",
     },
     {
       headerName: labels.colActive,
       field: "is_active",
       width: 80,
+      initialHide: true,
       editable: (params) => params.data?._status !== "deleted",
       cellEditor: "agSelectCellEditor",
       cellEditorParams: {
@@ -231,6 +236,7 @@ export function buildEmployeeMasterColumnDefs({
       headerName: labels.colPassword,
       field: "password",
       width: 160,
+      initialHide: true,
       editable: (params) => params.data?._status !== "deleted",
     },
   ];

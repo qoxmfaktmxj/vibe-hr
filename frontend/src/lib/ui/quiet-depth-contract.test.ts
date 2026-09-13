@@ -99,7 +99,8 @@ describe("Quiet Depth UI contract", () => {
     const source = readSource("app", "globals.css");
 
     expect(source.match(/--vibe-surface-raised:/g)).toHaveLength(4);
-    expect(source.match(/--vibe-shadow-card:/g)).toHaveLength(4);
+    expect(source.match(/--vibe-shadow-card:/g)).toHaveLength(5);
+    expect(source).toContain(":root:not(.dark) .vibe-workspace");
     expect(source).toContain("--vibe-canvas-glow:");
   });
 

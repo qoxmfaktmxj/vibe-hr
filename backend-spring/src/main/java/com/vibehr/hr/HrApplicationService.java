@@ -52,9 +52,14 @@ class HrApplicationService {
 
     @Transactional(readOnly = true)
     Map<String, Object> listEmployees(Integer page, Integer limit, boolean all, String employeeNo, String name, String department, String employmentStatus, Boolean active) {
+        return listEmployees(page, limit, all, employeeNo, name, department, employmentStatus, active, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    Map<String, Object> listEmployees(Integer page, Integer limit, boolean all, String employeeNo, String name, String department, String employmentStatus, Boolean active, List<String> positions, List<String> employmentStatuses, LocalDate hireDateTo) {
         Integer offset = all ? null : Math.max(0, (page - 1) * limit);
-        List<Map<String, Object>> rows = gridMapper.employeeRows(employeeNo, name, department, employmentStatus, active, offset, all ? null : limit);
-        long total = gridMapper.employeeCount(employeeNo, name, department, employmentStatus, active);
+        List<Map<String, Object>> rows = gridMapper.employeeRows(employeeNo, name, department, employmentStatus, active, offset, all ? null : limit, positions, employmentStatuses, hireDateTo);
+        long total = gridMapper.employeeCount(employeeNo, name, department, employmentStatus, active, positions, employmentStatuses, hireDateTo);
         Map<String, Object> result = new LinkedHashMap<>(); result.put("employees", rows); result.put("total_count", total);
         if (!all) { result.put("page", page); result.put("limit", limit); } return result;
     }
