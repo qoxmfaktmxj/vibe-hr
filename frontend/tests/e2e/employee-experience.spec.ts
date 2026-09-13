@@ -289,7 +289,7 @@ test("tab context dismissal respects outside clicks and sequential keyboard focu
   await companyTab.focus();
   await page.keyboard.press("Shift+F10");
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "고객사관리 탭 관리" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "고객사관리 탭 닫기" })).toBeFocused();
   await companyTab.focus();
   await page.keyboard.press("Shift+F10");
   await page.keyboard.press("Shift+Tab");
@@ -692,6 +692,25 @@ for (const mobile of [false, true]) {
     await page.screenshot({ path: test.info().outputPath(`sidebar-${mobile ? "mobile" : "desktop"}.png`) });
     if (mobile) await page.getByRole("button", { name: "메뉴 닫기", exact: true }).click();
     await page.goto("/mng/companies");
+    const tabActions = page.getByRole("button", { name: "고객사관리 탭 관리", exact: true });
+    const companyTab = page.getByRole("navigation", { name: "열린 업무" }).getByRole("button", { name: "고객사관리", exact: true });
+    if (mobile) {
+      await expect(tabActions).toBeVisible();
+      await tabActions.click();
+    } else {
+      await expect(tabActions).toBeHidden();
+      await companyTab.click({ button: "right" });
+    }
+    await expect(page.getByRole("menu", { name: "탭 관리 메뉴" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    if (!mobile) {
+      await companyTab.focus();
+      await page.keyboard.press("Shift+F10");
+      await expect(page.getByRole("menu", { name: "탭 관리 메뉴" })).toBeVisible();
+      await page.keyboard.press("Tab");
+      await expect(page.getByRole("button", { name: "고객사관리 탭 닫기", exact: true })).toBeFocused();
+    }
+    await page.screenshot({ path: test.info().outputPath(`work-tabs-${mobile ? "mobile" : "desktop"}.png`) });
     await page.getByRole("navigation", { name: "열린 업무" }).getByRole("button", { name: "홈", exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     expect(sceneTextures, "UI smoke checks must use the static login background").toEqual([]);

@@ -332,3 +332,10 @@
 - Scope review: scripts, test selection and documentation only; no runtime product, authentication, dependency or backend change. No benchmark speedup claimed beyond measured runs. Rollback: revert this validation configuration commit.
 - Configuration correction: the first build caught reducedMotion at the wrong Playwright option level. Moved it to use.contextOptions using the installed Playwright type definition, then reran only UI smoke, the changed config's lint, and build. Unchanged unit and GPU results were reused.
 - Final corrected UI smoke: 2 passed in 16.4s with no scene texture requests. Corrected config lint and production build (including TypeScript and 190 routes) passed.
+
+## 2026-09-13 Compact desktop work tabs
+- Risk: R2 shared navigation presentation; user explicitly requested removal of redundant three-dot controls.
+- Desktop tab management buttons are hidden at the existing lg breakpoint, reclaiming their width. Right-click and Shift+F10 continue to open the same menu; mobile buttons remain for touch access.
+- Updated keyboard tab-order regression expectation to focus the close button after the desktop tab title. Extended the existing two UI smoke flows to verify desktop hidden/mobile visible management actions, right-click, keyboard context menu and focus. No new test cases or GPU checks added.
+- Validation: npm run check:ui passed: lint with 15 existing warnings, 155 unit tests, 2 static UI flows in 17.6 seconds and one production build including TypeScript. Desktop/mobile screenshots inspected; DESIGN.md updated. No grid, backend or permission-policy changes.
+- Rollback: revert this tab presentation diff. Current change is local and not published.

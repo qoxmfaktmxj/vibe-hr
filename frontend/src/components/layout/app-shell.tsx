@@ -425,7 +425,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
                     aria-haspopup="menu"
                     aria-expanded={contextMenu?.targetPath === tab.path}
                     aria-controls={contextMenu?.targetPath === tab.path ? "work-tab-menu" : undefined}
-                    className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/70"
+                    className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/70 lg:hidden"
                     onClick={(event) => {
                       event.stopPropagation();
                       if (contextMenu?.targetPath === tab.path) { setContextMenu(null); return; }
