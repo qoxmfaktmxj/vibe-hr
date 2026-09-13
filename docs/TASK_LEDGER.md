@@ -322,3 +322,13 @@
 - Verification: lint passed with 15 existing warnings; unit tests 155 passed; production build and TypeScript passed. Two new desktop/mobile scenarios passed in default headless mode. Two existing scenarios timed out during login in default mode; all four targeted browser scenarios passed with Windows D3D11 in 59.9 seconds.
 - Browser checks cover hidden dashboard rail entries, Home return to /dashboard, title-adjacent control location, manual and aggregate toggles, keyboard activation, other-domain state preservation, existing menu panel keyboard behavior, and mobile profile/menu flow. Screenshots retained under .omx/state/sidebar-controls/.
 - Design detector returned no findings; desktop/mobile visual review passed. No backend or grid module changed. Rollback is a revert of this sidebar presentation diff.
+
+## 2026-09-13 Faster local UI validation
+- Task ID: faster-ui-validation. Risk: R2. User approved the recommended smaller UI validation path and publication to main.
+- Added test:ui (two existing tagged desktop/mobile flows with static login), test:ui:full (all 44 existing regression cases), test:gpu (dedicated scene pixel-response test), and check:ui (lint, unit, smoke, one production build).
+- UI smoke explicitly asserts that no 3D scene textures download. GPU configuration defaults to D3D11 on Windows; PLAYWRIGHT_HARDWARE_GPU=0 opts into default headless rendering.
+- AGENTS.md, TEST_STRATEGY.md and DESIGN.md now define affected checks during implementation, one final build including TypeScript, and reuse of unchanged passing evidence. Feature-specific and protected-change validation remains required; CI workflows and all existing test cases are retained.
+- Validation: UI smoke 2 passed; list confirms exactly 2 smoke tests and 44 full-suite tests; GPU test 1 passed in 16.4s; all 155 unit tests passed in 1.53s; lint passed with 15 existing warnings and no errors. Final production build run once after browser tests.
+- Scope review: scripts, test selection and documentation only; no runtime product, authentication, dependency or backend change. No benchmark speedup claimed beyond measured runs. Rollback: revert this validation configuration commit.
+- Configuration correction: the first build caught reducedMotion at the wrong Playwright option level. Moved it to use.contextOptions using the installed Playwright type definition, then reran only UI smoke, the changed config's lint, and build. Unchanged unit and GPU results were reused.
+- Final corrected UI smoke: 2 passed in 16.4s with no scene texture requests. Corrected config lint and production build (including TypeScript and 190 routes) passed.

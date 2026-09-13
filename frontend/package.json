@@ -10,6 +10,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:ui": "playwright test --config playwright.ui.config.ts --reporter=line",
+    "test:ui:full": "playwright test --config playwright.experience.config.ts --reporter=line",
+    "test:gpu": "playwright test --config playwright.scene.config.ts --reporter=line",
+    "check:ui": "npm run lint && npm run test && npm run test:ui && npm run build",
     "test:e2e:hr": "playwright test tests/e2e/hr-finalist-appointment.spec.ts --reporter=line",
     "generate:brand-assets": "node scripts/generate-brand-assets.mjs",
     "validate:grid": "node scripts/validate-grid-screens.mjs"
