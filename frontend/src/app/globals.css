@@ -596,6 +596,21 @@ body {
 .employee-workspace .employee-grid { border-radius: 0; border: 0; box-shadow: none; }
 .employee-workspace .employee-filter-extra { animation: employee-reveal 160ms ease-out; }
 .employee-workspace .employee-feedback { min-height: 1.5rem; }
+.employee-workspace .ag-cell.vibe-cell-range {
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 65%, transparent);
+}
+.employee-workspace .ag-cell.vibe-range-end::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  background: var(--primary);
+  border: 1px solid var(--background);
+  cursor: crosshair;
+}
 @media (max-width: 1023px) {
   .employee-workspace { height: auto; min-height: 100%; }
   .employee-workspace .employee-grid { flex: none; height: 520px; }
