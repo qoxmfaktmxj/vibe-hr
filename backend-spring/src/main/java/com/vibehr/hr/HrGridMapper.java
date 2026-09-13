@@ -12,12 +12,14 @@ interface HrGridMapper {
     @SelectProvider(type = Sql.class, method = "employees")
     List<Map<String, Object>> employeeRows(@Param("employeeNo") String employeeNo, @Param("name") String name,
             @Param("department") String department, @Param("employmentStatus") String employmentStatus,
-            @Param("active") Boolean active, @Param("offset") Integer offset, @Param("limit") Integer limit);
+            @Param("active") Boolean active, @Param("offset") Integer offset, @Param("limit") Integer limit,
+            @Param("positions") List<String> positions, @Param("employmentStatuses") List<String> employmentStatuses, @Param("hireDateTo") java.time.LocalDate hireDateTo);
 
     @SelectProvider(type = Sql.class, method = "employeeCount")
     long employeeCount(@Param("employeeNo") String employeeNo, @Param("name") String name,
             @Param("department") String department, @Param("employmentStatus") String employmentStatus,
-            @Param("active") Boolean active);
+            @Param("active") Boolean active, @Param("positions") List<String> positions,
+            @Param("employmentStatuses") List<String> employmentStatuses, @Param("hireDateTo") java.time.LocalDate hireDateTo);
 
     final class Sql {
         public static String employees(Map<String, Object> values) { return select(values, false); }
@@ -30,8 +32,17 @@ interface HrGridMapper {
             if (values.get("department") != null) sql.append(" and lower(d.name) like concat('%',lower(#{department}),'%')");
             if (values.get("employmentStatus") != null) sql.append(" and e.employment_status=#{employmentStatus}");
             if (values.get("active") != null) sql.append(" and u.is_active=#{active}");
+            appendList(sql, values, "positions", "e.position_title");
+            appendList(sql, values, "employmentStatuses", "e.employment_status");
+            if (values.get("hireDateTo") != null) sql.append(" and e.hire_date <= #{hireDateTo}");
             if (!count) { sql.append(" order by e.id"); if (values.get("offset") != null) sql.append(" offset #{offset} limit #{limit}"); }
             return sql.toString();
+        }
+        private static void appendList(StringBuilder sql, Map<String, Object> values, String key, String column) {
+            if (!(values.get(key) instanceof List<?> items) || items.isEmpty()) return;
+            sql.append(" and ").append(column).append(" in (");
+            for (int i = 0; i < items.size(); i++) { if (i > 0) sql.append(","); sql.append("#{").append(key).append("[").append(i).append("]}"); }
+            sql.append(")");
         }
     }
 }

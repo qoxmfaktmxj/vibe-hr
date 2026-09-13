@@ -39,7 +39,10 @@ export function buildEmployeeQuery(filters: SearchFilters): URLSearchParams {
   if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
   if (filters.name.trim()) params.set("name", filters.name.trim());
   if (filters.department.trim()) params.set("department", filters.department.trim());
-  if (filters.employmentStatuses.length === 1) params.set("employment_status", filters.employmentStatuses[0]);
+    if (filters.employmentStatuses.length === 1) params.set("employment_status", filters.employmentStatuses[0]);
+    if (filters.employmentStatuses.length > 1) filters.employmentStatuses.forEach((value) => params.append("employment_statuses", value));
+    filters.positions.forEach((value) => params.append("positions", value));
+    if (filters.hireDateTo) params.set("hire_date_to", filters.hireDateTo);
   if (filters.active === "Y") params.set("active", "true");
   if (filters.active === "N") params.set("active", "false");
   return params;

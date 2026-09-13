@@ -26,7 +26,7 @@ class HrControllerTest {
         when(authorization.requireAnyRole(authentication, "hr_manager", "admin")).thenReturn(17);
         when(service.listEmployees(1, 100, false, null, null, null, null, null)).thenReturn(expected);
 
-        assertThat(controller.employees(authentication, 1, 100, false, null, null, null, null, null)).isSameAs(expected);
+        assertThat(controller.employees(authentication, 1, 100, false, null, null, null, null, null, null, null, null)).isSameAs(expected);
         verify(authorization).requireEmployeeMenuAction(17, "query");
         verify(service).listEmployees(1, 100, false, null, null, null, null, null);
     }

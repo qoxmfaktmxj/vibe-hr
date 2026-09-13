@@ -65,3 +65,21 @@ The approval and receive inboxes use the same inset grid padding, rounded border
 ## AG Grid visual reference
 
 Employee management (`src/components/hr/employee-master-manager.tsx`) is the default visual reference for grid screens: standard search card, pagination/count/action header, inset rounded table border, 36px column header and 34px data rows. Preserve each screen's supported operations rather than filling its toolbar with unavailable controls. Retirement checklist registration opens from the Input action in a labeled dialog, keeping the default view focused on search and the grid.
+
+## Employee workspace UX
+
+The user approved the local employee workspace on 2026-09-13, including the column chooser and advanced search. Use it as the visual reference for subsequent screens. Repetitive implementation is assigned to GPT-5.6 Terra after the interaction contract is settled; preserve each screen's permissions, supported actions and data rules.
+
+Employee cells use single click for focus and double click for mouse editing. Existing keyboard editing remains available. Double-click editing does not enable rectangular cell selection: the current Community implementation still pastes tabular text as new employee rows. Range selection and overwrite paste remain pending a separate implementation decision and must not be advertised as supported.
+
+The column chooser begins with a Show all action (전체 표시) that reveals every currently hidden optional column and synchronizes the checkmarks. Disable it when all optional columns are visible. Individual column toggles remain available.
+
+Authenticated light-mode workspaces use a continuous white canvas and a warm near-white sidebar; the chosen primary accent and dark palette are preserved. Employee management combines search and grid into a flatter work surface. No per-row animation is added to AG Grid.
+
+- Basic search exposes employee number, name, department and employment status. Advanced search contains position, hire-date upper bound and account activity. Applied conditions are distinct from draft fields; reset and query continue through the unsaved-change guard.
+- Checkboxes select rows. Explicit selected deletion first confirms identities and marks persisted rows for deletion; saving applies the existing atomic batch. Unsaved inserted rows can be discarded locally. Delete cancellation restores persisted rows before save.
+- Dates display as YYYY-MM-DD and fetched dates are normalized before entering the editable working copy. Name, department and email use flexible widths with full-value tooltips. Login ID, account activity and password columns are initially hidden but remain available through the column chooser. The backend password policy is unchanged.
+- An explicit details button opens a read-only right panel without replacing the list. It displays the working copy and identifies unsaved changes. Password values are not included in this panel.
+- Save shows the changed count, prevents duplicate submission and edits during an active save, captures the latest cell edit, preserves failed edits, and focuses the first invalid row. New queries clear previous save feedback.
+- Quick navigation (Ctrl/Cmd+K) searches only the current permitted menu tree, can restrict results to open tabs, and stores menu pins per user. Enter opens the first result; arrow keys move through results. It does not grant access or create a separate employee-search API.
+- Short CSS transitions are limited to controls and disclosure; reduced-motion preferences disable them. No additional animation library is required for this phase.

@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { SessionCountdown } from "@/components/layout/session-countdown";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
+import { WorkspaceNavigator } from "@/components/layout/workspace-navigator";
 import type { MenuNode } from "@/types/menu";
 
 const AccountMenuNoSsr = dynamic(
@@ -328,7 +329,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
   }, [contextMenu]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-[var(--vibe-text-base)]">
+    <div className="vibe-workspace flex h-screen overflow-hidden bg-background text-[var(--vibe-text-base)]">
       <a href="#workspace-content" className="sr-only z-[100] rounded-lg bg-card px-4 py-3 font-semibold text-primary shadow-lg focus:not-sr-only focus:fixed focus:left-4 focus:top-4">본문으로 건너뛰기</a>
       <DashboardSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -361,6 +362,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
               ) : null}
             </div>
             <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
+              <WorkspaceNavigator key={user?.id ?? "anonymous"} tabs={openTabs} />
               <SessionCountdown />
               {isAdmin ? <div className="border-l border-border pl-1 sm:pl-2"><ImpersonationPopoverNoSsr /></div> : null}
               <AccountMenuNoSsr />

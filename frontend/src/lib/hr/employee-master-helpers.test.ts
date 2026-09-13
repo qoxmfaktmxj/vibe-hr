@@ -36,6 +36,15 @@ describe("employee-master-helpers", () => {
     expect(params.get("employment_status")).toBe("active");
     expect(params.get("active")).toBe("false");
     expect(params.get("department")).toBeNull();
+    expect(params.getAll("positions")).toEqual(["manager"]);
+  });
+
+  test("advanced filters survive in the shared page and export query", () => {
+    const params = buildEmployeeQuery({ ...EMPTY_SEARCH_FILTERS, positions: ["팀장", "사원"], employmentStatuses: ["active", "leave"], hireDateTo: "2026-09-13" });
+    expect(params.getAll("positions")).toEqual(["팀장", "사원"]);
+    expect(params.getAll("employment_statuses")).toEqual(["active", "leave"]);
+    expect(params.get("employment_status")).toBeNull();
+    expect(params.get("hire_date_to")).toBe("2026-09-13");
   });
 
   test("cloneFilters copies array fields defensively", () => {

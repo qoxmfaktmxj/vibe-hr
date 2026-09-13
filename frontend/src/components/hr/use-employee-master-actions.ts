@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Copy, Download, FileDown, Plus, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { GridApi } from "ag-grid-community";
@@ -66,6 +66,9 @@ export function useEmployeeMasterActions({
   validateRow,
   labels,
 }: UseEmployeeMasterActionsArgs) {
+  const inFlight = useRef(false);
+  const [saveFeedback, setSaveFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const clearSaveFeedback = useCallback(() => setSaveFeedback(null), []);
   const addRows = useCallback((count: number) => {
     const added = Array.from({ length: count }, () => createEmptyRow());
     commitRows((prev) => [...added, ...prev]);
@@ -168,7 +171,7 @@ export function useEmployeeMasterActions({
         row.display_name,
         row.department_name || "",
         row.position_title,
-        row.hire_date,
+        row.hire_date?.slice(0, 10),
         toDisplayEmploymentStatus(row.employment_status, employmentLabelByCode),
         row.email,
         row.is_active ? "Y" : "N",
@@ -222,23 +225,37 @@ export function useEmployeeMasterActions({
   }, [commitRows, departmentNameById, issueTempId, parseDepartmentId, positionNames]);
 
   const saveAllChanges = useCallback(async () => {
-    const changedRows = rows.filter((row) => row._status !== "clean");
+    if (inFlight.current || saving) return;
+    gridApiRef.current?.stopEditing();
+    const currentRows: EmployeeGridRow[] = [];
+    if (gridApiRef.current) gridApiRef.current.forEachNode((node) => { if (node.data) currentRows.push(node.data); });
+    else currentRows.push(...rows);
+    const changedRows = currentRows.filter((row) => row._status !== "clean");
     if (changedRows.length === 0) return;
 
     const validationErrors = new Map<number, string>();
-    for (const row of rows.filter((candidate) => candidate._status === "added" || candidate._status === "updated")) {
+    for (const row of currentRows.filter((candidate) => candidate._status === "added" || candidate._status === "updated")) {
       const message = validateRow(row);
       if (message) validationErrors.set(row.id, message);
     }
     if (validationErrors.size > 0) {
-      const details = Array.from(validationErrors.entries()).slice(0, 5).map(([id, message]) => `ID ${id}: ${message}`).join(" / ");
+      const details = Array.from(validationErrors.entries()).slice(0, 5).map(([id, message]) => {
+        const row = currentRows.find((candidate) => candidate.id === id);
+        return `${row?.employee_no || row?.display_name.trim() || "신규 사원"}: ${message}`;
+      }).join(" / ");
       toast.error(`${labels.validationError} ${details}`);
+      setSaveFeedback({ tone: "error", text: `${labels.validationError} ${details}` });
+      const firstId = validationErrors.keys().next().value;
+      const node = firstId === undefined ? undefined : gridApiRef.current?.getRowNode(String(firstId));
+      if (node) { gridApiRef.current?.ensureNodeVisible(node, "middle"); if (node.rowIndex !== null) gridApiRef.current?.setFocusedCell(node.rowIndex, "display_name"); }
       return;
     }
 
+    inFlight.current = true;
     setSaving(true);
+    setSaveFeedback(null);
     try {
-      const payload = buildEmployeeBatchPayload(rows);
+      const payload = buildEmployeeBatchPayload(currentRows);
       const response = await fetch("/api/employees/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -247,10 +264,12 @@ export function useEmployeeMasterActions({
       if (!response.ok) {
         const detail = await parseErrorDetail(response, labels.saveFailed);
         toast.error(detail);
+        setSaveFeedback({ tone: "error", text: detail });
         return;
       }
 
       const json = (await response.json()) as EmployeeBatchResponse;
+      setSaveFeedback({ tone: "success", text: `저장 완료: 입력 ${json.inserted_count}건, 수정 ${json.updated_count}건, 삭제 ${json.deleted_count}건` });
       commitRows((prev) =>
         clearSavedStatuses(prev, {
           removeDeleted: true,
@@ -269,10 +288,12 @@ export function useEmployeeMasterActions({
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : labels.saveFailed);
+      setSaveFeedback({ tone: "error", text: error instanceof Error ? error.message : labels.saveFailed });
     } finally {
+      inFlight.current = false;
       setSaving(false);
     }
-  }, [commitRows, gridApiRef, labels.saveDone, labels.saveFailed, labels.validationError, mutateEmployeePage, rows, setSaving, setSyncedPageKey, snapshotOriginal, validateRow]);
+  }, [commitRows, gridApiRef, labels.saveDone, labels.saveFailed, labels.validationError, mutateEmployeePage, rows, saving, setSaving, setSyncedPageKey, snapshotOriginal, validateRow]);
 
   const toolbarActions = useMemo(() => [
     { key: "add", label: labels.addRow, icon: Plus, onClick: () => addRows(1), disabled: !departmentsReady },
@@ -280,7 +301,7 @@ export function useEmployeeMasterActions({
     { key: "template", label: labels.templateDownload, icon: FileDown, onClick: () => void downloadTemplateExcel() },
     { key: "upload", label: labels.upload, icon: Upload, onClick: () => uploadInputRef.current?.click() },
     { key: "download", label: labels.download, icon: Download, onClick: () => void downloadCurrentSheetExcel() },
-  ], [addRows, copySelectedRows, departmentsReady, downloadCurrentSheetExcel, downloadTemplateExcel, labels.addRow, labels.copy, labels.download, labels.templateDownload, labels.upload, uploadInputRef]);
+  ].map((action) => ({ ...action, disabled: saving || ("disabled" in action && action.disabled) })), [addRows, copySelectedRows, departmentsReady, downloadCurrentSheetExcel, downloadTemplateExcel, labels.addRow, labels.copy, labels.download, labels.templateDownload, labels.upload, saving, uploadInputRef]);
 
   const toolbarSaveAction = useMemo(() => ({
     key: "save",
@@ -291,5 +312,5 @@ export function useEmployeeMasterActions({
     variant: "save" as const,
   }), [labels.saveAll, saveAllChanges, saving]);
 
-  return { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile };
+  return { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile, saveFeedback, clearSaveFeedback };
 }
