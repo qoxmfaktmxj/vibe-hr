@@ -11,6 +11,9 @@ for (const kind of ["approvals", "receives"] as const) {
     await page.goto(`/hri/tasks/${kind}`);
     await expect(page.getByRole("grid")).toBeVisible();
     await expect(page.getByRole("grid")).toContainText("DOC-");
+    await expect(page.getByLabel("처리 의견", { exact: true })).toHaveCount(0);
+    await expect(page.locator('.ag-header-cell[col-id="actions"]')).toHaveCount(0);
+    expect(await page.locator('.ag-center-cols-container [role="row"]').first().evaluate((row) => row.getBoundingClientRect().height)).toBe(34);
     await expect(page.getByRole("button", { name: "업로드", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "입력", exact: true })).toHaveCount(0);
     const label = kind === "approvals" ? "선택 승인" : "선택 수신 완료";
@@ -37,9 +40,10 @@ for (const kind of ["approvals", "receives"] as const) {
     await expect(page.locator('.ag-center-cols-container [role="row"]')).toHaveCount(3);
     await page.keyboard.press("Escape");
     await page.locator('.ag-header input[type="checkbox"]').check();
-    await page.getByLabel("처리 의견", { exact: true }).fill("확인했습니다");
     await page.getByRole("button", { name: label, exact: true }).click();
-    await expect(page.getByRole("dialog")).toContainText("확인했습니다");
+    await page.getByRole("dialog").getByLabel("처리 의견", { exact: true }).fill("확인했습니다");
+    await expect(page.getByRole("dialog").getByLabel("처리 의견", { exact: true })).toHaveValue("확인했습니다");
+    await page.screenshot({ path: test.info().outputPath(`${kind}-confirm.png`) });
     await page.getByRole("button", { name: "취소", exact: true }).click();
     expect(await (await request.get("http://127.0.0.1:3101/__task-actions")).json()).toEqual([]);
     await expect(page.getByRole("button", { name: label, exact: true })).toBeEnabled();
@@ -52,6 +56,7 @@ for (const kind of ["approvals", "receives"] as const) {
     expect(calls.every((call: { action: string; comment: string }) => call.action === (kind === "approvals" ? "approve" : "receive-complete") && call.comment === "확인했습니다")).toBe(true);
     await expect(page.getByRole("grid")).not.toContainText(kind === "approvals" ? "DOC-101" : "DOC-201");
     await page.screenshot({ path: test.info().outputPath(`${kind}.png`) });
+    await page.locator('.ag-header input[type="checkbox"]').check();
     await page.getByRole("button", { name: "반려", exact: true }).click();
     await page.getByRole("button", { name: "처리 확인", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "1건 중 1건 완료, 0건 실패" })).toBeVisible();
