@@ -209,11 +209,8 @@
       "componentFile": "frontend/src/components/hr/hr-retire-checklist-manager.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
-      "variant": "readonly",
-      "toolbar": [
-        "query",
-        "download"
-      ],
+      "variant": "workflow",
+      "toolbar": ["query", "create", "download"],
       "ownerModule": "HR"
     },
     "hr.severance.calcs": {

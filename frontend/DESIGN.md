@@ -61,3 +61,7 @@ The separate `playwright.scene.config.ts` exercises rendered title and water dif
 ## HRI inbox presentation
 
 The approval and receive inboxes use the same inset grid padding, rounded border, 34px rows and standard search controls as company management. Search is separate from processing: opinions are edited in the confirmation dialog, and selection-based approval/receive completion plus single-document rejection live in the toolbar. Result feedback remains inside the grid card rather than adding a separate page-level card. Other read-only grid consumers retain their existing presentation defaults.
+
+## AG Grid visual reference
+
+Employee management (`src/components/hr/employee-master-manager.tsx`) is the default visual reference for grid screens: standard search card, pagination/count/action header, inset rounded table border, 36px column header and 34px data rows. Preserve each screen's supported operations rather than filling its toolbar with unavailable controls. Retirement checklist registration opens from the Input action in a labeled dialog, keeping the default view focused on search and the grid.
