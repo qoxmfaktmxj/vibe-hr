@@ -48,6 +48,9 @@ type ReadonlyGridManagerProps<Row extends ReadonlyGridRow> = {
   onRowClick?: (row: Row) => void;
   beforeGrid?: ReactNode;
   afterGrid?: ReactNode;
+  inset?: boolean;
+  headerNote?: ReactNode;
+  feedback?: ReactNode;
   queryDisabled?: boolean;
   queryLabel?: string;
   selectedRowId?: number | string | null;
@@ -85,6 +88,9 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
   onRowClick,
   beforeGrid,
   afterGrid,
+  inset = false,
+  headerNote,
+  feedback,
   queryDisabled = false,
   queryLabel = "조회",
   selectedRowId = null,
@@ -220,14 +226,20 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
               disabled={queryDisabled}
               className="mt-0 justify-start"
             />
-            <span className="text-sm text-muted-foreground">총 {totalCount.toLocaleString()}건</span>
+            <span className={inset ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>총 {totalCount.toLocaleString()}건</span>
+            {headerNote}
             <GridChangeSummaryBadges summary={gridSummary} />
           </>
         }
         headerRight={<GridToolbarActions actions={actions ?? toolbarActions} saveAction={actions ? undefined : saveAction} />}
+        contentClassName={inset ? "flex min-h-0 flex-1 flex-col" : undefined}
       >
+        {feedback}
+        <div className={inset ? "min-h-0 flex-1 px-3 pb-4 pt-2 md:px-6 md:pt-0" : "contents"}>
         <div
-          className="ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-border"
+          className={inset
+            ? "ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border"
+            : "ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-border"}
           style={{ minHeight: gridHeight }}
         >
           <AgGridReact<Row>
@@ -243,7 +255,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             } : undefined}
             onSelectionChanged={onSelectionChange ? (event) => onSelectionChange(event.api.getSelectedRows()) : undefined}
             defaultColDef={defaultColDef}
-            rowHeight={36}
+            rowHeight={inset ? 34 : 36}
             headerHeight={36}
             animateRows={false}
             rowClassRules={rowClassRules}
@@ -262,6 +274,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
               }
             }}
           />
+        </div>
         </div>
       </ManagerGridSection>
       {afterGrid}

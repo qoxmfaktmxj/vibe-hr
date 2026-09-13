@@ -57,3 +57,7 @@ The dedicated Playwright configuration starts loopback-only Next and synthetic b
 Coverage includes desktop and mobile login, background pause/resume and static fallback, safe error recovery, profile focus/scroll/retry, reduced motion, theme apply/cancel/persistence, normal member controls, session warnings and renewal, menu responsiveness, and existing business grid/tab navigation. Captures wait for fonts, loaded content and finite animations to finish.
 
 The separate `playwright.scene.config.ts` exercises rendered title and water differences under identical virtual animation time. It uses D3D11 on Windows by default; `PLAYWRIGHT_HARDWARE_GPU=0` selects the default headless path, which may use SwiftShader. Functional tests and frame rate are separate from reference fidelity. The final HR scene and companion landing each passed the fixed independent90-point visual/interaction rubric. This is not a pixel equality claim. Public asset JSON files record source licenses and exact generation prompts.
+
+## HRI inbox presentation
+
+The approval and receive inboxes use the same inset grid padding, rounded border, 34px rows and standard search controls as company management. Search is separate from processing: opinions are edited in the confirmation dialog, and selection-based approval/receive completion plus single-document rejection live in the toolbar. Result feedback remains inside the grid card rather than adding a separate page-level card. Other read-only grid consumers retain their existing presentation defaults.

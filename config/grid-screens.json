@@ -254,7 +254,7 @@
       "engine": "ag-grid",
       "profile": "standard-v2",
       "variant": "approval",
-      "toolbar": ["query", "approve", "download"],
+      "toolbar": ["query", "approve", "reject", "download"],
       "ownerModule": "HRI"
     },
     "hri.tasks.receives": {
@@ -264,7 +264,7 @@
       "engine": "ag-grid",
       "profile": "standard-v2",
       "variant": "approval",
-      "toolbar": ["query", "approve", "download"],
+      "toolbar": ["query", "approve", "reject", "download"],
       "ownerModule": "HRI"
     },
     "mng.companies": {

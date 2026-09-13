@@ -2,11 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ColDef, GridApi } from "ag-grid-community";
-import { Check, Download, Search } from "lucide-react";
+import { Check, Download, X } from "lucide-react";
 import useSWR from "swr";
 import { ReadonlyGridManager, createReadonlyGridRows, type ReadonlyGridRow } from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
-import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
@@ -65,7 +64,7 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       try {
         const response = await fetch(`/api/hri/requests/${row.request_id}/${pending.action}`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ comment: pending.comment || null }),
+          body: JSON.stringify({ comment: pending.comment.trim() || null }),
         });
         const body = await response.json().catch(() => null) as { detail?: string } | null;
         if (!response.ok) throw new Error(body?.detail || "처리 실패");
@@ -111,22 +110,18 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
     { field: "step_type", headerName: "현재 단계", width: 110, valueFormatter: ({ value }) => STEP_LABELS[value] ?? value },
     { field: "step_order", headerName: "차수", width: 80 },
     { field: "requested_at", headerName: "요청일", width: 120, valueFormatter: ({ value }) => String(value ?? "").slice(0, 10) },
-    { headerName: "처리", colId: "actions", width: 185, pinned: "right", sortable: false, filter: false,
-      cellRenderer: ({ data: row }: { data?: TaskRow }) => row ? <div className="flex h-full items-center gap-1">
-        <Button size="sm" disabled={locked || !eligible(row)} onClick={() => prepare(primaryAction, [row])}>{primaryLabel}</Button>
-        <Button size="sm" variant="outline" disabled={locked || !eligible(row)} onClick={() => prepare(rejectAction, [row])}>반려</Button>
-      </div> : null },
   ];
 
   return <>
     <ReadonlyGridManager<TaskRow>
       title={title}
-      searchFields={<SearchFieldGrid><SearchTextField value={keyword} onChange={setKeyword} placeholder="현재 페이지의 문서번호, 제목, 신청서명" />
-        <label className="space-y-1 text-sm">처리 의견<Input aria-label="처리 의견" value={comment} disabled={locked} onChange={(event) => setComment(event.target.value)} placeholder="선택한 문서에 동일하게 적용할 의견" /></label>
+      inset gridHeight={420}
+      headerNote={selectedRows.length > 0 ? <span className="text-xs text-primary">선택 {selectedRows.length}건</span> : null}
+      searchFields={<SearchFieldGrid className="xl:grid-cols-4"><SearchTextField className="md:col-span-2" value={keyword} onChange={setKeyword} placeholder="문서번호, 제목, 신청서명 (현재 페이지)"
+        onKeyDown={(event) => { if (event.key === "Enter" && !locked) { setSelected([]); setAppliedKeyword(keyword); void mutate(); } }} />
       </SearchFieldGrid>}
-      beforeGrid={<>{error && <p role="alert" className="text-sm text-destructive">목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}
-        {result && <div role="status" className="rounded-lg border p-3 text-sm"><p>{result.summary}</p>{result.failures.length > 0 && <ul>{result.failures.map((message) => <li key={message}>{message}</li>)}</ul>}</div>}</>}
-      afterGrid={<p className="text-sm text-muted-foreground">현재 페이지 {rows.length}건, 선택 {selectedRows.length}건. 검색과 다운로드는 현재 페이지 목록 기준입니다. 서버에서 결재 권한과 현재 차수를 다시 확인합니다.</p>}
+      feedback={<>{error && <p role="alert" className="px-3 pb-3 text-sm text-destructive md:px-6">목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}
+        {result && <div role="status" className="px-3 pb-3 text-xs md:px-6"><p>{result.summary}</p>{result.failures.length > 0 && <ul className="text-destructive">{result.failures.map((message) => <li key={message}>{message}</li>)}</ul>}</div>}</>}
       rowData={rows} columnDefs={columns} totalCount={data?.total_count ?? 0} page={page} pageSize={pageSize}
       onPageChange={(next) => { if (!locked) { setSelected([]); setPage(next); } }}
       onQuery={() => { if (!locked) { setSelected([]); setAppliedKeyword(keyword); void mutate(); } }}
@@ -134,8 +129,8 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       onSelectionChange={setSelected} isRowSelectable={eligible}
       onReady={(api) => { gridApi.current = api; }}
       actions={[
-        { key: "query", label: "조회", icon: Search, onClick: () => { setSelected([]); setAppliedKeyword(keyword); void mutate(); }, disabled: locked || isValidating },
         { key: "approve", label: `선택 ${primaryLabel}`, icon: Check, onClick: () => prepare(primaryAction, selectedRows), disabled: locked || !selectedRows.length },
+        { key: "reject", label: "반려", icon: X, onClick: () => prepare(rejectAction, selectedRows), disabled: locked || selectedRows.length !== 1 },
         { key: "download", label: downloading ? "다운로드 중..." : "현재 페이지 다운로드", icon: Download, onClick: () => void download(), disabled: locked || downloading || !rows.length },
       ]}
       emptyText={`${title} 대기 문서가 없습니다.`}
@@ -144,8 +139,14 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       title={`${pending?.action === rejectAction ? "반려" : primaryLabel} ${pending?.rows.length ?? 0}건을 처리할까요?`}
       description="각 문서는 개별 처리됩니다. 일부 문서가 실패해도 다른 문서의 처리 결과는 유지됩니다."
       confirmLabel="처리 확인" confirmVariant="save" busy={busy} onConfirm={confirmAction}>
+      <div className="space-y-3 px-6">
       <ul className="max-h-48 overflow-y-auto text-sm">{pending?.rows.map((row) => <li key={row.request_id}>{row.request_no} / {row.title}</li>)}</ul>
-      <p className="whitespace-pre-wrap break-words text-sm">의견: {pending?.comment || "없음"}</p>
+      <label className="space-y-1 text-sm">처리 의견
+        <Input aria-label="처리 의견" value={pending?.comment ?? ""} disabled={busy}
+          onChange={(event) => { const value = event.target.value; setComment(value); setPending((current) => current ? { ...current, comment: value } : null); }}
+          placeholder="선택한 문서에 동일하게 적용할 의견" />
+      </label>
+      </div>
     </ConfirmDialog>
   </>;
 }
