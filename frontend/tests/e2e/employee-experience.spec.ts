@@ -533,21 +533,21 @@ async function sceneHardware(page: Page, renderer: string) {
   }, renderer);
 }
 
-test("Intel integrated graphics uses 30000 grass instances", async ({ page }) => {
+test("Intel integrated graphics uses 450 grass instances", async ({ page }) => {
   await sceneHardware(page, "ANGLE (Intel, Intel UHD Graphics 630)");
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
   await expect(scene).toHaveAttribute("data-ready", "true");
-  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+  await expect(scene).toHaveAttribute("data-grass-count", "450");
 });
 
-test("mobile scene uses 30000 grass instances even with a powerful GPU", async ({ page }) => {
+test("mobile scene uses 450 grass instances even with a powerful GPU", async ({ page }) => {
   await sceneHardware(page, "NVIDIA GeForce RTX 4060");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
   await expect(scene).toHaveAttribute("data-ready", "true");
-  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+  await expect(scene).toHaveAttribute("data-grass-count", "450");
 });
 
 test("capable PC lowers grass density before resolution when frames stay slow", async ({ page }) => {
@@ -566,10 +566,10 @@ test("capable PC lowers grass density before resolution when frames stay slow", 
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
   await expect(scene).toHaveAttribute("data-ready", "true");
-  await expect(scene).toHaveAttribute("data-grass-count", "48000");
+  await expect(scene).toHaveAttribute("data-grass-count", "900");
   const width = await scene.getAttribute("width");
   await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = true; });
-  await expect(scene).toHaveAttribute("data-grass-count", "30000");
+  await expect(scene).toHaveAttribute("data-grass-count", "450");
   await expect(scene).toHaveAttribute("width", width!);
 });
 

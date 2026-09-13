@@ -298,3 +298,18 @@
 - The companion landing includes actual70-piece igloo geometry,1200 snow particles, local hover displacement, continuously attached terrain material and low overlapping middle ridges. Its production build, lint,19 functional probes,3 resource lifecycle probes and6 portable Playwright cases passed.
 - Implementation audit, current hash associations and named source/candidate captures are retained under the local `.omx/fidelity-90/` evidence archive. Public assets include source/license records and generation prompts with local absolute user paths removed.
 - Rollback is a revert of the frontend presentation change; no database or infrastructure rollback is required.
+
+## 2026-09-13 Image-led login meadow
+- Task ID: pink-meadow-image-layers. Type: frontend presentation. Risk: R1.
+- User approved continuous image coverage, a few gently swaying layers, and publication. The earlier 24,000-instance preview was superseded.
+- Changed: conservatory-scene.ts, vegetation-quality.ts and existing unit/browser tier tests, login-scene.tsx performance threshold, poster renderer, generated assets/posters and DESIGN.md.
+- Final implementation: unlit image color covers the distant hillside. Three depth groups of alpha-tested feathered images add crest detail and subtle wind, capped at 900 desktop or 450 conservative/mobile instances. Two groups scatter across the hillside and one follows the crest. World-space texture sampling and mirrored wrapping retain spatial stability.
+- Simplification: removed cloned exterior rock color and normal maps. Existing load/dispose, frame-driven density reduction and title/water cursor interaction remain.
+- Asset provenance: built-in image_gen; exact prompts in frontend/public/images/conservatory/pink-meadow-assets.json. Added WebP assets total 536,184 bytes. Alpha-tested fragment work means instance reduction alone is not an FPS claim.
+- Validation: lint passed with 15 existing warnings and no errors; 155 unit tests passed; TypeScript and production build passed, including grid prebuild validation. Current poster renderer completed 900-instance desktop and 450-instance mobile without console errors. Final rendered title/water interaction test passed in 18.0 seconds.
+- Browser evidence: .omx/state/pink-meadow/login-final.png. A synthetic backend was used for UI checks; production authentication is not certified. The separately reported attendance authentication issue remains pending environment details and has no changes in this diff.
+- Retry: initial browser launch found the earlier owned preview server lock; that preview was stopped and the isolated tests rerun.
+- Root inspected the scoped shader, lifecycle, tier and visual diff. The optional specialist lane could not start because its configured model is unavailable; no independent approval is claimed.
+- Repository has no VERSION convention; its existing package version is retained for this presentation patch.
+- Risks: close inspection can reveal repeated tuft forms; existing image-position and GPU precision warnings remain. Rollback is a revert of the frontend presentation commit, with no database or infrastructure work.
+- Final browser verification: 42/42 existing UI regression tests passed in 2.2 minutes with D3D11 Chromium. A temporary config extended playwright.experience.config.ts with launch arguments --use-angle=d3d11, --enable-gpu, --ignore-gpu-blocklist; retained in .omx/state/pink-meadow/playwright.meadow.local.ts. Basic headless mode had 40 passed and 2 timeouts (density reduction and live motion preference). Both targeted retries and the complete hardware run passed unchanged code. The environment distinction remains a known validation limit.

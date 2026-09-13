@@ -1,5 +1,5 @@
-export const LOW_VEGETATION_COUNT = 30_000;
-export const HIGH_VEGETATION_COUNT = 48_000;
+export const LOW_VEGETATION_COUNT = 450;
+export const HIGH_VEGETATION_COUNT = 900;
 
 export function selectVegetationCount(device: {
   mobile: boolean;

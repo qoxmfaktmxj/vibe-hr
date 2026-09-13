@@ -282,10 +282,6 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
     stoneMaterial.bumpMap = null;
     stoneMaterial.color.set("#ffe9e1");
     stoneMaterial.needsUpdate = true;
-    const landscapeTexture = keep(texture.clone());
-    landscapeTexture.repeat.set(16, 6);
-    landscapeMaterial.map = landscapeTexture;
-    landscapeMaterial.needsUpdate = true;
   }));
   keep(loader.load("/images/conservatory/rock-normal.webp", (texture) => {
     if (disposed) return;
@@ -294,11 +290,13 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
     stoneMaterial.normalMap = texture;
     stoneMaterial.normalScale.set(0.85, 0.85);
     stoneMaterial.needsUpdate = true;
-    const landscapeNormal = keep(texture.clone());
-    landscapeNormal.repeat.set(16, 6);
-    landscapeMaterial.normalMap = landscapeNormal;
-    landscapeMaterial.normalScale.set(.90, .90);
-    landscapeMaterial.bumpMap = null;
+  }));
+  keep(loader.load("/images/conservatory/pink-meadow.webp", (texture) => {
+    if (disposed) return;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping;
+    texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+    landscapeMaterial.map = texture;
     landscapeMaterial.needsUpdate = true;
   }));
   stoneMaterial.onBeforeCompile = (shader) => {
@@ -421,16 +419,22 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   rock(-1.144877, .974466, -6.725248, 4.184818, 1.137446, 5.932117, 3.5);
 
   // The outdoor view is genuine distant geometry and remains spatially stable through the arches.
-  const landscapeMaterial = keep(new THREE.MeshStandardMaterial({ color: "#e3bccb", roughness: 1, map: stoneTexture, bumpMap: stoneTexture, bumpScale: 0.06, emissive: "#c59caf", emissiveIntensity: .16 }));
+  const landscapeMaterial = keep(new THREE.MeshBasicMaterial({ color: "#ead4df" }));
   landscapeMaterial.onBeforeCompile = (shader) => {
+    shader.vertexShader = `varying vec3 vMeadowPosition;\n${shader.vertexShader}`;
+    shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n vMeadowPosition=(modelMatrix*vec4(position,1.)).xyz;");
+    shader.fragmentShader = `varying vec3 vMeadowPosition;\n${shader.fragmentShader}`;
     shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", `
-      #include <map_fragment>
-      float cliffLuma = dot(diffuseColor.rgb, vec3(.21,.72,.07));
-      diffuseColor.rgb = vec3(.57,.32,.40) * (.85 + cliffLuma * .70);
+      #ifdef USE_MAP
+        // World-space projection keeps the meadow scale stable across the hillside.
+        vec2 meadowUv=vec2(vMeadowPosition.z,vMeadowPosition.y+vMeadowPosition.x*.25)*.22;
+        vec3 meadow=texture2D(map,meadowUv).rgb;
+        vec3 detail=texture2D(map,meadowUv*1.73+vec2(.37,.61)).rgb;
+        diffuseColor.rgb*=mix(meadow,detail,.12);
+      #endif
     `);
     shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `
-      float exteriorHaze=smoothstep(24.,42.,length(vViewPosition))*.68;
-      outgoingLight=mix(outgoingLight,vec3(.88,.48,.68),exteriorHaze);
+      outgoingLight=mix(outgoingLight,vec3(.88,.48,.68),.12);
       #include <opaque_fragment>
     `);
   };
@@ -455,23 +459,35 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   cliff.computeVertexNormals();
   landscapeMaterial.side = THREE.DoubleSide;
   addMesh(cliff, landscapeMaterial, 0, 0, 0);
-  const grassGeometry = keep(new THREE.PlaneGeometry(.045, .12, 1, 2));
-  grassGeometry.translate(0, .06, 0);
+  const grassGeometry = keep(new THREE.PlaneGeometry(.35, .22, 1, 3));
+  grassGeometry.translate(0, .11, 0);
   const grassTime = { value: 0 };
-  const grassMaterial = keep(new THREE.MeshBasicMaterial({ color: "#c893ab", side: THREE.DoubleSide }));
+  const grassMaterial = keep(new THREE.MeshBasicMaterial({ color: "#fff0f6", side: THREE.DoubleSide, alphaTest: .2 }));
+  keep(loader.load("/images/conservatory/pink-muhly-tuft.webp", (texture) => {
+    if (disposed) return;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
+    grassMaterial.map = texture;
+    grassMaterial.needsUpdate = true;
+  }));
   grassMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.grassTime = grassTime;
     shader.vertexShader = `uniform float grassTime; varying vec2 vGrassUv;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>", `
       #include <begin_vertex>
       vGrassUv=uv;
-      transformed.x*=1.-uv.y*.9;
       transformed.x+=sin(grassTime*.6+instanceMatrix[3].z*2.1+instanceMatrix[3].x)*.004*uv.y;
     `);
     shader.fragmentShader = `varying vec2 vGrassUv;\n${shader.fragmentShader}`;
     shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `
       #include <color_fragment>
-      diffuseColor.rgb*=mix(.76,1.04,smoothstep(0.,1.,vGrassUv.y));
+      float tuftLuma=dot(diffuseColor.rgb,vec3(.21,.72,.07));
+      diffuseColor.rgb=mix(diffuseColor.rgb,vec3(tuftLuma)*vec3(1.15,.72,.90),.8)*.7+vec3(.18,.09,.14);
+      diffuseColor.rgb*=mix(.93,1.04,smoothstep(0.,1.,vGrassUv.y));
+    `);
+    shader.fragmentShader = shader.fragmentShader.replace("#include <opaque_fragment>", `
+      outgoingLight=mix(outgoingLight,vec3(.88,.48,.68),.15);
+      #include <opaque_fragment>
     `);
   };
   const gl = renderer.getContext();
@@ -495,16 +511,17 @@ export function createConservatoryScene(canvas: HTMLCanvasElement): Conservatory
   const grassColor = new THREE.Color();
   for (let i = 0; i < grass.count; i++) {
     const z = -27.5 + grassRandom() * 45;
-    const v = .16 + grassRandom() * .84;
+    // Three loose image layers add a soft silhouette; the meadow map fills the hillside.
+    const layer = i % 3;
+    const v = layer === 2 ? .97 + grassRandom() * .025 : .16 + grassRandom() * .80;
     const cluster = reliefNoise(z * .55, v * 12);
-    if (grassRandom() > .35 + cluster * .65) { i--; continue; }
     exteriorSurface(z, v, grassDummy.position);
-    grassDummy.position.x += .055;
-    grassDummy.rotation.set((grassRandom() - .5) * .3, grassRandom() * Math.PI, (grassRandom() - .5) * .25);
-    grassDummy.scale.setScalar(.65 + cluster * .85 + grassRandom() * .55);
+    grassDummy.position.x += .08 + (2 - layer) * .06;
+    grassDummy.rotation.set(0, Math.PI / 2 + (grassRandom() - .5) * .5, (grassRandom() - .5) * .15);
+    grassDummy.scale.setScalar(.8 + grassRandom() * .5);
     grassDummy.updateMatrix();
     grass.setMatrixAt(i, grassDummy.matrix);
-    grassColor.setHSL(.94 + grassRandom() * .045, .16 + cluster * .10, .66 + cluster * .10 + grassRandom() * .07);
+    grassColor.setHSL(.94 + grassRandom() * .045, .14 + cluster * .08, .72 + cluster * .06 + grassRandom() * .05);
     grass.setColorAt(i, grassColor);
   }
   grass.instanceMatrix.needsUpdate = true;

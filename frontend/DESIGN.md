@@ -42,6 +42,8 @@ The login, navigation and account surfaces use the existing VIBE monogram, Cobal
 
 ## Validation
 
+The login meadow uses a generated image for continuous distant coverage. Three depth layers of alpha-tested muhly images add subtle wind and crest detail, with at most 900 instances on capable desktops and 450 on conservative or mobile devices. The meadow does not react directly to the cursor; the water and title remain the interactive focus. Static posters are rendered from this same scene. Generation prompts are recorded in `public/images/conservatory/pink-meadow-assets.json`.
+
 Run from `frontend`:
 
 ```powershell
