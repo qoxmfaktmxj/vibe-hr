@@ -5,11 +5,12 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout",
+  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout",
 ]);
 let scenario = "default";
 const completedTasks = new Set();
 const taskActions = [];
+const checklistRows = [];
 const user = { id: 1, email: "employee@example.test", display_name: "테스트 사용자", roles: ["admin"] };
 const employee = {
   id: 1, employee_no: "TEST-001", login_id: "test-user", display_name: user.display_name,
@@ -60,7 +61,17 @@ createServer(async (request, response) => {
     scenario = input.scenario;
     completedTasks.clear();
     taskActions.length = 0;
+    checklistRows.length = 0;
+    checklistRows.push({ id: 1, code: "asset_return", title: "회사 자산 반납", description: "지급 자산 확인", is_required: true, is_active: true, sort_order: 0, created_at: "2026-09-13T00:00:00Z", updated_at: "2026-09-13T00:00:00Z" });
     return json(response, 200, { scenario });
+  }
+  if (scenario === "checklist-layout" && request.method === "POST" && url.pathname === "/api/v1/hr/retire/checklist") {
+    if (!request.headers.authorization?.startsWith("Bearer ")) return json(response, 401, { detail: "Not authenticated." });
+    let text = "";
+    for await (const part of request) text += part;
+    const created = { ...JSON.parse(text), id: checklistRows.length + 1, created_at: "2026-09-13T00:00:00Z", updated_at: "2026-09-13T00:00:00Z" };
+    checklistRows.push(created);
+    return json(response, 201, created);
   }
   if (scenario === "hri-tasks" && route === "GET /__task-actions") return json(response, 200, taskActions);
   if (scenario === "hri-tasks" && url.pathname.startsWith("/api/v1/hri/")) {
@@ -108,6 +119,9 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "checklist-layout") return json(response, 200, { menus: [...menus,
+        { id: 60, code: "hr.retire.checklist", name: "퇴직체크리스트", path: "/hr/retire/checklist", icon: "FileText", sort_order: 3, children: [] },
+      ] });
       if (scenario === "retire-layout") return json(response, 200, { menus: [...menus,
         { id: 50, code: "hr.retire.approvals", name: "퇴직승인관리", path: "/hr/retire/approvals", icon: "FileText", sort_order: 3, children: [] },
         { id: 51, code: "tim.status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 4, children: [] },
@@ -133,6 +147,8 @@ createServer(async (request, response) => {
       return json(response, 200, { employees: [{ ...employee, department_name: "긴 부서명 테스트 인사운영지원그룹" }], total_count: 1 });
     case "GET /api/v1/hr/retire/cases":
       return json(response, 200, { items: [{ id: 1, employee_id: 1, employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서", position_title: "매니저", retire_date: "2026-10-31", reason: "화면 검증용", status: "draft", created_at: "2026-09-13T00:00:00Z" }], total_count: 1, page: 1, limit: 50 });
+    case "GET /api/v1/hr/retire/checklist":
+      return json(response, 200, { items: checklistRows, total_count: checklistRows.length, page: 1, limit: 50 });
     case "GET /api/v1/hr/retire/cases/1":
       return json(response, 200, { id: 1, employee_id: 1, employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서", position_title: "매니저", retire_date: "2026-10-31", status: "draft", checklist_items: [], audit_logs: [] });
     case "GET /api/v1/dashboard/summary":

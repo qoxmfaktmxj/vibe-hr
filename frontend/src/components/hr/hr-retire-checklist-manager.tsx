@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
+import { Download, Plus } from "lucide-react";
 
 import {
   ReadonlyGridManager,
@@ -11,8 +12,7 @@ import {
   type ReadonlyGridRow,
 } from "@/components/grid/readonly-grid-manager";
 import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
@@ -66,6 +66,7 @@ export function HrRetireChecklistManager() {
   const [newChecklistActive, setNewChecklistActive] = useState(true);
   const [newChecklistSortOrder, setNewChecklistSortOrder] = useState("0");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const { mutate: globalMutate } = useSWRConfig();
 
   const query = useMemo(() => {
@@ -137,6 +138,7 @@ export function HrRetireChecklistManager() {
       setNewChecklistActive(true);
       setNewChecklistSortOrder("0");
       await globalMutate((key) => typeof key === "string" && key.startsWith("/api/hr/retire/checklist"));
+      setCreateOpen(false);
       toast.success("체크리스트 항목을 등록했습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "체크리스트 항목 등록에 실패했습니다.");
@@ -170,15 +172,18 @@ export function HrRetireChecklistManager() {
   return (
     <ReadonlyGridManager<ChecklistGridRow>
       title="퇴직 체크리스트 관리"
+      inset gridHeight={420}
       searchFields={
-        <SearchFieldGrid className="md:grid-cols-[1fr_160px]">
+        <SearchFieldGrid className="xl:grid-cols-4">
           <SearchTextField
+            className="md:col-span-2"
             value={keywordInput}
             onChange={setKeywordInput}
             placeholder="코드, 제목, 설명"
           />
           <select
-            className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+            className="h-9 min-w-0 w-full rounded-md border border-border bg-card px-3 text-sm"
+            aria-label="사용 여부"
             value={activeFilterInput}
             onChange={(event) => setActiveFilterInput(event.target.value)}
           >
@@ -188,38 +193,48 @@ export function HrRetireChecklistManager() {
           </select>
         </SearchFieldGrid>
       }
-      beforeGrid={
-        <Card className="border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-foreground">체크리스트 항목 등록</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+      afterGrid={
+        <ConfirmDialog open={createOpen} onOpenChange={setCreateOpen} title="체크리스트 항목 등록"
+          description="퇴직 처리 시 확인할 항목을 등록합니다." confirmLabel="등록" confirmVariant="save" busy={isSubmitting} onConfirm={handleCreateChecklist}>
+          <div className="space-y-3 px-6">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm">코드
               <Input
+                aria-label="체크리스트 코드"
                 placeholder="코드 예: asset_return"
                 value={newChecklistCode}
                 onChange={(event) => setNewChecklistCode(event.target.value)}
                 disabled={isSubmitting}
               />
+              </label>
+              <label className="space-y-1 text-sm">제목
               <Input
+                aria-label="제목"
                 placeholder="제목"
                 value={newChecklistTitle}
                 onChange={(event) => setNewChecklistTitle(event.target.value)}
                 disabled={isSubmitting}
               />
+              </label>
+              <label className="space-y-1 text-sm">설명
               <Input
+                aria-label="설명"
                 placeholder="설명"
                 value={newChecklistDescription}
                 onChange={(event) => setNewChecklistDescription(event.target.value)}
                 disabled={isSubmitting}
               />
+              </label>
+              <label className="space-y-1 text-sm">정렬순서
               <Input
+                aria-label="정렬순서"
                 type="number"
                 placeholder="정렬순서"
                 value={newChecklistSortOrder}
                 onChange={(event) => setNewChecklistSortOrder(event.target.value)}
                 disabled={isSubmitting}
               />
+              </label>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 text-sm">
@@ -238,16 +253,17 @@ export function HrRetireChecklistManager() {
                 />
                 사용 항목
               </label>
-              <Button onClick={() => void handleCreateChecklist()} disabled={isSubmitting}>
-                등록
-              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ConfirmDialog>
       }
       rowData={rowData}
       columnDefs={columnDefs}
       onDownload={() => void downloadRowsAsXlsx(columnDefs, rowData, "퇴직 체크리스트 관리", "hr-retire-checklist")}
+      actions={[
+        { key: "create", label: "입력", icon: Plus, onClick: () => setCreateOpen(true), disabled: isSubmitting },
+        { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadRowsAsXlsx(columnDefs, rowData, "퇴직 체크리스트 관리", "hr-retire-checklist"), disabled: isLoading || rowData.length === 0 },
+      ]}
       totalCount={
         appliedKeyword.trim() || appliedActiveFilter !== "all"
           ? filteredItems.length
