@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
-import type { ColDef, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
+import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { Copy, Download, Plus, Save, Search, Upload } from "lucide-react";
 
@@ -41,6 +41,10 @@ type ReadonlyGridManagerProps<Row extends ReadonlyGridRow> = {
   onPageChange: (page: number) => void;
   onQuery: () => void;
   onDownload?: () => void;
+  actions?: GridToolbarAction[];
+  onSelectionChange?: (rows: Row[]) => void;
+  isRowSelectable?: (row: Row) => boolean;
+  onReady?: (api: GridApi<Row>) => void;
   onRowClick?: (row: Row) => void;
   beforeGrid?: ReactNode;
   afterGrid?: ReactNode;
@@ -74,6 +78,10 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
   onPageChange,
   onQuery,
   onDownload,
+  actions,
+  onSelectionChange,
+  isRowSelectable,
+  onReady,
   onRowClick,
   beforeGrid,
   afterGrid,
@@ -216,7 +224,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             <GridChangeSummaryBadges summary={gridSummary} />
           </>
         }
-        headerRight={<GridToolbarActions actions={toolbarActions} saveAction={saveAction} />}
+        headerRight={<GridToolbarActions actions={actions ?? toolbarActions} saveAction={actions ? undefined : saveAction} />}
       >
         <div
           className="ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-border"
@@ -227,6 +235,13 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             theme="legacy"
             rowData={rowData}
             columnDefs={columnDefs}
+            rowSelection={onSelectionChange ? {
+              mode: "multiRow",
+              selectAll: "filtered",
+              enableClickSelection: false,
+              isRowSelectable: (node) => !!node.data && (!isRowSelectable || isRowSelectable(node.data)),
+            } : undefined}
+            onSelectionChanged={onSelectionChange ? (event) => onSelectionChange(event.api.getSelectedRows()) : undefined}
             defaultColDef={defaultColDef}
             rowHeight={36}
             headerHeight={36}
@@ -236,6 +251,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             loading={loading}
             overlayNoRowsTemplate={`<span class='text-sm text-muted-foreground'>${emptyText}</span>`}
             onGridReady={(event: GridReadyEvent<Row>) => {
+              onReady?.(event.api);
               if (!loading && rowData.length === 0) {
                 event.api.showNoRowsOverlay();
               }

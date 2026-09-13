@@ -250,37 +250,21 @@
     "hri.tasks.approvals": {
       "path": "/hri/tasks/approvals",
       "pageFile": "frontend/src/app/hri/tasks/approvals/page.tsx",
-      "componentFile": "frontend/src/components/hri/hri-approval-task-board.tsx",
+      "componentFile": "frontend/src/components/hri/hri-task-board.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "variant": "approval",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
+      "toolbar": ["query", "approve", "download"],
       "ownerModule": "HRI"
     },
     "hri.tasks.receives": {
       "path": "/hri/tasks/receives",
       "pageFile": "frontend/src/app/hri/tasks/receives/page.tsx",
-      "componentFile": "frontend/src/components/hri/hri-receive-task-board.tsx",
+      "componentFile": "frontend/src/components/hri/hri-task-board.tsx",
       "engine": "ag-grid",
       "profile": "standard-v2",
       "variant": "approval",
-      "toolbar": [
-        "query",
-        "create",
-        "copy",
-        "template",
-        "upload",
-        "save",
-        "download"
-      ],
+      "toolbar": ["query", "approve", "download"],
       "ownerModule": "HRI"
     },
     "mng.companies": {
