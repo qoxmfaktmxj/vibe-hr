@@ -1,0 +1,67 @@
+import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { read, utils } from "xlsx";
+
+for (const kind of ["approvals", "receives"] as const) {
+  test(`${kind}: export, confirm/cancel and partial bulk processing`, async ({ page, request }) => {
+    await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "hri-tasks" } });
+    await page.goto("/login");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto(`/hri/tasks/${kind}`);
+    await expect(page.getByRole("grid")).toBeVisible();
+    await expect(page.getByRole("grid")).toContainText("DOC-");
+    await expect(page.getByRole("button", { name: "업로드", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "입력", exact: true })).toHaveCount(0);
+    const label = kind === "approvals" ? "선택 승인" : "선택 수신 완료";
+    await expect(page.getByRole("button", { name: label, exact: true })).toBeDisabled();
+    const downloadEvent = page.waitForEvent("download");
+    await page.getByRole("button", { name: "현재 페이지 다운로드", exact: true }).click();
+    const download = await downloadEvent;
+    const file = await download.path();
+    const book = read(await readFile(file!), { type: "buffer" });
+    const items = utils.sheet_to_json(book.Sheets[book.SheetNames[0]]);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveProperty("문서번호", kind === "approvals" ? "DOC-101" : "DOC-201");
+    await page.locator('.ag-header-cell[col-id="title"] .ag-header-cell-filter-button').click();
+    const filterInput = page.locator('.ag-filter input').first();
+    await filterInput.fill("1");
+    await expect(page.locator('.ag-center-cols-container [role="row"]')).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    const filteredDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "현재 페이지 다운로드", exact: true }).click();
+    const filteredBook = read(await readFile((await (await filteredDownload).path())!), { type: "buffer" });
+    expect(utils.sheet_to_json(filteredBook.Sheets[filteredBook.SheetNames[0]])).toHaveLength(1);
+    await page.locator('.ag-header-cell[col-id="title"] .ag-header-cell-filter-button').click();
+    await page.locator('.ag-filter input').first().fill("");
+    await expect(page.locator('.ag-center-cols-container [role="row"]')).toHaveCount(3);
+    await page.keyboard.press("Escape");
+    await page.locator('.ag-header input[type="checkbox"]').check();
+    await page.getByLabel("처리 의견", { exact: true }).fill("확인했습니다");
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("확인했습니다");
+    await page.getByRole("button", { name: "취소", exact: true }).click();
+    expect(await (await request.get("http://127.0.0.1:3101/__task-actions")).json()).toEqual([]);
+    await expect(page.getByRole("button", { name: label, exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await page.getByRole("button", { name: "처리 확인", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "3건 중 2건 완료, 1건 실패" })).toBeVisible();
+    await expect(page.getByText(/현재 처리 차수가 변경되었습니다/)).toBeVisible();
+    const calls = await (await request.get("http://127.0.0.1:3101/__task-actions")).json();
+    expect(calls).toHaveLength(3);
+    expect(calls.every((call: { action: string; comment: string }) => call.action === (kind === "approvals" ? "approve" : "receive-complete") && call.comment === "확인했습니다")).toBe(true);
+    await expect(page.getByRole("grid")).not.toContainText(kind === "approvals" ? "DOC-101" : "DOC-201");
+    await page.screenshot({ path: test.info().outputPath(`${kind}.png`) });
+    await page.getByRole("button", { name: "반려", exact: true }).click();
+    await page.getByRole("button", { name: "처리 확인", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "1건 중 1건 완료, 0건 실패" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "현재 페이지 다운로드", exact: true })).toBeDisabled();
+    const rejected = await (await request.get("http://127.0.0.1:3101/__task-actions")).json();
+    expect(rejected.at(-1).action).toBe(kind === "approvals" ? "reject" : "receive-reject");
+    // A pre-existing consumer keeps its default toolbar and has no new row checkboxes.
+    await page.goto("/tim/status");
+    await expect(page.getByRole("grid")).toBeVisible();
+    await expect(page.getByRole("button", { name: "업로드", exact: true })).toBeDisabled();
+    await expect(page.locator('.ag-header input[type="checkbox"]')).toHaveCount(0);
+  });
+}

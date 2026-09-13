@@ -5,9 +5,11 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member", "sidebar-domains",
+  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks",
 ]);
 let scenario = "default";
+const completedTasks = new Set();
+const taskActions = [];
 const user = { id: 1, email: "employee@example.test", display_name: "테스트 사용자", roles: ["admin"] };
 const employee = {
   id: 1, employee_no: "TEST-001", login_id: "test-user", display_name: user.display_name,
@@ -56,10 +58,39 @@ createServer(async (request, response) => {
     const input = JSON.parse(body || "null");
     if (!scenarios.has(input?.scenario)) return json(response, 400, { detail: "Unknown synthetic scenario." });
     scenario = input.scenario;
+    completedTasks.clear();
+    taskActions.length = 0;
     return json(response, 200, { scenario });
+  }
+  if (scenario === "hri-tasks" && route === "GET /__task-actions") return json(response, 200, taskActions);
+  if (scenario === "hri-tasks" && url.pathname.startsWith("/api/v1/hri/")) {
+    if (!request.headers.authorization?.startsWith("Bearer ")) return json(response, 401, { detail: "Not authenticated." });
+    const match = url.pathname.match(/\/requests\/(\d+)\/(approve|reject|receive-complete|receive-reject)$/);
+    if (request.method === "POST" && match) {
+      let text = "";
+      for await (const part of request) text += part;
+      const id = Number(match[1]);
+      taskActions.push({ id, action: match[2], ...JSON.parse(text) });
+      if (id % 100 === 2 && ["approve", "receive-complete"].includes(match[2])) return json(response, 409, { detail: "현재 처리 차수가 변경되었습니다." });
+      if (completedTasks.has(id)) return json(response, 409, { detail: "이미 처리되었습니다." });
+      completedTasks.add(id);
+      return json(response, 200, { request_id: id, status_code: "COMPLETED" });
+    }
+    if (request.method === "GET" && /\/tasks\/my-(approvals|receives)$/.test(url.pathname)) {
+      const approval = url.pathname.endsWith("my-approvals");
+      const base = approval ? 100 : 200;
+      const items = [1, 2, 3].filter((n) => !completedTasks.has(base + n)).map((n) => ({
+        request_id: base + n, request_no: `DOC-${base + n}`, title: `테스트 신청 ${n}`,
+        form_name: "휴가 신청", status_code: approval ? "APPROVAL_IN_PROGRESS" : "RECEIVE_IN_PROGRESS",
+        step_type: approval ? "APPROVAL" : "RECEIVE", step_order: 1, requester_id: 1, requested_at: "2026-09-13T00:00:00Z",
+      }));
+      return json(response, 200, { items, total_count: items.length, page: 1, limit: 50 });
+    }
   }
   request.resume();
   switch (route) {
+    case "GET /api/v1/tim/attendance-daily":
+      return json(response, 200, { items: [], total_count: 0, page: 1, limit: 50 });
     case "GET /health":
       return json(response, 200, { status: "ok", synthetic: true });
     case "GET /api/v1/auth/enter-cds":
@@ -77,6 +108,10 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "hri-tasks") return json(response, 200, { menus: [...menus,
+        ...["approvals", "receives"].map((kind, index) => ({ id: 30 + index, code: `hri.tasks.${kind}`, name: index ? "수신함" : "결재함", path: `/hri/tasks/${kind}`, icon: "FileText", sort_order: 10 + index, children: [] })),
+        { id: 40, code: "tim.attendance-status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 12, children: [] },
+      ] });
       return json(response, 200, { menus: scenario === "sidebar-domains" ? [...menus, {
         id: 20, code: "other", name: "다른 업무", path: null, icon: "Folder", sort_order: 3,
         children: [{ id: 21, code: "other.group", name: "다른 그룹", path: null, icon: "Folder", sort_order: 1,

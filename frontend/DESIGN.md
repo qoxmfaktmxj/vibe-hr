@@ -29,7 +29,7 @@ The login, navigation and account surfaces use the existing VIBE monogram, Cobal
 
 ## Interaction rules
 
-- Disabled tab actions reflect whether tabs exist in that direction. Closing the active page from another tab also selects a retained page. The visible tab management button supports touch as well as the context-menu shortcut.
+- Disabled tab actions reflect whether tabs exist in that direction. Closing the active page from another tab also selects a retained page. Desktop tabs use right-click or Shift+F10 for management; the visible management button is retained below the desktop breakpoint for touch access.
 - Menu and profile dialogs return focus to their actual entry control. Mobile menu closes before opening a profile and when crossing into the desktop layout.
 - Collapsed menu groups and panels are inert. Group control IDs remain unique when mobile and desktop navigation coexist.
 - Profile requests, including retries, are cancelled on close and account changes. Displayed records are bound to the current user ID.
