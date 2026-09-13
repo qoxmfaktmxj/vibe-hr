@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
+import { Download, Search } from "lucide-react";
 
 import {
   ReadonlyGridManager,
@@ -227,15 +228,16 @@ export function HrRetireApprovalManager() {
   }
 
   return (
-    <div className="space-y-4 px-4 py-4">
+    <div className="min-w-0 space-y-3 px-3 py-3 md:px-6 md:py-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="px-3 md:px-6">
           <CardTitle>퇴직 처리 생성</CardTitle>
           <CardDescription>대상자 선택 후 퇴직 처리 케이스를 생성합니다.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-4">
+        <CardContent className="grid min-w-0 grid-cols-1 gap-3 px-3 md:grid-cols-2 md:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]">
           <select
-            className="h-9 rounded-md border px-3 text-sm"
+            className="h-9 min-w-0 w-full rounded-md border px-3 text-sm"
+            aria-label="퇴직 대상자"
             value={newEmployeeId}
             onChange={(event) => setNewEmployeeId(event.target.value)}
             disabled={isSubmitting}
@@ -249,11 +251,14 @@ export function HrRetireApprovalManager() {
           </select>
           <Input
             type="date"
+            className="min-w-0 w-full"
+            aria-label="퇴직예정일"
             value={newRetireDate}
             onChange={(event) => setNewRetireDate(event.target.value)}
             disabled={isSubmitting}
           />
           <Input
+            className="min-w-0 w-full"
             placeholder="사유(선택)"
             value={newReason}
             onChange={(event) => setNewReason(event.target.value)}
@@ -266,6 +271,7 @@ export function HrRetireApprovalManager() {
       </Card>
 
       <ReadonlyGridManager<RetireCaseRow>
+        embedded inset gridHeight={420}
         title="퇴직 케이스 목록"
         searchFields={null}
         rowData={caseRows}
@@ -279,6 +285,10 @@ export function HrRetireApprovalManager() {
           void mutatePagedCases();
         }}
         onDownload={() => void downloadRowsAsXlsx(caseRows, retireColumns)}
+        actions={[
+          { key: "query", label: "조회", icon: Search, onClick: () => { setPage(1); void mutatePagedCases(); }, disabled: isPagedCaseLoading || isSubmitting },
+          { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadRowsAsXlsx(caseRows, retireColumns), disabled: isPagedCaseLoading || caseRows.length === 0 },
+        ]}
         queryDisabled={isPagedCaseLoading}
         loading={isPagedCaseLoading}
         emptyText="등록된 퇴직 케이스가 없습니다."
@@ -288,13 +298,13 @@ export function HrRetireApprovalManager() {
 
       <div className="grid gap-4">
         <Card>
-          <CardHeader>
+          <CardHeader className="px-3 md:px-6">
             <CardTitle>퇴직 승인 처리</CardTitle>
             <CardDescription>체크 완료 후 퇴직 확정 또는 취소를 수행합니다.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-3 md:px-6">
             {!caseDetail ? (
-              <p className="text-sm text-muted-foreground">좌측에서 퇴직 케이스를 선택해 주세요.</p>
+              <p className="text-sm text-muted-foreground">위 목록에서 퇴직 케이스를 선택해 주세요.</p>
             ) : (
               <div className="space-y-4">
                 <div className="rounded-md border p-3 text-sm">
