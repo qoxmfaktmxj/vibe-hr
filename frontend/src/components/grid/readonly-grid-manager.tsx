@@ -49,6 +49,7 @@ type ReadonlyGridManagerProps<Row extends ReadonlyGridRow> = {
   beforeGrid?: ReactNode;
   afterGrid?: ReactNode;
   inset?: boolean;
+  embedded?: boolean;
   headerNote?: ReactNode;
   feedback?: ReactNode;
   queryDisabled?: boolean;
@@ -89,6 +90,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
   beforeGrid,
   afterGrid,
   inset = false,
+  embedded = false,
   headerNote,
   feedback,
   queryDisabled = false,
@@ -202,8 +204,9 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
   );
 
   return (
-    <ManagerPageShell>
+    <ManagerPageShell className={embedded ? "h-auto min-w-0 p-0 md:p-0" : undefined}>
       {beforeGrid}
+      {!(embedded && searchFields === null) && (
       <ManagerSearchSection
         title={title}
         onQuery={onQuery}
@@ -212,9 +215,12 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
       >
         {searchFields}
       </ManagerSearchSection>
+      )}
       <ManagerGridSection
+        headerClassName={embedded ? "[&>div:first-child]:flex-wrap" : undefined}
         headerLeft={
           <>
+            {embedded && searchFields === null && <h2 className="w-full text-base font-semibold">{title}</h2>}
             <GridPaginationControls
               page={page}
               totalPages={pagination.totalPages}
@@ -240,7 +246,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
           className={inset
             ? "ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border"
             : "ag-theme-quartz vibe-grid h-full min-h-0 w-full overflow-hidden rounded-b-xl border-t border-border"}
-          style={{ minHeight: gridHeight }}
+          style={{ minHeight: gridHeight, height: embedded ? gridHeight : undefined }}
         >
           <AgGridReact<Row>
             ref={gridRef}

@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks",
+  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout",
 ]);
 let scenario = "default";
 const completedTasks = new Set();
@@ -108,6 +108,10 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "retire-layout") return json(response, 200, { menus: [...menus,
+        { id: 50, code: "hr.retire.approvals", name: "퇴직승인관리", path: "/hr/retire/approvals", icon: "FileText", sort_order: 3, children: [] },
+        { id: 51, code: "tim.status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 4, children: [] },
+      ] });
       if (scenario === "hri-tasks") return json(response, 200, { menus: [...menus,
         ...["approvals", "receives"].map((kind, index) => ({ id: 30 + index, code: `hri.tasks.${kind}`, name: index ? "수신함" : "결재함", path: `/hri/tasks/${kind}`, icon: "FileText", sort_order: 10 + index, children: [] })),
         { id: 40, code: "tim.attendance-status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 12, children: [] },
@@ -125,6 +129,12 @@ createServer(async (request, response) => {
     case "GET /api/v1/employees/me":
       if (scenario === "profile-failure") return json(response, 503, { detail: "프로필 정보를 불러오지 못했습니다." });
       return json(response, 200, { employee: scenario === "empty-profile" ? null : employee });
+    case "GET /api/v1/employees":
+      return json(response, 200, { employees: [{ ...employee, department_name: "긴 부서명 테스트 인사운영지원그룹" }], total_count: 1 });
+    case "GET /api/v1/hr/retire/cases":
+      return json(response, 200, { items: [{ id: 1, employee_id: 1, employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서", position_title: "매니저", retire_date: "2026-10-31", reason: "화면 검증용", status: "draft", created_at: "2026-09-13T00:00:00Z" }], total_count: 1, page: 1, limit: 50 });
+    case "GET /api/v1/hr/retire/cases/1":
+      return json(response, 200, { id: 1, employee_id: 1, employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서", position_title: "매니저", retire_date: "2026-10-31", status: "draft", checklist_items: [], audit_logs: [] });
     case "GET /api/v1/dashboard/summary":
       return json(response, 200, {
         total_employees: 128, total_departments: 8, attendance_present_today: 112,
