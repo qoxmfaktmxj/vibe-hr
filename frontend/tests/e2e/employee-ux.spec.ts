@@ -3,12 +3,203 @@ import { expect, test, type Page } from "@playwright/test";
 async function login(page: Page) {
   await page.goto("/login");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
   await page.goto("/hr/employee");
   await expect(page.getByRole("grid")).toContainText("김서준");
 }
 const nameCell = (page: Page) => page.locator('.ag-center-cols-container [row-index="0"] [col-id="display_name"]');
 const firstCheck = (page: Page) => page.locator('.ag-pinned-left-cols-container [row-index="0"] .ag-selection-checkbox input');
+
+const cell = (page: Page, row: number, field: string) => page.locator(`.ag-row[row-index="${row}"] .ag-cell[col-id="${field}"]`);
+async function paste(page: Page, value: string) {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate((text) => navigator.clipboard.writeText(text), value);
+  await page.keyboard.press("Control+v");
+}
+async function dragCells(page: Page, fromRow: number, fromField: string, toRow: number, toField: string) {
+  const start = await cell(page, fromRow, fromField).boundingBox();
+  const end = await cell(page, toRow, toField).boundingBox();
+  if (!start || !end) throw new Error("Range target missing");
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 8 });
+  await page.mouse.up();
+}
+
+test("bulk undo redo, range copy and context menu preserve history", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-preview" } });
+  await login(page);
+  await dragCells(page, 0, "display_name", 1, "department_id");
+  await expect(page.getByRole("status", { name: "선택 영역 통계" })).toContainText("선택 4셀");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.keyboard.press("Control+c");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("김서준\t테스트 부서\r\n이하은\t테스트 부서");
+  await cell(page, 0, "display_name").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "범위 복사", exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("이하은");
+  await cell(page, 0, "display_name").click();
+  await paste(page, "취소첫째\n취소둘째");
+  await expect(cell(page, 1, "display_name")).toHaveText("취소둘째");
+  await page.keyboard.press("Control+z");
+  await expect(cell(page, 0, "display_name")).toHaveText("김서준");
+  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "다시 실행", exact: true }).click();
+  await expect(cell(page, 1, "display_name")).toHaveText("취소둘째");
+  await cell(page, 0, "display_name").dblclick();
+  await page.locator('.ag-cell-inline-editing input').fill("개별수정");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+  await expect(cell(page, 0, "display_name")).toHaveText("취소첫째");
+  await page.getByRole("button", { name: "변경 2건 저장", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "저장 완료:" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "다시 실행", exact: true })).toBeDisabled();
+  await cell(page, 1, "display_name").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "사원 상세", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "사원 상세", exact: true })).toContainText("EMP-002");
+  await page.keyboard.press("Escape");
+});
+
+test("fill handle extends dates and can be undone as one operation", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-preview" } });
+  await login(page);
+  await cell(page, 0, "hire_date").click();
+  await expect(cell(page, 0, "hire_date")).toHaveClass(/vibe-range-end/);
+  const start = await cell(page, 0, "hire_date").boundingBox();
+  const end = await cell(page, 2, "hire_date").boundingBox();
+  if (!start || !end) throw new Error("Missing fill target");
+  await page.mouse.move(start.x + start.width - 3, start.y + start.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(cell(page, 1, "hire_date")).toHaveText("2021-01-03");
+  await expect(cell(page, 2, "hire_date")).toHaveText("2021-01-04");
+  await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+  await expect(cell(page, 1, "hire_date")).toHaveText("2022-01-02");
+  await expect(cell(page, 2, "hire_date")).toHaveText("2023-01-02");
+  await cell(page, 1, "hire_date").click();
+  await paste(page, "2021-01-04");
+  await dragCells(page, 1, "hire_date", 0, "hire_date");
+  const reverseCorner = await cell(page, 1, "hire_date").boundingBox();
+  const reverseEnd = await cell(page, 2, "hire_date").boundingBox();
+  if (!reverseCorner || !reverseEnd) throw new Error("Missing reverse fill target");
+  await page.mouse.move(reverseCorner.x + reverseCorner.width - 3, reverseCorner.y + reverseCorner.height - 3);
+  await page.mouse.down();
+  await page.mouse.move(reverseEnd.x + reverseEnd.width / 2, reverseEnd.y + reverseEnd.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(cell(page, 2, "hire_date")).toHaveText("2021-01-06");
+});
+
+test("check filters feed explicit current-page groups pivots and charts", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-preview" } });
+  await login(page);
+  await page.getByRole("button", { name: "분석", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "사원 분석" });
+  await expect(dialog).toContainText("필터 결과 3명");
+  await dialog.locator('summary').click();
+  await expect(dialog).toContainText("EMP-001");
+  await dialog.getByRole("button", { name: "상세 보기", exact: true }).first().click();
+  await expect(page.getByRole("dialog", { name: "사원 상세", exact: true })).toContainText("EMP-001");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "분석", exact: true }).click();
+  await dialog.getByRole("button", { name: "피벗", exact: true }).click();
+  await expect(dialog.getByRole("table")).toContainText("재직");
+  await expect(dialog.locator('tfoot td').last()).toHaveText("3");
+  await dialog.getByRole("button", { name: "차트", exact: true }).click();
+  await expect(dialog.getByRole("figure")).toContainText("총 3명");
+  await page.keyboard.press("Escape");
+  await page.locator('.ag-header-cell[col-id="employment_status"] .ag-header-cell-filter-button').click();
+  await page.getByRole("checkbox", { name: "휴직", exact: true }).uncheck();
+  await page.keyboard.press("Escape");
+  await expect(page.locator('.ag-center-cols-container [role="row"]')).toHaveCount(2);
+  await page.getByRole("button", { name: "분석", exact: true }).click();
+  await expect(dialog).toContainText("필터 결과 2명");
+  await dialog.getByRole("button", { name: "피벗", exact: true }).click();
+  await expect(dialog.locator('tfoot td').last()).toHaveText("2");
+  await page.screenshot({ path: test.info().outputPath("employee-pivot.png") });
+});
+
+test("range paste fills dragged cells and preserves locked source positions", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-preview" } });
+  await login(page);
+  await cell(page, 0, "display_name").dblclick();
+  await paste(page, "편집임시");
+  await expect(page.locator('.ag-cell-inline-editing input')).toHaveValue("편집임시");
+  await page.keyboard.press("Escape");
+  await expect(cell(page, 0, "display_name")).toHaveText("김서준");
+  await dragCells(page, 0, "display_name", 1, "department_id");
+  await expect(page.locator('.vibe-cell-range')).toHaveCount(4);
+  await paste(page, "행렬첫째\t테스트 부서\n행렬둘째\t테스트 부서");
+  await expect(cell(page, 0, "display_name")).toHaveText("행렬첫째");
+  await expect(cell(page, 1, "display_name")).toHaveText("행렬둘째");
+  await dragCells(page, 0, "display_name", 1, "department_id");
+  await paste(page, "김서준\t테스트 부서\n이하은\t테스트 부서");
+  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+  await dragCells(page, 1, "display_name", 0, "display_name");
+  await expect(page.locator('.vibe-cell-range')).toHaveCount(2);
+  await expect(page.locator('.ag-cell-inline-editing')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("range-selection.png") });
+  await paste(page, "범위수정");
+  await expect(cell(page, 0, "display_name")).toHaveText("범위수정");
+  await expect(cell(page, 1, "display_name")).toHaveText("범위수정");
+  await expect(page.getByRole("button", { name: "변경 2건 저장" })).toBeEnabled();
+  await cell(page, 0, "employee_no").click();
+  await expect(page.locator('.vibe-cell-range')).toHaveCount(1);
+  await paste(page, "변경금지\t잠금테스트\t테스트 부서");
+  await expect(cell(page, 0, "employee_no")).toHaveText("EMP-001");
+  await expect(cell(page, 0, "display_name")).toHaveText("잠금테스트");
+  await expect(page.getByRole("status").filter({ hasText: "잠금 셀 1개" })).toBeVisible();
+  expect(await (await request.get("http://127.0.0.1:3101/__employee-writes")).json()).toEqual([]);
+  await page.getByRole("button", { name: "변경 2건 저장" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "저장 완료:" })).toBeVisible();
+  const writes = await (await request.get("http://127.0.0.1:3101/__employee-writes")).json();
+  expect(writes[0].update.map((row: { id: number; display_name: string }) => [row.id, row.display_name])).toEqual([[1, "잠금테스트"], [2, "범위수정"]]);
+  expect(writes[0].insert).toEqual([]);
+});
+
+test("paste respects displayed order, hidden columns and atomic validation", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-preview" } });
+  await login(page);
+  await cell(page, 0, "display_name").click();
+  await paste(page, "반영되면안됨\t없는부서");
+  await expect(page.getByRole("status").filter({ hasText: "변경하지 않았습니다" })).toBeVisible();
+  await expect(cell(page, 0, "display_name")).toHaveText("김서준");
+  await expect(page.getByRole("button", { name: "저장", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "열 보기", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "직책", exact: true }).click();
+  await cell(page, 0, "department_id").click();
+  await expect(page.locator('.vibe-cell-range')).toHaveCount(1);
+  await paste(page, "테스트 부서\t2024-02-29");
+  await expect(cell(page, 0, "hire_date")).toHaveText("2024-02-29");
+  await cell(page, 0, "hire_date").click();
+  await paste(page, "2025-02-29");
+  await expect(cell(page, 0, "hire_date")).toHaveText("2024-02-29");
+  await page.locator('.ag-header-cell[col-id="employee_no"] .ag-header-cell-text').click();
+  await page.locator('.ag-header-cell[col-id="employee_no"] .ag-header-cell-text').click();
+  await expect(cell(page, 0, "employee_no")).toHaveText("EMP-003");
+  await cell(page, 0, "display_name").click();
+  await paste(page, "정렬첫째\n정렬둘째");
+  await expect(cell(page, 0, "display_name")).toHaveText("정렬첫째");
+  await expect(cell(page, 1, "display_name")).toHaveText("정렬둘째");
+  await page.getByRole("button", { name: "변경 3건 저장" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "저장 완료:" })).toBeVisible();
+  const writes = await (await request.get("http://127.0.0.1:3101/__employee-writes")).json();
+  expect(writes[0].update.find((row: { id: number }) => row.id === 3).display_name).toBe("정렬첫째");
+  expect(writes[0].update.find((row: { id: number }) => row.id === 2).display_name).toBe("정렬둘째");
+});
+
+test("paste leaves search/editor text native and rejects read-only writes", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux-no-save" } });
+  await login(page);
+  await cell(page, 0, "display_name").click();
+  await paste(page, "권한없음");
+  await expect(page.getByRole("status").filter({ hasText: "저장 권한" })).toBeVisible();
+  await expect(cell(page, 0, "display_name")).toHaveText("김서준");
+  await page.getByPlaceholder("이름", { exact: true }).click();
+  await paste(page, "검색\t텍스트");
+  await expect(page.locator('.ag-center-cols-container [role="row"]')).toHaveCount(3);
+  expect(await (await request.get("http://127.0.0.1:3101/__employee-writes")).json()).toEqual([]);
+});
 
 test("employee work surface preserves edit/save/delete and makes actions explicit", async ({ page, request }) => {
   await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "employee-ux" } });

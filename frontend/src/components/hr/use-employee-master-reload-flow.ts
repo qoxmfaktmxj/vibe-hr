@@ -16,6 +16,7 @@ type UseEmployeeMasterReloadFlowArgs = {
   setAppliedFilters: React.Dispatch<React.SetStateAction<SearchFilters>>;
   setSyncedPageKey: React.Dispatch<React.SetStateAction<string | null>>;
   tempIdRef: React.MutableRefObject<number>;
+  onReload: () => void;
 };
 
 export function useEmployeeMasterReloadFlow({
@@ -28,12 +29,14 @@ export function useEmployeeMasterReloadFlow({
   setAppliedFilters,
   setSyncedPageKey,
   tempIdRef,
+  onReload,
 }: UseEmployeeMasterReloadFlowArgs) {
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [pendingReloadAction, setPendingReloadAction] = useState<PendingReloadAction | null>(null);
 
   const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
     gridApiRef.current?.stopEditing();
+    onReload();
     gridApiRef.current?.deselectAll();
 
     if (discardDirtyRows) {
@@ -50,7 +53,7 @@ export function useEmployeeMasterReloadFlow({
     setAppliedFilters(action.filters);
     setPage(1);
     tempIdRef.current = -1;
-  }, [gridApiRef, rowsRef, setAppliedFilters, setPage, setRows, setSyncedPageKey, tempIdRef]);
+  }, [gridApiRef, rowsRef, setAppliedFilters, setPage, setRows, setSyncedPageKey, tempIdRef, onReload]);
 
   const requestReloadAction = useCallback((action: PendingReloadAction) => {
     if (action.type === "page" && action.page === page) return;

@@ -55,7 +55,12 @@ import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { buildGridRowClassRules, getGridRowClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { CheckListFilter } from "@/components/grid/check-list-filter";
+import { EmployeeAnalysis } from "@/components/hr/employee-analysis";
+import { ContextMenu } from "radix-ui";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import { useGridRangePaste, type RangePasteChange } from "@/lib/grid/use-grid-range-paste";
+import { parseEmployeePasteValue } from "@/lib/hr/employee-paste";
 import type { ActiveCodeListResponse } from "@/types/common-code";
 import type {
   DepartmentItem,
@@ -264,6 +269,10 @@ export function EmployeeMasterManager() {
   const [totalCount, setTotalCount] = useState(() => restoredViewState?.totalCount ?? 0);
   const [initialLoading, setInitialLoading] = useState(() => (restoredViewState?.rows.length ?? 0) === 0);
   const [saving, setSaving] = useState(false);
+  const editHistory = useRef<{ undo: EmployeeGridRow[][]; redo: EmployeeGridRow[][] }>({ undo: [], redo: [] });
+  const [historyCount, setHistoryCount] = useState({ undo: 0, redo: 0 });
+  const [analysisRows, setAnalysisRows] = useState<EmployeeGridRow[] | null>(null);
+  const resetEditHistory = useCallback(() => { editHistory.current = { undo: [], redo: [] }; setHistoryCount({ undo: 0, redo: 0 }); }, []);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [deleteTargets, setDeleteTargets] = useState<number[]>([]);
@@ -377,6 +386,7 @@ export function EmployeeMasterManager() {
     setAppliedFilters,
     setSyncedPageKey,
     tempIdRef,
+    onReload: resetEditHistory,
   });
 
   const {
@@ -485,9 +495,13 @@ export function EmployeeMasterManager() {
   );
 
   const commitRows = useCallback(
-    (updater: (prevRows: EmployeeGridRow[]) => EmployeeGridRow[]) => {
+    (updater: (prevRows: EmployeeGridRow[]) => EmployeeGridRow[], beforeEdit?: EmployeeGridRow[]) => {
       const prevRows = rowsRef.current;
       const nextRows = updater(prevRows);
+      if (nextRows === prevRows) return;
+      editHistory.current.undo = [...editHistory.current.undo.slice(-29), (beforeEdit ?? prevRows).map((row) => ({ ...row }))];
+      editHistory.current.redo = [];
+      setHistoryCount({ undo: editHistory.current.undo.length, redo: 0 });
       rowsRef.current = nextRows;
       setRows(nextRows);
       applyGridTransaction(prevRows, nextRows);
@@ -534,20 +548,23 @@ export function EmployeeMasterManager() {
     },
   );
   const loading = employeePageLoading || employeePageValidating;
+  const appliedEmployeeData = useRef<typeof employeePageData>(undefined);
 
   useEffect(() => {
     if (!employeePageData) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize the fetched snapshot with the editable grid working copy.
     setInitialLoading(false);
     setTotalCount(employeePageData.total_count ?? employeePageData.employees.length);
-    if (hasDirtyRows && syncedPageKey === pageQueryKey) {
+    if (syncedPageKey === pageQueryKey && (hasDirtyRows || appliedEmployeeData.current === employeePageData)) {
       return;
     }
     const nextRows = employeePageData.employees.map((employee) => toGridRow(employee));
     rowsRef.current = nextRows;
     setRows(nextRows);
+    appliedEmployeeData.current = employeePageData;
+    resetEditHistory();
     setSyncedPageKey(pageQueryKey);
-  }, [employeePageData, hasDirtyRows, pageQueryKey, syncedPageKey]);
+  }, [employeePageData, hasDirtyRows, pageQueryKey, syncedPageKey, resetEditHistory]);
 
   useEffect(() => {
     if (!employeePageError) return;
@@ -596,11 +613,45 @@ export function EmployeeMasterManager() {
     }).map((column) => {
       const editable = column.editable;
       const { width, flex, ...rest } = column;
+      if (["department_id", "position_title", "employment_status", "is_active"].includes(column.field ?? "")) rest.filter = CheckListFilter;
       return { ...rest, initialWidth: width, initialFlex: flex ?? undefined, editable: (params) => !saving && !loading && !menuActionLoading && can("save") && (typeof editable === "function" ? editable(params) : editable === true) };
     });
   }, [can, departmentNameById, departments, employmentLabelByCode, employmentStatusValues, holidayDateKeys, loading, menuActionLoading, positionNames, saving]);
 
-  const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(() => EMPLOYEE_MASTER_DEFAULT_COL_DEF, []);
+  const applyRangeChanges = useCallback((changes: RangePasteChange[]) => {
+    const patches = new Map<string, Record<string, unknown>>();
+    for (const change of changes) patches.set(change.id, { ...patches.get(change.id), [change.field]: change.value });
+    commitRows((previous) => previous.map((row) => {
+      const patch = patches.get(String(row.id));
+      if (!patch) return row;
+      const next = { ...row, ...patch } as EmployeeGridRow;
+      next.department_name = departmentNameById.get(next.department_id) ?? next.department_name;
+      return reconcileUpdatedStatus(next, { shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password });
+    }));
+  }, [commitRows, departmentNameById]);
+  const parseRangeValue = useCallback((field: string, value: string) => parseEmployeePasteValue(field, value, departments, positionNames), [departments, positionNames]);
+  const rangePaste = useGridRangePaste({ apiRef: gridApiRef, enabled: !saving && !loading && !menuActionLoading && can("save"), parseValue: parseRangeValue, applyChanges: applyRangeChanges });
+  const clearRange = rangePaste.clear;
+  const defaultColDef = useMemo<ColDef<EmployeeGridRow>>(() => ({ ...EMPLOYEE_MASTER_DEFAULT_COL_DEF, cellClassRules: { "vibe-cell-range": rangePaste.isSelected, "vibe-range-end": rangePaste.isEnd } }), [rangePaste.isSelected, rangePaste.isEnd]);
+
+  const restoreEdit = useCallback((direction: "undo" | "redo") => {
+    if (saving || loading || menuActionLoading || !can("save")) return;
+    gridApiRef.current?.stopEditing();
+    const history = editHistory.current;
+    const target = history[direction].pop();
+    if (!target) return;
+    history[direction === "undo" ? "redo" : "undo"].push(rowsRef.current.map((row) => ({ ...row })));
+    const current = rowsRef.current;
+    const next = target.map((row) => ({ ...row }));
+    rowsRef.current = next; setRows(next); applyGridTransaction(current, next);
+    setHistoryCount({ undo: history.undo.length, redo: history.redo.length });
+    clearRange();
+  }, [saving, loading, menuActionLoading, can, applyGridTransaction, clearRange]);
+  function openAnalysis() {
+    const result: EmployeeGridRow[] = [];
+    gridApiRef.current?.forEachNodeAfterFilterAndSort((node) => { if (node.data && node.data._status !== "deleted") result.push({ ...node.data }); });
+    setAnalysisRows(result);
+  }
 
   /* -- 클래스 기반 행 스타일 ---------------------------------- */
   const rowClassRules = useMemo(() => buildGridRowClassRules<EmployeeGridRow>(), []);
@@ -656,6 +707,7 @@ export function EmployeeMasterManager() {
             shouldBeClean: (candidate) => isRevertedToOriginal(candidate) && !candidate.password,
           });
         }),
+        rowsRef.current.map((row) => row.id === rowId ? { ...row, [field]: event.oldValue } : row),
       );
     },
     [commitRows, departmentNameById],
@@ -711,13 +763,12 @@ export function EmployeeMasterManager() {
   }, []);
 
   const departmentsReady = departments.length > 0;
-  const { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile, saveFeedback, clearSaveFeedback } = useEmployeeMasterActions({
+  const { toolbarActions, toolbarSaveAction, handleUploadFile, saveFeedback, clearSaveFeedback } = useEmployeeMasterActions({
     rows,
     appliedQuery: buildEmployeeQuery(appliedFilters),
     saving: saving || loading,
     departmentsReady,
     gridApiRef,
-    containerRef,
     uploadInputRef,
     departmentNameById,
     positionNames,
@@ -730,6 +781,7 @@ export function EmployeeMasterManager() {
     setSaving,
     setSyncedPageKey,
     snapshotOriginal,
+    onSaved: resetEditHistory,
     validateRow,
     labels: {
       addRow: I18N.addRow,
@@ -771,7 +823,7 @@ export function EmployeeMasterManager() {
   }
 
   return (
-    <ManagerPageShell className="employee-workspace" containerRef={containerRef} onPasteCapture={saving || !can("create") ? undefined : handlePasteCapture}>
+    <ManagerPageShell className="employee-workspace" containerRef={containerRef}>
       {/* ManagerSearchSection is rendered through EmployeeMasterSearchSection to keep standard-v2 composition. */}
       <EmployeeMasterSearchSection
         filters={searchFilters}
@@ -815,6 +867,8 @@ export function EmployeeMasterManager() {
         )}
         headerRight={(
           <>
+            <Button variant="outline" size="sm" disabled={saving || loading} onClick={openAnalysis}>분석</Button>
+            {can("save") && <><Button variant="outline" size="sm" disabled={saving || loading || historyCount.undo === 0} onClick={() => restoreEdit("undo")}>실행 취소</Button><Button variant="outline" size="sm" disabled={saving || loading || historyCount.redo === 0} onClick={() => restoreEdit("redo")}>다시 실행</Button></>}
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 className="h-3.5 w-3.5" />열 보기</Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem disabled={hiddenColumns.length === 0} onSelect={() => { gridApiRef.current?.setColumnsVisible(hiddenColumns, true); setHiddenColumns([]); }}>전체 표시</DropdownMenuItem>
@@ -843,7 +897,14 @@ export function EmployeeMasterManager() {
 
       {saveFeedback && (saveFeedback.tone === "error" || !hasDirtyRows) && <p role="status" className={`employee-feedback px-6 pb-2 text-sm ${saveFeedback.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>{saveFeedback.text}</p>}
 
-      <div className="min-h-0 flex flex-1 flex-col px-6 pb-4">
+      <p className="px-6 pb-2 text-xs text-muted-foreground">드래그로 선택, 더블클릭으로 수정, Ctrl+C/V로 복사와 붙여넣기. 선택 모서리를 끌면 자동 채우기, Ctrl+Z로 실행 취소. 신규 행은 입력 버튼으로 추가하세요.</p>
+      {rangePaste.message && <p role="status" className="px-6 pb-2 text-sm">{rangePaste.message}</p>}
+      <ContextMenu.Root><ContextMenu.Trigger asChild>
+      <div className="min-h-0 flex flex-1 flex-col px-6 pb-4" onPasteCapture={rangePaste.onPaste} onCopyCapture={rangePaste.onCopy} onKeyDownCapture={(event) => {
+        if ((event.target as HTMLElement).closest("input,textarea,[contenteditable=true]")) return;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab", "Home", "End", "Escape"].includes(event.key)) rangePaste.clear();
+        if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) { event.preventDefault(); event.stopPropagation(); restoreEdit(event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo"); }
+      }}>
         <div className="ag-theme-quartz vibe-grid h-full w-full overflow-hidden rounded-lg border border-border">
           <AgGridReact<EmployeeGridRow>
             theme="legacy"
@@ -854,6 +915,15 @@ export function EmployeeMasterManager() {
             selectionColumnDef={{ pinned: "left", width: 44, resizable: false }}
             onSelectionChanged={(event) => setSelectedIds(event.api.getSelectedRows().map((row: EmployeeGridRow) => row.id))}
             singleClickEdit={false}
+            onCellMouseDown={rangePaste.onCellMouseDown}
+            onCellMouseOver={rangePaste.onCellMouseOver}
+            onCellFocused={rangePaste.onCellFocused}
+            onSortChanged={rangePaste.clear}
+            onFilterChanged={rangePaste.clear}
+            onColumnVisible={rangePaste.clear}
+            onColumnMoved={rangePaste.clear}
+            onColumnPinned={rangePaste.clear}
+            onRowDataUpdated={rangePaste.clear}
             animateRows={false}
             rowClassRules={rowClassRules}
             getRowClass={getRowClass}
@@ -867,8 +937,18 @@ export function EmployeeMasterManager() {
             rowHeight={34}
           />
         </div>
+        <p role="status" aria-label="선택 영역 통계" className="pt-2 text-xs text-muted-foreground">{rangePaste.summary}</p>
       </div>
+      </ContextMenu.Trigger><ContextMenu.Portal><ContextMenu.Content className="z-50 min-w-48 rounded-lg border bg-popover p-1 text-sm shadow-lg">
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent" onSelect={() => void rangePaste.copy()}>범위 복사</ContextMenu.Item>
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent data-[disabled]:opacity-40" disabled={saving || loading || !can("save")} onSelect={() => void rangePaste.paste()}>붙여넣기</ContextMenu.Item>
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent data-[disabled]:opacity-40" disabled={!can("save") || saving || loading || historyCount.undo === 0} onSelect={() => restoreEdit("undo")}>실행 취소</ContextMenu.Item>
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent data-[disabled]:opacity-40" disabled={!can("save") || saving || loading || historyCount.redo === 0} onSelect={() => restoreEdit("redo")}>다시 실행</ContextMenu.Item>
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent" onSelect={() => { const focus = gridApiRef.current?.getFocusedCell(); const row = focus ? gridApiRef.current?.getDisplayedRowAtIndex(focus.rowIndex)?.data : null; if (row) setDetailId(row.id); }}>사원 상세</ContextMenu.Item>
+        <ContextMenu.Item className="rounded px-3 py-2 outline-none focus:bg-accent data-[disabled]:opacity-40" disabled={!can("save") || saving || loading || !selectedItems.some((row) => row._status !== "deleted")} onSelect={() => setDeleteTargets(selectedItems.filter((row) => row._status !== "deleted").map((row) => row.id))}>선택 행 삭제</ContextMenu.Item>
+      </ContextMenu.Content></ContextMenu.Portal></ContextMenu.Root>
       </ManagerGridSection>
+      <EmployeeAnalysis rows={analysisRows} onClose={() => setAnalysisRows(null)} onDetail={setDetailId} />
       <ConfirmDialog open={deleteTargets.length > 0} onOpenChange={(open) => { if (!open) setDeleteTargets([]); }} title={`${deleteTargets.length}건을 삭제 표시할까요?`} description="기존 사원은 저장해야 삭제가 반영되며 저장 전에는 삭제 취소가 가능합니다. 아직 저장하지 않은 신규 행은 목록에서 바로 제거됩니다." confirmLabel="삭제 표시" busy={saving || loading} onConfirm={() => { if (!saving && !loading && !menuActionLoading && can("save")) deleteTargets.forEach((id) => toggleDeleteById(id, true)); setDeleteTargets([]); }}>
         <ul className="max-h-40 overflow-y-auto px-6 pb-4 text-sm">{rows.filter((row) => deleteTargets.includes(row.id)).map((row) => <li key={row.id}>{row.employee_no || "신규"} / {row.display_name || "이름 미입력"}</li>)}</ul>
       </ConfirmDialog>

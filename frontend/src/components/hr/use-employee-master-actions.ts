@@ -17,7 +17,6 @@ type UseEmployeeMasterActionsArgs = {
   saving: boolean;
   departmentsReady: boolean;
   gridApiRef: React.MutableRefObject<GridApi<EmployeeGridRow> | null>;
-  containerRef: React.MutableRefObject<HTMLDivElement | null>;
   uploadInputRef: React.MutableRefObject<HTMLInputElement | null>;
   departmentNameById: Map<number, string>;
   positionNames: string[];
@@ -30,6 +29,7 @@ type UseEmployeeMasterActionsArgs = {
   setSaving: React.Dispatch<React.SetStateAction<boolean>>;
   setSyncedPageKey: React.Dispatch<React.SetStateAction<string | null>>;
   snapshotOriginal: (row: EmployeeItem) => Record<string, unknown>;
+  onSaved: () => void;
   validateRow: (row: EmployeeGridRow) => string | null;
   labels: {
     addRow: string;
@@ -50,7 +50,6 @@ export function useEmployeeMasterActions({
   saving,
   departmentsReady,
   gridApiRef,
-  containerRef,
   uploadInputRef,
   departmentNameById,
   positionNames,
@@ -63,6 +62,7 @@ export function useEmployeeMasterActions({
   setSaving,
   setSyncedPageKey,
   snapshotOriginal,
+  onSaved,
   validateRow,
   labels,
 }: UseEmployeeMasterActionsArgs) {
@@ -73,41 +73,6 @@ export function useEmployeeMasterActions({
     const added = Array.from({ length: count }, () => createEmptyRow());
     commitRows((prev) => [...added, ...prev]);
   }, [commitRows, createEmptyRow]);
-
-  const handlePasteCapture = useCallback((event: React.ClipboardEvent<HTMLDivElement>) => {
-    if (!containerRef.current?.contains(document.activeElement)) return;
-    const text = event.clipboardData.getData("text/plain");
-    if (!text || !text.includes("\t")) return;
-
-    event.preventDefault();
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    if (lines.length === 0) return;
-
-    const parsed: EmployeeGridRow[] = lines.map((line) => {
-      const cells = line.split("\t").map((value) => value.trim());
-      const departmentId = parseDepartmentId(cells[1] ?? "");
-      return {
-        id: issueTempId(),
-        employee_no: "",
-        login_id: "",
-        display_name: cells[0] ?? "",
-        department_id: departmentId,
-        department_name: departmentNameById.get(departmentId) ?? "",
-        position_title: cells[2] || "사원",
-        hire_date: (cells[3] || new Date().toISOString().slice(0, 10)).slice(0, 10),
-        employment_status: cells[4] === "leave" || cells[4] === "휴직" ? "leave" : cells[4] === "resigned" || cells[4] === "퇴직" ? "resigned" : "active",
-        email: cells[5] || "",
-        is_active: ["y", "yes", "true", "1"].includes((cells[6] || "Y").trim().toLowerCase()),
-        password: cells[7] || "admin",
-        _status: "added",
-      };
-    });
-
-    commitRows((prev) => [...parsed, ...prev]);
-  }, [commitRows, containerRef, departmentNameById, issueTempId, parseDepartmentId]);
 
   const copySelectedRows = useCallback(() => {
     if (!gridApiRef.current) return;
@@ -276,6 +241,7 @@ export function useEmployeeMasterActions({
           buildOriginal: (row) => snapshotOriginal(row),
         }),
       );
+      onSaved();
       gridApiRef.current?.deselectAll();
       gridApiRef.current?.stopEditing();
       toast.success(`${labels.saveDone} (입력 ${json.inserted_count}건 / 수정 ${json.updated_count}건 / 삭제 ${json.deleted_count}건)`);
@@ -293,7 +259,7 @@ export function useEmployeeMasterActions({
       inFlight.current = false;
       setSaving(false);
     }
-  }, [commitRows, gridApiRef, labels.saveDone, labels.saveFailed, labels.validationError, mutateEmployeePage, rows, saving, setSaving, setSyncedPageKey, snapshotOriginal, validateRow]);
+  }, [commitRows, gridApiRef, labels.saveDone, labels.saveFailed, labels.validationError, mutateEmployeePage, rows, saving, setSaving, setSyncedPageKey, snapshotOriginal, validateRow, onSaved]);
 
   const toolbarActions = useMemo(() => [
     { key: "add", label: labels.addRow, icon: Plus, onClick: () => addRows(1), disabled: !departmentsReady },
@@ -312,5 +278,5 @@ export function useEmployeeMasterActions({
     variant: "save" as const,
   }), [labels.saveAll, saveAllChanges, saving]);
 
-  return { toolbarActions, toolbarSaveAction, handlePasteCapture, handleUploadFile, saveFeedback, clearSaveFeedback };
+  return { toolbarActions, toolbarSaveAction, handleUploadFile, saveFeedback, clearSaveFeedback };
 }
