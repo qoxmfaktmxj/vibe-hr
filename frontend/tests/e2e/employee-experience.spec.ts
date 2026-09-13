@@ -657,7 +657,11 @@ test("lost WebGL context returns to the static background", async ({ page }) => 
 });
 
 for (const mobile of [false, true]) {
-  test(`sidebar home and scoped group controls work on ${mobile ? "mobile" : "desktop"}`, async ({ page, request }) => {
+  test(`@ui-smoke sidebar home and scoped group controls work on ${mobile ? "mobile" : "desktop"}`, async ({ page, request }) => {
+    const sceneTextures: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/images/conservatory/")) sceneTextures.push(request.url());
+    });
     await page.emulateMedia({ reducedMotion: "reduce" });
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "sidebar-domains" } });
@@ -690,5 +694,6 @@ for (const mobile of [false, true]) {
     await page.goto("/mng/companies");
     await page.getByRole("navigation", { name: "열린 업무" }).getByRole("button", { name: "홈", exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
+    expect(sceneTextures, "UI smoke checks must use the static login background").toEqual([]);
   });
 }

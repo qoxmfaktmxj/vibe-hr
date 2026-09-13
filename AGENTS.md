@@ -115,6 +115,7 @@ Before changes:
 ### Verification rules
 - AG Grid screens: run `npm run validate:grid` before lint/build.
 - Frontend changes: run `npm run lint` in `frontend` when applicable.
+- Small navigation/app-shell UI changes: use `npm run check:ui` once after final code edits (lint, unit tests, two static-background browser flows, one build including TypeScript). During editing, prefer affected tests and file-scoped lint. GPU rendering checks are for 3D/motion changes; select feature-specific tests for behavior outside the smoke flows. See `docs/TEST_STRATEGY.md` for full-suite and protected-change requirements. Do not repeat unchanged successful checks for documentation-only edits.
 - Backend changes: run the relevant Gradle test or Spring Boot startup verification from `backend-spring` when applicable.
 - When editing user-facing Korean text, preserve UTF-8 encoding and verify real browser rendering with a screenshot; treat CLI snapshot text as non-authoritative for Korean.
 - If validation cannot run, explicitly record why.

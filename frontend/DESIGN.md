@@ -47,16 +47,13 @@ The login meadow uses a generated image for continuous distant coverage. Three d
 Run from `frontend`:
 
 ```powershell
-npm run validate:grid
-npm run lint
-npm run test
-npx tsc --noEmit
-node node_modules/@playwright/test/cli.js test --config playwright.experience.config.ts --reporter=list
-npm run build
+npm run check:ui
 ```
+
+For small navigation changes this selects two static-background browser flows and builds once. Use `npm run test:gpu` for scene or shader changes, and `npm run test:ui:full` for broad UI regression work. Other feature changes still need focused behavior tests; see `docs/TEST_STRATEGY.md`.
 
 The dedicated Playwright configuration starts loopback-only Next and synthetic backend servers on 3100 and 3101 with ephemeral test secrets. It exercises the real frontend and BFF cookie lifecycle without changing an existing database or service. It is UI regression coverage, not a substitute for Spring authentication, authorization or production infrastructure tests.
 
 Coverage includes desktop and mobile login, background pause/resume and static fallback, safe error recovery, profile focus/scroll/retry, reduced motion, theme apply/cancel/persistence, normal member controls, session warnings and renewal, menu responsiveness, and existing business grid/tab navigation. Captures wait for fonts, loaded content and finite animations to finish.
 
-The separate `playwright.scene.config.ts` exercises rendered title and water differences under identical virtual animation time. On Windows, `PLAYWRIGHT_HARDWARE_GPU=1` selects the verified D3D11 hardware path for that suite; default headless Chromium may use SwiftShader. Functional tests and frame rate are separate from reference fidelity. The final HR scene and companion landing each passed the fixed independent90-point visual/interaction rubric. This is not a pixel equality claim. Public asset JSON files record source licenses and exact generation prompts.
+The separate `playwright.scene.config.ts` exercises rendered title and water differences under identical virtual animation time. It uses D3D11 on Windows by default; `PLAYWRIGHT_HARDWARE_GPU=0` selects the default headless path, which may use SwiftShader. Functional tests and frame rate are separate from reference fidelity. The final HR scene and companion landing each passed the fixed independent90-point visual/interaction rubric. This is not a pixel equality claim. Public asset JSON files record source licenses and exact generation prompts.

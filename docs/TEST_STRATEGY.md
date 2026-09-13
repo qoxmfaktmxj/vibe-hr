@@ -11,13 +11,24 @@ Run only the checks applicable to the changed scope, in dependency order.
 
 ```powershell
 cd frontend
-npm run validate:grid
-npm run lint
-npm run test
-npm run build
+npm run check:ui
 ```
 
-Run `npm run validate:grid` before lint or build when an AG Grid screen or shared grid module changes. Run targeted Playwright coverage for behavior that requires a browser.
+For small navigation or app-shell UI changes, `check:ui` runs lint, all fast unit tests, two static-background browser flows (desktop and mobile), then one production build. The build includes TypeScript checking, so do not also run a separate typecheck at this final gate. The existing build pre-hook validates the grid registry.
+
+During implementation, run the affected tests and file-scoped lint first. Run the final gate once after the last code change. Reuse successful evidence while its code is unchanged; do not repeat build or browser suites for documentation-only edits.
+
+| Command | Scope |
+| --- | --- |
+| `npm run test` | All fast unit tests, retained without deleting cases |
+| `npm run test:ui` | Two `@ui-smoke` navigation flows with reduced motion and no 3D texture downloads |
+| `npm run test:ui:full` | Full existing employee-experience regression suite, for broad shared-shell changes or explicit full QA |
+| `npm run test:gpu` | Rendered title and water interaction, for scene/shader/motion changes |
+| `npm run check:ui` | Final small-UI gate with exactly one build |
+
+The two smoke flows cover navigation, not every feature. Add or select focused tests when changing another screen, authentication, permissions, data writes, or other behavior they do not exercise. For 3D lifecycle or fallback changes, also select the relevant cases from the full suite. `test:gpu` uses D3D11 on Windows by default; `PLAYWRIGHT_HARDWARE_GPU=0` explicitly selects the default browser rendering path.
+
+Run `npm run validate:grid` before lint when an AG Grid screen or shared grid module changes. Run browser and build commands sequentially: the dev server and build share Next artifacts. Tests use isolated synthetic services and do not certify production authentication. These local commands do not weaken existing CI or protected-change gates.
 
 ### Spring Backend
 
