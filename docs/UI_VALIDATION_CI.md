@@ -12,8 +12,9 @@ Browser suites fail fast on their first failure and emit GitHub annotations;
 no test is filtered out, and an interrupted suite fails the entire gate. New
 runs of the same workflow/ref cancel superseded validation attempts.
 Synthetic services and generated ephemeral test secrets stay on the runner;
-production credentials and SSH secrets are not supplied. Browser evidence is
-retained for 7 days. These fixtures do not certify real backend authorization or
+production credentials and SSH secrets are not supplied. Functional UI screenshots temporarily pause motion and restore the previous
+preference after capture; dedicated scene/motion assertions remain unchanged.
+Browser evidence is retained for 7 days. These fixtures do not certify real backend authorization or
 hardware GPU fidelity; relevant backend/migration checks remain required.
 
 ## Daily 08:00 Asia/Seoul deployment gate
