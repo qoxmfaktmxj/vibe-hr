@@ -1,0 +1,52 @@
+name: UI validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Test same-SHA deployment gate
+        working-directory: .
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Validate grid before lint
+        run: npm run validate:grid
+      - run: npm run lint
+      - run: npm run test
+      - name: Employee UX regression (all eight scenarios)
+        run: npx playwright test --config playwright.employee-ux.config.ts --reporter=line
+      - name: Full employee experience regression (includes UI smoke)
+        run: npm run test:ui:full
+      - name: Production build and TypeScript
+        run: npm run build
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: frontend/test-results/
+          retention-days: 7
+          if-no-files-found: warn

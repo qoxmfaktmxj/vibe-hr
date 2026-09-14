@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
 
 jobs:
+  ui:
+    uses: ./.github/workflows/ui-validation.yml
+    permissions:
+      contents: read
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -94,7 +99,7 @@ jobs:
           pwsh -File scripts/spring-migration/smoke-spring-compose.ps1
 
   deploy:
-    needs: test
+    needs: [test, ui]
     runs-on: ubuntu-latest
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
@@ -157,10 +162,18 @@ jobs:
           }
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
 
-          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" 'bash -s' <<'REMOTE'
+          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash -s -- ${GITHUB_SHA}" <<'REMOTE'
           set -Eeuo pipefail
           repository=/root/.openclaw/workspace/vibe-hr
           cd "$repository"
+          expected_sha="$1"
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ -z "$(git status --porcelain)" ]] || { echo "[deploy] dirty checkout; refusing update" >&2; exit 1; }
+          git fetch origin
+          git checkout main
+          git pull --ff-only origin main
+          [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || { echo "[deploy] main advanced beyond tested SHA; rerun workflow" >&2; exit 1; }
+          python3 scripts/ci/require-ui-validation.py --sha "$expected_sha" --wait-seconds 1200
 
           restore_operator_config() {
             if [[ -n "${backup_dir:-}" && -f "${backup_dir}/docker-compose.deploy.yml" ]]; then
@@ -250,10 +263,7 @@ jobs:
           docker image tag "$previous_frontend" "$rollback_frontend" || fail "unable to retain the previous frontend image"
           rollback_ready=true
 
-          git fetch origin || fail "unable to fetch the deployment revision"
-          git checkout main || fail "unable to check out the deployment branch"
-          git branch "backup/deploy-${timestamp}" >/dev/null 2>&1 || true
-          git reset --hard origin/main || fail "unable to update to the deployment revision"
+          [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || fail "checkout changed after UI gate"
 
           source scripts/spring-migration/load-deploy-env.sh || fail "deployment dotenv parser is unavailable"
           load_deploy_env .env.deploy || fail "tracked deployment environment is invalid"

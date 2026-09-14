@@ -30,6 +30,13 @@ The two smoke flows cover navigation, not every feature. Add or select focused t
 
 Run `npm run validate:grid` before lint when an AG Grid screen or shared grid module changes. Run browser and build commands sequentially: the dev server and build share Next artifacts. Tests use isolated synthetic services and do not certify production authentication. These local commands do not weaken existing CI or protected-change gates.
 
+### Production-host UI isolation
+
+Daily deployments use the exact-SHA GitHub-hosted UI gate in
+[`UI_VALIDATION_CI.md`](UI_VALIDATION_CI.md). Do not run browser suites or Next dev
+on the production host. Missing/failed remote UI evidence blocks deployment;
+it does not waive testing. Backend and runtime checks below remain applicable.
+
 ### Spring Backend
 
 ```powershell
