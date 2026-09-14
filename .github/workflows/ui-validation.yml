@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+concurrency:
+  group: ui-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -37,9 +41,9 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - name: Employee UX regression (all eight scenarios)
-        run: npx playwright test --config playwright.employee-ux.config.ts --reporter=line
+        run: npx playwright test --config playwright.employee-ux.config.ts --reporter=line,github --max-failures=1
       - name: Full employee experience regression (includes UI smoke)
-        run: npm run test:ui:full
+        run: npx playwright test --config playwright.experience.config.ts --reporter=line,github --max-failures=1
       - name: Production build and TypeScript
         run: npm run build
       - name: Retain browser evidence

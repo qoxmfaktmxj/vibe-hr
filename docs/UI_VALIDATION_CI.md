@@ -8,6 +8,9 @@ Ubuntu for every main push (no path filters), PR, or manual dispatch; the manual
 deploy workflow also requires this reusable UI workflow. It runs the unchanged
 8-case employee UX suite and full employee-experience suite, sequentially with
 one worker, plus grid validation, lint, unit tests and one production build.
+Browser suites fail fast on their first failure and emit GitHub annotations;
+no test is filtered out, and an interrupted suite fails the entire gate. New
+runs of the same workflow/ref cancel superseded validation attempts.
 Synthetic services and generated ephemeral test secrets stay on the runner;
 production credentials and SSH secrets are not supplied. Browser evidence is
 retained for 7 days. These fixtures do not certify real backend authorization or
