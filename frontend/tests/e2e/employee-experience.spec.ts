@@ -1,24 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function capture(page: Page, filename: string) {
-  // UI evidence needs a stable frame, not continuous WebGL rendering on a
-  // software-only CI runner. Restore motion so later behavior checks retain it.
-  const reducedMotion = await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
-  try {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    const scene = page.getByTestId("login-scene");
-    if (await scene.count()) await expect(scene).toHaveAttribute("data-motion", "paused");
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      await Promise.all(document.getAnimations()
-        .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
-        .map((animation) => animation.finished.catch(() => undefined)));
-    });
-    await page.mouse.move(0, 0);
-    await page.screenshot({ path: test.info().outputPath(filename), animations: "disabled" });
-  } finally {
-    await page.emulateMedia({ reducedMotion: reducedMotion ? "reduce" : "no-preference" });
-  }
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(document.getAnimations()
+      .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().endTime))
+      .map((animation) => animation.finished.catch(() => undefined)));
+  });
+  await page.mouse.move(0, 0);
+  await page.screenshot({ path: test.info().outputPath(filename) });
 }
 
 // These tests exercise the real Next UI/BFF with synthetic backend responses.

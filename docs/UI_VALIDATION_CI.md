@@ -12,9 +12,8 @@ Browser suites fail fast on their first failure and emit GitHub annotations;
 no test is filtered out, and an interrupted suite fails the entire gate. New
 runs of the same workflow/ref cancel superseded validation attempts.
 Synthetic services and generated ephemeral test secrets stay on the runner;
-production credentials and SSH secrets are not supplied. Functional UI screenshots temporarily pause motion and restore the previous
-preference after capture; dedicated scene/motion assertions remain unchanged.
-Browser evidence is retained for 7 days. These fixtures do not certify real backend authorization or
+production credentials and SSH secrets are not supplied. Browser evidence is
+retained for 7 days. These fixtures do not certify real backend authorization or
 hardware GPU fidelity; relevant backend/migration checks remain required.
 
 ## Daily 08:00 Asia/Seoul deployment gate
@@ -68,3 +67,14 @@ activate this split. A new main push automatically starts remote validation.
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v
 ```
+
+## Observed rollout blocker (2026-09-14)
+
+Hosted employee UX8 passes, but the additional full experience suite timed out
+in the first login test, once on screenshot and once on a stable password
+visibility button. A screenshot-only change did not resolve the latter and was
+reverted. Do not treat this as proven host OOM or proven GPU failure. Preserve
+the failing gate and inspect uploaded Playwright traces with an authorized
+GitHub account before selecting a renderer/runner correction. Public run status
+and annotations are readable, but detailed logs/artifact downloads require
+authentication in the current environment. No tests were removed or waived.
