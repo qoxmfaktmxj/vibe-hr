@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function capture(page: Page, filename: string) {
   await page.evaluate(async () => {
@@ -8,7 +8,18 @@ async function capture(page: Page, filename: string) {
       .map((animation) => animation.finished.catch(() => undefined)));
   });
   await page.mouse.move(0, 0);
-  await page.screenshot({ path: test.info().outputPath(filename) });
+
+  // Preserve evidence of the UI under test without asking Chromium to composite
+  // the login page's decorative, continuously-rendered WebGL backdrop.
+  let evidence: Locator;
+  if (new URL(page.url()).pathname === "/login") {
+    evidence = page.locator('[data-slot="card"]');
+  } else {
+    const dialog = page.getByRole("dialog");
+    evidence = await dialog.count() > 0 ? dialog : page.getByRole("main");
+  }
+
+  await evidence.screenshot({ path: test.info().outputPath(filename) });
 }
 
 // These tests exercise the real Next UI/BFF with synthetic backend responses.
