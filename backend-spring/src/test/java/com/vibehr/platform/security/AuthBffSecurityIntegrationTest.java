@@ -109,7 +109,14 @@ class AuthBffSecurityIntegrationTest {
     @Test
     void rejectsForgedExpiredAndPathMismatchedAssertions() throws Exception {
         String valid = assertion(loginClaims(clientId(1), "admin"), NOW, NOW.plusSeconds(30));
-        String forged = valid.substring(0, valid.length() - 1) + (valid.endsWith("A") ? "B" : "A");
+        // A Base64URL token's final character can contain only padding bits; changing it
+        // may decode to the same signature bytes. Mutate the first signature character
+        // so this assertion always carries a genuinely different HMAC value.
+        int signatureStart = valid.lastIndexOf('.') + 1;
+        char signatureFirst = valid.charAt(signatureStart);
+        String forged = valid.substring(0, signatureStart)
+                + (signatureFirst == 'A' ? "B" : "A")
+                + valid.substring(signatureStart + 1);
 
         mockMvc.perform(login(forged, "admin"))
                 .andExpect(status().isUnauthorized())
