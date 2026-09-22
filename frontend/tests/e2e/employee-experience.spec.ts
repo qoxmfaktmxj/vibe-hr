@@ -44,6 +44,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("login has clear company/social labels and accessible password visibility", async ({ page }) => {
+  // This checks the form's accessible controls. Keep it independent from the
+  // decorative WebGL compositor; scene behavior is exercised below.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
   await expect(page.getByLabel("회사", { exact: true })).toContainText("테스트 법인");
   await expect(page.getByRole("link", { name: /구글|Google/ })).toBeVisible();
