@@ -50,7 +50,10 @@ export function LoginScene() {
       const slowFrameLimit = world && world.vegetationCount > 450 ? 24 : 36;
       if (previous && now - previous > slowFrameLimit) slowFrames++;
       else slowFrames = Math.max(0, slowFrames - 1);
-      if (slowFrames >= 24) {
+      // Reduce the heaviest scene detail after a short run of missed frame budgets.
+      // On a saturated device each rendered frame can itself be expensive, so waiting
+      // for dozens of callbacks delays the recovery that the scene is meant to provide.
+      if (slowFrames >= 6) {
         slowFrames = 0;
         if (!world?.reduceVegetation() && resolutionScale > .45) {
           resolutionScale = Math.max(.45, resolutionScale * .75);
