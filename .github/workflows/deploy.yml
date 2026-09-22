@@ -212,6 +212,10 @@ jobs:
       DEPLOY_PORT: ${{ secrets.DEPLOY_PORT != '' && secrets.DEPLOY_PORT || vars.DEPLOY_PORT || '22' }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      # Public ED25519 host key read directly from the managed deployment host
+      # (srv1384798 / 76.13.191.205:22) and verified by its local administrator.
+      # A DEPLOY_KNOWN_HOSTS secret, when configured, remains the preferred key-rotation path.
+      DEPLOY_HOST_ED25519_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIAYZpbXGlPStiKxeWqj/Ue0axvdHUwlapQXUvDcIug8
     steps:
       - name: Checkout tested release source
         uses: actions/checkout@v4
@@ -226,7 +230,6 @@ jobs:
           [[ -z "${DEPLOY_HOST}" ]] && missing+=("DEPLOY_HOST (Secret or Variable)")
           [[ -z "${DEPLOY_USER}" ]] && missing+=("DEPLOY_USER (Secret or Variable)")
           [[ -z "${DEPLOY_SSH_KEY}" ]] && missing+=("DEPLOY_SSH_KEY (Secret)")
-          [[ -z "${DEPLOY_KNOWN_HOSTS}" ]] && missing+=("DEPLOY_KNOWN_HOSTS (Secret)")
           if [[ ! "${DEPLOY_PORT}" =~ ^[0-9]+$ ]] || (( 10#${DEPLOY_PORT} < 1 || 10#${DEPLOY_PORT} > 65535 )); then
             missing+=("DEPLOY_PORT (must be an integer from 1 to 65535)")
           fi
@@ -259,13 +262,19 @@ jobs:
           known_hosts=$(mktemp)
           trap 'rm -f "$keyfile" "$known_hosts"' EXIT
           printf '%s\n' "${DEPLOY_SSH_KEY}" > "$keyfile"
-          printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > "$known_hosts"
-          chmod 600 "$keyfile" "$known_hosts"
 
           known_host="${DEPLOY_HOST}"
           if [[ "${DEPLOY_PORT}" != "22" ]]; then
             known_host="[${DEPLOY_HOST}]:${DEPLOY_PORT}"
           fi
+          if [[ -n "${DEPLOY_KNOWN_HOSTS}" ]]; then
+            printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > "$known_hosts"
+          else
+            # Do not learn a key from the network: bind the locally verified
+            # deployment-host public key to the configured hostname/port instead.
+            printf '%s %s\n' "$known_host" "${DEPLOY_HOST_ED25519_KEY}" > "$known_hosts"
+          fi
+          chmod 600 "$keyfile" "$known_hosts"
           ssh-keygen -F "$known_host" -f "$known_hosts" >/dev/null || {
             echo "::error::DEPLOY_KNOWN_HOSTS does not contain an exact host key entry for ${known_host}."
             exit 1
