@@ -19,6 +19,10 @@ type FxSnapshot = {
   baseDate: string | null;
 };
 
+// Dashboard enrichment must never hold up a completed login. These public,
+// best-effort endpoints are optional and the UI already has a safe empty state.
+const EXTERNAL_SNAPSHOT_TIMEOUT_MS = 4_000;
+
 function weatherLabel(code: number | null) {
   if (code == null) return "-";
   if ([0].includes(code)) return "맑음";
@@ -36,7 +40,7 @@ async function getNoKeyWeather(): Promise<WeatherSnapshot> {
   try {
     const response = await fetch(
       "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,wind_speed_10m,weather_code&timezone=Asia%2FSeoul",
-      { cache: "no-store" },
+      { cache: "no-store", signal: AbortSignal.timeout(EXTERNAL_SNAPSHOT_TIMEOUT_MS) },
     );
     if (!response.ok) throw new Error(`weather ${response.status}`);
     const json = (await response.json()) as {
@@ -56,9 +60,9 @@ async function getNoKeyWeather(): Promise<WeatherSnapshot> {
 async function getNoKeyFx(): Promise<FxSnapshot> {
   try {
     const [usd, eur, jpy] = await Promise.all([
-      fetch("https://api.frankfurter.app/latest?from=USD&to=KRW", { cache: "no-store" }),
-      fetch("https://api.frankfurter.app/latest?from=EUR&to=KRW", { cache: "no-store" }),
-      fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW", { cache: "no-store" }),
+      fetch("https://api.frankfurter.app/latest?from=USD&to=KRW", { cache: "no-store", signal: AbortSignal.timeout(EXTERNAL_SNAPSHOT_TIMEOUT_MS) }),
+      fetch("https://api.frankfurter.app/latest?from=EUR&to=KRW", { cache: "no-store", signal: AbortSignal.timeout(EXTERNAL_SNAPSHOT_TIMEOUT_MS) }),
+      fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW", { cache: "no-store", signal: AbortSignal.timeout(EXTERNAL_SNAPSHOT_TIMEOUT_MS) }),
     ]);
     if (!usd.ok || !eur.ok || !jpy.ok) throw new Error("fx fetch failed");
 
