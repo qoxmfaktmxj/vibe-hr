@@ -335,7 +335,13 @@ jobs:
           git checkout main
           git pull --ff-only origin main
           [[ "$(git rev-parse HEAD)" == "$expected_sha" ]] || { echo "[deploy] main advanced beyond tested SHA; rerun workflow" >&2; exit 1; }
-          python3 scripts/ci/require-ui-validation.py --sha "$expected_sha" --wait-seconds 1200
+          # The deploy job can only start after its reusable same-SHA `ui` job and
+          # `test` job succeed (`needs: [test, ui]`). Re-querying the public Actions
+          # API from this production host would make a previously certified release
+          # depend on its anonymous rate limit. The checkout identity checks above and
+          # the workflow dependency keep this promotion fail-closed without that
+          # duplicate network dependency.
+          echo "[deploy] same-SHA UI and test gates certified by workflow dependencies"
 
           restore_operator_config() {
             if [[ -n "${backup_dir:-}" && -f "${backup_dir}/docker-compose.deploy.yml" ]]; then
