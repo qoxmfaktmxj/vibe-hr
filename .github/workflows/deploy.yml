@@ -70,7 +70,12 @@ jobs:
         run: |
           set -euo pipefail
           cd backend-spring
-          ./gradlew --no-daemon --console=plain clean compileJava test bootJar
+          log_file="${RUNNER_TEMP}/spring-unit-gradle.log"
+          set +e
+          ./gradlew --no-daemon --console=plain clean compileJava test bootJar 2>&1 | tee "$log_file"
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
 
       - name: Publish Spring unit failure diagnostics
         if: always() && steps.spring_unit.outcome == 'failure'
@@ -80,6 +85,17 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const path = require('path');
+          const sanitize = (value) => value
+            .replace(/((?:password|secret|token|authorization|api[_-]?key)\s*(?:=|:|\s)\s*)\S+/gi, '$1[REDACTED]')
+            .replace(/postgres(?:ql)?:\/\/[^\s@]+@/gi, 'postgres://[REDACTED]@')
+            .replace(/[A-Fa-f0-9]{64}/g, '[REDACTED_HEX]');
+          const annotateTail = (title, file) => {
+            if (!fs.existsSync(file)) return;
+            const tail = sanitize(fs.readFileSync(file, 'utf8').split(/\r?\n/).slice(-100).join('\n'));
+            for (let index = 0; index < tail.length; index += 850) {
+              console.log(`::error title=${title} (${index / 850 + 1})::${tail.slice(index, index + 850).replace(/\r?\n/g, ' | ')}`);
+            }
+          };
           const root = 'backend-spring/build/test-results/test';
           const files = fs.existsSync(root)
             ? fs.readdirSync(root, { recursive: true }).filter((file) => file.endsWith('.xml'))
@@ -92,10 +108,11 @@ jobs:
             }
           }
           if (failures.length === 0) {
-            console.log('::error title=Spring unit tests::Gradle failed before producing a JUnit failure report; inspect compilation and runner diagnostics.');
+            console.log('::error title=Spring unit tests::Gradle failed before producing a JUnit failure report; sanitized Gradle tail follows.');
           } else {
             for (const failure of failures.slice(0, 10)) console.log(`::error title=Spring unit tests::${failure}`);
           }
+          annotateTail('Spring unit Gradle tail', process.env.RUNNER_TEMP + '/spring-unit-gradle.log');
           NODE
           exit 1
 
@@ -109,8 +126,21 @@ jobs:
         run: |
           set -euo pipefail
           cd backend-spring
-          ./gradlew --no-daemon --console=plain integrationTest
-          ./gradlew --no-daemon --console=plain migrationIntegrationTest
+          log_file="${RUNNER_TEMP}/spring-integration-gradle.log"
+          set +e
+          {
+            echo '--- Docker compatibility diagnostics (sanitized) ---'
+            docker version --format 'client={{.Client.Version}} server={{.Server.Version}} api={{.Server.APIVersion}} os={{.Server.Os}} arch={{.Server.Arch}}'
+            docker info --format 'driver={{.Driver}} cgroup={{.CgroupVersion}} cpus={{.NCPU}} mem={{.MemTotal}} rootless={{.SecurityOptions}}'
+            docker events --since 2m --until 0s --format '{{.Status}} {{.Type}} {{.Actor.Attributes.name}}' 2>/dev/null | tail -40 || true
+            echo '--- Gradle integrationTest ---'
+            ./gradlew --no-daemon --console=plain integrationTest
+            echo '--- Gradle migrationIntegrationTest ---'
+            ./gradlew --no-daemon --console=plain migrationIntegrationTest
+          } 2>&1 | tee "$log_file"
+          status=${PIPESTATUS[0]}
+          set -e
+          exit "$status"
 
       - name: Publish Spring integration failure diagnostics
         if: always() && steps.spring_integration.outcome == 'failure'
@@ -120,6 +150,17 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const path = require('path');
+          const sanitize = (value) => value
+            .replace(/((?:password|secret|token|authorization|api[_-]?key)\s*(?:=|:|\s)\s*)\S+/gi, '$1[REDACTED]')
+            .replace(/postgres(?:ql)?:\/\/[^\s@]+@/gi, 'postgres://[REDACTED]@')
+            .replace(/[A-Fa-f0-9]{64}/g, '[REDACTED_HEX]');
+          const annotateTail = (title, file) => {
+            if (!fs.existsSync(file)) return;
+            const tail = sanitize(fs.readFileSync(file, 'utf8').split(/\r?\n/).slice(-140).join('\n'));
+            for (let index = 0; index < tail.length; index += 850) {
+              console.log(`::error title=${title} (${index / 850 + 1})::${tail.slice(index, index + 850).replace(/\r?\n/g, ' | ')}`);
+            }
+          };
           const root = 'backend-spring/build/test-results';
           const files = fs.existsSync(root)
             ? fs.readdirSync(root, { recursive: true }).filter((file) => file.endsWith('.xml'))
@@ -133,12 +174,13 @@ jobs:
             }
           }
           if (failures.length === 0) {
-            console.log('::error title=Spring Testcontainers integration::Gradle failed before producing a JUnit failure report; inspect runner resource and Docker daemon diagnostics.');
+            console.log('::error title=Spring Testcontainers integration::Gradle failed before producing a JUnit failure report; sanitized Gradle and Docker diagnostic tails follow.');
           } else {
             for (const failure of failures.slice(0, 10)) {
               console.log(`::error title=Spring Testcontainers integration::${failure}`);
             }
           }
+          annotateTail('Spring Testcontainers Gradle/Docker tail', process.env.RUNNER_TEMP + '/spring-integration-gradle.log');
           NODE
           exit 1
 
