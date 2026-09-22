@@ -71,6 +71,8 @@ jobs:
           ./gradlew --no-daemon --console=plain clean compileJava test bootJar
 
       - name: Verify Spring Testcontainers integration
+        id: spring_integration
+        continue-on-error: true
         shell: bash
         env:
           VIBEHR_RUN_CONTAINER_TESTS: "true"
@@ -79,6 +81,36 @@ jobs:
           cd backend-spring
           ./gradlew --no-daemon --console=plain integrationTest
           ./gradlew --no-daemon --console=plain migrationIntegrationTest
+
+      - name: Publish Spring integration failure diagnostics
+        if: always() && steps.spring_integration.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const root = 'backend-spring/build/test-results';
+          const files = fs.existsSync(root)
+            ? fs.readdirSync(root, { recursive: true }).filter((file) => file.endsWith('.xml'))
+            : [];
+          const failures = [];
+          for (const file of files) {
+            const xml = fs.readFileSync(path.join(root, file), 'utf8');
+            for (const match of xml.matchAll(/<testcase[^>]*classname="([^"]+)"[^>]*name="([^"]+)"[\s\S]*?<(failure|error)[^>]*>([\s\S]*?)<\/(?:failure|error)>/g)) {
+              const detail = match[4].replace(/\s+/g, ' ').trim().slice(0, 900);
+              failures.push(`${match[1]}#${match[2]}: ${detail}`);
+            }
+          }
+          if (failures.length === 0) {
+            console.log('::error title=Spring Testcontainers integration::Gradle failed before producing a JUnit failure report; inspect runner resource and Docker daemon diagnostics.');
+          } else {
+            for (const failure of failures.slice(0, 10)) {
+              console.log(`::error title=Spring Testcontainers integration::${failure}`);
+            }
+          }
+          NODE
+          exit 1
 
       - name: Frontend tests
         shell: bash
