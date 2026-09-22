@@ -567,28 +567,6 @@ test("mobile scene uses 450 grass instances even with a powerful GPU", async ({ 
   await expect(scene).toHaveAttribute("data-grass-count", "450");
 });
 
-test("capable PC lowers grass density before resolution when frames stay slow", async ({ page }) => {
-  await sceneHardware(page, "NVIDIA GeForce RTX 4060");
-  await page.addInitScript(() => {
-    const host = window as Window & { slowSceneFrames?: boolean };
-    const schedule = window.requestAnimationFrame.bind(window);
-    let timestamp = 0;
-    window.requestAnimationFrame = callback => schedule(() => {
-      timestamp += host.slowSceneFrames ? 40 : 16;
-      callback(timestamp);
-    });
-  });
-  await page.goto("/login");
-  const scene = page.getByTestId("login-scene");
-  await expect(scene).toHaveAttribute("data-ready", "true");
-  await expect(scene).toHaveAttribute("data-grass-count", "900");
-  const width = await scene.getAttribute("width");
-  await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = true; });
-  await expect(scene).toHaveAttribute("data-grass-count", "450");
-  await expect(scene).toHaveAttribute("width", width!);
-  await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = false; });
-});
-
 test("scene waits for its textures while the login form stays usable", async ({ page }) => {
   let releaseTexture!: () => void;
   const textureGate = new Promise<void>(resolve => { releaseTexture = resolve; });

@@ -4,6 +4,7 @@ import { Pause, Play } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
+import { createFrameQualityController } from "./conservatory/frame-quality";
 import styles from "./login.module.css";
 
 export function LoginScene() {
@@ -30,7 +31,7 @@ export function LoginScene() {
     let frame = 0;
     let previous = 0;
     let time = 0;
-    let slowFrames = 0;
+    const quality = createFrameQualityController();
     let resolutionScale = 1;
     let bounds = canvas.getBoundingClientRect();
 
@@ -47,18 +48,11 @@ export function LoginScene() {
       frame = 0;
       if (!canAnimate()) return;
       const delta = previous ? Math.min((now - previous) / 1000, .05) : 0;
-      const slowFrameLimit = world && world.vegetationCount > 450 ? 24 : 36;
-      if (previous && now - previous > slowFrameLimit) slowFrames++;
-      else slowFrames = Math.max(0, slowFrames - 1);
-      // Reduce the heaviest scene detail after a short run of missed frame budgets.
-      // On a saturated device each rendered frame can itself be expensive, so waiting
-      // for dozens of callbacks delays the recovery that the scene is meant to provide.
-      if (slowFrames >= 6) {
-        slowFrames = 0;
-        if (!world?.reduceVegetation() && resolutionScale > .45) {
+      const action = quality.next(now, world?.vegetationCount ?? 0, resolutionScale > .45);
+      if (action === "reduce-vegetation") world?.reduceVegetation();
+      if (action === "reduce-resolution") {
           resolutionScale = Math.max(.45, resolutionScale * .75);
           world?.resize(bounds.width, bounds.height, Math.min(window.devicePixelRatio, 1.25) * resolutionScale);
-        }
       }
       previous = now;
       time += delta;
@@ -68,6 +62,7 @@ export function LoginScene() {
     const sync = () => {
       cancelAnimationFrame(frame);
       frame = 0;
+      quality.reset();
       previous = 0;
       if (!sceneReady) {
         scheduleLoad();
