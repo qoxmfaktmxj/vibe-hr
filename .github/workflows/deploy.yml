@@ -1,6 +1,8 @@
 name: Deploy Vibe-HR
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -108,6 +110,11 @@ jobs:
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
       DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
     steps:
+      - name: Checkout tested release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Validate deploy configuration
         shell: bash
         run: |
@@ -124,6 +131,20 @@ jobs:
             echo "::error::Missing required deploy settings: ${missing[*]}"
             exit 1
           fi
+
+      - name: Build release images on hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="${GITHUB_SHA}"
+          backend_image="vibehr-backend-spring:release-${revision}"
+          frontend_image="vibehr-frontend:release-${revision}"
+          docker build --label "org.opencontainers.image.revision=${revision}" --tag "${backend_image}" backend-spring
+          docker build --file frontend/Dockerfile --label "org.opencontainers.image.revision=${revision}" --tag "${frontend_image}" .
+          archive="${RUNNER_TEMP}/vibehr-release-${revision}.tar.gz"
+          docker save "${backend_image}" "${frontend_image}" | gzip --stdout > "${archive}"
+          test -s "${archive}"
+          echo "RELEASE_ARCHIVE=${archive}" >> "${GITHUB_ENV}"
 
       - name: Secure SSH preflight and staged Spring deployment
         shell: bash
@@ -156,18 +177,35 @@ jobs:
             -i "$keyfile"
             -p "${DEPLOY_PORT}"
           )
+          scp_options=(
+            -o BatchMode=yes
+            -o ConnectTimeout=10
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=${known_hosts}"
+            -o GlobalKnownHostsFile=/dev/null
+            -i "$keyfile"
+            -P "${DEPLOY_PORT}"
+          )
           timeout 10 bash -c ': >"/dev/tcp/$1/$2"' bash "${DEPLOY_HOST}" "${DEPLOY_PORT}" || {
             echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from the GitHub runner."
             exit 1
           }
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
 
-          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash -s -- ${GITHUB_SHA}" <<'REMOTE'
+          release_archive="/tmp/vibehr-release-${GITHUB_SHA}.tar.gz"
+          scp "${scp_options[@]}" "${RELEASE_ARCHIVE}" "${DEPLOY_USER}@${DEPLOY_HOST}:${release_archive}"
+
+          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash -s -- ${GITHUB_SHA} ${release_archive}" <<'REMOTE'
           set -Eeuo pipefail
           repository=/root/.openclaw/workspace/vibe-hr
           cd "$repository"
           expected_sha="$1"
+          release_archive="$2"
           [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$release_archive" == "/tmp/vibehr-release-${expected_sha}.tar.gz" ]] || exit 1
+          [[ -s "$release_archive" ]] || { echo "[deploy] release image archive is missing" >&2; exit 1; }
+          cleanup_release_archive() { rm -f "$release_archive"; }
+          trap cleanup_release_archive EXIT
           [[ -z "$(git status --porcelain)" ]] || { echo "[deploy] dirty checkout; refusing update" >&2; exit 1; }
           git fetch origin
           git checkout main
@@ -244,6 +282,7 @@ jobs:
           on_exit() {
             status=$?
             cleanup_candidate
+            cleanup_release_archive
             if [[ "$status" -ne 0 ]]; then
               restore_operator_config
             fi
@@ -285,19 +324,30 @@ jobs:
           [[ "${VIBEHR_ALLOW_FIXTURE_SEEDING:-false}" != "true" ]] || fail "fixture seeding is forbidden on a deployment target"
           docker compose -f docker-compose.deploy.yml config -q || fail "deployment compose configuration is invalid"
 
-          docker compose -f docker-compose.deploy.yml build backend frontend || fail "unable to build the Spring deployment images"
+          backend_release="vibehr-backend-spring:release-${expected_sha}"
+          frontend_release="vibehr-frontend:release-${expected_sha}"
+          docker load --input "$release_archive" || fail "unable to load hosted release images"
+          [[ "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$backend_release")" == "$expected_sha" ]] || fail "backend image revision does not match tested SHA"
+          [[ "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$frontend_release")" == "$expected_sha" ]] || fail "frontend image revision does not match tested SHA"
           docker run --detach --rm --name "$candidate_name" \
             --env-file .env.deploy --env-file .env.deploy.secret \
             -e SPRING_PROFILES_ACTIVE=flyway-cutover \
             -e VIBEHR_SCHEMA_OWNER=flyway \
             --add-host host.docker.internal:host-gateway \
             -p "127.0.0.1:${candidate_port}:8080" \
-            vibehr-backend-spring:deploy >/dev/null || fail "candidate container could not start"
+            "$backend_release" >/dev/null || fail "candidate container could not start"
           wait_for_candidate "$candidate_url/actuator/health/readiness" || fail "candidate readiness check failed"
           wait_for_candidate "$candidate_url/openapi.json" || fail "candidate OpenAPI check failed"
           cleanup_candidate
 
-          docker compose -f docker-compose.deploy.yml up -d --no-build --remove-orphans --force-recreate || fail "promotion compose failed"
+          cat > "$backup_dir/release.override.yml" <<EOF
+          services:
+            backend:
+              image: ${backend_release}
+            frontend:
+              image: ${frontend_release}
+          EOF
+          docker compose -f docker-compose.deploy.yml -f "$backup_dir/release.override.yml" up -d --no-build --remove-orphans --force-recreate || fail "promotion compose failed"
           wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness || fail "promotion readiness check failed"
           wait_for_candidate http://127.0.0.1:8080/openapi.json || fail "promotion OpenAPI check failed"
           wait_for_candidate http://127.0.0.1:3000/login || fail "promotion frontend check failed"
