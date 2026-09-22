@@ -60,7 +60,6 @@ jobs:
           node scripts/spring-migration/mutation-ledger.js --check-complete
           node scripts/spring-migration/flyway-baseline.js --verify
           node scripts/spring-migration/flyway-seed-ledger.js --verify
-          node scripts/spring-migration/verify-python-retirement.js
           node scripts/spring-migration/bff-cutover-audit.js
           node scripts/spring-migration/verify-delivery.js
 

@@ -64,6 +64,7 @@ export const metadata: Metadata = {
     images: ["/vibe-hr-thumbnail.webp"],
   },
   other: {
+    "application-stack": "Next.js + Spring Boot + JPA",
     "msapplication-config": "/browserconfig.xml",
     "msapplication-TileColor": "#3C6DEE",
   },
