@@ -256,6 +256,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          deploy_phase="initializing secure SSH material"
+          report_deploy_failure() {
+            status=$?
+            echo "::error title=Secure deployment::Failed during ${deploy_phase} (exit ${status}); sensitive connection settings are not printed."
+            exit "$status"
+          }
+          trap report_deploy_failure ERR
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           keyfile=$(mktemp)
@@ -267,6 +274,7 @@ jobs:
           if [[ "${DEPLOY_PORT}" != "22" ]]; then
             known_host="[${DEPLOY_HOST}]:${DEPLOY_PORT}"
           fi
+          deploy_phase="binding the verified host key to the configured host and port"
           if [[ -n "${DEPLOY_KNOWN_HOSTS}" ]]; then
             printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > "$known_hosts"
           else
@@ -298,15 +306,19 @@ jobs:
             -i "$keyfile"
             -P "${DEPLOY_PORT}"
           )
+          deploy_phase="checking TCP reachability from the hosted runner"
           timeout 10 bash -c ': >"/dev/tcp/$1/$2"' bash "${DEPLOY_HOST}" "${DEPLOY_PORT}" || {
             echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from the GitHub runner."
             exit 1
           }
+          deploy_phase="performing strict host-key SSH authentication"
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "echo '[preflight] ssh ok on' \"\$(hostname)\""
 
           release_archive="/tmp/vibehr-release-${GITHUB_SHA}.tar.gz"
+          deploy_phase="transferring the hosted release archive"
           scp "${scp_options[@]}" "${RELEASE_ARCHIVE}" "${DEPLOY_USER}@${DEPLOY_HOST}:${release_archive}"
 
+          deploy_phase="running remote staged image validation and promotion"
           ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash -s -- ${GITHUB_SHA} ${release_archive}" <<'REMOTE'
           set -Eeuo pipefail
           repository=/root/.openclaw/workspace/vibe-hr
