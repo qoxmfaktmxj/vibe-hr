@@ -64,14 +64,44 @@ jobs:
           node scripts/spring-migration/verify-delivery.js
 
       - name: Verify Spring build and unit tests
+        id: spring_unit
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           cd backend-spring
           ./gradlew --no-daemon --console=plain clean compileJava test bootJar
 
+      - name: Publish Spring unit failure diagnostics
+        if: always() && steps.spring_unit.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const root = 'backend-spring/build/test-results/test';
+          const files = fs.existsSync(root)
+            ? fs.readdirSync(root, { recursive: true }).filter((file) => file.endsWith('.xml'))
+            : [];
+          const failures = [];
+          for (const file of files) {
+            const xml = fs.readFileSync(path.join(root, file), 'utf8');
+            for (const match of xml.matchAll(/<testcase[^>]*classname="([^"]+)"[^>]*name="([^"]+)"[\s\S]*?<(failure|error)[^>]*>([\s\S]*?)<\/(?:failure|error)>/g)) {
+              failures.push(`${match[1]}#${match[2]}: ${match[4].replace(/\s+/g, ' ').trim().slice(0, 900)}`);
+            }
+          }
+          if (failures.length === 0) {
+            console.log('::error title=Spring unit tests::Gradle failed before producing a JUnit failure report; inspect compilation and runner diagnostics.');
+          } else {
+            for (const failure of failures.slice(0, 10)) console.log(`::error title=Spring unit tests::${failure}`);
+          }
+          NODE
+          exit 1
+
       - name: Verify Spring Testcontainers integration
         id: spring_integration
+        if: steps.spring_unit.outcome == 'success'
         continue-on-error: true
         shell: bash
         env:
