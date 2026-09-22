@@ -573,10 +573,8 @@ test("capable PC lowers grass density before resolution when frames stay slow", 
     const host = window as Window & { slowSceneFrames?: boolean };
     const schedule = window.requestAnimationFrame.bind(window);
     let timestamp = 0;
-    let slowFrameCount = 0;
     window.requestAnimationFrame = callback => schedule(() => {
       timestamp += host.slowSceneFrames ? 40 : 16;
-      if (host.slowSceneFrames && ++slowFrameCount >= 28) host.slowSceneFrames = false;
       callback(timestamp);
     });
   });
@@ -588,6 +586,7 @@ test("capable PC lowers grass density before resolution when frames stay slow", 
   await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = true; });
   await expect(scene).toHaveAttribute("data-grass-count", "450");
   await expect(scene).toHaveAttribute("width", width!);
+  await page.evaluate(() => { (window as Window & { slowSceneFrames?: boolean }).slowSceneFrames = false; });
 });
 
 test("scene waits for its textures while the login form stays usable", async ({ page }) => {
