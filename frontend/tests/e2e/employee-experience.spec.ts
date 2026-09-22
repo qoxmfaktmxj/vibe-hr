@@ -623,14 +623,39 @@ test("failed scene texture preserves the static background and login", async ({ 
 });
 
 test("changing the motion preference starts and stops the scene", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    const media = "(prefers-reduced-motion: reduce)";
+    const nativeMatchMedia = window.matchMedia.bind(window);
+    let reduced = true;
+    const listeners = new Set<EventListenerOrEventListenerObject>();
+    const motionQuery = {
+      media,
+      get matches() { return reduced; },
+      onchange: null,
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject | null) => {
+        if (type === "change" && listener) listeners.add(listener);
+      },
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject | null) => {
+        if (listener) listeners.delete(listener);
+      },
+      addListener: (listener: EventListenerOrEventListenerObject) => listeners.add(listener),
+      removeListener: (listener: EventListenerOrEventListenerObject) => listeners.delete(listener),
+      dispatchEvent: () => true,
+    } as MediaQueryList;
+    window.matchMedia = query => query === media ? motionQuery : nativeMatchMedia(query);
+    (window as Window & { setReducedMotionForTest: (value: boolean) => void }).setReducedMotionForTest = value => {
+      reduced = value;
+      const event = new Event("change");
+      listeners.forEach(listener => typeof listener === "function" ? listener.call(motionQuery, event) : listener.handleEvent(event));
+    };
+  });
   await page.goto("/login");
   const scene = page.getByTestId("login-scene");
   await expect(scene).toHaveAttribute("data-ready", "false");
-  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.evaluate(() => { (window as Window & { setReducedMotionForTest: (value: boolean) => void }).setReducedMotionForTest(false); });
   await expect(scene).toHaveAttribute("data-ready", "true");
   await expect(scene).toHaveAttribute("data-motion", "playing");
-  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => { (window as Window & { setReducedMotionForTest: (value: boolean) => void }).setReducedMotionForTest(true); });
   await expect(scene).toHaveAttribute("data-motion", "paused");
 });
 
