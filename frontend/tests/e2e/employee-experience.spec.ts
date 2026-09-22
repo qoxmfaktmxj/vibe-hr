@@ -25,6 +25,9 @@ async function capture(page: Page, filename: string) {
 // These tests exercise the real Next UI/BFF with synthetic backend responses.
 // They do not replace the Spring authentication or authorization test suites.
 async function signIn(page: Page) {
+  // Authentication and shell flows validate the reduced-motion fallback. The
+  // dedicated scene cases below retain coverage for animated WebGL behavior.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
   await page.getByLabel("아이디", { exact: true }).fill("admin");
   await page.getByLabel("비밀번호", { exact: true }).fill("admin");
