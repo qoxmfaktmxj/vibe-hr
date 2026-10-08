@@ -457,8 +457,8 @@ jobs:
           backend_release="vibehr-backend-spring:release-${expected_sha}"
           frontend_release="vibehr-frontend:release-${expected_sha}"
           docker load --input "$release_archive" || fail "unable to load hosted release images"
-          [[ "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$backend_release")" == "$expected_sha" ]] || fail "backend image revision does not match tested SHA"
-          [[ "$(docker image inspect --format '{{ index .Config.Labels \"org.opencontainers.image.revision\" }}' "$frontend_release")" == "$expected_sha" ]] || fail "frontend image revision does not match tested SHA"
+          [[ "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$backend_release")" == "$expected_sha" ]] || fail "backend image revision does not match tested SHA"
+          [[ "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$frontend_release")" == "$expected_sha" ]] || fail "frontend image revision does not match tested SHA"
           docker run --detach --rm --name "$candidate_name" \
             --env-file .env.deploy --env-file .env.deploy.secret \
             -e SPRING_PROFILES_ACTIVE=flyway-cutover \

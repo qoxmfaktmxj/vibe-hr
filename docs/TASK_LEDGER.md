@@ -421,3 +421,11 @@
 
 - Final diagnosis checkpoint: run34801636733 (24fb3f1) again passed UX8, but full experience failed before capture at the visible/stable password-hide button click (60000ms). Thus screenshot-only causation is unproven; the speculative capture helper change was reverted, leaving all original frontend test/application sources intact. Hosted browser traces were uploaded, but download/detail logs require GitHub authentication (currently unavailable). No UI cases waived; full gate remains fail-closed pending trace-based environment/renderer diagnosis. Do not infer host OOM or declare a GPU root cause from these timeouts alone.
 - Split execution is implemented/published; successful eight-case remote regression and actual pending/failed-CI rejection are proven. Full release validation is BLOCKED, not successful; build after the failed full suite was skipped and production was not redeployed. Cron success/failure policy is unchanged.
+## TASK VH-R3-DEPLOY-IMAGE-REVISION-TEMPLATE-20261008
+- Date: 2026-10-08
+- Risk Class: R3 (deployment workflow)
+- Approval: user requested resolution of the recurring deployment failure and supplied the failed job log after the proposed fix.
+- Scope: remove shell-escaped quotes from the Go templates used to verify backend/frontend image revision labels. No runtime, data, credential, or deployment-gate change.
+- Cause: the 2026-09-22 same-SHA Deploy run passed UI, tests, SSH, and image transfer, then `docker image inspect` rejected the escaped label key with `template parsing error: unexpected "\\" in operand`; rollback restored the prior containers.
+- Verification: `git diff --check`, extracted remote script `bash -n`, `node --test scripts/spring-migration/deploy-security.test.js`, `node scripts/spring-migration/verify-delivery.js`, and both corrected SHA comparisons against the existing release images passed.
+- Release gate: hosted same-SHA UI and test jobs remain required; deployment outcome must be checked after push. Existing production release was healthy before this change.
