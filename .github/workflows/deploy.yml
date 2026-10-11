@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '0 23 * * *' # 08:00 Asia/Seoul (UTC+9)
 
 jobs:
   ui:

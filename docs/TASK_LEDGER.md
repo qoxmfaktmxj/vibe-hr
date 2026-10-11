@@ -429,3 +429,11 @@
 - Cause: the 2026-09-22 same-SHA Deploy run passed UI, tests, SSH, and image transfer, then `docker image inspect` rejected the escaped label key with `template parsing error: unexpected "\\" in operand`; rollback restored the prior containers.
 - Verification: `git diff --check`, extracted remote script `bash -n`, `node --test scripts/spring-migration/deploy-security.test.js`, `node scripts/spring-migration/verify-delivery.js`, and both corrected SHA comparisons against the existing release images passed.
 - Release gate: hosted same-SHA UI and test jobs remain required; deployment outcome must be checked after push. Existing production release was healthy before this change.
+
+## TASK VH-R3-ACTIONS-DAILY-DEPLOY-20261011
+- Date: 2026-10-11
+- Risk Class: R3 (CI deployment schedule and operating automation).
+- Approval: user explicitly requested moving the recurring VIBE-HR deployment to GitHub Actions and stopping it in OpenClaw.
+- Scope: add a 23:00 UTC (08:00 Asia/Seoul) schedule to the existing Deploy Vibe-HR workflow, document hosted ownership, and disable the former OpenClaw daily deployment automation. No application, database, secret, gate, or rollback change.
+- Validation: YAML trigger and `deploy.needs`/reusable UI job assertions passed; eight same-SHA gate tests, deployment secret validation, deployment security test, delivery verification, and `git diff --check` passed. Hosted run and scheduler readback are verified after publication.
+- Recovery: revert the schedule commit if the hosted timer is unsuitable; re-enable the former OpenClaw automation only after a working authenticated dispatch path is supplied. Existing running containers remain untouched by the scheduling change itself.

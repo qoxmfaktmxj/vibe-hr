@@ -16,44 +16,25 @@ production credentials and SSH secrets are not supplied. Browser evidence is
 retained for 7 days. These fixtures do not certify real backend authorization or
 hardware GPU fidelity; relevant backend/migration checks remain required.
 
-## Daily 08:00 Asia/Seoul deployment gate
+## Daily 08:00 Asia/Seoul deployment
 
-After safe fetch / checkout main / pull --ff-only, capture the full target SHA.
-Before building images or modifying production, run from repository root:
+`deploy.yml` runs at 23:00 UTC every day, equivalent to 08:00 Asia/Seoul.
+GitHub Actions scheduled runs use the default branch's current commit. The same
+workflow also runs on main pushes and manual dispatch. Its deploy job requires
+both the reusable same-SHA UI job and Spring/test job to succeed. Release images
+are built on the hosted runner; strict SSH promotion checks the fixed commit,
+retains rollback images and verifies production health. A failed job does not
+promote a release. GitHub may delay a scheduled start beyond the nominal time.
 
-```sh
-release_sha=$(git rev-parse HEAD)
-python3 scripts/ci/require-ui-validation.py --sha "$release_sha" --wait-seconds 1200
-```
+The former OpenClaw daily deployment automation is disabled. The production host
+does not dispatch workflows or run scheduled builds/browser tests. For a manual
+same-SHA redeploy, use the Deploy Vibe-HR workflow's Run workflow action on main;
+GitHub Actions retains the same gates. A passed UI job alone is not deployment
+success: check the whole Deploy workflow and live revision/health.
 
-Require exit 0 and retain the JSON SHA/run URL as deployment evidence. The gate
-requires a clean checkout, exact SHA, main branch, canonical repository and
-workflow, a push/manual-dispatch event, the newest matching run's success, and
-an actually successful `ui-regression` job. PR merge SHA, stale success followed
-by failure, skipped/cancelled/missing/pending jobs, API errors, and dirty or
-changed local code fail closed. Check the same SHA and a clean tree immediately
-before build and promotion as well. Serialize deployment and do not pull again
-after approval. A missing script is a failure, never permission to skip UI.
-
-The public repository's read-only Actions API works without a token or gh CLI.
-The wait uses 30-second polls (at most about 42 API requests over 20 minutes,
-plus other clients sharing the anonymous 60/hour budget). Rate limits fail
-closed. If access becomes private or rate-limited, connect GitHub via OpenClaw
-Settings → Agents → Tools / provision managed Actions-read credentials in the
-execution environment; never paste a credential in chat. An existing `GH_TOKEN`
-or `GITHUB_TOKEN` is accepted without printing it. The gate never dispatches
-workflows, changes branch protection, or deploys anything itself.
-
-No new commit: reuse the latest successful same-SHA UI run and still perform the
-requested redeploy. Failed CI: repair the failure and push, or rerun the exact
-main SHA using Actions UI with an authorized account. No local browser fallback,
-RAM-limit increase, swap change, or automatic billing/permission change.
-
-Preserve cron ID `e690ef61-7018-4998-a54b-507aef582c7f`, schedule, model, timeout,
-and delivery policy: successful deployment + runtime checks returns exactly
-`NO_REPLY`; failure/incomplete/blocked returns the short existing failure notice.
-A passed UI gate alone is not deployment success. Continue existing backend,
-backup, candidate, rollback-image and production health verification procedures.
+`scripts/ci/require-ui-validation.py` remains a read-only gate for other manual
+host-side diagnostics; it is not part of the daily deployment path. No local
+browser fallback, RAM-limit increase, swap change or automatic permission change.
 
 ## Recovery
 
