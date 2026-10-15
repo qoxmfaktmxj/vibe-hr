@@ -111,8 +111,12 @@ jobs:
           const failures = [];
           for (const file of files) {
             const xml = fs.readFileSync(path.join(root, file), 'utf8');
-            for (const match of xml.matchAll(/<testcase[^>]*classname="([^"]+)"[^>]*name="([^"]+)"[\s\S]*?<(failure|error)[^>]*>([\s\S]*?)<\/(?:failure|error)>/g)) {
-              failures.push(`${match[1]}#${match[2]}: ${match[4].replace(/\s+/g, ' ').trim().slice(0, 900)}`);
+            for (const testCase of xml.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+              const failure = /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/.exec(testCase[2] || '');
+              if (!failure) continue;
+              const className = /\bclassname="([^"]+)"/.exec(testCase[1])?.[1] || file;
+              const name = /\bname="([^"]+)"/.exec(testCase[1])?.[1] || 'unknown';
+              failures.push(sanitize(`${className}#${name}: ${failure[1].replace(/\s+/g, ' ').trim().slice(0, 900)}`));
             }
           }
           if (failures.length === 0) {
@@ -174,9 +178,12 @@ jobs:
           const failures = [];
           for (const file of files) {
             const xml = fs.readFileSync(path.join(root, file), 'utf8');
-            for (const match of xml.matchAll(/<testcase[^>]*classname="([^"]+)"[^>]*name="([^"]+)"[\s\S]*?<(failure|error)[^>]*>([\s\S]*?)<\/(?:failure|error)>/g)) {
-              const detail = match[4].replace(/\s+/g, ' ').trim().slice(0, 900);
-              failures.push(`${match[1]}#${match[2]}: ${detail}`);
+            for (const testCase of xml.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+              const failure = /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/.exec(testCase[2] || '');
+              if (!failure) continue;
+              const className = /\bclassname="([^"]+)"/.exec(testCase[1])?.[1] || file;
+              const name = /\bname="([^"]+)"/.exec(testCase[1])?.[1] || 'unknown';
+              failures.push(sanitize(`${className}#${name}: ${failure[1].replace(/\s+/g, ' ').trim().slice(0, 900)}`));
             }
           }
           if (failures.length === 0) {

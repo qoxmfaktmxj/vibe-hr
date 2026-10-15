@@ -43,7 +43,7 @@ successfully; its existing cases do not require removal.
 
 ## Scope boundaries
 
-This task changes CI/checker orchestration, not application authentication, payroll calculations, stored data, or existing migrations. Existing source tests and security/data gates remain. No production-host browser fallback is introduced.
+The initial scope changes CI/checker orchestration. The separately approved hosted follow-up below also corrects the two attendance planned-time mappings. Authentication, payroll formulas, stored data and existing migrations are unchanged. Existing source tests and security/data gates remain. No production-host browser fallback is introduced.
 
 ## Local verification results
 
@@ -62,3 +62,29 @@ This task changes CI/checker orchestration, not application authentication, payr
 - Static guardrails: the schema coverage, delivery verification and Python retirement scripts and their tests validate the narrowly approved contracts. Generated schema coverage JSON/Markdown records the reviewed V6 addition separately from frozen legacy evidence.
 - Operating evidence: `docs/UI_VALIDATION_CI.md`, `docs/TEST_STRATEGY.md`, this report and `docs/TASK_LEDGER.md` describe ownership, verification and recovery.
 - Recovery: revert this CI orchestration change only while retaining an effective same-SHA UI release gate. No application data or migration rollback is part of this change.
+
+## Hosted follow-up: time-zone-dependent planned-time contract
+
+- Published CI fix: `b5c6ead13e33a3f6476903f0ebea878e93cf3563`. Hosted strict inventories and Spring unit build passed. The generic integration task now correctly stops release on a real failure instead of masking it with a later task result.
+- Deploy run 38767328971 failed one of 68 integration cases at `TimePostgreSqlIntegrationTest.java:165`. A local targeted run with `JAVA_TOOL_OPTIONS=-Duser.timezone=UTC` reproduces the exact failure: expected `2026-08-02T00:00`, actual `2026-08-01T15:00`.
+- The existing test inserts the historical UTC-naive planned timestamp and expects a KST-local Java value. `TimEmployeeDailySchedule` currently uses plain `LocalDateTime` while that context sets Hibernate JDBC time zone to UTC. The implicit JDBC conversion depends on the JVM default zone; the previous local KST run therefore passed accidentally.
+- Runtime investigation boundary: planned start/end mapping and the service's generation, display and late-classification paths. A correction must preserve the expected UTC persisted instant and KST business clock explicitly, verify database read/write and both JVM zones, and avoid a global time-zone override or weakened assertion. Existing stored-data format compatibility must be established before changing interpretation; no heuristic or data rewrite is authorized.
+- This crosses from approved CI orchestration into attendance semantics with payroll consequences. The user explicitly approved the additional planned-time mapping and related business regressions before runtime edits. Existing failed test and local UTC XML are retained as red evidence; no test is deleted.
+- A separate diagnostic defect is also visible: the failure annotator expects `classname` before `name`, while Gradle emits `name` before `classname`, so it incorrectly reports no JUnit failure report. Correcting that existing CI diagnostic parser is within the authorized failure-reporting boundary and must be regression-tested against real Gradle XML.
+
+### Stored-data verification before publication
+
+- Temporary branch `codex/time-storage-inventory` contains a manual-only inspection job in place of deployment jobs. Independent review confirmed it has no deployment, build, checkout, data-write or credential-output path. Existing pinned SSH host-key validation is retained. No temporary diagnostic workflow is merged into main.
+- Read-only run [38769967506](https://github.com/qoxmfaktmxj/vibe-hr/actions/runs/38769967506) used `default_transaction_read_only=on` and `BEGIN READ ONLY`; output confirms read-only mode and finishes with `ROLLBACK`. The first attempt stopped before a query because host psql was absent; the successful attempt reused an existing PostgreSQL 16 client image without pulling an image or mounting volumes.
+- Production release at inspection: `be668454566d46be01456698797b8ec51c43181a`. Container OS zone is UTC and PostgreSQL zone is Etc/UTC. No JVM default-zone claim is inferred from an absent Java property.
+- The complete aggregate covers 186,310 schedule rows, all identified by the legacy generator tag. Of these, 54,090 have no planned times. Every non-null plan matches its KST pattern converted to UTC; KST-naive and unclassified counts are both zero. There are no Spring-generated rows in this snapshot. Individual employees, row values, environment contents and credentials are not output.
+- This establishes the existing UTC storage contract and resolves the demonstrated mixed-format rollout risk for the inspected data. No row conversion or schema migration is needed. If future recovery encounters mixed-format rows, stop and classify them rather than applying a guessed offset.
+
+### Final implementation and verification
+
+- `KstScheduleTimeConverter` explicitly converts the two Java KST-local values to UTC-naive database values and back. The two fields use direct `LOCAL_DATE_TIME` JDBC binding with the existing physical timestamp type, avoiding implicit JVM-zone conversion. Other fields and business formulas are unchanged. The direct binding contract is documented in [Hibernate SqlTypes](https://docs.hibernate.org/orm/7.1/javadocs/org/hibernate/type/SqlTypes.html#LOCAL_DATE_TIME).
+- The original legacy-read/UTC-instant/KST-late regression remains. A new two-zone database regression exercises real schedule generation, exact start/end storage, reloaded 09:00/18:00 display and late classification. Before the fix, its UTC variant stored 09:00 instead of canonical 00:00; afterwards both UTC and Asia/Seoul variants pass.
+- Full local UTC Gradle verification passes 199 default tests, 70 generic integration cases and 20 migration/security cases with zero failures, errors or skips. A separate Asia/Seoul JVM run passes all 14 time integration cases. No class overlap is introduced between the integration tasks.
+- All 46 discovered Node tests pass, including three new diagnostic regressions that execute both real workflow snippets against reordered Gradle XML and verify failure names, passing-case exclusion, missing-report handling and credential masking. Strict schema completeness remains 105/105; frozen evidence and prior migrations are unchanged.
+- Hosted standalone UI run [38767328884](https://github.com/qoxmfaktmxj/vibe-hr/actions/runs/38767328884) passed grid/lint, 296 unit cases, all 82 distinct browser cases and production build/TypeScript. Its paired Deploy run correctly rejected the time integration failure and skipped promotion. The final amended commit must obtain its own successful same-SHA UI and Deploy results.
+- Recovery: source revert must consider the same UTC storage contract. No production data was modified during diagnosis, so there is no data rollback for this fix. Hosted release health and image SHA checks remain required after publication.

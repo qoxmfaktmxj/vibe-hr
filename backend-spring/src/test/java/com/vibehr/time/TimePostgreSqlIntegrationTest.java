@@ -15,6 +15,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -24,6 +25,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -178,6 +181,34 @@ class TimePostgreSqlIntegrationTest {
         TimAttendanceDailyItem reloaded = service.attendanceToday(EMPLOYEE_ID).item();
         assertThat(reloaded.checkInAt()).isEqualTo(Instant.parse("2026-08-01T15:01:00Z"));
         assertThat(reloaded.attendanceStatus()).isEqualTo("late");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"UTC", "Asia/Seoul"})
+    void generatedScheduleRoundTripsUtcStorageAndKstBusinessTimeInEitherJvmZone(String jvmZone) {
+        TimeZone previous = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(jvmZone));
+            LocalDate workDate = LocalDate.of(2026, 8, 3);
+            CLOCK.set(Instant.parse("2026-08-03T00:01:00Z"));
+
+            TimScheduleGenerateResponse generated = service.generateSchedules(new TimScheduleGenerateRequest(
+                    "department", DEPARTMENT_ID, null, workDate, workDate, "create_if_missing"));
+
+            assertThat(generated.createdCount()).isOne();
+            assertThat(jdbc.queryForObject("""
+                    select planned_start_at::text from tim_employee_daily_schedules where employee_id=? and work_date=?
+                    """, String.class, EMPLOYEE_ID, workDate)).startsWith("2026-08-03 00:00:00");
+            assertThat(jdbc.queryForObject("""
+                    select planned_end_at::text from tim_employee_daily_schedules where employee_id=? and work_date=?
+                    """, String.class, EMPLOYEE_ID, workDate)).startsWith("2026-08-03 09:00:00");
+            TimScheduleTodayItem schedule = service.myScheduleToday(EMPLOYEE_ID).item();
+            assertThat(schedule.workStart()).isEqualTo("09:00");
+            assertThat(schedule.workEnd()).isEqualTo("18:00");
+            assertThat(service.checkIn(EMPLOYEE_ID).attendanceStatus()).isEqualTo("late");
+        } finally {
+            TimeZone.setDefault(previous);
+        }
     }
 
     @Test

@@ -62,6 +62,11 @@ integration class, which are owned by `migrationIntegrationTest`. To run the ful
 PostgreSQL gate, invoke both tasks in one Gradle command. CI does this to preserve
 failure propagation and avoid executing the same four classes twice.
 
+Planned-time regressions exercise real schedule generation and reload in both UTC
+and Asia/Seoul JVM defaults. Java values use the KST business clock and the existing
+timestamp columns store UTC-naive values explicitly. Keep the legacy UTC read and
+late-classification test; do not force a global JVM time zone to make it pass.
+
 Flyway ownership-transfer work additionally requires:
 
 ```powershell

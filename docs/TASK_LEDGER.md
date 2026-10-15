@@ -485,3 +485,19 @@
 - Review Needed: read the new main SHA's standalone UI and Deploy outcomes after push; production deployment still requires successful test and exact-SHA UI jobs plus existing image/security/health checks.
 - Rollback: revert orchestration only with an effective same-SHA UI gate retained. Existing application data and migration recovery rules remain unchanged.
 - Notes: [cause, approved scope and evidence](audits/2026-10-16-ci-failure-analysis.md). Unrelated .impeccable/ and .playwright-mcp/ remain untracked and preserved.
+
+## TASK VH-CI-PLANNED-TIME-FOLLOWUP-20261016
+- Date: 2026-10-16 (Asia/Seoul)
+- Risk: R3 attendance/payroll-related persistence mapping, with R2 CI diagnostics
+- Approval: after hosted CI exposed the failure, the user explicitly approved planned-time mapping and related business regression corrections with stored-format verification first.
+- Status: implementation and local verification complete; final same-SHA hosted validation and promotion pending publication.
+- Cause: b5c6ead passes strict schema inventories and all UI validation, but correctly fails the formerly masked generic integration result. Plain LocalDateTime plus implicit JDBC conversion reads and writes planned times differently on UTC and Asia/Seoul JVMs. A separate diagnostic regex missed actual Gradle failures because it assumed XML attribute order.
+- Scope: the two planned fields in TimeEntities.java, KstScheduleTimeConverter.java, TimePostgreSqlIntegrationTest.java, generated active schema evidence, both existing workflow diagnostic snippets, deploy-diagnostics.test.js, test guidance and audit evidence. No migration, global timezone override, dependency or data rewrite.
+- First-Pass Validation: original read test fails on UTC; new generation regression fails on UTC storage 09:00 versus canonical 00:00 before the fix. All original assertions and test cases are retained.
+- Validation: full UTC Gradle passes 199 default, 70 generic integration and 20 migration/security cases, all with zero failures/errors/skips. Separate Asia/Seoul time integration passes 14 cases. All 46 Node tests and strict 105/105 schema completeness pass. Existing same-SHA UI run 38767328884 passes 296 unit and 82 browser cases plus build/TypeScript.
+- Stored Data: independent review required read-only production evidence before rollout. Manual-only temporary branch run 38769967506 confirms transaction_read_only=on, 186310 legacy schedule rows, all non-null plans matching UTC representation, zero KST-naive/unclassified plans and no Spring-tagged rows; final ROLLBACK. No individual employees or credentials are output. The first attempt stopped before querying because host psql was unavailable; the successful run reused an existing client image. No diagnostic workflow is merged into main.
+- Retry Count: one explicit column-metadata correction for the static source parser; the subsequent full validation passes. The original test was not weakened and no production data repair was attempted.
+- Simplifications: one converter shared only by the two fields preserves existing service code; diagnostic parsing reads testcase attributes independently instead of relying on serialization order.
+- Review Needed: independent source and operational-query review found no blocker after the stored-format evidence; final hosted UI, backend/image gates and deployment health still require readback.
+- Rollback: retain UTC storage interpretation and existing same-SHA gate. No data rollback is required because diagnosis and this correction do not rewrite stored rows.
+- Notes: [failure, approval, storage evidence and validation](audits/2026-10-16-ci-failure-analysis.md). Temporary inspection branch/worktree is cleaned up after evidence capture; original unrelated untracked folders are preserved.

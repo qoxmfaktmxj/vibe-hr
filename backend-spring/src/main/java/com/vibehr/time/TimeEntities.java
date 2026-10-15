@@ -1,6 +1,7 @@
 package com.vibehr.time;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -115,8 +116,8 @@ class TimEmployeeDailySchedule {
     @Column(nullable = false) public boolean is_holiday;
     @Column(length = 120) public String holiday_name;
     @Column(nullable = false) public boolean is_workday;
-    public LocalDateTime planned_start_at;
-    public LocalDateTime planned_end_at;
+    @Convert(converter = KstScheduleTimeConverter.class) @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME) @Column(columnDefinition = "timestamp without time zone") public LocalDateTime planned_start_at;
+    @Convert(converter = KstScheduleTimeConverter.class) @JdbcTypeCode(SqlTypes.LOCAL_DATE_TIME) @Column(columnDefinition = "timestamp without time zone") public LocalDateTime planned_end_at;
     @Column(nullable = false) public int break_minutes;
     @Column(nullable = false) public int expected_minutes;
     @Column(nullable = false) public boolean is_overnight;
