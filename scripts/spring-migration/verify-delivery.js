@@ -54,6 +54,39 @@ function verifyKoreanPdfFontWorkflow(workflowName, workflow) {
   return failures;
 }
 
+function verifyHostedUiGate(deploy, ui) {
+  deploy = deploy.replace(/\r\n/g, "\n");
+  ui = ui.replace(/\r\n/g, "\n");
+  const failures = [];
+  const gateJob = deploy.split("\n  ui:\n")[1]?.split("\n  test:\n")[0] || "";
+  const releaseJob = deploy.split("\n  deploy:\n")[1] || "";
+  const dependencies = /needs:\s*\[([^\]]+)\]/.exec(releaseJob)?.[1].split(",").map((value) => value.trim()) || [];
+  if (!dependencies.includes("test") || !dependencies.includes("ui")) failures.push("deploy must require both test and exact-SHA UI success");
+  for (const required of [
+    "contents: read", "actions: read", "ref: ${{ github.sha }}", "GH_TOKEN: ${{ github.token }}",
+    'run: python3 scripts/ci/require-ui-validation.py --sha "$GITHUB_SHA" --wait-seconds 2100',
+  ]) {
+    if (!gateJob.split("\n").some((line) => line.trim() === required)) failures.push(`same-SHA UI gate is missing ${required}`);
+  }
+  if (/^\s+(?:-\s+)?if:/m.test(gateJob)) failures.push("same-SHA UI gate must not be conditionally skipped");
+  if (deploy.includes("uses: ./.github/workflows/ui-validation.yml")) failures.push("deploy repeats the standalone UI test workflow");
+  if (deploy.includes("- name: Frontend tests")) failures.push("deploy repeats frontend validation owned by UI CI");
+  for (const script of ["spring-route-coverage", "schema-ledger", "spring-schema-coverage", "mutation-ledger"]) {
+    if (deploy.includes(`node scripts/spring-migration/${script}.test.js`)) failures.push(`deploy repeats discovered ${script} tests`);
+  }
+  const requiredRuns = [
+    "npm run validate:grid", "npm run lint", "npm run test", "npm run build",
+    "npx playwright test --config playwright.employee-ux.config.ts --reporter=line,github --max-failures=1",
+    "npx playwright test --config playwright.experience.config.ts --reporter=line,github --max-failures=1",
+    "npx playwright test --config playwright.audit.config.ts --grep-invert '@ui-smoke' --reporter=line,github --max-failures=1",
+  ];
+  for (const command of requiredRuns) {
+    if (!ui.split("\n").some((line) => line.trim().replace(/^-\s+/, "") === `run: ${command}`)) failures.push(`standalone UI CI is missing required validation: ${command}`);
+  }
+  if (ui.indexOf("run: npm run build") > ui.indexOf("--config playwright.audit.config.ts")) failures.push("business workflow tests require the completed production build");
+  return failures;
+}
+
 function verifyDelivery(argv = process.argv) {
   const compose = fs.readFileSync(path.join(repositoryRoot, "docker-compose.deploy.yml"), "utf8");
   const dockerfile = fs.readFileSync(path.join(repositoryRoot, "backend-spring", "Dockerfile"), "utf8");
@@ -73,6 +106,7 @@ function verifyDelivery(argv = process.argv) {
   const failures = [];
 
   failures.push(...verifyCutoverRunbook(cutoverRunbook));
+  failures.push(...verifyHostedUiGate(deployWorkflow, fs.readFileSync(path.join(workflowDirectory, "ui-validation.yml"), "utf8")));
   for (const [workflowName, workflow] of workflows) {
     failures.push(...verifyKoreanPdfFontWorkflow(workflowName, workflow));
   }
@@ -218,4 +252,4 @@ if (require.main === module) {
   process.stdout.write("Delivery verification: Spring-only rollback, staged cutover runbook, safe dotenv loading, layered non-root image contract, no-Python image check, and Nanum Korean PDF font check passed.\n");
 }
 
-module.exports = { verifyCutoverRunbook, verifyDelivery, verifyKoreanPdfFontWorkflow };
+module.exports = { verifyCutoverRunbook, verifyDelivery, verifyKoreanPdfFontWorkflow, verifyHostedUiGate };

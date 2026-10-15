@@ -9,9 +9,19 @@ on:
 
 jobs:
   ui:
-    uses: ./.github/workflows/ui-validation.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Require successful standalone UI validation for this SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/require-ui-validation.py --sha "$GITHUB_SHA" --wait-seconds 2100
 
   test:
     runs-on: ubuntu-latest
@@ -52,13 +62,9 @@ jobs:
           find scripts orchestration -name '*.test.js' -print0 | xargs -0 node --test
           node scripts/spring-migration/retirement-snapshot.js
           node scripts/spring-migration/endpoint-manifest.js --verify
-          node scripts/spring-migration/spring-route-coverage.test.js
           node scripts/spring-migration/spring-route-coverage.js --verify-complete
-          node scripts/spring-migration/schema-ledger.test.js
           node scripts/spring-migration/schema-ledger.js --check-complete
-          node scripts/spring-migration/spring-schema-coverage.test.js
           node scripts/spring-migration/spring-schema-coverage.js --verify-complete
-          node scripts/spring-migration/mutation-ledger.test.js
           node scripts/spring-migration/mutation-ledger.js --check-complete
           node scripts/spring-migration/flyway-baseline.js --verify
           node scripts/spring-migration/flyway-seed-ledger.js --verify
@@ -135,10 +141,8 @@ jobs:
             docker version --format 'client={{.Client.Version}} server={{.Server.Version}} api={{.Server.APIVersion}} os={{.Server.Os}} arch={{.Server.Arch}}'
             docker info --format 'driver={{.Driver}} cgroup={{.CgroupVersion}} cpus={{.NCPU}} mem={{.MemTotal}} rootless={{.SecurityOptions}}'
             docker events --since 2m --until 0s --format '{{.Status}} {{.Type}} {{.Actor.Attributes.name}}' 2>/dev/null | tail -40 || true
-            echo '--- Gradle integrationTest ---'
-            ./gradlew --no-daemon --console=plain integrationTest
-            echo '--- Gradle migrationIntegrationTest ---'
-            ./gradlew --no-daemon --console=plain migrationIntegrationTest
+            echo '--- Gradle integrationTest and migrationIntegrationTest ---'
+            ./gradlew --no-daemon --console=plain integrationTest migrationIntegrationTest
           } 2>&1 | tee "$log_file"
           status=${PIPESTATUS[0]}
           set -e
@@ -185,19 +189,6 @@ jobs:
           annotateTail('Spring Testcontainers Gradle/Docker tail', process.env.RUNNER_TEMP + '/spring-integration-gradle.log');
           NODE
           exit 1
-
-      - name: Frontend tests
-        shell: bash
-        env:
-          VIBEHR_BFF_BACKEND_URL: http://backend:8080
-        run: |
-          set -euo pipefail
-          cd frontend
-          npm ci
-          npm run validate:grid
-          npm run lint
-          npm run build
-          npm run test
 
       - name: Verify Spring-only delivery image and compose smoke
         shell: bash

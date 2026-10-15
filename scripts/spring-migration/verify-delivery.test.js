@@ -2,7 +2,9 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { verifyCutoverRunbook, verifyKoreanPdfFontWorkflow } = require("./verify-delivery");
+const fs = require("node:fs");
+const path = require("node:path");
+const { verifyCutoverRunbook, verifyKoreanPdfFontWorkflow, verifyHostedUiGate } = require("./verify-delivery");
 
 test("cutover runbook verifier rejects stale coexistence guidance", () => {
   const failures = verifyCutoverRunbook(`
@@ -59,4 +61,22 @@ steps:
 `);
 
   assert.deepEqual(failures, []);
+});
+
+test("hosted UI gate keeps exact-SHA ownership and all distinct regression suites", () => {
+  const root = path.resolve(__dirname, "../..");
+  const deploy = fs.readFileSync(path.join(root, ".github/workflows/deploy.yml"), "utf8");
+  const ui = fs.readFileSync(path.join(root, ".github/workflows/ui-validation.yml"), "utf8");
+  assert.deepEqual(verifyHostedUiGate(deploy, ui), []);
+  for (const changed of [
+    deploy.replace("needs: [test, ui]", "needs: [test]"),
+    deploy.replace("actions: read", "actions: none"),
+    deploy.replace(' --sha "$GITHUB_SHA"', ' --sha "main"'),
+    deploy.replace("      - name: Require successful standalone", "      - if: false\n        name: Require successful standalone"),
+    deploy + "\nuses: ./.github/workflows/ui-validation.yml\n",
+    deploy + "\n      - name: Frontend tests\n",
+    deploy + "\nnode scripts/spring-migration/schema-ledger.test.js\n",
+  ]) assert.ok(verifyHostedUiGate(changed, ui).length > 0);
+  assert.ok(verifyHostedUiGate(deploy, ui.replace("--config playwright.experience.config.ts --reporter", "--config playwright.experience.config.ts --grep login --reporter")).length > 0);
+  assert.ok(verifyHostedUiGate(deploy, ui.replace("--grep-invert '@ui-smoke'", "--grep-invert 'all-tests'")).length > 0);
 });

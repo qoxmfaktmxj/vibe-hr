@@ -18,10 +18,11 @@ This is a partial-migration inventory. It does not claim that the Spring migrati
 - Mapped column scale differences: 0
 - Mapped column unresolved required precision values: 0
 - Mapped column unresolved required scale values: 0
+- Reviewed Flyway extension inconsistencies: 0
 
 ## Verification Modes
 
-- `--verify` checks reference-ledger consistency, parser/source consistency, duplicate explicit Java table mappings, unresolved Java table names, concrete type/precision/scale differences, missing Java precision/scale for known source facets, and whether both generated files are stale.
+- `--verify` checks reference-ledger consistency, parser/source consistency, duplicate explicit Java table mappings, unresolved Java table names, concrete type/precision/scale differences, missing Java precision/scale for known source facets, reviewed Flyway extension presence/mapping, and whether both generated files are stale.
 - `--verify-complete` runs `--verify` and additionally fails on unmapped or extra tables, missing or extra columns, and unresolved required ownership.
 
 ## Static Analysis Boundaries
@@ -30,6 +31,12 @@ This is a partial-migration inventory. It does not claim that the Spring migrati
 - `@MappedSuperclass` fields and parsed `@EmbeddedId` components are included. Runtime naming strategies, XML mappings, method/property access, and dynamically constructed annotation values are not assumed.
 - Package-private and nested entities are recorded with their visibility and enclosing types. A Java source file can own multiple classes or entities; filenames are never treated as unique entity identities.
 - Column type, nullability, primary-key, foreign-key, length, precision, and scale data are compared only when source annotations or declarations make them static. `@JdbcTypeCode` is interpreted as the physical Hibernate type. The JSON artifact contains the complete per-column evidence.
+
+## Reviewed Flyway Extensions
+
+Frozen SQLModel reference columns remain unchanged. These reviewed additions are required when their reference table is present; other extra columns still fail complete verification.
+
+- `tim_leave_requests.annual_charge_breakdown`: `TimLeaveRequest` / `TimLeaveRequest`, `Map<String, Double>`, `@JdbcTypeCode(SqlTypes.JSON)`, `jsonb`, nullable=true. Source: [backend-spring/src/main/resources/db/migration/V6__time_leave_annual_charge_breakdown.sql](../../backend-spring/src/main/resources/db/migration/V6__time_leave_annual_charge_breakdown.sql).
 
 ## Table Coverage
 
@@ -124,7 +131,7 @@ This is a partial-migration inventory. It does not claim that the Spring migrati
 | `tim_employee_daily_schedules` | `TimEmployeeDailySchedule` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:109](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | none | mapped |
 | `tim_employee_schedule_exceptions` | `TimEmployeeScheduleException` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:97](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 10 | none | none | mapped |
 | `tim_holidays` | `TimHoliday` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:55](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
-| `tim_leave_requests` | `TimLeaveRequest` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:175](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | annual_charge_breakdown | mapped |
+| `tim_leave_requests` | `TimLeaveRequest` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:175](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | none | mapped |
 | `tim_month_closes` | `TimMonthClose` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:192](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 21 | none | none | mapped |
 | `tim_schedule_pattern_days` | `TimSchedulePatternDay` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:73](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 9 | none | none | mapped |
 | `tim_schedule_patterns` | `TimSchedulePattern` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:64](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
@@ -154,6 +161,6 @@ No unresolved Java table names.
 - Unmapped SQLModel tables: 0
 - Extra Java tables: 0
 - Per-owner missing columns: 0
-- Per-owner extra columns: 1
+- Per-owner extra columns: 0
 
 See `spring-schema-coverage.json` for all entity sources, mapped columns, and statically determined comparison clues.

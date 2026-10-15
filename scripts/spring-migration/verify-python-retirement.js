@@ -11,6 +11,7 @@ const CI_SUPPORT_PYTHON_FILES = new Set([
 ]);
 const CI_COMMAND_PATHS = new Set(["docs/UI_VALIDATION_CI.md", ".github/workflows/ui-validation.yml"]);
 const CI_TEST_COMMAND = "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v";
+const CI_UI_GATE_COMMAND = 'python3 scripts/ci/require-ui-validation.py --sha "$GITHUB_SHA" --wait-seconds 2100';
 const HISTORICAL_EVIDENCE = new Set([
   "docs/spring-migration/python-retirement-snapshot.json",
   "docs/spring-migration/endpoint-manifest.json",
@@ -130,6 +131,10 @@ function findActiveInvocations(repositoryRoot = REPOSITORY_ROOT) {
     if (CI_COMMAND_PATHS.has(relative(repositoryRoot, file))) {
       contents = contents.split(/\r?\n/).filter((line) =>
         line.trim() !== CI_TEST_COMMAND && line.trim() !== `run: ${CI_TEST_COMMAND}`).join("\n");
+    }
+    if (relative(repositoryRoot, file) === ".github/workflows/deploy.yml") {
+      contents = contents.split(/\r?\n/).filter((line) =>
+        line.trim() !== `run: ${CI_UI_GATE_COMMAND}`).join("\n");
     }
     if (/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(relative(repositoryRoot, file))) {
       contents = contents.replace(/^[ \t]*run:[ \t]*/gm, "");

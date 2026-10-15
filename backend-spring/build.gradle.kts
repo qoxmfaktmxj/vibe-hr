@@ -85,6 +85,8 @@ tasks.register<Test>("integrationTest") {
     dependsOn(tasks.named("testClasses"))
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
+    exclude("com/vibehr/migration/**")
+    exclude("com/vibehr/platform/security/BffAssertionReplayStorePostgreSqlIntegrationTest.class")
     shouldRunAfter(tasks.named("test"))
     useJUnitPlatform {
         includeTags("integration")

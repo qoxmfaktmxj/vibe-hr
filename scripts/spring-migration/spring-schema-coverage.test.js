@@ -101,6 +101,11 @@ for (const [tableName, columnName] of integerEntityContracts) {
   assert.strictEqual(mappedColumn.jdbc_type_code, null, `${tableName}.${columnName} must not rely on a JDBC type override`);
 }
 assert.strictEqual(integerEntityContracts.length, 42);
+assert.deepStrictEqual(productionCoverage.verification.reviewed_schema_extension_inconsistencies, []);
+assert.strictEqual(productionCoverage.reviewed_schema_extensions.length, 1);
+const leaveTable = productionCoverage.tables.find((table) => table.table_name === "tim_leave_requests");
+assert.ok(!leaveTable.sqlmodel.columns.some((column) => column.name === "annual_charge_breakdown"), "V6 must not rewrite the frozen legacy reference");
+assert.deepStrictEqual(leaveTable.extra_columns, []);
 
 const source = `
 package fixture;
@@ -292,6 +297,67 @@ try {
   assert.match(tableGapFailures, /required table owners are unresolved/);
 } finally {
   fs.rmSync(temporaryRoot, { recursive: true, force: true });
+}
+
+const extensionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "spring-schema-extension-"));
+try {
+  const ledger = {
+    expected_table_count: 1,
+    source_table_count: 1,
+    tables: [{ table_name: "tim_leave_requests", class_name: "TimLeaveRequest", columns: [column("id", { primary_key: true })] }],
+  };
+  const legacyContents = `${JSON.stringify(ledger, null, 2)}\n`;
+  writeFile(extensionRoot, "docs/spring-migration/schema-ledger.json", legacyContents);
+  const extensionSource = `
+    import jakarta.persistence.*;
+    import java.util.Map;
+    import org.hibernate.annotations.JdbcTypeCode;
+    import org.hibernate.type.SqlTypes;
+    @Entity(name = "TimLeaveRequest") @Table(name = "tim_leave_requests")
+    class TimLeaveRequest {
+      @Id Integer id;
+      @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") Map<String, Double> annual_charge_breakdown;
+    }
+  `;
+  function extensionCoverage(source) {
+    writeFile(extensionRoot, "backend-spring/src/main/java/fixture/TimeEntities.java", source);
+    return buildCoverage(extensionRoot, { expectedTableCount: 1 });
+  }
+  function extensionFailures(source) {
+    return verifyCoverage(extensionCoverage(source), extensionRoot, { complete: true, checkOutput: false }).join(" ");
+  }
+
+  const accepted = extensionCoverage(extensionSource);
+  writeCoverage(extensionRoot, accepted);
+  assert.deepStrictEqual(verifyCoverage(accepted, extensionRoot, { complete: true }), []);
+  assert.strictEqual(fs.readFileSync(path.join(extensionRoot, "docs/spring-migration/schema-ledger.json"), "utf8"), legacyContents);
+  assert.strictEqual(accepted.reviewed_schema_extensions[0].mapped_columns[0].nullable.value, null, "omitted @Column.nullable uses JPA's true default");
+  const extensionMarkdown = fs.readFileSync(path.join(extensionRoot, "docs/spring-migration/spring-schema-coverage.md"), "utf8");
+  assert.match(extensionMarkdown, /Frozen SQLModel reference columns remain unchanged/);
+  assert.match(extensionMarkdown, /V6__time_leave_annual_charge_breakdown\.sql/);
+  assert.strictEqual(extensionFailures(extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "jsonb", nullable = true')), "");
+
+  assert.match(extensionFailures(extensionSource.replace("@Id Integer id;", "@Id Integer id; @Column Integer unrelated_extra;")), /per-owner extra columns/);
+  const wrongTable = extensionSource.replace('name = "tim_leave_requests"', 'name = "other_table"');
+  assert.match(extensionFailures(wrongTable), /Java tables are absent from schema-ledger/);
+  assert.match(extensionFailures(wrongTable), /reviewed schema extension .*required Java owner is missing/);
+  const wrongOwner = extensionSource.replace(/TimLeaveRequest/g, "OtherOwner");
+  assert.match(extensionFailures(wrongOwner), /per-owner extra columns/);
+  assert.match(extensionFailures(wrongOwner), /reviewed schema extension .*required Java owner is missing/);
+  assert.match(extensionFailures(extensionSource.replace("class TimLeaveRequest", "class OtherOwner")), /required Java owner is missing/, "an @Entity name cannot impersonate the reviewed class");
+  assert.match(extensionFailures(extensionSource.replace(/\s*@JdbcTypeCode\(SqlTypes.JSON\).*annual_charge_breakdown;/, "")), /expected one mapped column, found 0/);
+  assert.match(extensionFailures(extensionSource.replace("Map<String, Double>", "Map<String, Integer>")), /Java type differs/);
+  assert.match(extensionFailures(extensionSource.replace("SqlTypes.JSON", "SqlTypes.VARCHAR")), /JDBC type code differs/);
+  assert.match(extensionFailures(extensionSource.replace("@JdbcTypeCode(SqlTypes.JSON)", "")), /JDBC type code differs/);
+  assert.match(extensionFailures(extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "json"')), /physical column definition differs/);
+  assert.match(extensionFailures(extensionSource.replace('columnDefinition = "jsonb"', "")), /physical column definition differs/);
+  assert.match(extensionFailures(extensionSource.replace("annual_charge_breakdown;", "annual_charge_breakdown; @Column Map<String, Double> annual_charge_breakdown;")), /expected one mapped column, found 2/);
+  const notNullable = extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "jsonb", nullable = false');
+  assert.match(extensionFailures(notNullable), /nullability differs/);
+  assert.match(extensionFailures(extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "jsonb", nullable = NULLABLE_CONSTANT')), /nullability differs or is unresolved/);
+  assert.match(verifyCoverage(extensionCoverage(notNullable), extensionRoot, { checkOutput: false }).join(" "), /nullability differs/, "reviewed extension drift must also fail normal verification");
+} finally {
+  fs.rmSync(extensionRoot, { recursive: true, force: true });
 }
 
 console.log("spring-schema-coverage tests passed");

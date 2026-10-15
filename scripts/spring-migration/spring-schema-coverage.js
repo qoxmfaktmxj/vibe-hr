@@ -5,6 +5,18 @@ const path = require("path");
 
 const EXPECTED_TABLE_COUNT = 105;
 const GENERATED_BY = "scripts/spring-migration/spring-schema-coverage.js";
+// These reviewed additions are not part of the frozen SQLModel reference.
+const REVIEWED_SCHEMA_EXTENSIONS = [{
+  table_name: "tim_leave_requests",
+  entity_name: "TimLeaveRequest",
+  class_name: "TimLeaveRequest",
+  column_name: "annual_charge_breakdown",
+  migration_file: "backend-spring/src/main/resources/db/migration/V6__time_leave_annual_charge_breakdown.sql",
+  java_type: "Map<String, Double>",
+  jdbc_type_code: "SqlTypes.JSON",
+  column_definition: "jsonb",
+  nullable: true,
+}];
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -407,6 +419,7 @@ function attributeOverrides(annotation) {
 function nullableClue(field, columnAnnotation) {
   const explicit = booleanArgument(columnAnnotation, "nullable");
   if (explicit !== null) return { value: explicit, source: "@Column.nullable" };
+  if (argumentValue(columnAnnotation, "nullable") !== null) return { value: null, source: "@Column.nullable is unresolved" };
   return { value: null, source: "not explicitly declared" };
 }
 
@@ -689,13 +702,20 @@ function compareColumns(referenceColumn, javaColumn) {
   };
 }
 
+function isExtensionOwner(extension, entity) {
+  return extension.table_name === entity.table_name
+    && extension.entity_name === entity.entity_name
+    && extension.class_name === entity.source.class_name;
+}
+
 function compareOwner(referenceTable, entity) {
   const referenceColumns = new Map((referenceTable.columns || []).map((column) => [column.name, column]));
   const javaColumns = new Map();
   for (const column of entity.columns) javaColumns.set(column.name, [...(javaColumns.get(column.name) || []), column]);
   const duplicateColumnNames = [...javaColumns.entries()].filter(([, columns]) => columns.length > 1).map(([name]) => name).sort(compareText);
   const missingColumns = [...referenceColumns.keys()].filter((name) => !javaColumns.has(name)).sort(compareText);
-  const extraColumns = [...javaColumns.keys()].filter((name) => !referenceColumns.has(name)).sort(compareText);
+  const extensionNames = new Set(REVIEWED_SCHEMA_EXTENSIONS.filter((extension) => isExtensionOwner(extension, entity)).map((extension) => extension.column_name));
+  const extraColumns = [...javaColumns.keys()].filter((name) => !referenceColumns.has(name) && !extensionNames.has(name)).sort(compareText);
   const columnClues = [...referenceColumns.keys()].filter((name) => javaColumns.has(name)).sort(compareText)
     .map((name) => compareColumns(referenceColumns.get(name), javaColumns.get(name)[0]));
   return {
@@ -731,6 +751,23 @@ function buildCoverage(repositoryRoot, options = {}) {
     if (entity.table_name) ownersByTable.set(entity.table_name, [...(ownersByTable.get(entity.table_name) || []), entity]);
   }
   const referenceNames = new Set(reference.tables.map((table) => table.table_name));
+  const reviewedExtensions = REVIEWED_SCHEMA_EXTENSIONS.filter((extension) => referenceNames.has(extension.table_name)).map((extension) => {
+    const owner = java.entities.find((entity) => isExtensionOwner(extension, entity));
+    const columns = owner ? owner.columns.filter((column) => column.name === extension.column_name) : [];
+    const differences = [];
+    if (!owner) differences.push("required Java owner is missing");
+    else if (columns.length !== 1) differences.push(`expected one mapped column, found ${columns.length}`);
+    else {
+      const column = columns[0];
+      if (column.java_type.replace(/\s+/g, "") !== extension.java_type.replace(/\s+/g, "")) differences.push("Java type differs");
+      if ((column.jdbc_type_code || "").replace(/\s+/g, "") !== extension.jdbc_type_code) differences.push("JDBC type code differs");
+      if ((column.column_definition || "").trim().toLowerCase() !== extension.column_definition) differences.push("physical column definition differs");
+      // JPA @Column defaults to nullable=true when the annotation omits it.
+      const nullable = column.nullable.source === "not explicitly declared" ? true : column.nullable.value;
+      if (nullable !== extension.nullable) differences.push("nullability differs or is unresolved");
+    }
+    return { ...extension, mapped_source: owner ? owner.source : null, mapped_columns: columns, differences };
+  });
   const tables = reference.tables.map((referenceTable) => {
     const owners = ownersByTable.get(referenceTable.table_name) || [];
     const ownerComparisons = owners.map((owner) => compareOwner(referenceTable, owner));
@@ -796,7 +833,10 @@ function buildCoverage(repositoryRoot, options = {}) {
       mapped_column_scale_differences: differenceRecords("scale"),
       mapped_column_precision_unresolved: unresolvedKnownNumericFacetRecords("precision"),
       mapped_column_scale_unresolved: unresolvedKnownNumericFacetRecords("scale"),
+      reviewed_schema_extension_inconsistencies: reviewedExtensions.filter((extension) => extension.differences.length > 0)
+        .map((extension) => ({ table_name: extension.table_name, entity_name: extension.entity_name, column_name: extension.column_name, reasons: extension.differences })),
     },
+    reviewed_schema_extensions: reviewedExtensions,
     tables,
     extra_java_tables: extraJavaTables,
     missing_java_tables: unmappedTables,
@@ -839,10 +879,11 @@ function renderMarkdown(coverage) {
     `- Mapped column scale differences: ${verification.mapped_column_scale_differences.length}`,
     `- Mapped column unresolved required precision values: ${verification.mapped_column_precision_unresolved.length}`,
     `- Mapped column unresolved required scale values: ${verification.mapped_column_scale_unresolved.length}`,
+    `- Reviewed Flyway extension inconsistencies: ${verification.reviewed_schema_extension_inconsistencies.length}`,
     "",
     "## Verification Modes",
     "",
-    "- `--verify` checks reference-ledger consistency, parser/source consistency, duplicate explicit Java table mappings, unresolved Java table names, concrete type/precision/scale differences, missing Java precision/scale for known source facets, and whether both generated files are stale.",
+    "- `--verify` checks reference-ledger consistency, parser/source consistency, duplicate explicit Java table mappings, unresolved Java table names, concrete type/precision/scale differences, missing Java precision/scale for known source facets, reviewed Flyway extension presence/mapping, and whether both generated files are stale.",
     "- `--verify-complete` runs `--verify` and additionally fails on unmapped or extra tables, missing or extra columns, and unresolved required ownership.",
     "",
     "## Static Analysis Boundaries",
@@ -851,6 +892,12 @@ function renderMarkdown(coverage) {
     "- `@MappedSuperclass` fields and parsed `@EmbeddedId` components are included. Runtime naming strategies, XML mappings, method/property access, and dynamically constructed annotation values are not assumed.",
     "- Package-private and nested entities are recorded with their visibility and enclosing types. A Java source file can own multiple classes or entities; filenames are never treated as unique entity identities.",
     "- Column type, nullability, primary-key, foreign-key, length, precision, and scale data are compared only when source annotations or declarations make them static. `@JdbcTypeCode` is interpreted as the physical Hibernate type. The JSON artifact contains the complete per-column evidence.",
+    "",
+    "## Reviewed Flyway Extensions",
+    "",
+    "Frozen SQLModel reference columns remain unchanged. These reviewed additions are required when their reference table is present; other extra columns still fail complete verification.",
+    "",
+    ...coverage.reviewed_schema_extensions.map((extension) => `- \`${extension.table_name}.${extension.column_name}\`: \`${extension.entity_name}\` / \`${extension.class_name}\`, \`${extension.java_type}\`, \`@JdbcTypeCode(${extension.jdbc_type_code})\`, \`${extension.column_definition}\`, nullable=${extension.nullable}. Source: [${extension.migration_file}](../../${extension.migration_file}).`),
     "",
     "## Table Coverage",
     "",
@@ -929,6 +976,9 @@ function verifyCoverage(coverage, repositoryRoot, options = {}) {
   if (verification.mapped_column_scale_differences.length > 0) failures.push(`${verification.mapped_column_scale_differences.length} mapped column scale differences found`);
   if (verification.mapped_column_precision_unresolved.length > 0) failures.push(`${verification.mapped_column_precision_unresolved.length} mapped column precision values are unresolved`);
   if (verification.mapped_column_scale_unresolved.length > 0) failures.push(`${verification.mapped_column_scale_unresolved.length} mapped column scale values are unresolved`);
+  for (const extension of verification.reviewed_schema_extension_inconsistencies) {
+    failures.push(`reviewed schema extension ${extension.table_name}.${extension.column_name} (${extension.entity_name}): ${extension.reasons.join(", ")}`);
+  }
   if (options.checkOutput !== false) {
     const stale = staleOutputs(repositoryRoot, coverage);
     if (stale.length > 0) failures.push(`generated output is stale: ${stale.join(", ")}`);

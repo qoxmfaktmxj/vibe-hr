@@ -57,11 +57,22 @@ $env:VIBEHR_RUN_CONTAINER_TESTS = "true"
 .\gradlew.bat integrationTest
 ```
 
+The generic integration task excludes the migration package and the replay-store
+integration class, which are owned by `migrationIntegrationTest`. To run the full
+PostgreSQL gate, invoke both tasks in one Gradle command. CI does this to preserve
+failure propagation and avoid executing the same four classes twice.
+
 Flyway ownership-transfer work additionally requires:
 
 ```powershell
 .\gradlew.bat migrationIntegrationTest
 ```
+
+Hosted UI validation runs the existing 8 employee UX cases, all 43 employee
+experience cases, and 31 additional repository-audit workflow cases after one
+production build. Only the audit configuration's duplicate two smoke cases are
+omitted from that extra invocation. The Deploy workflow verifies the standalone
+same-SHA result instead of repeating the browser suites and frontend fast checks.
 
 ### Runtime Smoke Check
 

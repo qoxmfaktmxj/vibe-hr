@@ -80,6 +80,7 @@ test("retirement verifier permits only the reviewed hosted UI gate support scrip
   const command = "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v";
   write(root, "docs/UI_VALIDATION_CI.md", command);
   write(root, ".github/workflows/ui-validation.yml", "        run: " + command);
+  write(root, ".github/workflows/deploy.yml", '        run: python3 scripts/ci/require-ui-validation.py --sha "$GITHUB_SHA" --wait-seconds 2100');
 
   const result = verifyPythonRetirement(root);
 
@@ -94,11 +95,12 @@ test("reviewed CI support does not allow extra Python files, changed commands or
   write(root, "docs/UI_VALIDATION_CI.md", "PYTHONDONTWRITEBYTECODE=1 python3 -m pytest\n");
   write(root, "docs/OTHER.md", "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v\n");
   write(root, ".github/workflows/ui-validation.yml", "        run: python3 -m uvicorn\n");
+  write(root, ".github/workflows/deploy.yml", '        run: python3 scripts/ci/require-ui-validation.py --sha "$GITHUB_SHA" --wait-seconds 2100 && python3 -m uvicorn\n');
 
   const result = verifyPythonRetirement(root);
 
   assert.deepEqual(result.pythonFiles, ["scripts/ci/unreviewed.py"]);
   assert.deepEqual(result.invocations.map((item) => item.path), [
-    ".github/workflows/ui-validation.yml", "docs/OTHER.md", "docs/UI_VALIDATION_CI.md", "scripts/ci/require-ui-validation.py",
+    ".github/workflows/deploy.yml", ".github/workflows/ui-validation.yml", "docs/OTHER.md", "docs/UI_VALIDATION_CI.md", "scripts/ci/require-ui-validation.py",
   ]);
 });

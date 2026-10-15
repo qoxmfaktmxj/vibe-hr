@@ -26,8 +26,59 @@
     "mapped_column_precision_differences": [],
     "mapped_column_scale_differences": [],
     "mapped_column_precision_unresolved": [],
-    "mapped_column_scale_unresolved": []
+    "mapped_column_scale_unresolved": [],
+    "reviewed_schema_extension_inconsistencies": []
   },
+  "reviewed_schema_extensions": [
+    {
+      "table_name": "tim_leave_requests",
+      "entity_name": "TimLeaveRequest",
+      "class_name": "TimLeaveRequest",
+      "column_name": "annual_charge_breakdown",
+      "migration_file": "backend-spring/src/main/resources/db/migration/V6__time_leave_annual_charge_breakdown.sql",
+      "java_type": "Map<String, Double>",
+      "jdbc_type_code": "SqlTypes.JSON",
+      "column_definition": "jsonb",
+      "nullable": true,
+      "mapped_source": {
+        "source_file": "backend-spring/src/main/java/com/vibehr/time/TimeEntities.java",
+        "source_line": 175,
+        "class_name": "TimLeaveRequest",
+        "qualified_class_name": "TimLeaveRequest",
+        "visibility": "package-private",
+        "modifiers": [],
+        "nested": false,
+        "enclosing_types": [],
+        "source_file_type_count": 14,
+        "source_file_entity_count": 13
+      },
+      "mapped_columns": [
+        {
+          "name": "annual_charge_breakdown",
+          "raw_name": "annual_charge_breakdown",
+          "name_source": "field name",
+          "source_file": "backend-spring/src/main/java/com/vibehr/time/TimeEntities.java",
+          "source_line": 182,
+          "field_name": "annual_charge_breakdown",
+          "java_type": "Map<String, Double>",
+          "jdbc_type_code": "SqlTypes.JSON",
+          "primary_key": false,
+          "embedded_id": null,
+          "inherited_from": null,
+          "nullable": {
+            "value": null,
+            "source": "not explicitly declared"
+          },
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "column_definition": "jsonb",
+          "foreign_key": null
+        }
+      ],
+      "differences": []
+    }
+  ],
   "tables": [
     {
       "table_name": "PAP_APPRAISAL_MASTERS",
@@ -98570,9 +98621,7 @@
           ],
           "mapped_column_count": 15,
           "missing_columns": [],
-          "extra_columns": [
-            "annual_charge_breakdown"
-          ],
+          "extra_columns": [],
           "duplicate_java_column_names": [],
           "column_clues": [
             {
@@ -99161,9 +99210,7 @@
       "owner_status": "mapped",
       "mapped_column_count": 15,
       "missing_columns": [],
-      "extra_columns": [
-        "annual_charge_breakdown"
-      ]
+      "extra_columns": []
     },
     {
       "table_name": "tim_month_closes",
@@ -122183,13 +122230,7 @@
   "missing_java_tables": [],
   "column_gaps": {
     "missing_columns": [],
-    "extra_columns": [
-      {
-        "table_name": "tim_leave_requests",
-        "entity_name": "TimLeaveRequest",
-        "column_name": "annual_charge_breakdown"
-      }
-    ]
+    "extra_columns": []
   },
   "java_entities": [
     {

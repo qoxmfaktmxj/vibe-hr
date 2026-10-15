@@ -469,3 +469,19 @@
 - Review Needed: existing hosted same-commit CI and deployment gates remain enforced.
 - Rollback: follow the V6 recovery restrictions in the cutover runbook; do not mix old leave cancellation with snapshot-backed approvals.
 - Notes: the final commit and remote SHA are read back and reported in this chat; configured Actions run automatically on main push.
+
+## TASK VH-CI-FAILURE-AND-DEDUPLICATION-20261016
+- Date: 2026-10-16 (Asia/Seoul)
+- Type: diagnose failed GitHub Actions, correct strict schema validation and remove proven duplicate execution
+- Risk: R2 CI/shared guardrails and R3 deployment orchestration, explicitly approved for main publication and actual Actions verification
+- Approval: user approved the exact V6 extension, standalone same-SHA UI gate, duplicate Node/frontend/Gradle execution removal, shell failure propagation correction and 31 additional business regressions.
+- Status: locally verified; hosted workflow and production promotion results are pending publication and must be read back for the resulting commit.
+- Cause: Deploy run 38763351853 failed before Gradle because complete-mode schema coverage rejected the approved V6 annual_charge_breakdown column. The previous local normal-mode check did not exercise this condition. The prior four scheduled releases succeeded; existing UI cases were not obsolete.
+- Scope: two workflows, the Gradle integration partition, schema/delivery/retirement guardrails and focused regressions, generated schema evidence, test/CI documentation and this task record. No application source, existing migration, secret or dependency change.
+- Simplifications: run frontend/UI checks once; reuse only the exact SHA's latest successful standalone UI result; remove four explicit Node reruns; give the 20 migration/security cases one Gradle owner; invoke both integration tasks together so any failure reaches CI.
+- First-Pass Validation: reproduced the strict coverage rejection and masked Gradle failure; focused regression tests now reject unrelated columns/type drift and propagate generic/migration failures. All source test cases are retained.
+- Retry Count: targeted test fixture and workflow-parser corrections were verified before the final complete pass; no test filtering or gate waiver was used to pass failures.
+- Validation: 43 Node tests, eight Python gate tests, compose-smoke behavior, complete route/schema/mutation/Flyway/BFF/delivery checks and YAML parsing pass. Full container-enabled Gradle passes 199 default, 68 generic integration and 20 migration/security tests with no failures/errors/skips and no overlapping integration classes. Added Playwright command discovers exactly 31 cases; hosted total is 82 unique cases.
+- Review Needed: read the new main SHA's standalone UI and Deploy outcomes after push; production deployment still requires successful test and exact-SHA UI jobs plus existing image/security/health checks.
+- Rollback: revert orchestration only with an effective same-SHA UI gate retained. Existing application data and migration recovery rules remain unchanged.
+- Notes: [cause, approved scope and evidence](audits/2026-10-16-ci-failure-analysis.md). Unrelated .impeccable/ and .playwright-mcp/ remain untracked and preserved.

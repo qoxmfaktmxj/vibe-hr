@@ -46,6 +46,8 @@ jobs:
         run: npx playwright test --config playwright.experience.config.ts --reporter=line,github --max-failures=1
       - name: Production build and TypeScript
         run: npm run build
+      - name: Business workflow regression (31 additional cases)
+        run: npx playwright test --config playwright.audit.config.ts --grep-invert '@ui-smoke' --reporter=line,github --max-failures=1
       - name: Retain browser evidence
         if: always()
         uses: actions/upload-artifact@v4
