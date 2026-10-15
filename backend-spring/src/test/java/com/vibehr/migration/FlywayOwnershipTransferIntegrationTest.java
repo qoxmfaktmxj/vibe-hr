@@ -76,7 +76,7 @@ class FlywayOwnershipTransferIntegrationTest {
             assertThat(relationExists(connection, "alembic_version")).isFalse();
             assertThat(relationExists(connection, "bff_assertion_replays")).isTrue();
             assertThat(requiredReferenceRowCount(connection)).isEqualTo(EXPECTED_REFERENCE_ROWS);
-            PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
+            PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
         }
         StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
                 .applySetting(AvailableSettings.JAKARTA_JDBC_URL, POSTGRES.getJdbcUrl())
@@ -88,6 +88,34 @@ class FlywayOwnershipTransferIntegrationTest {
             new MetadataSources(registry).addAnnotatedClass(ExactAuthRole.class).buildMetadata().buildSessionFactory().close();
         } finally {
             StandardServiceRegistryBuilder.destroy(registry);
+        }
+    }
+
+    @Test
+    void currentRuntimeSchemaAllowsOnlyTheExactV6ExtensionWhileAdoptionKeepsTheBaseline() throws Exception {
+        migrateFresh();
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("schema metadata drift");
+
+            statement.execute("alter table tim_leave_requests add column unexpected_column text");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("schema metadata drift");
+            statement.execute("alter table tim_leave_requests drop column unexpected_column");
+
+            statement.execute("alter table tim_leave_requests alter column annual_charge_breakdown set not null");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V6 annual leave deduction snapshot column");
+            statement.execute("alter table tim_leave_requests alter column annual_charge_breakdown drop not null");
+
+            statement.execute("alter table tim_leave_requests alter column annual_charge_breakdown type json using annual_charge_breakdown::json");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V6 annual leave deduction snapshot column");
+            statement.execute("alter table tim_leave_requests drop column annual_charge_breakdown");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("snapshot column is missing");
+            PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
         }
     }
 
@@ -148,14 +176,14 @@ class FlywayOwnershipTransferIntegrationTest {
         migrateFresh();
         try (Connection connection = connection()) {
             assertThat(applicationTableCount(connection)).isEqualTo(106);
-            assertThat(flywayHistoryCount(connection)).isEqualTo(5);
+            assertThat(flywayHistoryCount(connection)).isEqualTo(6);
             assertThat(relationExists(connection, "alembic_version")).isFalse();
             assertThat(deterministicTableEvidence(connection, "tim_department_schedule_assignments"))
                     .isEqualTo(assignmentsBefore);
             assertThat(longValue(connection, "select count(*) from tim_department_schedule_assignments where is_active")).isEqualTo(100);
             // The 1,377 canonical rows plus 50 preserved extra assignments and one noncanonical actor rule.
             assertThat(requiredReferenceRowCount(connection)).isEqualTo(EXPECTED_REFERENCE_ROWS + 51);
-            PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
+            PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
         }
         validateWholeApplicationModel();
     }

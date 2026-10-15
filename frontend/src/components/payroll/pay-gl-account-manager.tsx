@@ -28,6 +28,8 @@ import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summar
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
+import { GL_ACCOUNT_COLUMNS, validateGlAccountRows } from "@/lib/spreadsheet/payroll-master-schemas";
 import type {
   GlAccountItem,
   GlAccountBatchRequest,
@@ -120,6 +122,7 @@ export function PayGlAccountManager() {
   const [rows, setRows] = useState<GlAccountRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [appliedName, setAppliedName] = useState("");
   const [page, setPage] = useState(1);
@@ -423,6 +426,7 @@ export function PayGlAccountManager() {
   }
 
   function handleQueryRequest() {
+    if (uploading) return;
     gridApiRef.current?.stopEditing();
     if (hasChanges) {
       setPendingQuery(true);
@@ -502,19 +506,43 @@ export function PayGlAccountManager() {
   }, [filteredRows, page, pageSize]);
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-  function handleTemplateDownload() {
-    toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+  async function handleTemplateDownload() {
+    try {
+      await downloadSpreadsheet("pay-gl-accounts-template.xlsx", GL_ACCOUNT_COLUMNS, [], "계정과목");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "양식 다운로드에 실패했습니다.");
+    }
   }
 
-  function handleUpload() {
-    toast.success("업로드는 다음 단계에서 연결합니다.");
+  async function handleUpload() {
+    if (saving || uploading) return;
+    gridApiRef.current?.stopEditing();
+    setUploading(true);
+    try {
+      const file = await pickSpreadsheetFile();
+      if (!file) return;
+      const parsed = await readSpreadsheet(file, GL_ACCOUNT_COLUMNS);
+      gridApiRef.current?.stopEditing();
+      commitRows((prev) => {
+        const existingKeys = prev.filter((row) => row._status !== "deleted").map((row) => row.code);
+        const items = validateGlAccountRows(parsed, existingKeys);
+        const added = items.map((item) => ({ ...createEmptyRow(issueTempId()), ...item }));
+        return [...added, ...prev];
+      });
+      setPage(1);
+      toast.success(`${parsed.length}건을 추가했습니다. 저장 버튼을 눌러 반영해 주세요.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   const toolbarActions = [
     { key: "create", label: "입력", icon: Plus, onClick: addRow },
     { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
     { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
+    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload, disabled: saving || uploading || menuActionLoading },
     { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
   ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
 
@@ -524,7 +552,7 @@ export function PayGlAccountManager() {
         label: saving ? "저장중..." : "저장",
         icon: Save,
         onClick: () => void saveAllChanges(),
-        disabled: saving || menuActionLoading,
+        disabled: saving || uploading || menuActionLoading,
         variant: "save" as const,
       }
     : undefined;
@@ -542,7 +570,7 @@ export function PayGlAccountManager() {
       <ManagerSearchSection
         title="계정과목관리"
         onQuery={handleQueryRequest}
-        queryDisabled={saving || menuActionLoading || !can("query")}
+        queryDisabled={saving || uploading || menuActionLoading || !can("query")}
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">

@@ -23,6 +23,8 @@ import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/l
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { EMPLOYEE_PROFILE_COLUMNS, validateEmployeeProfileUpload } from "@/lib/spreadsheet/payroll-operation-schemas";
+import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
 import type { PayEmployeeProfileBatchRequest, PayEmployeeProfileBatchResponse, PayEmployeeProfileItem } from "@/types/pay";
 
 type RowStatus = GridRowStatus;
@@ -108,6 +110,7 @@ export function PayEmployeeProfileManager() {
   const [rows, setRows] = useState<RowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [appliedSearchText, setAppliedSearchText] = useState("");
   const [page, setPage] = useState(1);
@@ -312,16 +315,50 @@ export function PayEmployeeProfileManager() {
 
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-  function handleTemplateDownload() {
-    toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+  async function handleTemplateDownload() {
+    try {
+      await downloadSpreadsheet("employee-profiles-template.xlsx", EMPLOYEE_PROFILE_COLUMNS, []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "양식 다운로드에 실패했습니다.");
+    }
   }
 
-  function handleUpload() {
-    toast.success("업로드는 다음 단계에서 연결합니다.");
+  async function handleUpload() {
+    setUploading(true);
+    try {
+      const file = await pickSpreadsheetFile();
+      if (!file) return;
+      const records = await readSpreadsheet(file, EMPLOYEE_PROFILE_COLUMNS);
+      gridApiRef.current?.stopEditing();
+      commitRows((prev) => {
+        const items = validateEmployeeProfileUpload(records, prev);
+        const updates = new Map(items.filter((item) => item.id != null).map((item) => [item.id, item]));
+        const added = items.filter((item) => item.id == null).map((item) => {
+          const row = createEmptyRow(issueTempId());
+          return { ...row, ...item, id: row.id };
+        });
+        return [...added, ...prev.map((row) => {
+          const item = updates.get(row.id);
+          if (!item) return row;
+          return reconcileUpdatedStatus({ ...row, ...item, id: row.id }, { shouldBeClean: isReverted });
+        })];
+      });
+      setPage(1);
+      toast.success(`${records.length}건을 반영했습니다. 저장 버튼을 눌러 저장해 주세요.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+    }
   }
 
-  function handleDownload() {
-    toast.success("다운로드는 다음 단계에서 연결합니다.");
+  async function handleDownload() {
+    gridApiRef.current?.stopEditing();
+    try {
+      await downloadSpreadsheet("employee-profiles-current-page.xlsx", EMPLOYEE_PROFILE_COLUMNS, pagedRows.filter((row) => row._status !== "deleted").map((row) => ({ ...row, id: row.id > 0 ? row.id : null })));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "다운로드에 실패했습니다.");
+    }
   }
 
   const defaultColDef = useMemo<ColDef<RowData>>(
@@ -459,16 +496,16 @@ export function PayEmployeeProfileManager() {
             actions={[
               { key: "create", label: "입력", icon: Plus, onClick: addRow },
               { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-              { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-              { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
-              { key: "download", label: "다운로드", icon: Download, onClick: handleDownload },
+              { key: "template", label: "양식 다운로드", icon: Search, onClick: () => void handleTemplateDownload() },
+              { key: "upload", label: "업로드", icon: Search, onClick: () => void handleUpload(), disabled: saving || uploading },
+              { key: "download", label: "현재 페이지 다운로드", icon: Download, onClick: () => void handleDownload() },
             ]}
             saveAction={{
               key: "save",
               label: saving ? "저장중..." : "저장",
               icon: Save,
               onClick: () => void saveAllChanges(),
-              disabled: saving,
+              disabled: saving || uploading,
             }}
           />
         }

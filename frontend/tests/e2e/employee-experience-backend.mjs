@@ -5,14 +5,18 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview",
+  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview", "training-applications", "retirement-selection", "appraisal-targets", "file-actions",
 ]);
 let scenario = "default";
 const completedTasks = new Set();
 const taskActions = [];
+const hriRequestWrites = [];
+const hriRequests = [];
 const checklistRows = [];
 let uxEmployees = [];
 const employeeWrites = [];
+let trainingApplications = [];
+const trainingActions = [];
 let rejectNextSave = true;
 const user = { id: 1, email: "employee@example.test", display_name: "테스트 사용자", roles: ["admin"] };
 const employee = {
@@ -62,14 +66,56 @@ createServer(async (request, response) => {
     const input = JSON.parse(body || "null");
     if (!scenarios.has(input?.scenario)) return json(response, 400, { detail: "Unknown synthetic scenario." });
     scenario = input.scenario;
+    trainingActions.length = 0;
+    trainingApplications = ["submitted", "submitted", "draft", "approved"].map((status, index) => ({
+      id: 101 + index, application_no: `TRA-${101 + index}`, employee_id: 1,
+      employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서",
+      course_id: 1, course_name: "업무 교육", event_id: null, event_name: "기본 과정", in_out_type: "IN",
+      status, year_plan_yn: false, survey_yn: false, edu_memo: null, note: null,
+      created_at: "2026-10-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z",
+    }));
     employeeWrites.length = 0;
     rejectNextSave = scenario !== "employee-ux-preview";
     uxEmployees = [1, 2, 3].map((id) => ({ ...employee, id, employee_no: `EMP-00${id}`, login_id: `employee-${id}`, display_name: ["김서준", "이하은", "박지우"][id - 1], email: `person${id}@example.test`, position_title: id === 1 ? "팀장" : "사원", hire_date: `202${id}-01-02T00:00:00`, employment_status: id === 3 ? "leave" : "active" }));
     completedTasks.clear();
     taskActions.length = 0;
+    hriRequestWrites.length = 0;
+    hriRequests.length = 0;
     checklistRows.length = 0;
     checklistRows.push({ id: 1, code: "asset_return", title: "회사 자산 반납", description: "지급 자산 확인", is_required: true, is_active: true, sort_order: 0, created_at: "2026-09-13T00:00:00Z", updated_at: "2026-09-13T00:00:00Z" });
     return json(response, 200, { scenario });
+  }
+  if (scenario === "training-applications") {
+    if (route === "GET /__training-actions") return json(response, 200, trainingActions);
+    if (route === "POST /__training-status") {
+      let body = ""; for await (const part of request) body += part;
+      const input = JSON.parse(body);
+      trainingApplications.find((row) => row.id === input.id).status = input.status;
+      return json(response, 200, { updated: true });
+    }
+    if (url.pathname.startsWith("/api/v1/tra/")) {
+      if (!request.headers.authorization?.startsWith("Bearer ")) return json(response, 401, { detail: "Not authenticated." });
+      if (["GET /api/v1/tra/applications-detail", "GET /api/v1/tra/my-applications"].includes(route)) {
+        return json(response, 200, { items: trainingApplications, total_count: trainingApplications.length });
+      }
+      if (route === "GET /api/v1/tra/courses") return json(response, 200, { items: [{ id: 1, course_name: "업무 교육" }], total_count: 1 });
+      if (route === "POST /api/v1/tra/my-applications") {
+        let body = ""; for await (const part of request) body += part;
+        const input = JSON.parse(body);
+        const item = { ...trainingApplications[0], ...input, id: 105, application_no: "TRA-105", status: "submitted" };
+        trainingActions.push({ action: "create", method: request.method, body: input });
+        trainingApplications.push(item);
+        return json(response, 201, { item });
+      }
+      const match = url.pathname.match(/^\/api\/v1\/tra\/applications\/(\d+)\/(approve|reject|withdraw)$/);
+      if (match && request.method === (match[2] === "withdraw" ? "PUT" : "POST")) {
+        let body = ""; for await (const part of request) body += part;
+        const item = trainingApplications.find((row) => row.id === Number(match[1]));
+        trainingActions.push({ id: item.id, action: match[2], method: request.method, body: body ? JSON.parse(body) : null });
+        item.status = { approve: "approved", reject: "rejected", withdraw: "canceled" }[match[2]];
+        return json(response, 200, { item });
+      }
+    }
   }
   if (scenario.startsWith("employee-ux") && route === "GET /__employee-writes") return json(response, 200, employeeWrites);
   if (scenario.startsWith("employee-ux") && route === "POST /api/v1/employees/batch") {
@@ -91,8 +137,30 @@ createServer(async (request, response) => {
     return json(response, 201, created);
   }
   if (scenario === "hri-tasks" && route === "GET /__task-actions") return json(response, 200, taskActions);
+  if (scenario === "hri-tasks" && route === "GET /__hri-request-writes") return json(response, 200, hriRequestWrites);
   if (scenario === "hri-tasks" && url.pathname.startsWith("/api/v1/hri/")) {
     if (!request.headers.authorization?.startsWith("Bearer ")) return json(response, 401, { detail: "Not authenticated." });
+    if (route === "GET /api/v1/hri/form-types") return json(response, 200, { items: [{
+      id: 11, form_code: "GENERIC_REQUEST", form_name_ko: "일반 신청", module_code: "HRI",
+      is_active: true, allow_draft: false, allow_withdraw: true, requires_receive: false, default_priority: 1,
+    }], total_count: 1 });
+    if (route === "GET /api/v1/hri/requests/my") return json(response, 200, { items: hriRequests, total_count: hriRequests.length, page: 1, limit: 50 });
+    if (request.method === "POST" && ["/api/v1/hri/requests/submit", "/api/v1/hri/requests/draft"].includes(url.pathname)) {
+      let body = "";
+      for await (const part of request) body += part;
+      const payload = JSON.parse(body);
+      hriRequestWrites.push({ path: url.pathname, ...payload });
+      if (url.pathname.endsWith("/draft")) return json(response, 409, { detail: "Draft is disabled for this form type." });
+      if (payload.title.includes("실패")) return json(response, 400, { detail: "결재선 설정을 확인해 주세요." });
+      const item = {
+        id: 401, request_no: "HRI-401", form_type_id: 11, form_name: "일반 신청", requester_id: 1,
+        title: payload.title, content_json: payload.content_json, status_code: "APPROVAL_IN_PROGRESS",
+        current_step_order: 1, current_actor_name: "테스트 결재자", submitted_at: "2026-10-15T00:00:00Z",
+        completed_at: null, created_at: "2026-10-15T00:00:00Z", updated_at: "2026-10-15T00:00:00Z",
+      };
+      hriRequests.push(item);
+      return json(response, 200, { request_id: item.id, status_code: item.status_code, current_step_order: 1 });
+    }
     const match = url.pathname.match(/\/requests\/(\d+)\/(approve|reject|receive-complete|receive-reject)$/);
     if (request.method === "POST" && match) {
       let text = "";
@@ -136,6 +204,21 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "appraisal-targets") return json(response, 200, { menus: [...menus,
+        { id: 90, code: "pap.targets", name: "평가 대상자 관리", path: "/pap/targets", icon: "Users", sort_order: 3, children: [] },
+      ] });
+      if (scenario === "file-actions") return json(response, 200, { menus: [...menus,
+        ...[
+          "/payroll/runs", "/payroll/employee-profiles", "/payroll/variable-inputs", "/payroll/payment-schedules",
+          "/payroll/gl-accounts", "/payroll/gl-mappings", "/payroll/item-groups", "/payroll/allowance-deduction-items",
+          "/payroll/severance-item-rules", "/payroll/codes", "/payroll/tax-rates",
+          "/tim/holidays", "/tim/codes", "/tim/work-codes",
+        ].map((path, index) => ({ id: 100 + index, code: path.slice(1).replaceAll("/", "."), name: `파일 검증 ${index + 1}`, path, icon: "FileText", sort_order: 3 + index, children: [] })),
+      ] });
+      if (scenario === "training-applications") return json(response, 200, { menus: [...menus,
+        { id: 80, code: "tra.applications", name: "교육 신청 승인 관리", path: "/tra/applications", icon: "FileText", sort_order: 3, children: [] },
+        { id: 81, code: "tra.my-applications", name: "나의 교육 신청", path: "/tra/my-applications", icon: "FileText", sort_order: 4, children: [] },
+      ] });
       if (scenario.startsWith("employee-ux")) return json(response, 200, { menus: [...menus, { id: 70, code: "hr.employee", name: "사원관리", path: "/hr/employee", icon: "Users", sort_order: 3, children: [] }] });
       if (scenario === "checklist-layout") return json(response, 200, { menus: [...menus,
         { id: 60, code: "hr.retire.checklist", name: "퇴직체크리스트", path: "/hr/retire/checklist", icon: "FileText", sort_order: 3, children: [] },
@@ -144,7 +227,12 @@ createServer(async (request, response) => {
         { id: 50, code: "hr.retire.approvals", name: "퇴직승인관리", path: "/hr/retire/approvals", icon: "FileText", sort_order: 3, children: [] },
         { id: 51, code: "tim.status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 4, children: [] },
       ] });
+      if (scenario === "retirement-selection") return json(response, 200, { menus: [...menus,
+        { id: 50, code: "hr.retire.approvals", name: "퇴직승인관리", path: "/hr/retire/approvals", icon: "FileText", sort_order: 3, children: [] },
+        { id: 52, code: "hr.severance.calcs", name: "퇴직금산정", path: "/hr/severance/calcs", icon: "FileText", sort_order: 4, children: [] },
+      ] });
       if (scenario === "hri-tasks") return json(response, 200, { menus: [...menus,
+        { id: 32, code: "hri.requests.mine", name: "내 신청서", path: "/hri/requests/mine", icon: "FileText", sort_order: 9, children: [] },
         ...["approvals", "receives"].map((kind, index) => ({ id: 30 + index, code: `hri.tasks.${kind}`, name: index ? "수신함" : "결재함", path: `/hri/tasks/${kind}`, icon: "FileText", sort_order: 10 + index, children: [] })),
         { id: 40, code: "tim.attendance-status", name: "근태현황", path: "/tim/status", icon: "FileText", sort_order: 12, children: [] },
       ] });

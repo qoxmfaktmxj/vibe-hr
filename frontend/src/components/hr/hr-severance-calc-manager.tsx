@@ -89,18 +89,12 @@ export function HrSeveranceCalcManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { mutate: globalMutate } = useSWRConfig();
-  const { data: calcData, mutate: mutateCalcs } = useSWR<HrSeveranceCalcListResponse>(
-    "/api/hr/severance/calcs",
-    fetcher,
-    { revalidateOnFocus: false },
-  );
   const pageSize = 50;
   const pagedCalcKey = `/api/hr/severance/calcs?page=${page}&limit=${pageSize}`;
   const { data: pagedCalcData, isLoading: isPagedCalcLoading, mutate: mutatePagedCalcs } =
     useSWR<HrSeveranceCalcListResponse>(pagedCalcKey, fetcher, { revalidateOnFocus: false });
 
   async function mutateAllCalcLists() {
-    await mutateCalcs();
     await globalMutate((key) => typeof key === "string" && key.startsWith("/api/hr/severance/calcs?"));
   }
 
@@ -111,7 +105,7 @@ export function HrSeveranceCalcManager() {
     { revalidateOnFocus: false },
   );
 
-  const calcItems = useMemo(() => calcData?.items ?? [], [calcData?.items]);
+  const calcItems = useMemo(() => pagedCalcData?.items ?? [], [pagedCalcData?.items]);
   const calcRows = useMemo<SeveranceCalcRow[]>(
     () => createReadonlyGridRows(pagedCalcData?.items ?? []),
     [pagedCalcData?.items],
@@ -177,13 +171,14 @@ export function HrSeveranceCalcManager() {
   );
 
   useEffect(() => {
+    if (isSubmitting || !pagedCalcData) return;
     if (calcItems.length === 0) {
       if (selectedCalcId !== null) setSelectedCalcId(null);
       return;
     }
     if (selectedCalcId && calcItems.some((item) => item.id === selectedCalcId)) return;
     setSelectedCalcId(firstCalcId);
-  }, [calcItems, firstCalcId, selectedCalcId]);
+  }, [calcItems, firstCalcId, selectedCalcId, isSubmitting, pagedCalcData]);
 
   useEffect(() => {
     if (!calcDetail) {

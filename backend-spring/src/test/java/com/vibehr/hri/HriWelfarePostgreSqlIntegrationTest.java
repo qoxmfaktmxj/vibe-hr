@@ -224,6 +224,31 @@ class HriWelfarePostgreSqlIntegrationTest {
     }
 
     @Test
+    void incompleteDraftDetailReflectsTheLatestSavedContentInsteadOfThePriorTypedRow() {
+        jdbc.update("insert into hri_form_types(id,form_code,form_name_ko,module_code,is_active,allow_draft,allow_withdraw,requires_receive,default_priority,created_by,updated_by,created_at,updated_at) values (12,'TIM_CORRECTION','Correction','TIM',true,true,true,false,20,1,1,current_timestamp,current_timestamp)");
+        jdbc.update("insert into hri_form_type_approval_maps(form_type_id,template_id,is_active,effective_from,effective_to,created_at,updated_at) values (12,21,true,date '2020-01-01',null,current_timestamp,current_timestamp)");
+        HriRequestItem draft = hri.saveDraft(1, new HriRequestDraftUpsertRequest(null, 12, "Correction", Map.of(
+                "work_date", "2026-07-31", "before_status", "absent", "after_status", "present", "reason", "initial")));
+        assertThat(hri.detail(1, draft.id()).detailData()).containsEntry("after_status", "present");
+
+        Map<String, Object> incomplete = Map.of("before_status", "absent", "reason", "edited");
+        hri.saveDraft(1, new HriRequestDraftUpsertRequest(draft.id(), 12, "Correction", incomplete));
+        HriRequestDetailFull detail = hri.detail(1, draft.id());
+        assertThat(detail.contentJson()).isEqualTo(incomplete);
+        assertThat(detail.detailData()).isEqualTo(incomplete);
+        assertThatThrownBy(() -> hri.submit(1, draft.id()))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.status().value()).isEqualTo(422));
+
+        hri.saveDraft(1, new HriRequestDraftUpsertRequest(draft.id(), 12, "Correction", Map.of(
+                "work_date", "2026-07-31", "before_status", "absent", "after_status", "late", "reason", "restored")));
+        hri.submit(1, draft.id());
+        assertThat(hri.detail(1, draft.id()).detailData()).containsEntry("after_status", "late")
+                .containsEntry("reason", "restored");
+        assertThat(jdbc.queryForMap("select after_status,reason from hri_req_tim_correction where request_id=?", draft.id()))
+                .containsEntry("after_status", "late").containsEntry("reason", "restored");
+    }
+
+    @Test
     void matchingRequiresReceiveTemplateTransitionsThroughBothPhases() {
         jdbc.update("update hri_form_types set requires_receive=true where id=11");
         jdbc.update("insert into hri_approval_line_steps(template_id,step_order,step_type,actor_resolve_type,actor_user_id,allow_delegate,required_action,created_at,updated_at) values (21,2,'RECEIVE','USER_FIXED',3,false,'RECEIVE',current_timestamp,current_timestamp)");
@@ -232,6 +257,138 @@ class HriWelfarePostgreSqlIntegrationTest {
         assertThat(hri.submit(1, draft.id()).statusCode()).isEqualTo("APPROVAL_IN_PROGRESS");
         assertThat(hri.approve(2, draft.id(), null).statusCode()).isEqualTo("RECEIVE_IN_PROGRESS");
         assertThat(hri.receiveComplete(3, draft.id(), "접수 완료").statusCode()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void approvalInboxOnlyListsTheCurrentStepAndCountsOnlyActionableRequests() {
+        jdbc.update("insert into hri_approval_line_steps(template_id,step_order,step_type,actor_resolve_type,actor_user_id,allow_delegate,required_action,created_at,updated_at) values (21,2,'APPROVAL','USER_FIXED',3,false,'APPROVE',current_timestamp,current_timestamp)");
+        HriRequestItem first = hri.saveDraft(1, draftCommand(null, 10_000));
+        HriRequestItem second = hri.saveDraft(1, draftCommand(null, 20_000));
+        HriRequestItem rejected = hri.saveDraft(1, draftCommand(null, 30_000));
+        hri.submit(1, first.id());
+        hri.submit(1, second.id());
+        hri.submit(1, rejected.id());
+        hri.reject(2, rejected.id(), "rejected");
+
+        assertInbox(hri.approvalTasks(2, 1, 20), first.id(), second.id());
+        assertInbox(hri.approvalTasks(3, 1, 20));
+        HriTaskListResponse firstPage = hri.approvalTasks(2, 1, 1);
+        HriTaskListResponse secondPage = hri.approvalTasks(2, 2, 1);
+        assertThat(firstPage.totalCount()).isEqualTo(2);
+        assertThat(secondPage.totalCount()).isEqualTo(2);
+        assertThat(firstPage.items()).hasSize(1);
+        assertThat(secondPage.items()).hasSize(1);
+        assertThat(List.of(firstPage.items().getFirst().requestId(), secondPage.items().getFirst().requestId()))
+                .containsExactlyInAnyOrder(first.id(), second.id());
+
+        hri.approve(2, first.id(), null);
+        assertInbox(hri.approvalTasks(2, 1, 20), second.id());
+        assertInbox(hri.approvalTasks(3, 1, 20), first.id());
+        assertThat(hri.approve(3, first.id(), null).statusCode()).isEqualTo("COMPLETED");
+        assertInbox(hri.approvalTasks(3, 1, 20));
+
+        hri.approve(2, second.id(), null);
+        assertInbox(hri.approvalTasks(2, 1, 20));
+        assertInbox(hri.approvalTasks(3, 1, 20), second.id());
+        hri.approve(3, second.id(), null);
+        assertInbox(hri.approvalTasks(3, 1, 20));
+    }
+
+    @Test
+    void receiveInboxOnlyListsTheCurrentStepUntilCompletionOrRejection() {
+        jdbc.update("update hri_form_types set requires_receive=true where id=11");
+        jdbc.update("insert into hri_approval_line_steps(template_id,step_order,step_type,actor_resolve_type,actor_user_id,allow_delegate,required_action,created_at,updated_at) values (21,2,'RECEIVE','USER_FIXED',2,false,'RECEIVE',current_timestamp,current_timestamp),(21,3,'RECEIVE','USER_FIXED',3,false,'RECEIVE',current_timestamp,current_timestamp)");
+        HriRequestItem completed = hri.saveDraft(1, draftCommand(null, 10_000));
+        HriRequestItem rejected = hri.saveDraft(1, draftCommand(null, 20_000));
+        hri.submit(1, completed.id());
+        hri.submit(1, rejected.id());
+        assertInbox(hri.receiveTasks(2, 1, 20));
+        assertInbox(hri.receiveTasks(3, 1, 20));
+
+        hri.approve(2, completed.id(), null);
+        hri.approve(2, rejected.id(), null);
+        assertInbox(hri.receiveTasks(2, 1, 20), completed.id(), rejected.id());
+        assertInbox(hri.receiveTasks(3, 1, 20));
+        assertThat(hri.receiveReject(2, rejected.id(), "rejected").statusCode()).isEqualTo("RECEIVE_REJECTED");
+        assertInbox(hri.receiveTasks(2, 1, 20), completed.id());
+        assertInbox(hri.receiveTasks(3, 1, 20));
+
+        hri.receiveComplete(2, completed.id(), null);
+        assertInbox(hri.receiveTasks(2, 1, 20));
+        assertInbox(hri.receiveTasks(3, 1, 20), completed.id());
+        assertThat(hri.receiveComplete(3, completed.id(), null).statusCode()).isEqualTo("COMPLETED");
+        assertInbox(hri.receiveTasks(2, 1, 20));
+        assertInbox(hri.receiveTasks(3, 1, 20));
+    }
+
+    private void assertInbox(HriTaskListResponse response, Integer... requestIds) {
+        assertThat(response.items()).extracting(HriTaskItem::requestId).containsExactlyInAnyOrder(requestIds);
+        assertThat(response.totalCount()).isEqualTo(requestIds.length);
+    }
+
+    @Test
+    void draftDisabledFormsCanSubmitAndResubmitAtomicallyWhileDraftSavingRemainsDisabled() {
+        jdbc.update("update hri_form_types set allow_draft=false where id=11");
+        assertThatThrownBy(() -> hri.saveDraft(1, draftCommand(null, 10_000)))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.status().value()).isEqualTo(409));
+        HriRequestSubmitResponse submitted = hri.saveAndSubmit(1, draftCommand(null, 10_000));
+        assertThat(submitted.statusCode()).isEqualTo("APPROVAL_IN_PROGRESS");
+        assertThat(submitted.currentStepOrder()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from hri_request_masters where status_code='DRAFT'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select status_code from wel_benefit_requests", String.class)).isEqualTo("submitted");
+        assertInbox(hri.approvalTasks(2, 1, 20), submitted.requestId());
+
+        hri.reject(2, submitted.requestId(), "revise");
+        HriRequestSubmitResponse resubmitted = hri.saveAndSubmit(1, draftCommand(submitted.requestId(), 20_000));
+        assertThat(resubmitted.requestId()).isEqualTo(submitted.requestId());
+        assertThat(resubmitted.statusCode()).isEqualTo("APPROVAL_IN_PROGRESS");
+        assertThat(jdbc.queryForObject("select count(*) from hri_request_masters", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select requested_amount from wel_benefit_requests", Integer.class)).isEqualTo(20_000);
+        assertInbox(hri.approvalTasks(2, 1, 20), submitted.requestId());
+        assertThatThrownBy(() -> hri.saveAndSubmit(1, draftCommand(submitted.requestId(), 30_000)))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.status().value()).isEqualTo(409));
+    }
+
+    @Test
+    void directSubmissionRollsBackAllWritesWhenRequiredContentIsIncomplete() {
+        jdbc.update("update hri_form_types set allow_draft=false where id=11");
+        assertThatThrownBy(() -> hri.saveAndSubmit(1,
+                new HriRequestDraftUpsertRequest(null, 11, "Incomplete", Map.of("reason", "test"))))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.status().value()).isEqualTo(422));
+        assertNoRequestWrites();
+    }
+
+    @Test
+    void directSubmissionRollsBackAllWritesWhenNoApprovalTemplateIsAvailable() {
+        jdbc.update("update hri_form_types set allow_draft=false where id=11");
+        jdbc.update("update hri_approval_line_templates set is_active=false where id=21");
+        assertThatThrownBy(() -> hri.saveAndSubmit(1, draftCommand(null, 10_000)))
+                .isInstanceOf(ApiException.class);
+        assertNoRequestWrites();
+    }
+
+    @Test
+    void failedDirectResubmissionPreservesTheRejectedContentAndProjection() {
+        HriRequestItem draft = hri.saveDraft(1, draftCommand(null, 10_000));
+        hri.submit(1, draft.id());
+        hri.reject(2, draft.id(), "revise");
+        jdbc.update("update hri_form_types set allow_draft=false where id=11");
+        jdbc.update("update hri_approval_line_templates set is_active=false where id=21");
+        assertThatThrownBy(() -> hri.saveAndSubmit(1, draftCommand(draft.id(), 20_000)))
+                .isInstanceOf(ApiException.class);
+        HriRequestDetailFull detail = hri.detail(1, draft.id());
+        assertThat(detail.statusCode()).isEqualTo("APPROVAL_REJECTED");
+        assertThat(detail.contentJson()).containsEntry("requested_amount", 10_000);
+        assertThat(jdbc.queryForMap("select status_code,requested_amount from wel_benefit_requests"))
+                .containsEntry("status_code", "rejected").containsEntry("requested_amount", 10_000);
+        assertThat(jdbc.queryForObject("select count(*) from hri_request_histories", Integer.class)).isEqualTo(3);
+    }
+
+    private void assertNoRequestWrites() {
+        for (String table : List.of("hri_request_masters", "hri_request_step_snapshots", "hri_request_histories",
+                "hri_request_counters", "wel_benefit_requests")) {
+            assertThat(jdbc.queryForObject("select count(*) from " + table, Integer.class)).as(table).isZero();
+        }
     }
 
     @Test

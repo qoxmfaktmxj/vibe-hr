@@ -116,19 +116,19 @@ This is a partial-migration inventory. It does not claim that the Spring migrati
 | `pay_variable_inputs` | `VariableInput` ([backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java:119](../../backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java)) | 9 | none | none | mapped |
 | `pay_voucher_lines` | `VoucherLine` ([backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java:267](../../backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java)) | 10 | none | none | mapped |
 | `pay_vouchers` | `Voucher` ([backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java:250](../../backend-spring/src/main/java/com/vibehr/payroll/PayrollEntities.java)) | 14 | none | none | mapped |
-| `tim_annual_leaves` | `TimAnnualLeave` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:161](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 11 | none | none | mapped |
-| `tim_attendance_codes` | `TimAttendanceCode` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:23](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 14 | none | none | mapped |
-| `tim_attendance_corrections` | `TimAttendanceCorrection` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:146](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 11 | none | none | mapped |
-| `tim_attendance_daily` | `TimAttendanceDaily` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:127](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 17 | none | none | mapped |
-| `tim_department_schedule_assignments` | `TimDepartmentScheduleAssignment` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:85](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 9 | none | none | mapped |
-| `tim_employee_daily_schedules` | `TimEmployeeDailySchedule` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:108](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | none | mapped |
-| `tim_employee_schedule_exceptions` | `TimEmployeeScheduleException` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:96](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 10 | none | none | mapped |
-| `tim_holidays` | `TimHoliday` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:54](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
-| `tim_leave_requests` | `TimLeaveRequest` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:174](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 14 | none | none | mapped |
-| `tim_month_closes` | `TimMonthClose` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:190](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 21 | none | none | mapped |
-| `tim_schedule_pattern_days` | `TimSchedulePatternDay` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:72](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 9 | none | none | mapped |
-| `tim_schedule_patterns` | `TimSchedulePattern` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:63](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
-| `tim_work_schedule_codes` | `TimWorkScheduleCode` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:39](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 13 | none | none | mapped |
+| `tim_annual_leaves` | `TimAnnualLeave` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:162](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 11 | none | none | mapped |
+| `tim_attendance_codes` | `TimAttendanceCode` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:24](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 14 | none | none | mapped |
+| `tim_attendance_corrections` | `TimAttendanceCorrection` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:147](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 11 | none | none | mapped |
+| `tim_attendance_daily` | `TimAttendanceDaily` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:128](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 17 | none | none | mapped |
+| `tim_department_schedule_assignments` | `TimDepartmentScheduleAssignment` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:86](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 9 | none | none | mapped |
+| `tim_employee_daily_schedules` | `TimEmployeeDailySchedule` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:109](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | none | mapped |
+| `tim_employee_schedule_exceptions` | `TimEmployeeScheduleException` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:97](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 10 | none | none | mapped |
+| `tim_holidays` | `TimHoliday` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:55](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
+| `tim_leave_requests` | `TimLeaveRequest` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:175](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 15 | none | annual_charge_breakdown | mapped |
+| `tim_month_closes` | `TimMonthClose` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:192](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 21 | none | none | mapped |
+| `tim_schedule_pattern_days` | `TimSchedulePatternDay` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:73](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 9 | none | none | mapped |
+| `tim_schedule_patterns` | `TimSchedulePattern` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:64](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 7 | none | none | mapped |
+| `tim_work_schedule_codes` | `TimWorkScheduleCode` ([backend-spring/src/main/java/com/vibehr/time/TimeEntities.java:40](../../backend-spring/src/main/java/com/vibehr/time/TimeEntities.java)) | 13 | none | none | mapped |
 | `tra_applications` | `TraApplication` ([backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java:109](../../backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java)) | 15 | none | none | mapped |
 | `tra_courses` | `TraCourse` ([backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java:34](../../backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java)) | 19 | none | none | mapped |
 | `tra_cyber_uploads` | `TraCyberUpload` ([backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java:173](../../backend-spring/src/main/java/com/vibehr/training/TrainingEntities.java)) | 33 | none | none | mapped |
@@ -154,6 +154,6 @@ No unresolved Java table names.
 - Unmapped SQLModel tables: 0
 - Extra Java tables: 0
 - Per-owner missing columns: 0
-- Per-owner extra columns: 0
+- Per-owner extra columns: 1
 
 See `spring-schema-coverage.json` for all entity sources, mapped columns, and statically determined comparison clues.

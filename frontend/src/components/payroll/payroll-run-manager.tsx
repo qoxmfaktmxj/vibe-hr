@@ -16,6 +16,8 @@ import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summar
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { snapshotFields, type GridRowStatus } from "@/lib/hr/grid-change-tracker";
+import { PAYROLL_RUN_COLUMNS } from "@/lib/spreadsheet/payroll-operation-schemas";
+import { downloadSpreadsheet } from "@/lib/spreadsheet/workbook";
 import type {
   PayPayrollRunActionResponse,
   PayPayrollRunEmployeeDetailItem,
@@ -403,6 +405,14 @@ export function PayrollRunManager() {
     }
   }
 
+  async function handleDownload() {
+    try {
+      await downloadSpreadsheet("payroll-runs-current-page.xlsx", PAYROLL_RUN_COLUMNS, pagedRows);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "다운로드에 실패했습니다.");
+    }
+  }
+
   async function runAction(path: string, successMessage: string) {
     if (!selectedRunId) {
       toast.error("대상 Run을 먼저 선택해 주세요.");
@@ -544,9 +554,9 @@ export function PayrollRunManager() {
             ]}
             saveAction={{
               key: "save",
-              label: "다운로드",
+              label: "현재 페이지 다운로드",
               icon: Download,
-              onClick: () => toast.success("다운로드는 다음 단계에서 연결합니다."),
+              onClick: () => void handleDownload(),
               disabled: working,
             }}
           />

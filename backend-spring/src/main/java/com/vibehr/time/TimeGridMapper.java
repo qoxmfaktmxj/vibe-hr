@@ -95,7 +95,10 @@ interface TimeGridMapper {
                    d.name as departmentName, r.leave_type as leaveType, r.start_date as startDate, r.end_date as endDate,
                    r.reason, r.request_status as requestStatus, r.approver_employee_id as approverEmployeeId,
                    r.approved_at as approvedAt, r.decision_comment as decisionComment, r.decided_by as decidedBy,
-                   r.decided_at as decidedAt, r.created_at as createdAt
+                   r.decided_at as decidedAt, r.created_at as createdAt,
+                   case when r.annual_charge_breakdown is not null then
+                     (select coalesce(sum(value::double precision), 0) from jsonb_each_text(r.annual_charge_breakdown))
+                   end as annualDeductionDays
               from tim_leave_requests r join hr_employees e on e.id = r.employee_id
               join auth_users u on u.id = e.user_id join org_departments d on d.id = e.department_id
              where 1 = 1
@@ -120,4 +123,5 @@ record AnnualLeaveGridRow(Integer id, int employeeId, String employeeNo, String 
         int year, double grantedDays, double usedDays, double carriedOverDays, double remainingDays, String grantType, String note) { }
 record LeaveRequestGridRow(Integer id, int employeeId, String employeeNo, String employeeName, String departmentName,
         String leaveType, LocalDate startDate, LocalDate endDate, String reason, String requestStatus,
-        Integer approverEmployeeId, Instant approvedAt, String decisionComment, Integer decidedBy, Instant decidedAt, Instant createdAt) { }
+        Integer approverEmployeeId, Instant approvedAt, String decisionComment, Integer decidedBy, Instant decidedAt, Instant createdAt,
+        Double annualDeductionDays) { }

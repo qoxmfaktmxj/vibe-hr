@@ -16,7 +16,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-/** Proves the complete Spring model validates after a pristine Flyway V1-V5 installation. */
+/** Proves the complete Spring model validates after a pristine Flyway V1-V6 installation. */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 @ActiveProfiles("flyway-cutover")

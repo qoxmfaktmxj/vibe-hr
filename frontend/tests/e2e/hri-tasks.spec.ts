@@ -2,6 +2,40 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { read, utils } from "xlsx";
 
+for (const width of [1440, 390]) {
+  test(`draft-disabled form submits atomically and keeps failed edits at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "hri-tasks" } });
+    await page.goto("/login");
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto("/hri/requests/mine");
+    await page.getByRole("button", { name: "신청서 작성", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "일반 신청", exact: true }).click();
+    await dialog.getByPlaceholder("신청서 제목").fill("실패 신청");
+    await dialog.locator("textarea").fill("입력한 신청 사유");
+    await dialog.getByRole("button", { name: "결재신청", exact: true }).click();
+    await expect(page.getByText("결재선 설정을 확인해 주세요.", { exact: true })).toBeVisible();
+    await expect(dialog.getByPlaceholder("신청서 제목")).toHaveValue("실패 신청");
+    await expect(dialog.locator("textarea")).toHaveValue("입력한 신청 사유");
+    await expect(page.locator('[role="grid"]')).not.toContainText("실패 신청");
+    await page.screenshot({ path: test.info().outputPath(`direct-submit-failure-${width}.png`) });
+
+    await dialog.getByPlaceholder("신청서 제목").fill("최종 신청");
+    await dialog.getByRole("button", { name: "결재신청", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole("grid")).toContainText("최종 신청");
+    const writes = await (await request.get("http://127.0.0.1:3101/__hri-request-writes")).json();
+    expect(writes).toHaveLength(2);
+    expect(writes.map((write: { path: string }) => write.path)).toEqual([
+      "/api/v1/hri/requests/submit", "/api/v1/hri/requests/submit",
+    ]);
+    expect(writes[1]).toMatchObject({ request_id: null, form_type_id: 11, title: "최종 신청", content_json: { reason: "입력한 신청 사유" } });
+    await page.screenshot({ path: test.info().outputPath(`direct-submit-success-${width}.png`) });
+  });
+}
+
 for (const kind of ["approvals", "receives"] as const) {
   test(`${kind}: export, confirm/cancel and partial bulk processing`, async ({ page, request }) => {
     await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "hri-tasks" } });

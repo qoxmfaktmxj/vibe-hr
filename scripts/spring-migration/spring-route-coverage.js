@@ -18,7 +18,9 @@ const EXPECTED_TRA_SHADOWED_HANDLER_COUNT = 6;
 // This is deliberately small. Add an entry only with an explicit migration decision.
 const COMPLETE_ALLOWLIST = Object.freeze({
   missing: Object.freeze({}),
-  extra: Object.freeze({}),
+  extra: Object.freeze({
+    "POST /api/v1/hri/requests/submit": "Approved atomic HRI submission extension; see docs/HRI_SUBMISSION_API.md.",
+  }),
 });
 
 function toPosix(filePath) {
@@ -794,7 +796,7 @@ function buildCoverage(repositoryRoot = process.cwd(), options = {}) {
     },
     spring_source_root: toPosix(path.relative(repositoryRoot, options.springSourceRoot || path.join(repositoryRoot, "backend-spring", "src", "main", "java"))),
     completion: {
-      state: missing.length === 0 && extra.length === 0 && duplicateSpringMappings.length === 0 && spring.unresolved_annotations.length === 0 && manifestCheck.errors.length === 0
+      state: missing.length === 0 && extra.every((mapping) => Object.prototype.hasOwnProperty.call(COMPLETE_ALLOWLIST.extra, mapping.key)) && duplicateSpringMappings.length === 0 && spring.unresolved_annotations.length === 0 && manifestCheck.errors.length === 0
         ? "complete_candidate"
         : "partial_migration",
       required_route_count: requiredRouteCount,
@@ -873,7 +875,9 @@ function markdownCoverage(coverage) {
     "",
     "## Complete Allowlist",
     "",
-    "The hard-coded complete-mode allowlist is intentionally empty. Add only explicit, reviewed migration exceptions in `COMPLETE_ALLOWLIST` in the generator; never use it to hide a domain still in progress.",
+    "The complete-mode allowlist contains only explicit, reviewed extensions in `COMPLETE_ALLOWLIST` in the generator; never use it to hide a domain still in progress.",
+    "",
+    ...Object.entries(COMPLETE_ALLOWLIST.extra).map(([key, reason]) => `- \`${key}\`: ${reason}`),
     "",
     "## Route Summary",
     "",

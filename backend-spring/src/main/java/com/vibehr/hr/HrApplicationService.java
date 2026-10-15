@@ -324,6 +324,15 @@ class HrApplicationService {
         for (HrAppointmentOrderItem item : items) {
             if ("cancelled".equals(item.apply_status)) continue;
             HrEmployee employee = lockedEmployee(item.employee_id);
+            for (int previousId : appointmentRules(employee.id, item.appointment_kind, item.start_date, item.end_date, item.id)) {
+                HrAppointmentOrderItem previous = entityManager.find(HrAppointmentOrderItem.class, previousId);
+                LocalDate previousEnd = previous.end_date;
+                previous.end_date = item.start_date.minusDays(1);
+                previous.updated_at = time;
+                writeHistory(employee.id, "appointment_end", "hr_appointment_order_items", previous.id, previous.order_id, item.start_date,
+                        "end_date", previousEnd == null ? null : previousEnd.toString(), previous.end_date.toString(),
+                        "Superseded by " + order.appointment_no + ".", actor);
+            }
             List<String[]> changes = new ArrayList<>();
             if (item.to_department_id != null && item.to_department_id != employee.department_id) { changes.add(new String[] { "department_id", String.valueOf(employee.department_id), String.valueOf(item.to_department_id) }); employee.department_id = item.to_department_id; }
             if (item.to_position_title != null && !Objects.equals(item.to_position_title, employee.position_title)) { changes.add(new String[] { "position_title", employee.position_title, item.to_position_title }); employee.position_title = item.to_position_title; }
@@ -397,6 +406,8 @@ class HrApplicationService {
         Long incomplete = entityManager.createQuery("select count(i) from HrRetireCaseItem i where i.case_id=:id and i.is_required=true and i.is_checked=false", Long.class).setParameter("id", caseId).getSingleResult();
         if (incomplete > 0) throw ApiException.badRequest("Required checklist items are not completed.");
         HrEmployee employee = lockedEmployee(c.employee_id);
+        if (exists("select 1 from hr_retire_cases where employee_id=:value and status='confirmed' and id<>:id", employee.id, "id", caseId)) throw ApiException.conflict("Employee already has a confirmed retirement case.");
+        if ("resigned".equals(employee.employment_status)) throw ApiException.conflict("Employee is already resigned.");
         Instant time = now();
         String before = employee.employment_status;
         c.previous_employment_status = before; c.status = "confirmed"; c.confirmed_by = actor; c.confirmed_at = time; c.updated_at = time;
@@ -414,12 +425,27 @@ class HrApplicationService {
         HrRetireCase c = retireCase(caseId, LockModeType.PESSIMISTIC_WRITE);
         if (!"confirmed".equals(c.status)) throw ApiException.conflict("Only confirmed cases can be cancelled.");
         HrEmployee employee = lockedEmployee(c.employee_id);
+        HrRetireCase remaining = entityManager.createQuery("select c from HrRetireCase c where c.employee_id=:employeeId and c.status='confirmed' and c.id<>:id order by c.confirmed_at desc,c.id desc", HrRetireCase.class)
+                .setParameter("employeeId", employee.id).setParameter("id", caseId).setMaxResults(1).getResultStream().findFirst().orElse(null);
         Instant time = now();
-        String before = employee.employment_status, restore = present(c.previous_employment_status) ? c.previous_employment_status : "active";
+        String before = employee.employment_status, restore = remaining != null ? "resigned" : (present(c.previous_employment_status) ? c.previous_employment_status : "active");
+        if (remaining == null && "resigned".equals(restore) && c.confirmed_at != null) {
+            Instant overlapStart = c.confirmed_at;
+            List<HrRetireCase> previousCases = entityManager.createQuery("select c from HrRetireCase c where c.employee_id=:employeeId and c.id<>:id and c.confirmed_at<=:confirmedAt and c.status in ('confirmed','cancelled') order by c.confirmed_at desc,c.id desc", HrRetireCase.class)
+                    .setParameter("employeeId", employee.id).setParameter("id", caseId).setParameter("confirmedAt", c.confirmed_at).getResultList();
+            for (HrRetireCase previous : previousCases) {
+                if (previous.cancelled_at != null && previous.cancelled_at.isBefore(overlapStart)) continue;
+                overlapStart = previous.confirmed_at;
+                if ("active".equals(previous.previous_employment_status) || "leave".equals(previous.previous_employment_status)) {
+                    restore = previous.previous_employment_status;
+                    break;
+                }
+            }
+        }
         c.status = "cancelled"; c.cancelled_by = actor; c.cancelled_at = time; c.cancel_reason = payload.cancelReason; c.updated_at = time;
         employee.employment_status = restore; employee.updated_at = time;
         HrEmployeeBasicProfile profile = optionalProfile(employee.id);
-        if (profile != null) { profile.retire_date = null; profile.updated_at = time; }
+        if (profile != null) { profile.retire_date = remaining == null ? null : remaining.retire_date; profile.updated_at = time; }
         writeInfoRecord(employee.id, c.retire_date, "퇴직처리 취소", "retire_cancel", null, payload.cancelReason, "퇴직처리 취소(case_id=" + c.id + ")", time);
         writeHistory(employee.id, "retire_cancel", "hr_retire_cases", c.id, null, c.retire_date, "employment_status", before, restore, "Retire case cancelled.", actor);
         audit(caseId, "cancel", actor, "employment_status:" + before + "->" + restore);
@@ -576,7 +602,28 @@ class HrApplicationService {
     private Map<String,Object> codeMap(Map<String,Object> row){return map("id",row.get("id"),"code",row.get("code"),"name",row.get("name"),"description",row.get("description"),"is_active",row.get("is_active"),"sort_order",row.get("sort_order"),"mapping_key",row.get("mapping_key"),"mapping_value",row.get("mapping_value"),"created_at",row.get("created_at"),"updated_at",row.get("updated_at"));}
     private Integer validCodeId(Integer id){if(id==null)return null;Map<String,Object> code=codeRow(id);if(code==null||integer(code.get("group_id"))!=integer(appointmentGroup(false).get("id")))throw ApiException.badRequest("Invalid appointment code.");return id;}
     private String nextAppointmentNo(){String prefix="APT-"+LocalDate.now(ZoneOffset.UTC).toString().replace("-","")+"-";@SuppressWarnings("unchecked")List<String> values=entityManager.createNativeQuery("select appointment_no from hr_appointment_orders where appointment_no like :prefix").setParameter("prefix",prefix+"%").getResultList();int max=values.stream().mapToInt(value->{try{return Integer.parseInt(value.substring(prefix.length()));}catch(RuntimeException ignored){return 0;}}).max().orElse(0);return prefix+String.format("%04d",max+1);}
-    private void appointmentRules(int employeeId,String kind,LocalDate start,LocalDate end,Integer excludedItem){if(!Set.of("permanent","temporary").contains(kind))throw ApiException.badRequest("Invalid appointment kind.");if("temporary".equals(kind)&&end==null)throw ApiException.badRequest("Temporary appointment requires end_date.");if(start==null)throw ApiException.unprocessable("start_date is required.");if(end!=null&&start.isAfter(end))throw ApiException.badRequest("start_date must be before or equal to end_date.");String sql="select i.start_date,i.end_date from hr_appointment_order_items i join hr_appointment_orders o on o.id=i.order_id where i.employee_id=:employeeId and o.status in ('draft','confirmed')"+(excludedItem==null?"":" and i.id<>:itemId");var query=entityManager.createNativeQuery(sql).setParameter("employeeId",employeeId);if(excludedItem!=null)query.setParameter("itemId",excludedItem);@SuppressWarnings("unchecked")List<Object[]> rows=query.getResultList();for(Object[] row:rows){LocalDate oldStart=localDate(row[0]),oldEnd=localDate(row[1]);if(oldEnd==null)throw ApiException.conflict("해당 직원에게 겹치는 발령이 이미 존재합니다. 기존 발령을 취소한 후 진행하세요.");boolean overlap=start.compareTo(oldEnd)<=0&&(end==null||end.compareTo(oldStart)>=0);if(overlap)throw ApiException.conflict("해당 직원의 기존 발령 기간("+oldStart+"~"+oldEnd+")과 겹칩니다.");}}
+    private List<Integer> appointmentRules(int employeeId,String kind,LocalDate start,LocalDate end,Integer excludedItem) {
+        if (!Set.of("permanent", "temporary").contains(kind)) throw ApiException.badRequest("Invalid appointment kind.");
+        if ("temporary".equals(kind) && end == null) throw ApiException.badRequest("Temporary appointment requires end_date.");
+        if (start == null) throw ApiException.unprocessable("start_date is required.");
+        if (end != null && start.isAfter(end)) throw ApiException.badRequest("start_date must be before or equal to end_date.");
+        String sql = "select i.id,i.start_date,i.end_date,i.appointment_kind,o.status from hr_appointment_order_items i join hr_appointment_orders o on o.id=i.order_id where i.employee_id=:employeeId and o.status in ('draft','confirmed')" + (excludedItem == null ? "" : " and i.id<>:itemId");
+        var query = entityManager.createNativeQuery(sql).setParameter("employeeId", employeeId);
+        if (excludedItem != null) query.setParameter("itemId", excludedItem);
+        @SuppressWarnings("unchecked") List<Object[]> rows = query.getResultList();
+        List<Integer> previousItems = new ArrayList<>();
+        for (Object[] row : rows) {
+            LocalDate oldStart = localDate(row[1]), oldEnd = row[2] == null ? null : localDate(row[2]);
+            boolean overlap = (oldEnd == null || !start.isAfter(oldEnd)) && (end == null || !end.isBefore(oldStart));
+            if (overlap && "permanent".equals(kind) && "permanent".equals(row[3]) && "confirmed".equals(row[4]) && start.isAfter(oldStart)) {
+                previousItems.add(integer(row[0]));
+                continue;
+            }
+            if (oldEnd == null) throw ApiException.conflict("해당 직원에게 겹치는 발령이 이미 존재합니다. 기존 발령을 취소한 후 진행하세요.");
+            if (overlap) throw ApiException.conflict("해당 직원의 기존 발령 기간(" + oldStart + "~" + oldEnd + ")과 겹칩니다.");
+        }
+        return previousItems;
+    }
     private String resolvedEmploymentStatus(HrEmployee employee,String requested,String action){if(present(requested)){String status=requested.trim().toLowerCase(Locale.ROOT);if(!EMPLOYMENT_STATUSES.contains(status))throw ApiException.badRequest("Invalid employment status.");return status;}String lower=action.toLowerCase(Locale.ROOT);return "leave".equals(employee.employment_status)&&(lower.contains("입사")||lower.contains("신규")||lower.contains("hire")||lower.contains("onboard")||lower.contains("join"))?"active":null;}
     private List<HrAppointmentOrderItem> appointmentItems(){return entityManager.createQuery("select i from HrAppointmentOrderItem i, HrAppointmentOrder o where o.id=i.order_id order by o.effective_date desc,o.id desc,i.id desc",HrAppointmentOrderItem.class).getResultList();}
     private Map<String,Object> appointmentMap(HrAppointmentOrderItem item){HrAppointmentOrder order=entityManager.find(HrAppointmentOrder.class,item.order_id);Map<String,Object> employee=employeeById(item.employee_id);Map<String,Object> itemCode=item.appointment_code_id==null?null:codeRow(item.appointment_code_id),orderCode=order.appointment_code_id==null?null:codeRow(order.appointment_code_id);return map("id",item.id,"order_id",order.id,"appointment_no",order.appointment_no,"order_title",order.title,"order_description",order.description,"effective_date",order.effective_date,"order_status",order.status,"confirmed_at",order.confirmed_at,"confirmed_by",order.confirmed_by,"employee_id",item.employee_id,"employee_no",employee.get("employee_no"),"display_name",employee.get("display_name"),"department_name",employee.get("department_name"),"employment_status",employee.get("employment_status"),"appointment_code_id",item.appointment_code_id==null?order.appointment_code_id:item.appointment_code_id,"appointment_code_name",itemCode==null?(orderCode==null?null:orderCode.get("name")):itemCode.get("name"),"appointment_kind",item.appointment_kind,"action_type",item.action_type,"start_date",item.start_date,"end_date",item.end_date,"from_department_id",item.from_department_id,"to_department_id",item.to_department_id,"from_position_title",item.from_position_title,"to_position_title",item.to_position_title,"from_employment_status",item.from_employment_status,"to_employment_status",item.to_employment_status,"apply_status",item.apply_status,"applied_at",item.applied_at,"temporary_reason",item.temporary_reason,"note",item.note,"created_at",item.created_at,"updated_at",item.updated_at);}

@@ -51,6 +51,7 @@ export function TraApplicationsApprovalManager() {
 
   const gridRef = useRef<AgGridReact<TraApplicationItem>>(null);
   const [gridApi, setGridApi] = useState<GridApi<TraApplicationItem> | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [approveOpen, setApproveOpen] = useState(false);
@@ -84,7 +85,7 @@ export function TraApplicationsApprovalManager() {
 
   const rowClassRules = useMemo(() => buildGridRowClassRules<TraApplicationGridRow>(), []);
 
-  const selectedRows = gridApi?.getSelectedRows() ?? [];
+  const selectedRows = rowData.filter((row) => selectedIds.includes(row.id));
   const canApprove = selectedRows.length > 0 && selectedRows.every((r) => r.status === "submitted");
   const canReject = selectedRows.length > 0 && selectedRows.every((r) => ["submitted", "draft"].includes(r.status));
 
@@ -252,7 +253,7 @@ export function TraApplicationsApprovalManager() {
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
-              onSelectionChanged={() => setGridApi((prev) => prev)}
+              onSelectionChanged={(event) => setSelectedIds(event.api.getSelectedRows().map((row) => row.id))}
               localeText={{ noRowsToShow: "신청 내역이 없습니다." }}
               headerHeight={36}
               rowHeight={34}
@@ -266,7 +267,8 @@ export function TraApplicationsApprovalManager() {
         open={approveOpen}
         onOpenChange={setApproveOpen}
         title="교육 신청 승인"
-        description={`선택한 ${(gridApi?.getSelectedRows() ?? []).length}건의 교육 신청을 승인하시겠습니까?`}
+        description={`선택한 ${selectedRows.length}건의 교육 신청을 승인하시겠습니까?`}
+        busy={submitting}
         confirmLabel="승인"
         cancelLabel="취소"
         onConfirm={() => void handleApprove()}
@@ -277,7 +279,8 @@ export function TraApplicationsApprovalManager() {
         open={rejectOpen}
         onOpenChange={setRejectOpen}
         title="교육 신청 반려"
-        description={`선택한 ${(gridApi?.getSelectedRows() ?? []).length}건의 교육 신청을 반려하시겠습니까?`}
+        description={`선택한 ${selectedRows.length}건의 교육 신청을 반려하시겠습니까?`}
+        busy={submitting}
         confirmLabel="반려"
         cancelLabel="취소"
         confirmVariant="destructive"

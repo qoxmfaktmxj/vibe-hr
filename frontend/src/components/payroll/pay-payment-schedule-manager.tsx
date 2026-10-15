@@ -17,6 +17,8 @@ import { isRowRevertedToOriginal, snapshotFields, type GridRowStatus } from "@/l
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { PAYMENT_SCHEDULE_COLUMNS, validatePaymentScheduleUpload } from "@/lib/spreadsheet/payroll-operation-schemas";
+import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
 import type { PayEmployeeProfileBatchRequest, PayEmployeeProfileBatchResponse, PayEmployeeProfileItem } from "@/types/pay";
 
 type RowStatus = GridRowStatus;
@@ -59,6 +61,7 @@ export function PayPaymentScheduleManager() {
   const [rows, setRows] = useState<RowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [appliedSearchText, setAppliedSearchText] = useState("");
   const [page, setPage] = useState(1);
@@ -217,6 +220,47 @@ export function PayPaymentScheduleManager() {
 
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
+  async function handleTemplateDownload() {
+    try {
+      await downloadSpreadsheet("payment-schedules-template.xlsx", PAYMENT_SCHEDULE_COLUMNS, []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "양식 다운로드에 실패했습니다.");
+    }
+  }
+
+  async function handleUpload() {
+    setUploading(true);
+    try {
+      const file = await pickSpreadsheetFile();
+      if (!file) return;
+      const records = await readSpreadsheet(file, PAYMENT_SCHEDULE_COLUMNS);
+      gridApiRef.current?.stopEditing();
+      commitRows((prev) => {
+        const items = validatePaymentScheduleUpload(records, prev);
+        const updates = new Map(items.map((item) => [item.id, item]));
+        return prev.map((row) => {
+          const item = updates.get(row.id);
+          if (!item) return row;
+          return reconcileUpdatedStatus({ ...row, ...item }, { shouldBeClean: isReverted });
+        });
+      });
+      toast.success(`${records.length}건을 반영했습니다. 저장 버튼을 눌러 저장해 주세요.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDownload() {
+    gridApiRef.current?.stopEditing();
+    try {
+      await downloadSpreadsheet("payment-schedules-current-page.xlsx", PAYMENT_SCHEDULE_COLUMNS, pagedRows);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "다운로드에 실패했습니다.");
+    }
+  }
+
   const defaultColDef = useMemo<ColDef<RowData>>(
     () => ({
       editable: (params) => params.data?._status !== "deleted",
@@ -316,16 +360,16 @@ export function PayPaymentScheduleManager() {
         headerRight={
           <GridToolbarActions
             actions={[
-              { key: "template", label: "양식 다운로드", icon: Search, onClick: () => toast.success("양식 다운로드는 다음 단계에서 연결합니다.") },
-              { key: "upload", label: "업로드", icon: Search, onClick: () => toast.success("업로드는 다음 단계에서 연결합니다."), disabled: true },
-              { key: "download", label: "다운로드", icon: Download, onClick: () => toast.success("다운로드는 다음 단계에서 연결합니다.") },
+              { key: "template", label: "양식 다운로드", icon: Search, onClick: () => void handleTemplateDownload() },
+              { key: "upload", label: "업로드", icon: Search, onClick: () => void handleUpload(), disabled: saving || uploading },
+              { key: "download", label: "현재 페이지 다운로드", icon: Download, onClick: () => void handleDownload() },
             ]}
             saveAction={{
               key: "save",
               label: saving ? "저장중..." : "저장",
               icon: Save,
               onClick: () => void saveAllChanges(),
-              disabled: saving,
+              disabled: saving || uploading,
             }}
           />
         }

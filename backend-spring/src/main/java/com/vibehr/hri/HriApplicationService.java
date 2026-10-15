@@ -140,9 +140,19 @@ public class HriApplicationService {
 
     @Transactional
     public HriRequestItem saveDraft(int userId, HriRequestDraftUpsertRequest command) {
+        return saveRequest(userId, command, false);
+    }
+
+    @Transactional
+    public HriRequestSubmitResponse saveAndSubmit(int userId, HriRequestDraftUpsertRequest command) {
+        HriRequestItem request = saveRequest(userId, command, true);
+        return submit(userId, request.id());
+    }
+
+    private HriRequestItem saveRequest(int userId, HriRequestDraftUpsertRequest command, boolean submitting) {
         HriFormType formType = formType(command.formTypeId());
         if (!formType.is_active) throw ApiException.notFound("Form type not found.");
-        if (!formType.allow_draft) throw ApiException.conflict("Draft is disabled for this form type.");
+        if (!submitting && !formType.allow_draft) throw ApiException.conflict("Draft is disabled for this form type.");
         HriDetailContracts.ValidatedDetail detail = HriDetailContracts.validate(formType.form_code,
                 map(command.contentJson()), effectivePolicies(formType.id), businessDate(), false);
         Map<String, Object> content = detail.content();
@@ -329,7 +339,8 @@ public class HriApplicationService {
         String actorName = request.current_step_order == null ? null : snapshots.stream()
                 .filter(step -> step.step_order == request.current_step_order).map(step -> step.actor_name).findFirst().orElse(null);
         Map<String, Object> content = map(read(request.content_json));
-        Map<String, Object> detail = readDetail(formType == null ? "" : formType.form_code, request.id);
+        Map<String, Object> detail = "DRAFT".equals(request.status_code)
+                ? content : readDetail(formType == null ? "" : formType.form_code, request.id);
         return new HriRequestDetailFull(request.id, request.request_no, request.form_type_id, formType == null ? null : formType.form_code,
                 formType == null ? null : formType.form_name_ko, request.requester_id, request.title, request.status_code,
                 request.current_step_order, actorName, request.submitted_at, request.completed_at, request.created_at, request.updated_at,
@@ -345,6 +356,7 @@ public class HriApplicationService {
         List<Object[]> rows = entityManager.createQuery("""
                 select s, r from HriRequestStepSnapshot s, HriRequestMaster r
                 where s.request_id = r.id and s.actor_user_id = :userId and s.step_type = :type
+                  and s.step_order = r.current_step_order
                   and s.action_status = 'WAITING' and r.status_code = :status
                 order by r.created_at desc, s.step_order
                 """, Object[].class).setParameter("userId", userId).setParameter("type", type).setParameter("status", status).getResultList();

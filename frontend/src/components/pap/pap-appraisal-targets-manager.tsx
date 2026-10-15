@@ -11,11 +11,18 @@ import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-b
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { SearchFieldGrid, SearchTextField } from "@/components/grid/search-controls";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
-import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
+import { SEARCH_PLACEHOLDERS } from "@/lib/grid/search-presets";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { fetcher } from "@/lib/fetcher";
+import { isRowRevertedToOriginal } from "@/lib/hr/grid-change-tracker";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import type { EmployeeItem, EmployeeListResponse } from "@/types/employee";
 import type { PapAppraisalItem, PapAppraisalListResponse } from "@/types/pap-appraisal";
 import type {
   PapAppraisalTargetBatchRequest,
@@ -29,9 +36,16 @@ type TargetRow = PapAppraisalTargetItem & {
   _prevStatus?: "clean" | "added" | "updated" | "deleted";
 };
 
-// standard-v2 contract: toggleDeletedStatus, getGridRowClass available for editable grids
-void toggleDeletedStatus;
-void getGridRowClass;
+const TRACKED_FIELDS = ["score", "grade_code", "status", "evaluator_note"] as const;
+
+function reconcileRow(row: TargetRow): TargetRow {
+  return reconcileUpdatedStatus({
+    ...row,
+    score: row.score == null || String(row.score).trim() === "" ? null : Number(row.score),
+  }, {
+    shouldBeClean: (candidate) => isRowRevertedToOriginal(candidate, TRACKED_FIELDS),
+  });
+}
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "미평가",
@@ -47,7 +61,22 @@ export function PapAppraisalTargetsManager() {
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
   const [selectedAppraisalId, setSelectedAppraisalId] = useState<number | null>(null);
-  const pageSize = 200;
+  const [rowData, setRowData] = useState<TargetRow[]>([]);
+  const rowsRef = useRef<TargetRow[]>([]);
+  const tempIdRef = useRef(-1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pendingAppraisal, setPendingAppraisal] = useState<{ id: number | null } | null>(null);
+  const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeNo, setEmployeeNo] = useState("");
+  const [employeeResults, setEmployeeResults] = useState<EmployeeItem[]>([]);
+  const [employeeTotal, setEmployeeTotal] = useState(0);
+  const [employeeSearching, setEmployeeSearching] = useState(false);
+  const replaceRows = useCallback((rows: TargetRow[]) => {
+    rowsRef.current = rows;
+    setRowData(rows);
+  }, []);
 
   // load appraisals for selection
   const { data: appraisalsData } = useSWR<PapAppraisalListResponse>(
@@ -58,30 +87,42 @@ export function PapAppraisalTargetsManager() {
 
   const appraisals = useMemo(() => appraisalsData?.items ?? [], [appraisalsData?.items]);
 
-  const queryUrl = useMemo(
-    () => (selectedAppraisalId ? `/api/pap/targets?appraisal_id=${selectedAppraisalId}` : null),
-    [selectedAppraisalId],
-  );
-
-  const { data, isLoading, mutate } = useSWR<PapAppraisalTargetListResponse>(queryUrl, fetcher, {
-    revalidateOnFocus: false,
-  });
-
-  const [rowData, setRowData] = useState<TargetRow[]>([]);
-  useMemo(() => {
-    const items = data?.items ?? [];
-    setRowData(
-      items.map((item) => ({
+  const loadTargets = useCallback(async (appraisalId: number | null) => {
+    setSelectedAppraisalId(appraisalId);
+    setPage(1);
+    replaceRows([]);
+    setTotalCount(0);
+    if (!appraisalId) return;
+    setIsLoading(true);
+    try {
+      const data = await fetcher<PapAppraisalTargetListResponse>(`/api/pap/targets?appraisal_id=${appraisalId}`);
+      replaceRows(data.items.map((item) => ({
         ...item,
         _status: "clean" as const,
         _original: { ...(item as unknown as Record<string, unknown>) },
-      })),
-    );
-  }, [data]);
+      })));
+      setTotalCount(data.total_count);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "평가 대상자를 불러오지 못했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [replaceRows]);
 
-  const totalCount = data?.total_count ?? 0;
-  const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
+  const requestReload = useCallback((appraisalId: number | null) => {
+    gridApi?.stopEditing();
+    const currentRows = rowsRef.current.map(reconcileRow);
+    if (currentRows.some((row) => row._status !== "clean")) {
+      replaceRows(currentRows);
+      setPendingAppraisal({ id: appraisalId });
+      return;
+    }
+    void loadTargets(appraisalId);
+  }, [gridApi, loadTargets, replaceRows]);
+
+  const pagination = useGridPagination({ page, totalCount, pageSize: Math.max(1, totalCount), onPageChange: setPage });
   const rowClassRules = useMemo(() => buildGridRowClassRules<TargetRow>(), []);
+  const getRowClass = useCallback((params: { data?: TargetRow }) => getGridRowClass(params.data?._status), []);
   const gridSummary = useMemo(
     () => summarizeGridStatuses(rowData, (r) => r._status),
     [rowData],
@@ -115,6 +156,8 @@ export function PapAppraisalTargetsManager() {
         field: "score",
         width: 100,
         editable: true,
+        cellDataType: false,
+        cellEditor: "agTextCellEditor",
         cellClass: (p) => getGridStatusCellClass(p.data?._status),
       },
       {
@@ -151,30 +194,51 @@ export function PapAppraisalTargetsManager() {
   }, []);
 
   const onCellValueChanged = useCallback((e: CellValueChangedEvent<TargetRow>) => {
-    if (!e.data) return;
-    setRowData((prev) =>
-      prev.map((r) => {
-        if (r.id !== e.data?.id) return r;
-        const updated = { ...r, ...e.data };
-        if (updated._status === "clean") updated._status = "updated";
-        return updated;
+    const changed = e.data;
+    if (!changed) return;
+    replaceRows(
+      rowsRef.current.map((r) => {
+        if (r.id !== changed.id) return r;
+        return reconcileRow({ ...r, ...changed });
       }),
     );
-  }, []);
+  }, [replaceRows]);
 
-  const handleAddRow = useCallback(() => {
-    if (!selectedAppraisalId) {
-      toast.error("평가를 먼저 선택해주세요.");
+  const handleEmployeeSearch = useCallback(async () => {
+    if (!employeeName.trim() && !employeeNo.trim()) {
+      toast.error("이름 또는 사번을 입력해주세요.");
+      return;
+    }
+    setEmployeeSearching(true);
+    setEmployeeResults([]);
+    try {
+      const params = new URLSearchParams({ page: "1", limit: "50" });
+      if (employeeName.trim()) params.set("name", employeeName.trim());
+      if (employeeNo.trim()) params.set("employee_no", employeeNo.trim());
+      const data = await fetcher<EmployeeListResponse>(`/api/employees?${params}`);
+      setEmployeeResults(data.employees);
+      setEmployeeTotal(data.total_count);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "사원을 검색하지 못했습니다.");
+    } finally {
+      setEmployeeSearching(false);
+    }
+  }, [employeeName, employeeNo]);
+
+  const handleAddEmployee = useCallback((employee: EmployeeItem) => {
+    if (!selectedAppraisalId) return;
+    if (rowsRef.current.some((row) => row.employee_id === employee.id)) {
+      toast.error("이미 등록된 평가 대상자입니다.");
       return;
     }
     const newRow: TargetRow = {
-      id: -(Date.now()),
+      id: tempIdRef.current--,
       appraisal_id: selectedAppraisalId,
       appraisal_name: null,
-      employee_id: 0,
-      employee_no: null,
-      employee_name: null,
-      department_name: null,
+      employee_id: employee.id,
+      employee_no: employee.employee_no,
+      employee_name: employee.display_name,
+      department_name: employee.department_name,
       score: null,
       grade_code: null,
       evaluator_note: null,
@@ -184,24 +248,36 @@ export function PapAppraisalTargetsManager() {
       updated_at: new Date().toISOString(),
       _status: "added",
     };
-    setRowData((prev) => [...prev, newRow]);
-  }, [selectedAppraisalId]);
+    replaceRows([...rowsRef.current, newRow]);
+    setEmployeeDialogOpen(false);
+  }, [selectedAppraisalId, replaceRows]);
 
   const handleDeleteSelected = useCallback(() => {
     const selected = gridApi?.getSelectedRows() ?? [];
     if (selected.length === 0) return;
-    const selectedIds = new Set(selected.map((s) => s.id));
-    setRowData((prev) =>
-      prev
-        .filter((r) => !(selectedIds.has(r.id) && r._status === "added"))
-        .map((r) => (selectedIds.has(r.id) && r._status !== "added" ? { ...r, _status: "deleted" as const } : r)),
+    replaceRows(
+      selected.reduce((rows, selectedRow) => toggleDeletedStatus(rows, selectedRow.id, selectedRow._status !== "deleted", {
+        removeAddedRow: true,
+        shouldBeClean: (row) => isRowRevertedToOriginal(row, TRACKED_FIELDS),
+      }), rowsRef.current),
     );
-  }, [gridApi]);
+  }, [gridApi, replaceRows]);
 
   const handleSave = useCallback(async () => {
-    const dirtyRows = rowData.filter((r) => r._status !== "clean");
+    gridApi?.stopEditing();
+    const currentRows = rowsRef.current.map(reconcileRow);
+    replaceRows(currentRows);
+    const dirtyRows = currentRows.filter((r) => r._status !== "clean");
     if (dirtyRows.length === 0) {
       toast.info("변경된 항목이 없습니다.");
+      return;
+    }
+    if (dirtyRows.some((row) => row._status === "added" && (!Number.isInteger(row.employee_id) || row.employee_id <= 0))) {
+      toast.error("신규 평가 대상자의 사원을 선택해주세요.");
+      return;
+    }
+    if (dirtyRows.some((row) => row._status !== "deleted" && row.score !== null && !Number.isFinite(row.score))) {
+      toast.error("점수는 올바른 숫자로 입력해주세요.");
       return;
     }
 
@@ -213,6 +289,7 @@ export function PapAppraisalTargetsManager() {
           appraisal_id: r.appraisal_id,
           employee_id: r.employee_id || undefined,
           score: r.score,
+          clear_score: r._status === "updated" && r.score === null && r._original?.score != null ? true : undefined,
           grade_code: r.grade_code,
           evaluator_note: r.evaluator_note,
           status: r.status,
@@ -231,24 +308,26 @@ export function PapAppraisalTargetsManager() {
       }
       const result = (await res.json()) as { created: number; updated: number; deleted: number };
       toast.success(`저장 완료 (신규 ${result.created}, 수정 ${result.updated}, 삭제 ${result.deleted})`);
-      void mutate();
+      await loadTargets(selectedAppraisalId);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
     } finally {
       setSaving(false);
     }
-  }, [rowData, mutate]);
+  }, [gridApi, loadTargets, replaceRows, selectedAppraisalId]);
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title="평가 대상자 관리" onQuery={() => selectedAppraisalId && void mutate()}>
+      <ManagerSearchSection title="평가 대상자 관리" onQuery={() => requestReload(selectedAppraisalId)} queryDisabled={saving || isLoading || !selectedAppraisalId}>
         <div className="flex items-center gap-3">
           <select
+            aria-label="평가 선택"
             className="h-9 rounded-md border border-border bg-background px-3 text-sm"
             value={selectedAppraisalId ?? ""}
+            disabled={saving || isLoading}
             onChange={(e) => {
               const val = e.target.value;
-              setSelectedAppraisalId(val ? Number(val) : null);
+              requestReload(val ? Number(val) : null);
             }}
           >
             <option value="">평가 선택</option>
@@ -287,22 +366,26 @@ export function PapAppraisalTargetsManager() {
                 key: "query",
                 label: "조회",
                 icon: Search,
-                onClick: () => selectedAppraisalId && void mutate(),
-                disabled: saving || !selectedAppraisalId,
+                onClick: () => requestReload(selectedAppraisalId),
+                disabled: saving || isLoading || !selectedAppraisalId,
               },
               {
                 key: "add",
                 label: "행추가",
                 icon: Plus,
-                onClick: handleAddRow,
-                disabled: saving || !selectedAppraisalId,
+                onClick: () => {
+                  setEmployeeResults([]);
+                  setEmployeeTotal(0);
+                  setEmployeeDialogOpen(true);
+                },
+                disabled: saving || isLoading || !selectedAppraisalId,
               },
               {
                 key: "delete",
                 label: "삭제",
                 icon: Trash2,
                 onClick: handleDeleteSelected,
-                disabled: saving,
+                disabled: saving || isLoading,
               },
             ]}
             saveAction={{
@@ -310,7 +393,7 @@ export function PapAppraisalTargetsManager() {
               label: "저장",
               icon: Save,
               onClick: () => void handleSave(),
-              disabled: saving || (gridSummary.added + gridSummary.updated + gridSummary.deleted) === 0,
+              disabled: saving || isLoading || (gridSummary.added + gridSummary.updated + gridSummary.deleted) === 0,
             }}
           />
         }
@@ -330,6 +413,8 @@ export function PapAppraisalTargetsManager() {
               defaultColDef={{ sortable: true, resizable: true, filter: false }}
               rowSelection={{ mode: "multiRow", checkboxes: true }}
               rowClassRules={rowClassRules}
+              getRowClass={getRowClass}
+              readOnlyEdit={saving}
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
@@ -342,6 +427,48 @@ export function PapAppraisalTargetsManager() {
           )}
         </div>
       </ManagerGridSection>
+
+      <Dialog open={employeeDialogOpen} onOpenChange={setEmployeeDialogOpen}>
+        <DialogContent className="max-h-[85vh] w-[calc(100%-2rem)] overflow-y-auto pb-6">
+          <DialogHeader>
+            <DialogTitle>평가 대상자 선택</DialogTitle>
+            <DialogDescription>이름 또는 사번으로 검색한 후 사원을 선택해주세요.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 px-6 pt-4">
+            <form onSubmit={(event) => { event.preventDefault(); void handleEmployeeSearch(); }} className="flex flex-col gap-2 sm:flex-row">
+              <SearchFieldGrid>
+                <SearchTextField value={employeeName} onChange={setEmployeeName} placeholder={SEARCH_PLACEHOLDERS.employeeName} />
+                <SearchTextField value={employeeNo} onChange={setEmployeeNo} placeholder={SEARCH_PLACEHOLDERS.employeeNo} />
+              </SearchFieldGrid>
+              <Button type="submit" variant="query" disabled={employeeSearching}>사원 검색</Button>
+            </form>
+            <p className="text-xs text-muted-foreground">
+              검색 결과 {employeeTotal.toLocaleString()}건{employeeTotal > 50 ? " (최대 50건 표시, 검색 조건을 좁혀주세요.)" : ""}
+            </p>
+            <div className="flex flex-col gap-2">
+              {employeeResults.map((employee) => (
+                <Button key={employee.id} variant="outline" className="h-auto justify-start whitespace-normal py-3 text-left" onClick={() => handleAddEmployee(employee)}>
+                  {employee.display_name} ({employee.employee_no}) / {employee.department_name}
+                </Button>
+              ))}
+              {employeeSearching && <p className="text-sm text-muted-foreground">검색 중...</p>}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={pendingAppraisal !== null}
+        onOpenChange={(open) => { if (!open) setPendingAppraisal(null); }}
+        title="저장되지 않은 변경 사항이 있습니다."
+        description="현재 변경 내용을 저장하지 않고 이동하면 수정 내용이 사라집니다. 계속 진행하시겠습니까?"
+        confirmLabel="무시하고 이동"
+        cancelLabel="취소"
+        onConfirm={() => {
+          if (pendingAppraisal) void loadTargets(pendingAppraisal.id);
+          setPendingAppraisal(null);
+        }}
+      />
     </ManagerPageShell>
   );
 }

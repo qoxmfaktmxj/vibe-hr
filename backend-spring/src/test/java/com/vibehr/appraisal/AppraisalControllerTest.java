@@ -1,6 +1,7 @@
 package com.vibehr.appraisal;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import com.vibehr.platform.error.ApiExceptionHandler;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
@@ -98,5 +100,28 @@ class AppraisalControllerTest {
 
         assertSame(expected, controller.saveTargetBatch(authentication, request));
         verify(service).saveTargetBatch(request);
+    }
+
+    @Test
+    void targetBatchBindsScoreClearOnlyWhenExplicitlyRequested() throws Exception {
+        when(service.saveTargetBatch(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new TargetBatchResponse(0, 3, 0));
+
+        mockMvc.perform(post("/api/v1/pap/targets/batch")
+                        .principal(new TestingAuthenticationToken("17", "token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"items\":[{\"id\":101,\"score\":null,\"clear_score\":true,\"_status\":\"updated\"},"
+                                + "{\"id\":102,\"evaluator_note\":\"note only\",\"_status\":\"updated\"},"
+                                + "{\"id\":103,\"clear_score\":null,\"_status\":\"updated\"}]}"))
+                .andExpect(result -> assertThat(result.getResolvedException()).isNull())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updated").value(3));
+
+        ArgumentCaptor<TargetBatchRequest> saved = ArgumentCaptor.forClass(TargetBatchRequest.class);
+        verify(service).saveTargetBatch(saved.capture());
+        assertThat(saved.getValue().items().get(0).clearScore()).isTrue();
+        assertThat(saved.getValue().items().get(1).clearScore()).isFalse();
+        assertThat(saved.getValue().items().get(1).score()).isNull();
+        assertThat(saved.getValue().items().get(2).clearScore()).isFalse();
     }
 }

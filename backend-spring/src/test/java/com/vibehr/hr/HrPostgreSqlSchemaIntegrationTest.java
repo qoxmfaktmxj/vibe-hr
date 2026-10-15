@@ -13,9 +13,12 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -248,6 +251,279 @@ class HrPostgreSqlSchemaIntegrationTest {
         assertThat(jdbc.queryForObject("select description from hr_personnel_histories where source_table='hr_retire_cases' and source_id=? order by id desc limit 1", String.class, caseId)).isEqualTo("Retire case cancelled.");
         assertThat(jdbc.queryForMap("select action_type,detail from hr_retire_audit_logs where case_id=? order by id desc limit 1", caseId))
                 .containsEntry("action_type", "cancel").containsEntry("detail", "employment_status:resigned->active");
+    }
+
+    @Test
+    void permanentFollowUpClosesPreviousOnlyOnConfirmationAndPreservesItsHistory() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        Map<String,Object> first = appointment(employeeId, "permanent", LocalDate.of(2026, 8, 1), null);
+        int firstId = ((Number) first.get("id")).intValue(), firstOrderId = ((Number) first.get("order_id")).intValue();
+        service.confirmAppointment(firstOrderId, 17);
+        List<Map<String,Object>> originalHistory = jdbc.queryForList("select * from hr_personnel_histories where appointment_order_id=? order by id", firstOrderId);
+
+        Map<String,Object> next = appointment(employeeId, "permanent", LocalDate.of(2026, 9, 1), null);
+        int nextId = ((Number) next.get("id")).intValue(), nextOrderId = ((Number) next.get("order_id")).intValue();
+        HrRequests.AppointmentRecordUpdate update = new HrRequests.AppointmentRecordUpdate();
+        update.startDate = LocalDate.of(2026, 10, 1);
+        update.effectiveDate = update.startDate;
+        update.toPositionTitle = "Senior";
+        service.updateAppointmentRecord(nextId, update);
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, firstId)).isNull();
+
+        assertThat(service.confirmAppointment(nextOrderId, 17)).containsEntry("applied_count", 1);
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, firstId)).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(jdbc.queryForMap("select start_date,end_date,apply_status from hr_appointment_order_items where id=?", nextId))
+                .containsEntry("start_date", java.sql.Date.valueOf("2026-10-01")).containsEntry("end_date", null).containsEntry("apply_status", "applied");
+        assertThat(jdbc.queryForObject("select position_title from hr_employees where id=?", String.class, employeeId)).isEqualTo("Senior");
+        assertThat(jdbc.queryForList("select * from hr_personnel_histories where appointment_order_id=? and history_type<>'appointment_end' order by id", firstOrderId)).isEqualTo(originalHistory);
+        assertThat(jdbc.queryForMap("select history_type,source_id,field_name,before_value,after_value,created_by from hr_personnel_histories where history_type='appointment_end'"))
+                .containsEntry("source_id", firstId).containsEntry("field_name", "end_date").containsEntry("before_value", null)
+                .containsEntry("after_value", "2026-09-30").containsEntry("created_by", 17);
+        assertThat(jdbc.queryForList("select status from hr_appointment_orders order by id", String.class)).containsExactly("confirmed", "confirmed");
+    }
+
+    @Test
+    void permanentFollowUpShortensAFiniteConfirmedPeriod() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        Map<String,Object> first = appointment(employeeId, "permanent", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 12, 31));
+        service.confirmAppointment(((Number) first.get("order_id")).intValue(), 17);
+        Map<String,Object> next = appointment(employeeId, "permanent", LocalDate.of(2026, 9, 1), null);
+
+        service.confirmAppointment(((Number) next.get("order_id")).intValue(), 17);
+
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, first.get("id"))).isEqualTo(LocalDate.of(2026, 8, 31));
+        assertThat(jdbc.queryForMap("select before_value,after_value from hr_personnel_histories where history_type='appointment_end'"))
+                .containsEntry("before_value", "2026-12-31").containsEntry("after_value", "2026-08-31");
+    }
+
+    @Test
+    void sameDatePermanentOverlapIsRejectedOnCreationAndRecheckedOnConfirmation() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        LocalDate start = LocalDate.of(2026, 8, 1);
+        Map<String,Object> first = appointment(employeeId, "permanent", start, null);
+        service.confirmAppointment(((Number) first.get("order_id")).intValue(), 17);
+        ApiException createConflict = catchThrowableOfType(() -> appointment(employeeId, "permanent", start, null), ApiException.class);
+        assertThat(createConflict.status().value()).isEqualTo(409);
+
+        int staleOrder = jdbc.queryForObject("insert into hr_appointment_orders(appointment_no,title,effective_date,status,created_at,updated_at) values ('APT-STALE','Stale draft',?,'draft',now(),now()) returning id", Integer.class, start);
+        jdbc.update("insert into hr_appointment_order_items(order_id,employee_id,appointment_kind,action_type,start_date,to_position_title,apply_status,created_at,updated_at) values (?,?,'permanent','transfer',?,'Wrong position','pending',now(),now())", staleOrder, employeeId, start);
+        ApiException confirmConflict = catchThrowableOfType(() -> service.confirmAppointment(staleOrder, 17), ApiException.class);
+
+        assertThat(confirmConflict.status().value()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("select status from hr_appointment_orders where id=?", String.class, staleOrder)).isEqualTo("draft");
+        assertThat(jdbc.queryForObject("select position_title from hr_employees where id=?", String.class, employeeId)).isEqualTo("인사담당");
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, first.get("id"))).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from hr_personnel_histories where appointment_order_id=?", Integer.class, staleOrder)).isZero();
+    }
+
+    @Test
+    void draftAndTemporaryOverlapPoliciesArePreserved() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        Map<String,Object> temporary = appointment(employeeId, "temporary", LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 10));
+        ApiException draftConflict = catchThrowableOfType(() -> appointment(employeeId, "permanent", LocalDate.of(2026, 8, 5), null), ApiException.class);
+        assertThat(draftConflict.status().value()).isEqualTo(409);
+        service.confirmAppointment(((Number) temporary.get("order_id")).intValue(), 17);
+        ApiException temporaryConflict = catchThrowableOfType(() -> appointment(employeeId, "permanent", LocalDate.of(2026, 8, 5), null), ApiException.class);
+        assertThat(temporaryConflict.status().value()).isEqualTo(409);
+        Map<String,Object> next = appointment(employeeId, "temporary", LocalDate.of(2026, 8, 11), LocalDate.of(2026, 8, 20));
+        service.confirmAppointment(((Number) next.get("order_id")).intValue(), 17);
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, temporary.get("id"))).isEqualTo(LocalDate.of(2026, 8, 10));
+        assertThat(jdbc.queryForObject("select count(*) from hr_personnel_histories where history_type='appointment_end'", Integer.class)).isZero();
+
+        Map<String,Object> permanent = appointment(employeeId, "permanent", LocalDate.of(2026, 9, 1), null);
+        ApiException permanentDraftConflict = catchThrowableOfType(() -> appointment(employeeId, "permanent", LocalDate.of(2026, 10, 1), null), ApiException.class);
+        assertThat(permanentDraftConflict.status().value()).isEqualTo(409);
+        service.confirmAppointment(((Number) permanent.get("order_id")).intValue(), 17);
+        ApiException overlap = catchThrowableOfType(() -> appointment(employeeId, "temporary", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 2)), ApiException.class);
+        assertThat(overlap.status().value()).isEqualTo(409);
+        assertThat(jdbc.queryForObject("select end_date from hr_appointment_order_items where id=?", LocalDate.class, permanent.get("id"))).isNull();
+    }
+
+    @Test
+    void twoRetirementDraftsCannotBothConfirmAndCancellationRestoresOriginalStatus() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        jdbc.update("update hr_employees set employment_status='leave' where id=?", employeeId);
+        int first = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        int second = retirementDraft(employeeId, LocalDate.of(2026, 9, 30));
+
+        service.confirmRetireCase(first, 17);
+        ApiException conflict = catchThrowableOfType(() -> service.confirmRetireCase(second, 17), ApiException.class);
+        assertThat(conflict.status().value()).isEqualTo(409);
+        assertThat(conflict.detail()).isEqualTo("Employee already has a confirmed retirement case.");
+        assertThat(jdbc.queryForObject("select status from hr_retire_cases where id=?", String.class, second)).isEqualTo("draft");
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_audit_logs where case_id=? and action_type='confirm'", Integer.class, second)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from hr_severance_calcs where retire_case_id=?", Integer.class, second)).isZero();
+
+        HrRequests.RetireCancel cancel = new HrRequests.RetireCancel(); cancel.cancelReason = "Withdrawn";
+        service.cancelRetireCase(first, cancel, 17);
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("leave");
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isNull();
+        service.confirmRetireCase(second, 17);
+        assertThat(jdbc.queryForObject("select previous_employment_status from hr_retire_cases where id=?", String.class, second)).isEqualTo("leave");
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_cases where employee_id=? and status='confirmed'", Integer.class, employeeId)).isOne();
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isEqualTo(LocalDate.of(2026, 9, 30));
+    }
+
+    @Test
+    void concurrentRetirementDraftConfirmationsSerializeOnEmployeeAndOnlyOneSucceeds() throws Exception {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        int firstCase = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        int secondCase = retirementDraft(employeeId, LocalDate.of(2026, 9, 30));
+        CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<String> first = executor.submit(() -> confirmRetirementAfter(firstCase, ready, start));
+            Future<String> second = executor.submit(() -> confirmRetirementAfter(secondCase, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder("confirmed", "Employee already has a confirmed retirement case.");
+        }
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_cases where employee_id=? and status='confirmed'", Integer.class, employeeId)).isOne();
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_cases where employee_id=? and status='draft'", Integer.class, employeeId)).isOne();
+        assertThat(jdbc.queryForObject("select count(*) from hr_severance_calcs where employee_id=?", Integer.class, employeeId)).isOne();
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_audit_logs where action_type='confirm'", Integer.class)).isOne();
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("resigned");
+    }
+
+    @ParameterizedTest
+    @CsvSource({ "active,true", "active,false", "leave,true", "leave,false" })
+    void cancellingLegacyDuplicateRetirementsRestoresOriginalStatusInEitherOrder(String originalStatus, boolean cancelEarlierFirst) {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        jdbc.update("update hr_employees set employment_status=? where id=?", originalStatus, employeeId);
+        int first = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        int second = retirementDraft(employeeId, LocalDate.of(2026, 9, 30));
+        service.confirmRetireCase(first, 17);
+        jdbc.update("update hr_retire_cases set status='confirmed',previous_employment_status='resigned',confirmed_at=now(),confirmed_by=17 where id=?", second);
+        jdbc.update("update hr_employee_basic_profiles set retire_date=date '2026-09-30' where employee_id=?", employeeId);
+        HrRequests.RetireCancel cancel = new HrRequests.RetireCancel(); cancel.cancelReason = "Duplicate case";
+        int cancelledFirst = cancelEarlierFirst ? first : second, cancelledLast = cancelEarlierFirst ? second : first;
+        LocalDate remainingDate = cancelEarlierFirst ? LocalDate.of(2026, 9, 30) : LocalDate.of(2026, 8, 31);
+
+        service.cancelRetireCase(cancelledFirst, cancel, 17);
+
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("resigned");
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isEqualTo(remainingDate);
+        assertThat(jdbc.queryForObject("select status from hr_retire_cases where id=?", String.class, cancelledLast)).isEqualTo("confirmed");
+        assertThat(jdbc.queryForObject("select detail from hr_retire_audit_logs where case_id=? and action_type='cancel'", String.class, cancelledFirst)).isEqualTo("employment_status:resigned->resigned");
+        assertThat(jdbc.queryForMap("select before_value,after_value from hr_personnel_histories where source_table='hr_retire_cases' and source_id=? and history_type='retire_cancel'", cancelledFirst))
+                .containsEntry("before_value", "resigned").containsEntry("after_value", "resigned");
+        service.cancelRetireCase(cancelledLast, cancel, 17);
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_cases where employee_id=? and status='confirmed'", Integer.class, employeeId)).isZero();
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo(originalStatus);
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isNull();
+        assertThat(jdbc.queryForObject("select detail from hr_retire_audit_logs where case_id=? and action_type='cancel'", String.class, cancelledLast)).isEqualTo("employment_status:resigned->" + originalStatus);
+        assertThat(jdbc.queryForMap("select before_value,after_value from hr_personnel_histories where source_table='hr_retire_cases' and source_id=? and history_type='retire_cancel'", cancelledLast))
+                .containsEntry("before_value", "resigned").containsEntry("after_value", originalStatus);
+    }
+
+    @Test
+    void lastLegacyRetirementCancellationFollowsOverlappingCasesBackToOriginalLeaveStatus() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        jdbc.update("update hr_employees set employment_status='leave' where id=?", employeeId);
+        int first = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        int second = retirementDraft(employeeId, LocalDate.of(2026, 9, 30));
+        int third = retirementDraft(employeeId, LocalDate.of(2026, 10, 31));
+        service.confirmRetireCase(first, 17);
+        jdbc.update("update hr_retire_cases set status='cancelled',confirmed_at=timestamp '2026-08-01 09:00:00',cancelled_at=timestamp '2026-08-03 09:00:00' where id=?", first);
+        jdbc.update("update hr_retire_cases set status='cancelled',previous_employment_status='resigned',confirmed_at=timestamp '2026-08-02 09:00:00',cancelled_at=timestamp '2026-08-05 09:00:00' where id=?", second);
+        jdbc.update("update hr_retire_cases set status='confirmed',previous_employment_status='resigned',confirmed_at=timestamp '2026-08-04 09:00:00',confirmed_by=17 where id=?", third);
+        List<Map<String,Object>> previousCases = jdbc.queryForList("select * from hr_retire_cases where id in (?,?) order by id", first, second);
+        HrRequests.RetireCancel cancel = new HrRequests.RetireCancel(); cancel.cancelReason = "Last duplicate";
+
+        service.cancelRetireCase(third, cancel, 17);
+
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("leave");
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isNull();
+        assertThat(jdbc.queryForList("select * from hr_retire_cases where id in (?,?) order by id", first, second)).isEqualTo(previousCases);
+        assertThat(jdbc.queryForObject("select detail from hr_retire_audit_logs where case_id=? and action_type='cancel'", String.class, third)).isEqualTo("employment_status:resigned->leave");
+    }
+
+    @Test
+    void previousUnrelatedRetirementDoesNotReplaceAnUnknownResignedBaseline() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        int previous = retirementDraft(employeeId, LocalDate.of(2026, 7, 31));
+        int current = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        service.confirmRetireCase(previous, 17);
+        jdbc.update("update hr_retire_cases set status='cancelled',previous_employment_status='leave',confirmed_at=timestamp '2026-07-01 09:00:00',cancelled_at=timestamp '2026-07-02 09:00:00' where id=?", previous);
+        jdbc.update("update hr_retire_cases set status='confirmed',previous_employment_status='resigned',confirmed_at=timestamp '2026-08-01 09:00:00',confirmed_by=17 where id=?", current);
+        HrRequests.RetireCancel cancel = new HrRequests.RetireCancel(); cancel.cancelReason = "Unrelated cycle";
+
+        service.cancelRetireCase(current, cancel, 17);
+
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("resigned");
+        assertThat(jdbc.queryForObject("select detail from hr_retire_audit_logs where case_id=? and action_type='cancel'", String.class, current)).isEqualTo("employment_status:resigned->resigned");
+    }
+
+    @Test
+    void concurrentLegacyRetirementCancellationsRestoreOriginalLeaveWithoutCrossCaseWrites() throws Exception {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        jdbc.update("update hr_employees set employment_status='leave' where id=?", employeeId);
+        int firstCase = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        int secondCase = retirementDraft(employeeId, LocalDate.of(2026, 9, 30));
+        service.confirmRetireCase(firstCase, 17);
+        jdbc.update("update hr_retire_cases set status='confirmed',previous_employment_status='resigned',confirmed_at=now(),confirmed_by=17 where id=?", secondCase);
+        CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Map<String,Object>> first = executor.submit(() -> cancelRetirementAfter(firstCase, ready, start));
+            Future<Map<String,Object>> second = executor.submit(() -> cancelRetirementAfter(secondCase, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(first.get(30, TimeUnit.SECONDS)).containsEntry("status", "cancelled");
+            assertThat(second.get(30, TimeUnit.SECONDS)).containsEntry("status", "cancelled");
+        }
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_cases where employee_id=? and status='confirmed'", Integer.class, employeeId)).isZero();
+        assertThat(jdbc.queryForObject("select employment_status from hr_employees where id=?", String.class, employeeId)).isEqualTo("leave");
+        assertThat(jdbc.queryForObject("select retire_date from hr_employee_basic_profiles where employee_id=?", LocalDate.class, employeeId)).isNull();
+        assertThat(jdbc.queryForList("select previous_employment_status from hr_retire_cases where employee_id=? order by id", String.class, employeeId)).containsExactly("leave", "resigned");
+        assertThat(jdbc.queryForObject("select count(*) from hr_retire_audit_logs where action_type='cancel'", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("select count(*) from hr_personnel_histories where history_type='retire_cancel' and after_value='leave'", Integer.class)).isOne();
+    }
+
+    @Test
+    void retirementConfirmationRechecksResignedStatusAfterDraftWasCreated() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        int caseId = retirementDraft(employeeId, LocalDate.of(2026, 8, 31));
+        jdbc.update("update hr_employees set employment_status='resigned' where id=?", employeeId);
+
+        ApiException conflict = catchThrowableOfType(() -> service.confirmRetireCase(caseId, 17), ApiException.class);
+
+        assertThat(conflict.status().value()).isEqualTo(409);
+        assertThat(conflict.detail()).isEqualTo("Employee is already resigned.");
+        assertThat(jdbc.queryForObject("select status from hr_retire_cases where id=?", String.class, caseId)).isEqualTo("draft");
+        assertThat(jdbc.queryForObject("select count(*) from hr_severance_calcs where retire_case_id=?", Integer.class, caseId)).isZero();
+    }
+
+    private Map<String,Object> appointment(int employeeId, String kind, LocalDate start, LocalDate end) {
+        HrRequests.AppointmentRecordCreate payload = new HrRequests.AppointmentRecordCreate();
+        payload.employeeId = employeeId; payload.orderTitle = "Appointment"; payload.effectiveDate = start;
+        payload.appointmentKind = kind; payload.actionType = "transfer"; payload.startDate = start; payload.endDate = end;
+        return castMap(service.createAppointmentRecord(payload, 17).get("item"));
+    }
+
+    private int retirementDraft(int employeeId, LocalDate date) {
+        if (jdbc.queryForObject("select count(*) from hr_retire_checklist_items", Integer.class) == 0)
+            jdbc.update("insert into hr_retire_checklist_items(code,title,is_required,is_active,sort_order,created_at,updated_at) values ('handover','Handover',true,true,1,now(),now())");
+        HrRequests.RetireCaseCreate payload = new HrRequests.RetireCaseCreate();
+        payload.employeeId = employeeId; payload.retireDate = date; payload.reason = "Personal";
+        int caseId = ((Number) service.createRetireCase(payload, 17).get("id")).intValue();
+        int itemId = jdbc.queryForObject("select id from hr_retire_case_items where case_id=?", Integer.class, caseId);
+        HrRequests.RetireItemUpdate check = new HrRequests.RetireItemUpdate(); check.isChecked = true;
+        service.updateRetireItem(caseId, itemId, check, 17);
+        return caseId;
+    }
+
+    private String confirmRetirementAfter(int caseId, CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Retirement confirmation start timed out.");
+        try { service.confirmRetireCase(caseId, 17); return "confirmed"; }
+        catch (ApiException exception) { return String.valueOf(exception.detail()); }
+    }
+
+    private Map<String,Object> cancelRetirementAfter(int caseId, CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Retirement cancellation start timed out.");
+        HrRequests.RetireCancel cancel = new HrRequests.RetireCancel(); cancel.cancelReason = "Concurrent duplicate cancellation";
+        return service.cancelRetireCase(caseId, cancel, 17);
     }
 
     private int insertEmployee(int userId, String employeeNo, LocalDate hireDate) {

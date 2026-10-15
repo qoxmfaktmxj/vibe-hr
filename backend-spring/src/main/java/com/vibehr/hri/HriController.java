@@ -57,6 +57,12 @@ public class HriController {
         return new HriRequestDetailResponse(service.saveDraft(userId, request));
     }
 
+    @PostMapping("/hri/requests/submit")
+    public HriRequestSubmitResponse saveAndSubmit(Authentication authentication, @Valid @RequestBody HriRequestDraftUpsertRequest request) {
+        int userId = authorization.requireAnyRole(authentication, "employee", "hr_manager", "admin");
+        return service.saveAndSubmit(userId, request);
+    }
+
     @PostMapping("/hri/requests/{request_id}/submit")
     public HriRequestSubmitResponse submit(Authentication authentication, @PathVariable("request_id") int requestId) {
         int userId = authorization.requireAnyRole(authentication, "employee", "hr_manager", "admin");

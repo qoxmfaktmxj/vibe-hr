@@ -27,7 +27,7 @@ public class FlywayCutoverConfiguration {
                 if (hasAlembic) throw new IllegalStateException("Alembic marker present. Run the explicit flyway-adoption command instead of Flyway migrate.");
                 if (hasApplicationTables && !hasFlyway) throw new IllegalStateException("Existing schema has no Flyway history. Run the explicit flyway-adoption command instead of Flyway migrate.");
                 flyway.migrate();
-                PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
+                PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
             } catch (Exception exception) {
                 if (exception instanceof RuntimeException runtimeException) throw runtimeException;
                 throw new IllegalStateException("Flyway cutover preflight failed.", exception);

@@ -5,6 +5,12 @@ const fs = require("fs");
 const path = require("path");
 
 const REPOSITORY_ROOT = path.resolve(__dirname, "..", "..");
+const CI_SUPPORT_PYTHON_FILES = new Set([
+  "scripts/ci/require-ui-validation.py",
+  "scripts/ci/test_require_ui_validation.py",
+]);
+const CI_COMMAND_PATHS = new Set(["docs/UI_VALIDATION_CI.md", ".github/workflows/ui-validation.yml"]);
+const CI_TEST_COMMAND = "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v";
 const HISTORICAL_EVIDENCE = new Set([
   "docs/spring-migration/python-retirement-snapshot.json",
   "docs/spring-migration/endpoint-manifest.json",
@@ -88,7 +94,8 @@ function isTextFile(file) {
   return !fs.readFileSync(file).subarray(0, 8192).includes(0);
 }
 function scanPythonFiles(repositoryRoot = REPOSITORY_ROOT) {
-  return walk(repositoryRoot).filter((file) => file.toLowerCase().endsWith(".py")).map((file) => relative(repositoryRoot, file)).sort();
+  return walk(repositoryRoot).filter((file) => file.toLowerCase().endsWith(".py")).map((file) => relative(repositoryRoot, file))
+    .filter((file) => !CI_SUPPORT_PYTHON_FILES.has(file)).sort();
 }
 function isImmutableHistoricalEvidence(repositoryRoot, file) {
   const filePath = relative(repositoryRoot, file);
@@ -119,7 +126,14 @@ function activeFiles(repositoryRoot = REPOSITORY_ROOT) {
 function findActiveInvocations(repositoryRoot = REPOSITORY_ROOT) {
   const violations = [];
   for (const file of activeFiles(repositoryRoot)) {
-    const contents = fs.readFileSync(file, "utf8");
+    let contents = fs.readFileSync(file, "utf8");
+    if (CI_COMMAND_PATHS.has(relative(repositoryRoot, file))) {
+      contents = contents.split(/\r?\n/).filter((line) =>
+        line.trim() !== CI_TEST_COMMAND && line.trim() !== `run: ${CI_TEST_COMMAND}`).join("\n");
+    }
+    if (/^\.github\/workflows\/[^/]+\.ya?ml$/i.test(relative(repositoryRoot, file))) {
+      contents = contents.replace(/^[ \t]*run:[ \t]*/gm, "");
+    }
     for (const pattern of INVOCATION_PATTERNS) {
       const match = pattern.exec(contents);
       if (match) violations.push({ path: relative(repositoryRoot, file), match: match[0].trim() });
@@ -136,11 +150,12 @@ function verifyPythonRetirement(repositoryRoot = REPOSITORY_ROOT) {
     active_files_scanned: activeFiles(repositoryRoot).length,
     pythonFiles,
     invocations,
+    reviewedCiPythonFiles: [...CI_SUPPORT_PYTHON_FILES].filter((file) => fs.existsSync(path.join(repositoryRoot, file))),
   };
 }
 function main() {
   const result = verifyPythonRetirement();
-  process.stdout.write(`Python retirement: ${result.python_file_count} .py files, ${result.active_python_invocation_count} active Python invocations across ${result.active_files_scanned} active files.\n`);
+  process.stdout.write(`Application Python retirement: ${result.python_file_count} .py files, ${result.active_python_invocation_count} active Python invocations across ${result.active_files_scanned} active files; ${result.reviewedCiPythonFiles.length} reviewed CI support files.\n`);
   if (result.pythonFiles.length) process.stderr.write(`Python files: ${result.pythonFiles.join(", ")}\n`);
   if (result.invocations.length) process.stderr.write(`Python invocations: ${result.invocations.map((item) => `${item.path}: ${item.match}`).join("; ")}\n`);
   if (result.python_file_count || result.active_python_invocation_count) process.exitCode = 1;

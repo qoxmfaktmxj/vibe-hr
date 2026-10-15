@@ -20,7 +20,7 @@ The script waits for Spring readiness, verifies the non-root/no-Python image con
   assert.match(message, /FastAPI application operations/);
 });
 
-test("cutover runbook verifier requires the staged V1/V2 and V1-V5 checks", () => {
+test("cutover runbook verifier requires the staged V1/V2 and V1-V6 checks", () => {
   const failures = verifyCutoverRunbook(`
 The adoption command stops at the exact V1/V2 ownership transfer.
 
@@ -29,7 +29,7 @@ The adoption command stops at the exact V1/V2 ownership transfer.
 `);
 
   const message = failures.join("\n");
-  assert.match(message, /separate `flyway-cutover` stage applies V3, V4, and V5/);
+  assert.match(message, /separate `flyway-cutover` stage applies V3, V4, V5, and V6/);
   assert.match(message, /After starting `flyway-cutover`/);
   assert.match(message, /106-table live schema check/);
 });

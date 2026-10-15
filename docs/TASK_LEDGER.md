@@ -437,3 +437,35 @@
 - Scope: add a 23:00 UTC (08:00 Asia/Seoul) schedule to the existing Deploy Vibe-HR workflow, document hosted ownership, and disable the former OpenClaw daily deployment automation. No application, database, secret, gate, or rollback change.
 - Validation: YAML trigger and `deploy.needs`/reusable UI job assertions passed; eight same-SHA gate tests, deployment secret validation, deployment security test, delivery verification, and `git diff --check` passed. Hosted run and scheduler readback are verified after publication.
 - Recovery: revert the schedule commit if the hosted timer is unsuitable; re-enable the former OpenClaw automation only after a working authenticated dispatch path is supplied. Existing running containers remain untouched by the scheduling change itself.
+
+
+## TASK VH-REPOSITORY-WORKFLOW-AUDIT-20261015
+- Date: 2026-10-15 to 2026-10-16 (Asia/Seoul)
+- Type: repository/runtime investigation, workflow bug fixes, real spreadsheet file actions
+- Risk: R1/R2/R3, explicitly scoped by user approvals during this chat
+- Approval: HRI inbox, LF preservation, HR appointment/retirement transitions, half-day/yearly leave accounting, V6 deduction snapshots, atomic HRI submit, appraisal validation, actual file processing on 14 screens, shared read-only grid repaint, and the exact hosted-UI Python support exceptions in the retirement scanner were approved.
+- Status: completed and locally verified, including approved F17 CI guardrail correction. Publication and production deployment were not requested.
+- First-Pass Validation: regressions and independent review exposed real failures; environmental startup and new-test locator/expectation errors were corrected separately.
+- Retry Count: two production-browser correction/recheck batches after the initial production discovery run; targeted red/green evidence is retained.
+- Review Needed: human diff/release review before rollout of the approved R3 changes; independent backend and spreadsheet findings have been resolved.
+- Rollback: local source diff is reversible before release. After V6-backed approvals exist, do not serve approval/cancellation with old code; use the documented recovery controls.
+- Simplifications: removed duplicate first-page selection queries, replaced HRI draft-then-submit waterfall with one atomic request, reused existing row mutations and one typed workbook parser without dependencies.
+- Validation: frontend grid registry, full lint (0 errors, 14 existing warnings), 296 unit tests, production build/TypeScript; backend 199 default tests, 44 PostgreSQL workflow tests, 20 migration/replay/schema tests; 36 repository Node tests and 8 existing CI support-tool tests; active route/schema/BFF/delivery verification. All final applicable checks pass, including the real repository retirement CLI.
+- Browser: 33 distinct cases have passing latest outcomes (26 initially passed plus 9 focused confirmations, with two selected-grid cases repeated for visible captures). Includes 18 real XLSX/import workflows and races, appraisal desktop/mobile, HRI desktop/mobile and task flows, training selection/busy states, retirement page-2 writes and existing shell smoke flows.
+- REA: controlled local Chromium login observation, complete requested capture, no page errors/failed requests; evidence bundle is retained under .omx/state/repository-audit-20261015. No production-auth guarantee is inferred from synthetic browser services.
+- Commands: npm run validate:grid; npm run lint; npm run test; npm run build; direct Playwright CLI using playwright.audit.config.ts; Gradle test, focused integrationTest and migrationIntegrationTest; node --test scripts/check-risk-paths.test.js scripts/spring-migration/*.test.js; active coverage and delivery verification.
+- Notes: [full findings, changed files and evidence](audits/2026-10-15-repository-audit.md). Base main is be66845; pre-existing .impeccable/ and .playwright-mcp/ were preserved. No dependency, secret, production data, commit, push, or deployment change.
+
+
+## TASK VH-AUDIT-PUBLICATION-20261016
+- Date: 2026-10-16 (Asia/Seoul)
+- Type: publish the verified repository workflow audit fixes
+- Risk: existing approved R2/R3 scope; no additional application or deployment configuration changes
+- Status: validated and explicitly authorized for publication to origin/main
+- Approval: user requested push after the completed local audit and all scoped approvals.
+- Scope: the 80 reviewed source, test and documentation paths; existing unrelated untracked folders are preserved.
+- First-Pass Validation: reuse the unchanged application evidence from VH-REPOSITORY-WORKFLOW-AUDIT-20261015; verify staged paths, frozen checksums and remote branch state.
+- Retry Count: 0 at publication preparation
+- Review Needed: existing hosted same-commit CI and deployment gates remain enforced.
+- Rollback: follow the V6 recovery restrictions in the cutover runbook; do not mix old leave cancellation with snapshot-backed approvals.
+- Notes: the final commit and remote SHA are read back and reported in this chat; configured Actions run automatically on main push.

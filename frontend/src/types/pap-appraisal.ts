@@ -52,5 +52,5 @@ export type PapAppraisalTargetListResponse = {
 };
 
 export type PapAppraisalTargetBatchRequest = {
-  items: Array<Partial<PapAppraisalTargetItem> & { _status?: string }>;
+  items: Array<Partial<PapAppraisalTargetItem> & { _status?: string; clear_score?: boolean }>;
 };

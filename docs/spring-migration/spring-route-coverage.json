@@ -12,7 +12,7 @@
     "required_route_count": 290,
     "implemented_route_count": 290,
     "missing_route_count": 0,
-    "extra_spring_mapping_count": 0,
+    "extra_spring_mapping_count": 1,
     "duplicate_spring_mapping_count": 0,
     "completion_percentage": 100,
     "required_route_kinds": {
@@ -23,7 +23,7 @@
   "source_inventory": {
     "spring_source_file_count": 140,
     "spring_controller_count": 20,
-    "spring_mapping_count": 290,
+    "spring_mapping_count": 291,
     "unresolved_annotation_count": 0
   },
   "routes": {
@@ -1469,7 +1469,7 @@
             "method": "GET",
             "normalized_path": "/api/v1/hri/requests/{param}",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 108,
+            "source_line": 114,
             "controller": "HriController",
             "handler": "detail",
             "annotation": "GetMapping",
@@ -1498,7 +1498,7 @@
             "method": "GET",
             "normalized_path": "/api/v1/hri/requests/my",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 100,
+            "source_line": 106,
             "controller": "HriController",
             "handler": "myRequests",
             "annotation": "GetMapping",
@@ -1527,7 +1527,7 @@
             "method": "GET",
             "normalized_path": "/api/v1/hri/tasks/my-approvals",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 114,
+            "source_line": 120,
             "controller": "HriController",
             "handler": "myApprovalTasks",
             "annotation": "GetMapping",
@@ -1556,7 +1556,7 @@
             "method": "GET",
             "normalized_path": "/api/v1/hri/tasks/my-receives",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 122,
+            "source_line": 128,
             "controller": "HriController",
             "handler": "myReceiveTasks",
             "annotation": "GetMapping",
@@ -5215,7 +5215,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/approve",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 72,
+            "source_line": 78,
             "controller": "HriController",
             "handler": "approve",
             "annotation": "PostMapping",
@@ -5244,7 +5244,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/receive-complete",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 86,
+            "source_line": 92,
             "controller": "HriController",
             "handler": "receiveComplete",
             "annotation": "PostMapping",
@@ -5273,7 +5273,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/receive-reject",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 93,
+            "source_line": 99,
             "controller": "HriController",
             "handler": "receiveReject",
             "annotation": "PostMapping",
@@ -5302,7 +5302,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/reject",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 79,
+            "source_line": 85,
             "controller": "HriController",
             "handler": "reject",
             "annotation": "PostMapping",
@@ -5331,7 +5331,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/submit",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 60,
+            "source_line": 66,
             "controller": "HriController",
             "handler": "submit",
             "annotation": "PostMapping",
@@ -5360,7 +5360,7 @@
             "method": "POST",
             "normalized_path": "/api/v1/hri/requests/{param}/withdraw",
             "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
-            "source_line": 66,
+            "source_line": 72,
             "controller": "HriController",
             "handler": "withdraw",
             "annotation": "PostMapping",
@@ -8445,7 +8445,20 @@
       }
     ],
     "missing": [],
-    "extra_spring_mappings": [],
+    "extra_spring_mappings": [
+      {
+        "key": "POST /api/v1/hri/requests/submit",
+        "method": "POST",
+        "normalized_path": "/api/v1/hri/requests/submit",
+        "source_file": "backend-spring/src/main/java/com/vibehr/hri/HriController.java",
+        "source_line": 60,
+        "controller": "HriController",
+        "handler": "saveAndSubmit",
+        "annotation": "PostMapping",
+        "class_path": "/api/v1",
+        "method_path": "/hri/requests/submit"
+      }
+    ],
     "duplicate_spring_mappings": [],
     "shadowed_python_tra_handlers": [
       {
@@ -8525,7 +8538,9 @@
   },
   "approved_complete_allowlist": {
     "missing": {},
-    "extra": {}
+    "extra": {
+      "POST /api/v1/hri/requests/submit": "Approved atomic HRI submission extension; see docs/HRI_SUBMISSION_API.md."
+    }
   },
   "parser_source_integrity_errors": []
 }

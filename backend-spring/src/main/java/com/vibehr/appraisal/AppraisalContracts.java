@@ -67,7 +67,15 @@ record TargetBatchRow(
         @JsonProperty("grade_code") @Size(max = 30) String gradeCode,
         @JsonProperty("evaluator_note") @Size(max = 2000) String evaluatorNote,
         @Size(max = 20) String status,
-        @JsonProperty("_status") String rowStatus) {
+        @JsonProperty("_status") String rowStatus,
+        @JsonProperty("clear_score") Boolean clearScore) {
+    TargetBatchRow {
+        clearScore = Boolean.TRUE.equals(clearScore);
+    }
+    TargetBatchRow(Integer id, Integer appraisalId, Integer employeeId, Double score, String gradeCode,
+            String evaluatorNote, String status, String rowStatus) {
+        this(id, appraisalId, employeeId, score, gradeCode, evaluatorNote, status, rowStatus, false);
+    }
     String statusOrClean() { return rowStatus == null ? "clean" : rowStatus; }
 }
 

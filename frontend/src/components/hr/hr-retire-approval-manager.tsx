@@ -61,18 +61,12 @@ export function HrRetireApprovalManager() {
   const { data: employeeData } = useSWR<EmployeeListResponse>("/api/employees?all=true", fetcher, {
     revalidateOnFocus: false,
   });
-  const { data: caseData, mutate: mutateCases } = useSWR<HrRetireCaseListResponse>(
-    "/api/hr/retire/cases",
-    fetcher,
-    { revalidateOnFocus: false },
-  );
   const pageSize = 50;
   const pagedCaseKey = `/api/hr/retire/cases?page=${page}&limit=${pageSize}`;
   const { data: pagedCaseData, isLoading: isPagedCaseLoading, mutate: mutatePagedCases } =
     useSWR<HrRetireCaseListResponse>(pagedCaseKey, fetcher, { revalidateOnFocus: false });
 
   async function mutateAllCaseLists() {
-    await mutateCases();
     await globalMutate((key) => typeof key === "string" && key.startsWith("/api/hr/retire/cases?"));
   }
 
@@ -85,7 +79,7 @@ export function HrRetireApprovalManager() {
     () => (employeeData?.employees ?? []).filter((row) => row.employment_status !== "resigned"),
     [employeeData?.employees],
   );
-  const caseItems = useMemo(() => caseData?.items ?? [], [caseData?.items]);
+  const caseItems = useMemo(() => pagedCaseData?.items ?? [], [pagedCaseData?.items]);
   const caseRows = useMemo<RetireCaseRow[]>(
     () => createReadonlyGridRows(pagedCaseData?.items ?? []),
     [pagedCaseData?.items],
@@ -106,14 +100,14 @@ export function HrRetireApprovalManager() {
   );
 
   useEffect(() => {
-    if (isSubmitting) return;
+    if (isSubmitting || !pagedCaseData) return;
     if (caseItems.length === 0) {
       if (selectedCaseId !== null) setSelectedCaseId(null);
       return;
     }
     if (selectedCaseId && caseItems.some((item) => item.id === selectedCaseId)) return;
     setSelectedCaseId(firstCaseId);
-  }, [caseItems, firstCaseId, selectedCaseId, isSubmitting]);
+  }, [caseItems, firstCaseId, selectedCaseId, isSubmitting, pagedCaseData]);
 
   useEffect(() => {
     if (!caseDetail) {
@@ -149,9 +143,12 @@ export function HrRetireApprovalManager() {
       }
 
       const created = (await response.json()) as HrRetireCaseDetail;
-      setSelectedCaseId(created.id);
       setNewReason("");
       await mutateAllCaseLists();
+      const firstPageKey = `/api/hr/retire/cases?page=1&limit=${pageSize}`;
+      await globalMutate(firstPageKey, fetcher<HrRetireCaseListResponse>(firstPageKey), { revalidate: false });
+      setPage(1);
+      setSelectedCaseId(created.id);
       toast.success("퇴직 처리 건이 생성되었습니다.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "퇴직 건 생성에 실패했습니다.");

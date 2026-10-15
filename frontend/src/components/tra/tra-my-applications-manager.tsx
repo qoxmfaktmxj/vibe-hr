@@ -53,6 +53,7 @@ export function TraMyApplicationsManager() {
 
   const gridRef = useRef<AgGridReact<TraApplicationItem>>(null);
   const [gridApi, setGridApi] = useState<GridApi<TraApplicationItem> | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | string>("");
@@ -74,14 +75,8 @@ export function TraMyApplicationsManager() {
   const rowData = data?.items ?? [];
   const courses = (coursesData?.items ?? []) as CourseRow[];
 
-  const selectedRows = useMemo(() => {
-    return gridApi?.getSelectedRows() ?? [];
-  }, [gridApi]);
-
-  const canWithdraw = useMemo(() => {
-    const rows = gridApi?.getSelectedRows() ?? [];
-    return rows.length === 1 && ["submitted", "draft"].includes(rows[0]?.status ?? "");
-  }, [gridApi]);
+  const selectedRows = rowData.filter((row) => selectedIds.includes(row.id));
+  const canWithdraw = selectedRows.length === 1 && ["submitted", "draft"].includes(selectedRows[0]?.status ?? "");
 
   const columnDefs = useMemo<ColDef<TraApplicationItem>[]>(
     () => [
@@ -216,7 +211,7 @@ export function TraMyApplicationsManager() {
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onGridReady={onGridReady}
-              onSelectionChanged={() => setGridApi((prev) => prev)}
+              onSelectionChanged={(event) => setSelectedIds(event.api.getSelectedRows().map((row) => row.id))}
               localeText={{ noRowsToShow: "신청 내역이 없습니다." }}
               headerHeight={36}
               rowHeight={34}
@@ -232,6 +227,7 @@ export function TraMyApplicationsManager() {
         title="교육 신청"
         description="신청할 과정을 선택하고 비고를 입력하세요."
         confirmLabel="신청"
+        busy={submitting}
         cancelLabel="취소"
         onConfirm={() => void handleCreate()}
       >
@@ -272,6 +268,7 @@ export function TraMyApplicationsManager() {
         title="신청 회수"
         description="선택한 교육 신청을 회수하시겠습니까? 회수 후에는 취소 상태로 변경됩니다."
         confirmLabel="회수"
+        busy={submitting}
         cancelLabel="취소"
         confirmVariant="destructive"
         onConfirm={() => void handleWithdraw()}

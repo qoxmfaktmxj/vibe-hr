@@ -28,6 +28,8 @@ import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summar
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
+import { ATTENDANCE_CODE_COLUMNS, validateAttendanceCodeImport } from "@/lib/spreadsheet/time-payroll-code-schemas";
 import type {
   TimAttendanceCodeItem,
   TimAttendanceCodeBatchRequest,
@@ -126,6 +128,7 @@ export function AttendanceCodeManager() {
   const [rows, setRows] = useState<AttendanceCodeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [searchCategory, setSearchCategory] = useState("");
   const [appliedName, setAppliedName] = useState("");
@@ -485,6 +488,7 @@ export function AttendanceCodeManager() {
   }
 
   function handleQueryRequest() {
+    if (importing) return;
     gridApiRef.current?.stopEditing();
     if (hasChanges) {
       setPendingQuery(true);
@@ -495,6 +499,7 @@ export function AttendanceCodeManager() {
   }
 
   async function saveAllChanges() {
+    if (saving || importing) return;
     const toInsert = rows.filter((r) => r._status === "added");
     const toUpdate = rows.filter((r) => r._status === "updated");
     const toDelete = rows.filter((r) => r._status === "deleted" && r.id > 0);
@@ -572,12 +577,37 @@ export function AttendanceCodeManager() {
   }, [filteredRows, page, pageSize]);
   const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-  function handleTemplateDownload() {
-    toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+  async function handleTemplateDownload() {
+    if (saving || importing || !can("template_download")) return;
+    try {
+      await downloadSpreadsheet("attendance-codes-template.xlsx", ATTENDANCE_CODE_COLUMNS, [], "근태코드");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "양식 다운로드에 실패했습니다.");
+    }
   }
 
-  function handleUpload() {
-    toast.success("업로드는 다음 단계에서 연결합니다.");
+  async function handleUpload() {
+    if (saving || importing || menuActionLoading || !can("upload")) return;
+    gridApiRef.current?.stopEditing();
+    setImporting(true);
+    try {
+      const file = await pickSpreadsheetFile();
+      if (!file) return;
+      const records = await readSpreadsheet(file, ATTENDANCE_CODE_COLUMNS);
+      const values = validateAttendanceCodeImport(records, rowsRef.current.filter((row) => row._status !== "deleted"));
+      const addedRows = values.map((value) => ({ ...createEmptyRow(issueTempId()), ...value }));
+      commitRows((prev) => [...addedRows, ...prev]);
+      setSearchName("");
+      setAppliedName("");
+      setSearchCategory("");
+      setAppliedCategory("");
+      setPage(1);
+      toast.success(`${addedRows.length}건을 불러왔습니다. 저장 버튼을 눌러 반영해 주세요.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+    } finally {
+      setImporting(false);
+    }
   }
 
   const toolbarActions = [
@@ -586,7 +616,8 @@ export function AttendanceCodeManager() {
     { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
     { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
     { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key))
+    .map((action) => ({ ...action, disabled: saving || importing || menuActionLoading }));
 
   const toolbarSaveAction = can("save")
     ? {
@@ -594,7 +625,7 @@ export function AttendanceCodeManager() {
         label: saving ? "저장중..." : "저장",
         icon: Save,
         onClick: () => void saveAllChanges(),
-        disabled: saving || menuActionLoading,
+        disabled: saving || importing || menuActionLoading,
         variant: "save" as const,
       }
     : undefined;
@@ -613,7 +644,7 @@ export function AttendanceCodeManager() {
       <ManagerSearchSection
         title="근태코드관리"
         onQuery={handleQueryRequest}
-        queryDisabled={saving || menuActionLoading || !can("query")}
+        queryDisabled={saving || importing || menuActionLoading || !can("query")}
       >
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">

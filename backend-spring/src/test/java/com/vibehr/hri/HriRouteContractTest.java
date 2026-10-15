@@ -11,11 +11,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 class HriRouteContractTest {
     @Test
-    void exposesExactlyTheFifteenCanonicalHriRoutes() {
+    void exposesTheFifteenCanonicalHriRoutesAndApprovedAtomicSubmissionExtension() {
         Set<String> expected = Set.of(
                 "GET /hri/form-types", "POST /hri/form-types/batch",
                 "GET /hri/approval-templates", "POST /hri/approval-templates/batch",
                 "POST /hri/requests/draft", "POST /hri/requests/{request_id}/submit", "POST /hri/requests/{request_id}/withdraw",
+                "POST /hri/requests/submit",
                 "POST /hri/requests/{request_id}/approve", "POST /hri/requests/{request_id}/reject",
                 "POST /hri/requests/{request_id}/receive-complete", "POST /hri/requests/{request_id}/receive-reject",
                 "GET /hri/requests/my", "GET /hri/requests/{request_id}",
@@ -25,7 +26,7 @@ class HriRouteContractTest {
             add(actual, "GET", method.getAnnotation(GetMapping.class) == null ? null : method.getAnnotation(GetMapping.class).value());
             add(actual, "POST", method.getAnnotation(PostMapping.class) == null ? null : method.getAnnotation(PostMapping.class).value());
         }
-        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected).hasSize(15);
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected).hasSize(16);
     }
 
     private void add(Set<String> routes, String verb, String[] paths) {

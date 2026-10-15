@@ -84,6 +84,19 @@ assert.match(verifyCoverage({
   routes: { unresolved_annotations: nestedConstant.unresolved_annotations, duplicate_spring_mappings: [] },
 }).join(" "), /could not be resolved deterministically/);
 
+const approvedHriExtension = {
+  parser_source_integrity_errors: [],
+  routes: {
+    unresolved_annotations: [], duplicate_spring_mappings: [], missing: [],
+    extra_spring_mappings: [{ key: "POST /api/v1/hri/requests/submit" }],
+  },
+};
+assert.deepStrictEqual(verifyCoverage(approvedHriExtension, true), []);
+assert.match(verifyCoverage({
+  ...approvedHriExtension,
+  routes: { ...approvedHriExtension.routes, extra_spring_mappings: [{ key: "POST /api/v1/hri/requests/unreviewed" }] },
+}, true).join(" "), /unapproved extra Spring mapping/);
+
 const duplicateSource = `package fixture;
 import org.springframework.web.bind.annotation.*;
 @RestController

@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -101,6 +102,9 @@ class TimePostgreSqlIntegrationTest {
         jdbc.update("delete from tim_attendance_corrections where corrected_by_employee_id=? or attendance_id in (select id from tim_attendance_daily where employee_id=?)", EMPLOYEE_ID, EMPLOYEE_ID);
         jdbc.update("delete from tim_attendance_daily where employee_id=?", EMPLOYEE_ID);
         jdbc.update("delete from tim_employee_daily_schedules where employee_id=?", EMPLOYEE_ID);
+        jdbc.update("delete from tim_leave_requests where employee_id=?", EMPLOYEE_ID);
+        jdbc.update("delete from tim_annual_leaves where employee_id=?", EMPLOYEE_ID);
+        jdbc.update("delete from tim_holidays where name='leave snapshot test'");
         jdbc.update("delete from tim_month_closes where year=2026 and month=8");
         jdbc.update("delete from hr_employees where id=?", EMPLOYEE_ID);
         jdbc.update("delete from auth_users where id=?", USER_ID);
@@ -128,9 +132,9 @@ class TimePostgreSqlIntegrationTest {
     }
 
     @Test
-    void canonicalFlywayV1ThroughV5AndHibernateValidationProvideTheActualTimSchema() {
+    void canonicalFlywayV1ThroughV6AndHibernateValidationProvideTheActualTimSchema() {
         assertThat(jdbc.queryForList("select version from flyway_schema_history where success order by installed_rank", String.class))
-                .containsExactly("1", "2", "3", "4", "5");
+                .containsExactly("1", "2", "3", "4", "5", "6");
         assertThat(Set.copyOf(jdbc.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema='public' and table_name like 'tim_%'
@@ -184,6 +188,131 @@ class TimePostgreSqlIntegrationTest {
         assertThat(service.checkIn(EMPLOYEE_ID).attendanceStatus()).isEqualTo("present");
         assertApiError(() -> service.checkIn(EMPLOYEE_ID), 409, "오늘 이미 출근 처리되었습니다.");
         assertThat(jdbc.queryForObject("select count(*) from tim_attendance_daily where employee_id=?", Integer.class, EMPLOYEE_ID)).isOne();
+    }
+
+    @Test
+    void halfDayApprovalPersistsHalfADayAndCancellationRestoresItExactlyOnce() {
+        insertAnnualLeave(2026, 2, 0);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("half_day",
+                LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 3), "진료"));
+
+        assertThat(created.leaveDays()).isEqualTo(0.5);
+        assertThat(service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null)).deductionDays()).isEqualTo(0.5);
+        assertAnnualLeave(2026, 1.5, 0.5);
+        assertThat(jdbc.queryForObject("select (annual_charge_breakdown->>'2026')::double precision from tim_leave_requests where id=?",
+                Double.class, created.id())).isEqualTo(0.5);
+
+        service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertAnnualLeave(2026, 2, 0);
+        assertApiError(() -> service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null)), 409,
+                "취소할 수 없는 휴가 상태입니다.");
+        assertAnnualLeave(2026, 2, 0);
+    }
+
+    @Test
+    void crossYearApprovalAndCancellationUseThePersistedPerYearSnapshotAfterHolidayChanges() {
+        insertAnnualLeave(2026, 4, 0);
+        insertAnnualLeave(2027, 5, 0);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 4), "연말 휴가"));
+
+        assertThat(service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null)).deductionDays()).isEqualTo(3);
+        assertAnnualLeave(2026, 3, 1);
+        assertAnnualLeave(2027, 3, 2);
+        jdbc.update("""
+                insert into tim_holidays(holiday_date,name,holiday_type,is_active,created_at,updated_at)
+                values (date '2027-01-04','leave snapshot test','company',true,?,?)
+                """, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+
+        TimLeaveRequestItem listed = service.leaveRequests(EMPLOYEE_ID, "approved", false, 1, 20).items().getFirst();
+        assertThat(listed.deductionDays()).isEqualTo(3);
+        TimLeaveRequestItem cancelled = service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertThat(cancelled.deductionDays()).isEqualTo(3);
+        assertAnnualLeave(2026, 4, 0);
+        assertAnnualLeave(2027, 5, 0);
+    }
+
+    @Test
+    void insufficientSecondYearBalanceRollsBackApprovalAndLeavesEveryBalanceUntouched() {
+        insertAnnualLeave(2026, 10, 0);
+        insertAnnualLeave(2027, 5, 0);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 4), "연말 휴가"));
+        jdbc.update("update tim_annual_leaves set remaining_days=1 where employee_id=? and year=2027", EMPLOYEE_ID);
+
+        assertApiError(() -> service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null)), 400,
+                "연차 잔여일수가 부족합니다.");
+
+        assertAnnualLeave(2026, 10, 0);
+        assertAnnualLeave(2027, 1, 0);
+        assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, created.id())).isEqualTo("pending");
+        assertThat(jdbc.queryForObject("select annual_charge_breakdown is null from tim_leave_requests where id=?", Boolean.class, created.id())).isTrue();
+        service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+        assertApiError(() -> service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 4), "연말 휴가")), 400, "연차 잔여일수가 부족합니다.");
+    }
+
+    @Test
+    void legacyNullSnapshotCancellationPreservesOldStartYearAnnualAndZeroHalfDayAccounting() {
+        insertAnnualLeave(2026, 7, 3);
+        insertAnnualLeave(2027, 5, 0);
+        int annualRequest = insertLegacyApprovedLeave("annual", LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 4));
+        int halfDayRequest = insertLegacyApprovedLeave("half_day", LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 3));
+
+        service.cancelLeave(annualRequest, EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+        service.cancelLeave(halfDayRequest, EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertAnnualLeave(2026, 10, 0);
+        assertAnnualLeave(2027, 5, 0);
+    }
+
+    @Test
+    void concurrentHalfDayDecisionsAndCancellationsCannotDoubleDebitOrCredit() throws Exception {
+        insertAnnualLeave(2026, 2, 0);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("half_day",
+                LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 3), "진료"));
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            CountDownLatch approve = new CountDownLatch(1);
+            Future<Object> first = executor.submit(() -> leaveActionAfter(approve,
+                    () -> service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null))));
+            Future<Object> second = executor.submit(() -> leaveActionAfter(approve,
+                    () -> service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null))));
+            approve.countDown();
+            assertLeaveActionResults(List.of(first.get(), second.get()), 400);
+            assertAnnualLeave(2026, 1.5, 0.5);
+
+            CountDownLatch cancel = new CountDownLatch(1);
+            first = executor.submit(() -> leaveActionAfter(cancel,
+                    () -> service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null))));
+            second = executor.submit(() -> leaveActionAfter(cancel,
+                    () -> service.cancelLeave(created.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null))));
+            cancel.countDown();
+            assertLeaveActionResults(List.of(first.get(), second.get()), 409);
+        }
+        assertAnnualLeave(2026, 2, 0);
+    }
+
+    @Test
+    void concurrentOverlappingRequestsWithDifferentStartYearsCreateOnlyOnePendingLeave() throws Exception {
+        insertAnnualLeave(2026, 10, 0);
+        insertAnnualLeave(2027, 10, 0);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Object> first = executor.submit(() -> leaveActionAfter(start,
+                    () -> service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                            LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 4), "연말 휴가"))));
+            Future<Object> second = executor.submit(() -> leaveActionAfter(start,
+                    () -> service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                            LocalDate.of(2027, 1, 4), LocalDate.of(2027, 1, 5), "연초 휴가"))));
+            start.countDown();
+            assertLeaveActionResults(List.of(first.get(), second.get()), 409);
+        }
+        assertThat(jdbc.queryForObject("select count(*) from tim_leave_requests where employee_id=? and request_status='pending'",
+                Integer.class, EMPLOYEE_ID)).isOne();
+        assertAnnualLeave(2026, 10, 0);
+        assertAnnualLeave(2027, 10, 0);
     }
 
     @Test
@@ -294,6 +423,42 @@ class TimePostgreSqlIntegrationTest {
         insertSchedule(LocalDate.of(2026, 8, 10), LocalDateTime.of(2026, 8, 10, 21, 0),
                 LocalDateTime.of(2026, 8, 11, 7, 0), true, false);
         insertAttendance(LocalDate.of(2026, 8, 10), Instant.parse("2026-08-10T12:00:00Z"), Instant.parse("2026-08-10T22:00:00Z"));
+    }
+
+    private void insertAnnualLeave(int year, double remaining, double used) {
+        jdbc.update("""
+                insert into tim_annual_leaves(employee_id,year,granted_days,used_days,carried_over_days,remaining_days,grant_type,created_at,updated_at)
+                values (?,?,?,?,0,?,'test',?,?)
+                """, EMPLOYEE_ID, year, remaining + used, used, remaining, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+    }
+
+    private int insertLegacyApprovedLeave(String type, LocalDate start, LocalDate end) {
+        return jdbc.queryForObject("""
+                insert into tim_leave_requests(employee_id,leave_type,start_date,end_date,reason,request_status,created_at,updated_at)
+                values (?,?,?,?, 'legacy request','approved',?,?) returning id
+                """, Integer.class, EMPLOYEE_ID, type, start, end, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+    }
+
+    private void assertAnnualLeave(int year, double remaining, double used) {
+        assertThat(jdbc.queryForObject("select remaining_days from tim_annual_leaves where employee_id=? and year=?",
+                Double.class, EMPLOYEE_ID, year)).isEqualTo(remaining);
+        assertThat(jdbc.queryForObject("select used_days from tim_annual_leaves where employee_id=? and year=?",
+                Double.class, EMPLOYEE_ID, year)).isEqualTo(used);
+    }
+
+    private Object leaveActionAfter(CountDownLatch start, Supplier<TimLeaveRequestItem> action) throws Exception {
+        start.await();
+        try {
+            return action.get();
+        } catch (ApiException error) {
+            return error;
+        }
+    }
+
+    private void assertLeaveActionResults(List<Object> results, int conflictStatus) {
+        assertThat(results.stream().filter(TimLeaveRequestItem.class::isInstance)).hasSize(1);
+        assertThat(results.stream().filter(ApiException.class::isInstance).map(ApiException.class::cast)
+                .map(error -> error.status().value())).containsExactly(conflictStatus);
     }
 
     private Object closeAfter(CountDownLatch start) {

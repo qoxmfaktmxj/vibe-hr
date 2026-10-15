@@ -1,1 +1,19 @@
 docs/spring-migration/flyway-required-reference-source.sql whitespace=-blank-at-eof
+# These immutable artifacts are verified by byte-level SHA-256 checksums.
+docs/spring-migration/endpoint-manifest.json text eol=lf
+docs/spring-migration/endpoint-manifest.md text eol=lf
+docs/spring-migration/mutation-ledger.json text eol=lf
+docs/spring-migration/mutation-ledger.md text eol=lf
+docs/spring-migration/mutation-decision-registry.json text eol=lf
+docs/spring-migration/schema-ledger.json text eol=lf
+docs/spring-migration/schema-ledger.md text eol=lf
+docs/spring-migration/schema-default-decision-registry.json text eol=lf
+docs/spring-migration/flyway-baseline-manifest.json text eol=lf
+docs/spring-migration/flyway-reference-seed-manifest.json text eol=lf
+docs/spring-migration/flyway-required-reference-source.sql text eol=lf
+docs/spring-migration/flyway-seed-ownership-ledger.json text eol=lf
+docs/spring-migration/flyway-seed-ownership-ledger.md text eol=lf
+backend-spring/src/main/resources/db/migration/V1__alembic_head_baseline.sql text eol=lf
+backend-spring/src/main/resources/db/migration/V2__retire_alembic_version_marker.sql text eol=lf
+backend-spring/src/main/resources/db/migration/V3__required_reference_data.sql text eol=lf
+scripts/spring-migration/*.sh text eol=lf

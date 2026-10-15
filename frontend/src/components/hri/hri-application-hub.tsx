@@ -42,7 +42,6 @@ import type {
   HriFormTypeItem,
   HriFormTypeListResponse,
   HriRequestDetailFullResponse,
-  HriRequestDetailResponse,
   HriRequestItem,
   HriRequestListResponse,
   HriRequestStepSnapshotItem,
@@ -691,8 +690,7 @@ function RequestDetailDialog({
     }
     setSaving(true);
     try {
-      // 임시저장
-      const draftRes = await fetch("/api/hri/requests/draft", {
+      const submitRes = await fetch("/api/hri/requests/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -702,13 +700,6 @@ function RequestDetailDialog({
           content_json: buildContentJson(request.form_code ?? null, editVals, welfareBenefitTypes),
         }),
       });
-      const draftJson = (await draftRes.json().catch(() => null)) as HriRequestDetailResponse | { detail?: string } | null;
-      if (!draftRes.ok || !draftJson || !("request" in draftJson)) {
-        throw new Error((draftJson as { detail?: string } | null)?.detail ?? "저장 실패");
-      }
-
-      // 제출
-      const submitRes = await fetch(`/api/hri/requests/${request.id}/submit`, { method: "POST" });
       const submitJson = (await submitRes.json().catch(() => null)) as { detail?: string } | null;
       if (!submitRes.ok) throw new Error(submitJson?.detail ?? "재제출 실패");
 
@@ -951,8 +942,7 @@ function NewRequestDialog({
     }
     setSaving(true);
     try {
-      // 임시저장
-      const draftRes = await fetch("/api/hri/requests/draft", {
+      const submitRes = await fetch("/api/hri/requests/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -961,15 +951,6 @@ function NewRequestDialog({
           title: title.trim(),
           content_json: buildContentJson(selectedForm.form_code, vals, welfareBenefitTypes),
         }),
-      });
-      const draftJson = (await draftRes.json().catch(() => null)) as HriRequestDetailResponse | { detail?: string } | null;
-      if (!draftRes.ok || !draftJson || !("request" in draftJson)) {
-        throw new Error((draftJson as { detail?: string } | null)?.detail ?? "임시저장 실패");
-      }
-
-      // 제출
-      const submitRes = await fetch(`/api/hri/requests/${draftJson.request.id}/submit`, {
-        method: "POST",
       });
       const submitJson = (await submitRes.json().catch(() => null)) as { detail?: string } | null;
       if (!submitRes.ok) throw new Error(submitJson?.detail ?? "결재신청 실패");

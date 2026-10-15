@@ -143,6 +143,10 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
     [selectedRowId],
   );
 
+  useEffect(() => {
+    gridRef.current?.api?.redrawRows();
+  }, [selectedRowId]);
+
   const toolbarActions = useMemo<GridToolbarAction[]>(
     () => [
       {

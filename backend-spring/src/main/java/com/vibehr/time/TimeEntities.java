@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -179,6 +180,7 @@ class TimLeaveRequest extends TimeAudit {
     @Column(nullable = false) public LocalDate end_date;
     @Column(length = 500) public String reason;
     @Column(nullable = false, length = 20) public String request_status;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") public Map<String, Double> annual_charge_breakdown;
     public Integer approver_employee_id;
     @JdbcTypeCode(SqlTypes.TIMESTAMP) @Column(columnDefinition = "timestamp without time zone") public Instant approved_at;
     @Column(length = 500) public String decision_comment;

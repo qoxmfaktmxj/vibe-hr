@@ -28,6 +28,8 @@ import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summar
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
+import { TAX_RATE_COLUMNS, validateTaxRateImport } from "@/lib/spreadsheet/time-payroll-code-schemas";
 import type {
     PayTaxRateItem,
     PayTaxRateBatchRequest,
@@ -103,6 +105,7 @@ export function PayrollTaxRateManager() {
     const [rows, setRows] = useState<RowData[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [searchYear, setSearchYear] = useState<string>(new Date().getFullYear().toString());
     const [appliedYear, setAppliedYear] = useState<string>(new Date().getFullYear().toString());
     const [page, setPage] = useState(1);
@@ -402,6 +405,7 @@ export function PayrollTaxRateManager() {
     }
 
     function handleQueryRequest() {
+        if (importing) return;
         gridApiRef.current?.stopEditing();
         if (hasChanges) {
             setPendingQuery(true);
@@ -412,6 +416,7 @@ export function PayrollTaxRateManager() {
     }
 
     async function saveAllChanges() {
+        if (saving || importing) return;
         const toInsert = rows.filter((r) => r._status === "added");
         const toUpdate = rows.filter((r) => r._status === "updated");
         const toDelete = rows.filter((r) => r._status === "deleted" && r.id > 0);
@@ -480,12 +485,35 @@ export function PayrollTaxRateManager() {
     }, [filteredRows, page, pageSize]);
     const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-    function handleTemplateDownload() {
-        toast.success("양식 다운로드는 다음 단계에서 연결합니다.");
+    async function handleTemplateDownload() {
+        if (saving || importing || !can("template_download")) return;
+        try {
+            await downloadSpreadsheet("tax-rates-template.xlsx", TAX_RATE_COLUMNS, [], "세율");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "양식 다운로드에 실패했습니다.");
+        }
     }
 
-    function handleUpload() {
-        toast.success("업로드는 다음 단계에서 연결합니다.");
+    async function handleUpload() {
+        if (saving || importing || menuActionLoading || !can("upload")) return;
+        gridApiRef.current?.stopEditing();
+        setImporting(true);
+        try {
+            const file = await pickSpreadsheetFile();
+            if (!file) return;
+            const records = await readSpreadsheet(file, TAX_RATE_COLUMNS);
+            const values = validateTaxRateImport(records, rowsRef.current.filter((row) => row._status !== "deleted"));
+            const addedRows = values.map((value) => ({ ...createEmptyRow(issueTempId()), ...value }));
+            commitRows((prev) => [...addedRows, ...prev]);
+            setSearchYear("");
+            setAppliedYear("");
+            setPage(1);
+            toast.success(`${addedRows.length}건을 불러왔습니다. 저장 버튼을 눌러 반영해 주세요.`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+        } finally {
+            setImporting(false);
+        }
     }
 
     const toolbarActions = [
@@ -495,14 +523,16 @@ export function PayrollTaxRateManager() {
         { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
         { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
     ];
-    const filteredToolbarActions = toolbarActions.filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+    const filteredToolbarActions = toolbarActions
+        .filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key))
+        .map((action) => ({ ...action, disabled: saving || importing || menuActionLoading }));
     const toolbarSaveAction = can("save")
         ? {
             key: "save",
             label: saving ? "저장중..." : "저장",
             icon: Save,
             onClick: () => void saveAllChanges(),
-            disabled: saving || menuActionLoading,
+            disabled: saving || importing || menuActionLoading,
         }
         : undefined;
 
@@ -519,7 +549,7 @@ export function PayrollTaxRateManager() {
             <ManagerSearchSection
                 title="세율관리"
                 onQuery={handleQueryRequest}
-                queryDisabled={saving || menuActionLoading || !can("query")}
+                queryDisabled={saving || importing || menuActionLoading || !can("query")}
             >
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="space-y-1">

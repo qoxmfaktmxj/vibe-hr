@@ -54,9 +54,43 @@ public final class PostgreSqlSchemaManifest {
     }
 
     public static void assertMatchesCheckedInManifest(Connection connection) throws SQLException {
+        assertMatchesBaselineMetadata(capture(connection));
+    }
+
+    public static void assertMatchesCurrentSchema(Connection connection) throws SQLException {
+        ObjectNode metadata = capture(connection);
+        ObjectNode expectedColumn = OBJECT_MAPPER.createObjectNode()
+                .put("name", "annual_charge_breakdown")
+                .put("data_type", "jsonb")
+                .put("udt_name", "jsonb")
+                .put("nullable", "YES")
+                .putNull("default")
+                .putNull("character_maximum_length")
+                .putNull("numeric_precision")
+                .putNull("numeric_scale")
+                .putNull("datetime_precision");
+        boolean found = false;
+        for (JsonNode table : metadata.withArray("tables")) {
+            if (!"tim_leave_requests".equals(table.path("name").asText())) continue;
+            ArrayNode columns = (ArrayNode) table.path("columns");
+            for (int index = 0; index < columns.size(); index++) {
+                JsonNode column = columns.get(index);
+                if (!"annual_charge_breakdown".equals(column.path("name").asText())) continue;
+                if (!expectedColumn.equals(column)) throw new IllegalStateException("PostgreSQL schema metadata drift detected in the V6 annual leave deduction snapshot column.");
+                columns.remove(index);
+                found = true;
+                break;
+            }
+        }
+        if (!found) throw new IllegalStateException("PostgreSQL schema metadata drift detected: the V6 annual leave deduction snapshot column is missing.");
+        // Adoption keeps the immutable V1 baseline; runtime permits only this exact V6 extension.
+        assertMatchesBaselineMetadata(metadata);
+    }
+
+    private static void assertMatchesBaselineMetadata(JsonNode metadata) {
         JsonNode expected = loadCheckedInManifest();
         String expectedFingerprint = expected.path("metadata_sha256").asText();
-        String actualFingerprint = fingerprint(connection);
+        String actualFingerprint = sha256(canonicalJson(metadata));
         if (!Objects.equals(expectedFingerprint, actualFingerprint)) {
             throw new IllegalStateException("PostgreSQL schema metadata drift detected; expected "
                     + expectedFingerprint + " but found " + actualFingerprint + ". Adoption was not started.");

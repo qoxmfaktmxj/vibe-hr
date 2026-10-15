@@ -11,9 +11,9 @@ function verifyCutoverRunbook(runbook) {
   const failures = [];
   for (const required of [
     "The adoption command stops at the exact V1/V2 ownership transfer.",
-    "The separate `flyway-cutover` stage applies V3, V4, and V5 on startup after adoption succeeds.",
+    "The separate `flyway-cutover` stage applies V3, V4, V5, and V6 on startup after adoption succeeds.",
     "Post-adoption: run the exact V1/V2 integrity check immediately after the adoption command completes.",
-    "After starting `flyway-cutover`: confirm the exact current V1-V5 chain/checksums, then confirm the 106-table live schema check through the migration gate and smoke.",
+    "After starting `flyway-cutover`: confirm the exact current V1-V6 chain/checksums, then confirm the 106-table live schema check through the migration gate and smoke.",
     "canonical application operations",
   ]) {
     if (!runbook.includes(required)) failures.push(`cutover runbook is missing ${required}`);

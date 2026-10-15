@@ -34,14 +34,16 @@ from flyway_schema_history
 order by installed_rank;
 ```
 
-The adoption command stops at the exact V1/V2 ownership transfer. The separate `flyway-cutover` stage applies V3, V4, and V5 on startup after adoption succeeds.
+The adoption command stops at the exact V1/V2 ownership transfer. The separate `flyway-cutover` stage applies V3, V4, V5, and V6 on startup after adoption succeeds.
+
+V6 adds the nullable `tim_leave_requests.annual_charge_breakdown` JSONB column. New annual and half-day approvals store the actual debit by year so cancellation restores the same amounts after holiday-calendar changes. Existing null records retain the earlier cancellation rule: annual leave restores its start-year working-day charge, and half-day leave restores no annual credit. The runtime schema gate validates this exact nullable column and all baseline metadata; the adoption schema manifest remains unchanged. Apply V6 through Flyway before running this application version. A rollback must preserve the column and stored deductions. Do not resume the earlier leave approval/cancellation code while approvals with a saved snapshot remain; retain this accounting implementation or suspend those operations during recovery.
 
 The corrected V3 preserves all active department schedule assignments and resolves only its temporary source-ID map with `priority DESC, effective_from DESC, id DESC`. Its approved SHA-256 is `9e964bf96d864a7ef8f0a3114d3a6f27a6c187fed94031c8e0d92a6da51f0dcc` and Flyway checksum is `720383589`; any difference is a stop condition.
 
 ## Verification Stages
 
 - Post-adoption: run the exact V1/V2 integrity check immediately after the adoption command completes.
-- After starting `flyway-cutover`: confirm the exact current V1-V5 chain/checksums, then confirm the 106-table live schema check through the migration gate and smoke.
+- After starting `flyway-cutover`: confirm the exact current V1-V6 chain/checksums, then confirm the 106-table live schema check through the migration gate and smoke.
 
 Fixture profiles are prohibited in this runbook. `dev-seed` and `demo-seed` additionally require a `local` or `dev` profile, `VIBEHR_ALLOW_FIXTURE_SEEDING=true`, a loopback PostgreSQL host, and a database name without `prod` or `live`; the seed gate rejects production-like targets before the local `admin` fixture can be written.
 

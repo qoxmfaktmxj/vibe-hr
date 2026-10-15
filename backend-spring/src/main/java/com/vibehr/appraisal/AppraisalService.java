@@ -176,6 +176,17 @@ public class AppraisalService {
 
     @Transactional
     public TargetBatchResponse saveTargetBatch(TargetBatchRequest request) {
+        for (TargetBatchRow item : request.items()) {
+            if ("deleted".equals(item.statusOrClean())) continue;
+            if ("added".equals(item.statusOrClean()) || item.id() == null) {
+                if (item.appraisalId() == null || item.appraisalId() <= 0) {
+                    throw ApiException.badRequest("신규 평가 대상자의 평가를 선택해주세요.");
+                }
+                if (item.employeeId() == null || item.employeeId() <= 0) {
+                    throw ApiException.badRequest("신규 평가 대상자의 사원을 선택해주세요.");
+                }
+            }
+        }
         int created = 0;
         int updated = 0;
         int deleted = 0;
@@ -190,7 +201,6 @@ public class AppraisalService {
                 continue;
             }
             if ("added".equals(rowStatus) || item.id() == null) {
-                if (item.appraisalId() == null || item.employeeId() == null) continue;
                 PapAppraisalTarget row = new PapAppraisalTarget();
                 row.appraisal_id = item.appraisalId(); row.employee_id = item.employeeId(); row.score = item.score();
                 row.grade_code = item.gradeCode(); row.evaluator_note = item.evaluatorNote(); row.status = item.status() == null ? "pending" : item.status();
@@ -200,7 +210,8 @@ public class AppraisalService {
             } else if ("updated".equals(rowStatus) || "clean".equals(rowStatus)) {
                 PapAppraisalTarget row = entityManager.find(PapAppraisalTarget.class, item.id(), LockModeType.PESSIMISTIC_WRITE);
                 if (row == null) continue;
-                if (item.score() != null) row.score = item.score();
+                if (item.clearScore()) row.score = null;
+                else if (item.score() != null) row.score = item.score();
                 if (item.gradeCode() != null) row.grade_code = item.gradeCode();
                 if (item.evaluatorNote() != null) row.evaluator_note = item.evaluatorNote();
                 if (item.status() != null) {
