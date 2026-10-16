@@ -133,20 +133,18 @@ export function PayEmployeeProfileManager() {
   const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/pay/employee-profiles", { cache: "no-store" });
+  const loadData = useCallback(() => {
+    return fetch("/api/pay/employee-profiles", { cache: "no-store" }).then(async (res) => {
       if (!res.ok) throw new Error("직원 급여프로필 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as { items: PayEmployeeProfileItem[] };
       const nextRows = (data.items ?? []).map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
-    } catch (error) {
+    }).catch((error: unknown) => {
       toast.error(error instanceof Error ? error.message : "로딩 실패");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {

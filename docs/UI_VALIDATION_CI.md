@@ -6,14 +6,14 @@ The production host must not launch Playwright/Chromium or a Next development
 server as part of the daily deployment. `ui-validation.yml` runs on GitHub-hosted
 Ubuntu for every main push (no path filters), PR, or manual dispatch; the manual
 deploy workflow waits for this standalone workflow through the existing read-only
-same-SHA gate instead of executing it again. It runs the unchanged 8-case employee
-UX and 43-case employee-experience suites, sequentially with one worker, plus grid
+same-SHA gate instead of executing it again. It runs the existing 8-case employee
+UX and 44-case employee-experience suites, sequentially with one worker, plus grid
 validation, lint, unit tests and one production build. After that build, the
 repository-audit configuration runs 31 additional business workflow cases against
 the production server. Its two UI-smoke cases are already part of employee
 experience and are the only cases excluded from this additional invocation.
 Browser suites fail fast on their first failure and emit GitHub annotations;
-No distinct case is removed; 82 distinct browser cases protect the hosted UI
+No distinct case is removed; 83 distinct browser cases protect the hosted UI
 gate, and an interrupted suite fails the entire gate. New
 runs of the same workflow/ref cancel superseded validation attempts.
 Synthetic services and generated ephemeral test secrets stay on the runner;

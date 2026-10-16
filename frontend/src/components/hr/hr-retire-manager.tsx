@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 
@@ -78,22 +78,19 @@ export function HrRetireManager() {
   const caseItems = caseData?.items ?? [];
   const firstCaseId = caseData?.items?.[0]?.id ?? null;
 
-  useEffect(() => {
-    if (selectedCaseId || !firstCaseId) return;
+  if (!selectedCaseId && firstCaseId) {
     setSelectedCaseId(firstCaseId);
-  }, [firstCaseId, selectedCaseId]);
+  }
 
-  useEffect(() => {
-    if (!caseDetail) {
-      setNoteDrafts({});
-      return;
-    }
+  const [noteSource, setNoteSource] = useState<typeof caseDetail>(undefined);
+  if (caseDetail !== noteSource) {
+    setNoteSource(caseDetail);
     const next: Record<number, string> = {};
-    for (const item of caseDetail.checklist_items) {
+    for (const item of caseDetail?.checklist_items ?? []) {
       next[item.id] = item.note ?? "";
     }
     setNoteDrafts(next);
-  }, [caseDetail]);
+  }
 
   async function handleCreateChecklist() {
     if (!newChecklistCode.trim() || !newChecklistTitle.trim()) {

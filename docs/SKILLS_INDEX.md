@@ -2,7 +2,7 @@ Status: Draft
 Owner: 석
 Canonical: Yes
 Source of Truth: This file
-Last Verified: 2026-03-22
+Last Verified: 2026-10-16
 Confidence: Medium
 
 # SKILLS_INDEX.md
@@ -23,11 +23,11 @@ Vibe-HR에서 상황별로 주입할 skill/working pattern의 목록과 적용 �
 | `employee-grid-reference` | 사원관리 grid 패턴 참조 | grid/toolbar/editor/action 구현 시 | `docs/GRID_SCREEN_STANDARD.md`, `docs/employee-grid-standard.md` | grid/manual checks |
 | `permission-change` | 메뉴/액션 권한 작업 보호 | 메뉴 권한, 액션 권한, role matrix 변경 | `docs/MENU_ACTION_PERMISSION_PLAN.md`, `docs/GOVERNANCE.md` | permission tests |
 | `workflow-gap-check` | workflow 1~10 기준 누락 화면/API/데이터 찾기 | cron/analysis/manual planning | `docs/ARCHITECTURE.md`, `docs/HARNESS_STATUS.md` | browser/manual review |
-| `deploy-safety` | 수동 배포 전 점검 | workflow_dispatch, docker compose deploy, runtime fix | `docs/GOVERNANCE.md`, `docs/OBSERVABILITY.md` | health/deploy checks |
+| `deploy-safety` | 동일 SHA 검증과 배포 전 점검 | main push, schedule, workflow_dispatch, docker compose deploy, runtime fix | `docs/GOVERNANCE.md`, `docs/OBSERVABILITY.md`, `docs/UI_VALIDATION_CI.md` | hosted UI/backend/image/runtime checks |
 | `legacy-regression` | 기존 화면/동작 보호 | legacy hotspot 수정 시 | `docs/TEST_STRATEGY.md`, `docs/TASK_LEDGER.md` | regression/manual checks |
 
 ## 자동화/cron 관련 원칙
-- cron은 R0/R1만 자동 수행
+- 에이전트의 예약 개선 작업은 R0/R1만 자동 수행한다. 기존 승인된 배포 workflow는 별도의 동일 SHA 검증과 배포 게이트를 따른다.
 - 새 화면 추가 시 DB 메뉴/권한/seed까지 확인
 - browser 도구를 써서 실제 진입/동작을 확인할 수 있으면 우선 검증한다
 

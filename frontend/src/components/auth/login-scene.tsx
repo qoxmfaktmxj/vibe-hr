@@ -173,7 +173,7 @@ export function LoginScene() {
   return (
     <>
       <div className={styles.scene} aria-hidden="true">
-        <picture>
+        <picture className={styles.scenePicture}>
           <source media="(max-width: 767px)" srcSet="/images/conservatory-login-mobile.webp" />
           <Image src="/images/conservatory-login-desktop.webp" fill loading="eager" fetchPriority="high" sizes="100vw" alt="" className={styles.sceneImage} />
         </picture>

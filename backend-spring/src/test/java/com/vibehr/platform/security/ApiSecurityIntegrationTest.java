@@ -15,6 +15,8 @@ import com.vibehr.platform.error.RequestBodyCachingFilter;
 import com.vibehr.platform.health.ApiHealthController;
 import com.vibehr.platform.health.DatabaseHealthCheck;
 import com.vibehr.platform.health.HealthController;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -36,9 +38,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,6 +73,12 @@ class ApiSecurityIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private FilterChainProxy springSecurityFilterChain;
 
     @Autowired
     private SwitchableDataSource dataSource;
@@ -127,6 +138,25 @@ class ApiSecurityIntegrationTest {
     @Test
     void deniesUnmigratedApiPathsWithFastApiCompatible401() throws Exception {
         mockMvc.perform(get("/api/v1/employees"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Not authenticated."));
+    }
+
+    @Test
+    void permitsInternalErrorDispatchWithoutMaskingItsServerErrorAsUnauthorized() throws Exception {
+        // Register the chain directly so MockMvc also filters ERROR dispatches.
+        MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .addFilters(springSecurityFilterChain).build().perform(get("/error")
+                        .with(request -> { request.setDispatcherType(DispatcherType.ERROR); return request; })
+                        .requestAttr(RequestDispatcher.ERROR_STATUS_CODE, 500)
+                        .requestAttr(RequestDispatcher.ERROR_REQUEST_URI, "/api/v1/test-runtime-error"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500));
+    }
+
+    @Test
+    void rejectsAnUnauthenticatedDirectRequestToTheErrorUrl() throws Exception {
+        mockMvc.perform(get("/error"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Not authenticated."));
     }

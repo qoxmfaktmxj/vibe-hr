@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
@@ -114,11 +114,9 @@ export function InfraConfigManager() {
   const masters = useMemo(() => allMasterData?.items ?? [], [allMasterData?.items]);
   const pageMasters = useMemo(() => masterData?.items ?? [], [masterData?.items]);
 
-  useEffect(() => {
-    if (!selectedMasterId && masters.length > 0) {
-      setSelectedMasterId(masters[0].id);
-    }
-  }, [masters, selectedMasterId]);
+  if (selectedMasterId === null && masters.length > 0) {
+    setSelectedMasterId(masters[0].id);
+  }
 
   const configEndpoint = selectedMasterId ? `/api/mng/infra-configs/${selectedMasterId}` : null;
   const { data: configData, mutate: mutateConfigs } = useSWR<MngInfraConfigListResponse>(configEndpoint, fetcher, {

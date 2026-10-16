@@ -11,6 +11,23 @@ import org.springframework.security.core.Authentication;
 
 class TimeControllerTest {
     @Test
+    void myAnnualLeaveUsesTheAuthenticatedUsersLinkedEmployee() {
+        TimeApplicationService service = mock(TimeApplicationService.class);
+        TimeAuthorization authorization = mock(TimeAuthorization.class);
+        MenuPermissionService menuPermissions = mock(MenuPermissionService.class);
+        Authentication authentication = mock(Authentication.class);
+        TimAnnualLeaveResponse expected = new TimAnnualLeaveResponse(null);
+        when(authorization.userId(authentication)).thenReturn(7);
+        when(authorization.employeeIdForUser(7)).thenReturn(22);
+        when(service.annualLeave(22, 2026)).thenReturn(expected);
+        TimeController controller = new TimeController(service, authorization, menuPermissions);
+
+        assertThat(controller.myAnnualLeave(authentication, 2026)).isSameAs(expected);
+
+        verify(service).annualLeave(22, 2026);
+    }
+
+    @Test
     void checkInUsesTheAuthenticatedEmployeesOwnRecordWhenNoTargetIsProvided() {
         TimeApplicationService service = mock(TimeApplicationService.class);
         TimeAuthorization authorization = mock(TimeAuthorization.class);

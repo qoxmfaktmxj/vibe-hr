@@ -83,54 +83,52 @@ export function HriApprovalTemplateManager() {
   }, [query, rows]);
 
   useEffect(() => {
+    async function loadRows() {
+      try {
+        const res = await fetch("/api/hri/approval-templates", { cache: "no-store" });
+        const raw = (await res.json().catch(() => null)) as unknown;
+        if (!res.ok) {
+          const errorData = raw as { detail?: string } | null;
+          throw new Error(errorData?.detail ?? "결재선 템플릿 조회에 실패했습니다.");
+        }
+        const data = raw as HriApprovalTemplateListResponse;
+        setRows(data.items);
+        setSelectedId((prev) => prev ?? data.items[0]?.id ?? null);
+      } catch (error) {
+        setNoticeType("error");
+        setNotice(error instanceof Error ? error.message : "결재선 템플릿 조회에 실패했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
     void loadRows();
   }, []);
 
-  useEffect(() => {
-    if (createMode) {
-      setForm(EMPTY_FORM);
-      return;
-    }
-    if (!selected) return;
-    setForm({
-      id: selected.id,
-      template_code: selected.template_code,
-      template_name: selected.template_name,
-      scope_type: selected.scope_type,
-      scope_id: selected.scope_id ?? "",
-      is_default: selected.is_default,
-      is_active: selected.is_active,
-      priority: String(selected.priority),
-      steps: selected.steps.map((step) => ({
-        id: step.id,
-        step_order: step.step_order,
-        step_type: step.step_type,
-        actor_resolve_type: step.actor_resolve_type,
-        actor_role_code: step.actor_role_code,
-        actor_user_id: step.actor_user_id,
-        allow_delegate: step.allow_delegate,
-        required_action: step.required_action,
-      })),
-    });
-  }, [createMode, selected]);
-
-  async function loadRows() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/hri/approval-templates", { cache: "no-store" });
-      const raw = (await res.json().catch(() => null)) as unknown;
-      if (!res.ok) {
-        const errorData = raw as { detail?: string } | null;
-        throw new Error(errorData?.detail ?? "결재선 템플릿 조회에 실패했습니다.");
-      }
-      const data = raw as HriApprovalTemplateListResponse;
-      setRows(data.items);
-      setSelectedId((prev) => prev ?? data.items[0]?.id ?? null);
-    } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : "결재선 템플릿 조회에 실패했습니다.");
-    } finally {
-      setLoading(false);
+  const [formSource, setFormSource] = useState<typeof selected>(null);
+  if (selected !== formSource) {
+    setFormSource(selected);
+    if (!createMode && selected) {
+      setForm({
+        id: selected.id,
+        template_code: selected.template_code,
+        template_name: selected.template_name,
+        scope_type: selected.scope_type,
+        scope_id: selected.scope_id ?? "",
+        is_default: selected.is_default,
+        is_active: selected.is_active,
+        priority: String(selected.priority),
+        steps: selected.steps.map((step) => ({
+          id: step.id,
+          step_order: step.step_order,
+          step_type: step.step_type,
+          actor_resolve_type: step.actor_resolve_type,
+          actor_role_code: step.actor_role_code,
+          actor_user_id: step.actor_user_id,
+          allow_delegate: step.allow_delegate,
+          required_action: step.required_action,
+        })),
+      });
     }
   }
 
@@ -257,6 +255,7 @@ export function HriApprovalTemplateManager() {
   }
 
   function startCreate() {
+    setForm(EMPTY_FORM);
     setCreateMode(true);
     setSelectedId(null);
     setNotice(null);

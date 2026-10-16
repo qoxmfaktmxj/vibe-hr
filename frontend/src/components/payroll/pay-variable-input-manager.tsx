@@ -103,21 +103,19 @@ export function PayVariableInputManager() {
   const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
 
-  const loadData = useCallback(async (yearMonth: string) => {
-    setLoading(true);
-    try {
-      const q = yearMonth ? `?year_month=${encodeURIComponent(yearMonth)}` : "";
-      const res = await fetch(`/api/pay/variable-inputs${q}`, { cache: "no-store" });
+  const loadData = useCallback((yearMonth: string) => {
+    const q = yearMonth ? `?year_month=${encodeURIComponent(yearMonth)}` : "";
+    return fetch(`/api/pay/variable-inputs${q}`, { cache: "no-store" }).then(async (res) => {
       if (!res.ok) throw new Error("월 변동입력 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as { items: PayVariableInputItem[] };
       const nextRows = (data.items ?? []).map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
-    } catch (error) {
+    }).catch((error: unknown) => {
       toast.error(error instanceof Error ? error.message : "로딩 실패");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -196,6 +194,7 @@ export function PayVariableInputManager() {
   async function handleQuery() {
     if (uploading) return;
     const next = searchYearMonth.trim();
+    if (next !== appliedYearMonth) setLoading(true);
     setAppliedYearMonth(next);
     setPage(1);
   }

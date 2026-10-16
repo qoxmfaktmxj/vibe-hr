@@ -16,7 +16,7 @@ import {
   Shapes,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -297,22 +297,16 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
   const [draftRows, setDraftRows] = useState<Record<number, HrInfoRow>>({});
   const [appointmentPage, setAppointmentPage] = useState(1);
 
-  const [profileDraft, setProfileDraft] = useState<BasicProfileDraft>(() => buildProfileDraft(detail));
+  const [editedProfileDraft, setProfileDraft] = useState<BasicProfileDraft>(() => buildProfileDraft(detail));
   const [profileEditMode, setProfileEditMode] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
-
-  useEffect(() => {
-    if (!profileEditMode) {
-      setProfileDraft(buildProfileDraft(detail));
-    }
-  }, [detail, profileEditMode]);
-
-  useEffect(() => {
-    if (detail) {
-      setLastUpdatedAt(new Date());
-    }
-  }, [detail]);
+  const profileDraft = profileEditMode ? editedProfileDraft : buildProfileDraft(detail);
+  const [previousDetail, setPreviousDetail] = useState(detail);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(() => detail ? new Date() : null);
+  if (detail !== previousDetail) {
+    setPreviousDetail(detail);
+    if (detail) setLastUpdatedAt(new Date());
+  }
 
   const tabs: Array<[TabKey, string]> = [
     ["basic", "인사기본"],
@@ -504,6 +498,7 @@ export function HrBasicTabs({ detail, employeeId, onReload }: Props) {
                 if (activeTab !== "basic") {
                   setActiveTab("basic");
                 }
+                setProfileDraft(buildProfileDraft(detail));
                 setProfileEditMode(true);
               }}
               disabled={!employeeId || profileEditMode}

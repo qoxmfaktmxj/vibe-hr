@@ -2,7 +2,7 @@ Status: Draft
 Owner: 석
 Canonical: Yes
 Source of Truth: This file
-Last Verified: 2026-03-22
+Last Verified: 2026-10-16
 Confidence: Medium
 
 # QUALITY_SCORE.md
@@ -20,10 +20,10 @@ Confidence: Medium
 ## 현재 점수
 | 축 | 점수 | 근거 | 개선 우선순위 |
 |---|---:|---|---|
-| Test Confidence | 2 | `validate:grid`, lint/build, pytest, 일부 browser/manual 검증 경로 존재 | 높음 |
+| Test Confidence | 2 | `validate:grid`, lint/build, Gradle/JUnit/Testcontainers, browser/manual 검증 경로 존재 | 높음 |
 | Architecture Clarity | 2 | 도메인/문서/실행 규약이 정리됐지만 일부 런타임 결합도가 남음 | 중간 |
 | Documentation Freshness | 3 | Layer 1~6, governance, execution, ledger, eval 문서가 최근 상태로 갱신됨 | 낮음 |
-| Operational Safety | 2 | 자동배포 비활성화, 수동 배포 전환, R0~R3 경계 정리 | 높음 |
+| Operational Safety | 2 | main push, 매일 08:00 KST 예약, 수동 배포에 동일 SHA UI 성공 및 backend/image/runtime 검증 적용, R0~R3 승인 경계 유지 | 높음 |
 | Observability Readiness | 2 | Task Ledger, guardrails, eval summary skeleton 존재 | 중간 |
 
 ## 총점
@@ -49,14 +49,14 @@ Confidence: Medium
   - workflow 진단/상태 점검
 - 승인 필요한 영역:
   - shared contract, permission flow, CI/workflow, broad refactor
-- 금지 영역:
+- 명시적 범위 승인과 충분한 검증이 필요한 R3 영역:
   - auth 의미 변경
   - payroll semantics 변경
   - DB schema/migration
-  - deploy/infra 자동 반영
+  - deploy/infra 변경 및 반영
   - destructive data change
 
 ## 개선 우선순위
-1. baseline `validate:grid` 실패 화면 정리
+1. `validate:grid`와 lint/build 회귀 검증 유지
 2. workflow 1~10 기준 기능 완성도 점검과 누락 화면/데이터 보강
 3. Layer 6용 반복 실행 데이터 누적

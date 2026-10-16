@@ -30,6 +30,10 @@ The two smoke flows cover navigation, not every feature. Add or select focused t
 
 Run `npm run validate:grid` before lint when an AG Grid screen or shared grid module changes. Run browser and build commands sequentially: the dev server and build share Next artifacts. Tests use isolated synthetic services and do not certify production authentication. These local commands do not weaken existing CI or protected-change gates.
 
+For explicit full QA, inventory every spec rather than equating the hosted83 cases with the whole repository. Separate configurations cover checklist and retirement layouts and GPU rendering. The default configuration contains additional Spring-backed and mocked-response workflows, including the real finalist-to-employee/appointment case and lifecycle screen checks. Run those against a disposable loopback backend with development fixtures and BFF cookie login; set `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` and the fixture's distinct temporary `AUTH_TOKEN_SECRET`/`VIBEHR_BFF_ASSERTION_SECRET`. This configuration owns its Next server, refuses to reuse a listening frontend and explicitly pins its BFF target to the loopback API URL. Do not invoke every default-config spec together, because synthetic-only specs require their own fixture server/configuration. Use per-run JSON reports and distinct output paths so a later run or restarted worker cannot erase earlier failures. A lifecycle grid check proves page/API health, not every possible business write.
+
+Keep all existing cases and assertions. On an intermittent failure, preserve the failing evidence, identify the missing synchronization or product defect, and rerun the affected case before claiming a clean final suite. A version upgrade that changes lint analysis is a failed gate to investigate; do not disable rules or force an unsupported analyzer version to obtain a green result.
+
 ### Production-host UI isolation
 
 Daily deployments use the exact-SHA GitHub-hosted UI gate in
@@ -73,7 +77,7 @@ Flyway ownership-transfer work additionally requires:
 .\gradlew.bat migrationIntegrationTest
 ```
 
-Hosted UI validation runs the existing 8 employee UX cases, all 43 employee
+Hosted UI validation runs the existing 8 employee UX cases, all 44 employee
 experience cases, and 31 additional repository-audit workflow cases after one
 production build. Only the audit configuration's duplicate two smoke cases are
 omitted from that extra invocation. The Deploy workflow verifies the standalone

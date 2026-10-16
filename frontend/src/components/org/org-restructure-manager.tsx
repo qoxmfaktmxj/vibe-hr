@@ -150,14 +150,12 @@ export function OrgRestructureManager() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const planGridApiRef = useRef<GridApi<PlanRow> | null>(null);
   const planRowsRef = useRef<PlanRow[]>([]);
-  const planTempIdRef = useRef(-1);
 
   // Items state
   const [itemRows, setItemRows] = useState<ItemRow[]>([]);
   const [itemLoading, setItemLoading] = useState(false);
   const [itemSaving, setItemSaving] = useState(false);
   const itemGridApiRef = useRef<GridApi<ItemRow> | null>(null);
-  const itemRowsRef = useRef<ItemRow[]>([]);
   const itemTempIdRef = useRef(-1);
 
   // Dialog state
@@ -197,51 +195,43 @@ export function OrgRestructureManager() {
   }, []);
 
   const commitItemRows = useCallback((updater: (prev: ItemRow[]) => ItemRow[]) => {
-    const prev = itemRowsRef.current;
-    const next = updater(prev);
-    itemRowsRef.current = next;
-    setItemRows(next);
+    setItemRows(updater);
   }, []);
 
   // ---------------------------------------------------------------------------
   // Fetch plans
   // ---------------------------------------------------------------------------
-  const fetchPlans = useCallback(async (status?: string) => {
-    setPlanLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (status) params.set("status", status);
-      const url = params.size > 0 ? `/api/org/restructure/plans?${params.toString()}` : "/api/org/restructure/plans";
-      const res = await fetch(url, { cache: "no-store" });
+  const fetchPlans = useCallback((status?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    const url = params.size > 0 ? `/api/org/restructure/plans?${params.toString()}` : "/api/org/restructure/plans";
+    return fetch(url, { cache: "no-store" }).then(async (res) => {
       if (!res.ok) throw new Error("개편안 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as OrgRestructurePlanListResponse;
       const next = data.items.map(toPlanRow);
       planRowsRef.current = next;
       setPlanRows(next);
-    } catch (e) {
+    }).catch((e) => {
       toast.error(e instanceof Error ? e.message : "조회 실패");
-    } finally {
+    }).finally(() => {
       setPlanLoading(false);
-    }
+    });
   }, []);
 
   // ---------------------------------------------------------------------------
   // Fetch items for selected plan
   // ---------------------------------------------------------------------------
-  const fetchItems = useCallback(async (planId: number) => {
-    setItemLoading(true);
-    try {
-      const res = await fetch(`/api/org/restructure/plans/${planId}/items`, { cache: "no-store" });
+  const fetchItems = useCallback((planId: number) => {
+    return fetch(`/api/org/restructure/plans/${planId}/items`, { cache: "no-store" }).then(async (res) => {
       if (!res.ok) throw new Error("항목 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as OrgRestructurePlanItemListResponse;
       const next = data.items.map(toItemRow);
-      itemRowsRef.current = next;
       setItemRows(next);
-    } catch (e) {
+    }).catch((e) => {
       toast.error(e instanceof Error ? e.message : "항목 조회 실패");
-    } finally {
+    }).finally(() => {
       setItemLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -249,11 +239,7 @@ export function OrgRestructureManager() {
   }, [fetchPlans]);
 
   useEffect(() => {
-    if (selectedPlanId == null) {
-      itemRowsRef.current = [];
-      setItemRows([]);
-      return;
-    }
+    if (selectedPlanId == null) return;
     void fetchItems(selectedPlanId);
   }, [selectedPlanId, fetchItems]);
 
@@ -279,6 +265,7 @@ export function OrgRestructureManager() {
       const plan = (await res.json()) as OrgRestructurePlanItem;
       const newRow = toPlanRow(plan);
       commitPlanRows((prev) => [newRow, ...prev]);
+      setItemLoading(true);
       setSelectedPlanId(plan.id);
       setNewPlanTitle("");
       toast.success(`개편안 "${plan.title}" 생성됨`);
@@ -339,7 +326,11 @@ export function OrgRestructureManager() {
         return;
       }
       commitPlanRows((prev) => prev.filter((r) => r.id !== deletingPlanId));
-      if (selectedPlanId === deletingPlanId) setSelectedPlanId(null);
+      if (selectedPlanId === deletingPlanId) {
+        setSelectedPlanId(null);
+        setItemRows([]);
+        setItemLoading(false);
+      }
       toast.success("개편안 삭제됨");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "삭제 실패");
@@ -369,7 +360,9 @@ export function OrgRestructureManager() {
       if (json.messages?.length > 0) {
         for (const msg of json.messages) toast.warning(msg);
       }
+      setPlanLoading(true);
       await fetchPlans(statusFilter);
+      setItemLoading(true);
       await fetchItems(selectedPlanId);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "적용 실패");
@@ -498,8 +491,10 @@ export function OrgRestructureManager() {
       }
 
       toast.success(`항목 저장 완료 (입력 ${toInsert.length} / 수정 ${toUpdate.length} / 삭제 ${toDelete.length}건)`);
+      setItemLoading(true);
       await fetchItems(selectedPlanId);
       // Refresh plan row item_count
+      setPlanLoading(true);
       await fetchPlans(statusFilter);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "저장 실패");
@@ -793,7 +788,6 @@ export function OrgRestructureManager() {
   const canApply =
     selectedPlan?.status === "draft" || selectedPlan?.status === "reviewing";
 
-  const planHasDirty = planRows.some((r) => r._status !== "clean");
   const itemHasDirty = itemRows.some((r) => r._status !== "clean");
 
   // ---------------------------------------------------------------------------
@@ -821,7 +815,7 @@ export function OrgRestructureManager() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void fetchPlans(statusFilter)}
+              onClick={() => { setPlanLoading(true); void fetchPlans(statusFilter); }}
               disabled={planLoading}
             >
               <RefreshCw className="mr-1 h-3.5 w-3.5" />
@@ -900,7 +894,12 @@ export function OrgRestructureManager() {
                   headerHeight={32}
                   rowHeight={34}
                   onGridReady={onPlanGridReady}
-                  onRowClicked={(e) => { if (e.data) setSelectedPlanId(e.data.id); }}
+                  onRowClicked={(e) => {
+                    if (e.data && e.data.id !== selectedPlanId) {
+                      setItemLoading(true);
+                      setSelectedPlanId(e.data.id);
+                    }
+                  }}
                   onCellValueChanged={onPlanCellValueChanged}
                 />
               </div>

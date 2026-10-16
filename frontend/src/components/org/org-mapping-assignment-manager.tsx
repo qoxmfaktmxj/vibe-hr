@@ -405,18 +405,17 @@ export function OrgMappingAssignmentManager() {
     [applyGridTransaction],
   );
 
-  const loadTypeOptions = useCallback(async () => {
-    try {
-      const response = await fetch("/api/org/mapping-type-options", { cache: "no-store" });
+  const loadTypeOptions = useCallback(() => {
+    return fetch("/api/org/mapping-type-options", { cache: "no-store" }).then(async (response) => {
       if (!response.ok) {
         setTypeOptions([]);
         return;
       }
       const data = (await response.json()) as { items?: OrganizationLookupItem[] };
       setTypeOptions(data.items ?? []);
-    } catch {
+    }).catch(() => {
       setTypeOptions([]);
-    }
+    });
   }, []);
 
   const ensureItemLookupOptions = useCallback(async (typeCodeInput: string) => {
@@ -462,6 +461,7 @@ export function OrgMappingAssignmentManager() {
   const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
     gridApiRef.current?.stopEditing();
     gridApiRef.current?.deselectAll();
+    setLoading(true);
 
     if (discardDirtyRows) {
       rowsRef.current = [];
@@ -527,25 +527,20 @@ export function OrgMappingAssignmentManager() {
     [pageSize],
   );
 
-  const runQuery = useCallback(
-    async (filters: SearchFilters, pageNo: number) => {
-      setLoading(true);
-      try {
-        const response = await fetchAssignments(filters, pageNo);
-        const nextRows = response.items.map(toGridRow);
-        rowsRef.current = nextRows;
-        setRows(nextRows);
-        setTotalCount(response.total_count ?? nextRows.length);
-        setSelectedId(nextRows[0]?.id ?? null);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : I18N.loadError);
-      } finally {
-        setLoading(false);
-        setInitialLoading(false);
-      }
-    },
-    [fetchAssignments],
-  );
+  const runQuery = useCallback((filters: SearchFilters, pageNo: number) => {
+    return fetchAssignments(filters, pageNo).then((response) => {
+      const nextRows = response.items.map(toGridRow);
+      rowsRef.current = nextRows;
+      setRows(nextRows);
+      setTotalCount(response.total_count ?? nextRows.length);
+      setSelectedId(nextRows[0]?.id ?? null);
+    }).catch((error) => {
+      toast.error(error instanceof Error ? error.message : I18N.loadError);
+    }).finally(() => {
+      setLoading(false);
+      setInitialLoading(false);
+    });
+  }, [fetchAssignments]);
 
   useEffect(() => {
     void runQuery(appliedFilters, page);
@@ -914,6 +909,7 @@ export function OrgMappingAssignmentManager() {
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
       );
+      setLoading(true);
       await runQuery(appliedFilters, page);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFail);
@@ -948,32 +944,28 @@ export function OrgMappingAssignmentManager() {
   }
 
   const toolbarActions = [
-    {
+    ...(canCreateAction ? [{
       key: "create",
       label: I18N.addRow,
       icon: Plus,
       onClick: addRow,
       disabled: saving || loading || !canSaveAction,
-    },
-    {
+    }] : []),
+    ...(canCopyAction ? [{
       key: "copy",
       label: I18N.copy,
       icon: Copy,
       onClick: copyRow,
       disabled: saving || loading || !selectedRow || selectedRow._status === "deleted" || !canSaveAction,
-    },
-    {
+    }] : []),
+    ...(can("download") ? [{
       key: "download",
       label: I18N.download,
       icon: Download,
       onClick: () => void downloadXlsx(),
       disabled: saving || loading,
-    },
-  ].filter((action) => {
-    if (action.key === "download") return can("download");
-    if (action.key === "create") return canCreateAction;
-    return canCopyAction;
-  });
+    }] : []),
+  ];
 
   const toolbarSaveAction = canSaveAction
     ? {

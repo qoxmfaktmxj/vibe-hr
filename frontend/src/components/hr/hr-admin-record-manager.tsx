@@ -208,22 +208,19 @@ export function HrAdminRecordManager({ category, title }: Props) {
     return rows.slice(startIndex, startIndex + PAGE_SIZE);
   }, [page, rows]);
 
-  useEffect(() => {
-    if (page <= totalPages) return;
+  if (page > totalPages) {
     setPage(totalPages);
-  }, [page, totalPages]);
+  }
 
-  const refresh = useCallback(
-    async (filters: SearchFilters) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({ category });
-        if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
-        if (filters.name.trim()) params.set("name", filters.name.trim());
-        if (filters.department.trim()) params.set("department", filters.department.trim());
-        if (filters.employmentStatus) params.set("employment_status", filters.employmentStatus);
+  const refresh = useCallback((filters: SearchFilters) => {
+    const params = new URLSearchParams({ category });
+    if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
+    if (filters.name.trim()) params.set("name", filters.name.trim());
+    if (filters.department.trim()) params.set("department", filters.department.trim());
+    if (filters.employmentStatus) params.set("employment_status", filters.employmentStatus);
 
-        const response = await fetch(`/api/hr/basic/admin-records?${params.toString()}`, { cache: "no-store" });
+    return fetch(`/api/hr/basic/admin-records?${params.toString()}`, { cache: "no-store" })
+      .then(async (response) => {
         if (!response.ok) {
           throw new Error(await parseErrorDetail(response, "데이터 조회에 실패했습니다."));
         }
@@ -237,14 +234,18 @@ export function HrAdminRecordManager({ category, title }: Props) {
         rowsRef.current = nextRows;
         setRows(nextRows);
         setPage(1);
-      } catch (error) {
+      })
+      .catch((error) => {
         toast.error(error instanceof Error ? error.message : "데이터 조회에 실패했습니다.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [category],
-  );
+      })
+      .finally(() => setLoading(false));
+  }, [category]);
+
+  const [previousCategory, setPreviousCategory] = useState(category);
+  if (category !== previousCategory) {
+    setPreviousCategory(category);
+    setLoading(true);
+  }
 
   useEffect(() => {
     void refresh(appliedFilters);
@@ -252,6 +253,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
 
   const handleQuery = useCallback(() => {
     const nextFilters = { ...searchFilters };
+    setLoading(true);
     setAppliedFilters(nextFilters);
     setPage(1);
   }, [searchFilters]);
@@ -417,6 +419,7 @@ export function HrAdminRecordManager({ category, title }: Props) {
       );
 
       toast.success(`저장 완료 (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`);
+      setLoading(true);
       await refresh(appliedFilters);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장 실패");

@@ -38,6 +38,7 @@ test("bulk undo redo, range copy and context menu preserve history", async ({ pa
   await page.getByRole("menuitem", { name: "범위 복사", exact: true }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("이하은");
   await cell(page, 0, "display_name").click();
+  await expect(page.getByRole("status", { name: "선택 영역 통계" })).toContainText("선택 1셀");
   await paste(page, "취소첫째\n취소둘째");
   await expect(cell(page, 1, "display_name")).toHaveText("취소둘째");
   await page.keyboard.press("Control+z");

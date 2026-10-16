@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import type { MenuNode } from "@/types/menu";
 
@@ -48,46 +48,56 @@ export function MenuProvider({
 }) {
   const pathname = usePathname();
   const [menus, setMenus] = useState<MenuNode[]>(initialMenus);
-  const [isLoading, setIsLoading] = useState(false);
-  const hasTriedRefreshRef = useRef(false);
+  const [previousInitialMenus, setPreviousInitialMenus] = useState(initialMenus);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasTriedRefresh, setHasTriedRefresh] = useState(initialMenus.length > 0);
 
-  const refreshMenus = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/menus/tree", {
-        method: "GET",
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        setMenus([]);
-        if (response.status === 401 && typeof window !== "undefined") {
-          window.location.replace("/login");
-        }
-        return;
-      }
-
-      const data = (await response.json()) as { menus?: MenuNode[] };
-      setMenus(data.menus ?? []);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
+  if (previousInitialMenus !== initialMenus) {
+    setPreviousInitialMenus(initialMenus);
     setMenus(initialMenus);
-    hasTriedRefreshRef.current = initialMenus.length > 0;
-  }, [initialMenus]);
+    setHasTriedRefresh(initialMenus.length > 0);
+  }
 
-  useEffect(() => {
-    if (pathname === "/login" || pathname === "/unauthorized") {
+  const loadMenus = useCallback(async () => {
+    const response = await fetch("/api/menus/tree", {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      setMenus([]);
+      if (response.status === 401 && typeof window !== "undefined") {
+        window.location.replace("/login");
+      }
       return;
     }
 
-    if (menus.length === 0 && !hasTriedRefreshRef.current) {
-      hasTriedRefreshRef.current = true;
-      void refreshMenus();
+    const data = (await response.json()) as { menus?: MenuNode[] };
+    setMenus(data.menus ?? []);
+  }, []);
+
+  const refreshMenus = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadMenus();
+    } finally {
+      setHasTriedRefresh(true);
+      setIsRefreshing(false);
     }
-  }, [menus.length, pathname, refreshMenus]);
+  }, [loadMenus]);
+
+  const shouldRefresh = pathname !== "/login" && pathname !== "/unauthorized" && menus.length === 0 && !hasTriedRefresh;
+  const isLoading = isRefreshing || shouldRefresh;
+  useEffect(() => {
+    if (!shouldRefresh) return;
+    async function refreshInitially() {
+      try {
+        await loadMenus();
+      } finally {
+        setHasTriedRefresh(true);
+      }
+    }
+    void refreshInitially();
+  }, [loadMenus, shouldRefresh]);
 
   const value = useMemo<MenuContextValue>(() => {
     const pathSet = collectPaths(menus);

@@ -25,48 +25,62 @@ export function EmployeeProfileDialog({ open, onOpenChange, returnFocusRef }: {
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [profile, setProfile] = useState<{ userId: number | undefined; employee: EmployeeItem } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(open);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
+  const [requestSource, setRequestSource] = useState({ open, userId });
+  if (requestSource.open !== open || requestSource.userId !== userId) {
+    setRequestSource({ open, userId });
+    if (open || requestSource.userId !== userId) {
+      setLoading(open);
+      setError(null);
+      setProfile(null);
+      setLoadedAt(null);
+    }
+  }
   const requestRef = useRef<AbortController | null>(null);
   const employee = profile?.userId === user?.id ? profile?.employee ?? null : null;
   const displayName = employee?.display_name ?? user?.display_name ?? "내 정보";
   const initials = displayName.split(/\s+/).map((word) => word[0]).join("").toUpperCase().slice(0, 2) || "U";
   const roles = [...new Set((user?.roles ?? []).map((role) => ROLE_LABELS[role] ?? role))];
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(() => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    setLoading(true);
-    setError(null);
-    setProfile(null);
-    setLoadedAt(null);
-    try {
-      const response = await fetch("/api/employees/me", { cache: "no-store", signal: controller.signal });
+    return fetch("/api/employees/me", { cache: "no-store", signal: controller.signal }).then(async (response) => {
       const json = (await response.json().catch(() => null)) as { employee?: EmployeeItem | null } | null;
       if (controller.signal.aborted) return;
       if (!response.ok || !json || !("employee" in json)) throw new Error("Profile unavailable");
       if (json.employee) {
-        setProfile({ userId: user?.id, employee: json.employee });
+        setProfile({ userId, employee: json.employee });
         setLoadedAt(new Date());
       }
-    } catch (fetchError) {
+    }).catch((fetchError: unknown) => {
       if (controller.signal.aborted) return;
       setError(fetchError instanceof TypeError
         ? "네트워크 연결을 확인한 뒤 다시 시도해 주세요."
         : "프로필 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-    } finally {
+    }).finally(() => {
       if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [user?.id]);
+    });
+  }, [userId]);
 
   useEffect(() => {
     if (!open) return;
     void loadProfile();
     return () => requestRef.current?.abort();
   }, [loadProfile, open]);
+
+  function retryProfile() {
+    setLoading(true);
+    setError(null);
+    setProfile(null);
+    setLoadedAt(null);
+    void loadProfile();
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,7 +109,7 @@ export function EmployeeProfileDialog({ open, onOpenChange, returnFocusRef }: {
             {loading ? (
               <div className={styles.state} role="status"><Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" /><p>프로필을 불러오는 중입니다.</p></div>
             ) : error ? (
-              <div className={styles.state} role="alert"><p>{error}</p><Button type="button" variant="outline" className="min-h-11" onClick={() => void loadProfile()}><RefreshCcw className="h-4 w-4" aria-hidden="true" />다시 시도</Button></div>
+              <div className={styles.state} role="alert"><p>{error}</p><Button type="button" variant="outline" className="min-h-11" onClick={retryProfile}><RefreshCcw className="h-4 w-4" aria-hidden="true" />다시 시도</Button></div>
             ) : employee ? (
               <div className={styles.sections}>
                 <section aria-labelledby="employee-profile-basic">
@@ -119,7 +133,7 @@ export function EmployeeProfileDialog({ open, onOpenChange, returnFocusRef }: {
                 </section>
               </div>
             ) : (
-              <div className={styles.state} role="status"><p>현재 계정에 연결된 사원 정보가 없습니다. 사내 인사 담당자에게 확인해 주세요.</p><Button type="button" variant="outline" className="min-h-11" onClick={() => void loadProfile()}><RefreshCcw className="h-4 w-4" aria-hidden="true" />다시 시도</Button></div>
+              <div className={styles.state} role="status"><p>현재 계정에 연결된 사원 정보가 없습니다. 사내 인사 담당자에게 확인해 주세요.</p><Button type="button" variant="outline" className="min-h-11" onClick={retryProfile}><RefreshCcw className="h-4 w-4" aria-hidden="true" />다시 시도</Button></div>
             )}
             <div className={styles.footer}>
               <p>조회 전용입니다. 정보 수정은 사내 인사 담당자에게 문의해 주세요.</p>

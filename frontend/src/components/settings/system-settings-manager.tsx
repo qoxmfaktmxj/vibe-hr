@@ -14,25 +14,26 @@ export function SystemSettingsManager() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string>("");
 
-  async function load() {
-    setLoading(true);
-    setNotice("");
-    try {
-      const res = await fetch("/api/system-settings/auth-session", { cache: "no-store" });
+  function load(signal?: AbortSignal) {
+    return fetch("/api/system-settings/auth-session", { cache: "no-store", signal }).then(async (res) => {
       const data = (await res.json()) as { policy?: AuthSessionPolicy; detail?: string };
+      if (signal?.aborted) return;
       if (!res.ok || !data.policy) {
         throw new Error(data.detail ?? "정책 조회 실패");
       }
       setPolicy(data.policy);
-    } catch (error) {
+    }).catch((error) => {
+      if (signal?.aborted) return;
       setNotice(error instanceof Error ? error.message : "정책 조회 실패");
-    } finally {
-      setLoading(false);
-    }
+    }).finally(() => {
+      if (!signal?.aborted) setLoading(false);
+    });
   }
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, []);
 
   async function save() {
@@ -129,7 +130,7 @@ export function SystemSettingsManager() {
                 <Button type="button" onClick={save} disabled={saving}>
                   저장
                 </Button>
-                <Button type="button" variant="outline" onClick={() => void load()} disabled={loading || saving}>
+                <Button type="button" variant="outline" onClick={() => { setLoading(true); setNotice(""); void load(); }} disabled={loading || saving}>
                   새로고침
                 </Button>
               </div>

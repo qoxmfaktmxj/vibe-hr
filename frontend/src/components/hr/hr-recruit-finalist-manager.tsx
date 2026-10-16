@@ -179,12 +179,16 @@ export function HrRecruitFinalistManager() {
     { revalidateOnFocus: false, dedupingInterval: 30_000 },
   );
 
-  useEffect(() => {
-    if (!data) return;
+  const [rowsSource, setRowsSource] = useState<typeof data>(undefined);
+  if (data && data !== rowsSource) {
+    setRowsSource(data);
     const nextRows = (data.items ?? []).map(toGridRow);
-    rowsRef.current = nextRows;
     setRows(nextRows);
-  }, [data]);
+  }
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const keyword = appliedFilters.keyword.trim().toLowerCase();

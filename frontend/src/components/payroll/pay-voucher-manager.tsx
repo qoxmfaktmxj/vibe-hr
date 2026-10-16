@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
@@ -77,7 +77,7 @@ async function downloadRowsAsXlsx(rows: VoucherRow[], columns: ColDef<VoucherRow
 }
 
 export function PayVoucherManager() {
-  const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
+  const [requestedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [selectedRunId, setSelectedRunId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,7 +91,13 @@ export function PayVoucherManager() {
   const { data: voucherData, mutate: mutateVouchers } = useSWR<PayVoucherListResponse>(
     "/api/pay/vouchers",
     fetcher,
-    { revalidateOnFocus: false },
+    {
+      revalidateOnFocus: false,
+      onSuccess: (data) => {
+        if (isSubmitting) return;
+        setSelectedVoucherId((previous) => data.items.some((item) => item.id === previous) ? previous : data.items[0]?.id ?? null);
+      },
+    },
   );
   const pageSize = 50;
   const pagedVoucherKey = `/api/pay/vouchers?page=${page}&limit=${pageSize}`;
@@ -103,6 +109,11 @@ export function PayVoucherManager() {
     await globalMutate((key) => typeof key === "string" && key.startsWith("/api/pay/vouchers?"));
   }
 
+  const runs = useMemo(() => runData?.items ?? [], [runData?.items]);
+  const voucherItems = useMemo(() => voucherData?.items ?? [], [voucherData?.items]);
+  const selectedVoucherId = (isSubmitting && requestedVoucherId !== null) || voucherItems.some((item) => item.id === requestedVoucherId)
+    ? requestedVoucherId
+    : voucherItems[0]?.id ?? null;
   const detailKey = selectedVoucherId ? `/api/pay/vouchers/${selectedVoucherId}` : null;
   const { data: voucherDetail, mutate: mutateVoucherDetail } = useSWR<PayVoucherDetailResponse>(
     detailKey,
@@ -110,17 +121,14 @@ export function PayVoucherManager() {
     { revalidateOnFocus: false },
   );
 
-  const runs = useMemo(() => runData?.items ?? [], [runData?.items]);
-  const voucherItems = useMemo(() => voucherData?.items ?? [], [voucherData?.items]);
   const voucherRows = useMemo<VoucherRow[]>(
     () => createReadonlyGridRows(pagedVoucherData?.items ?? []),
     [pagedVoucherData?.items],
   );
-  const firstVoucherId = voucherItems[0]?.id ?? null;
-
+  const voucherRunId = voucherDetail?.voucher.run_id;
   const selectedRun = useMemo(
-    () => runs.find((run) => run.id === voucherDetail?.voucher.run_id) ?? null,
-    [runs, voucherDetail?.voucher.run_id],
+    () => runs.find((run) => run.id === voucherRunId) ?? null,
+    [runs, voucherRunId],
   );
   const canGenerateDisbursement =
     !!voucherDetail &&
@@ -169,21 +177,6 @@ export function PayVoucherManager() {
     ],
     [],
   );
-
-  useEffect(() => {
-    // Generate handlers call setSelectedVoucherId(newId) while isSubmitting is
-    // still true, before the vouchers list SWR cache has revalidated to include
-    // the new voucher. Skipping the sync while a mutation is in flight avoids
-    // reverting that selection back to the list's first row on the stale
-    // intermediate render; the effect re-checks once isSubmitting flips back.
-    if (isSubmitting) return;
-    if (voucherItems.length === 0) {
-      if (selectedVoucherId !== null) setSelectedVoucherId(null);
-      return;
-    }
-    if (selectedVoucherId && voucherItems.some((item) => item.id === selectedVoucherId)) return;
-    setSelectedVoucherId(firstVoucherId);
-  }, [voucherItems, firstVoucherId, selectedVoucherId, isSubmitting]);
 
   async function handleGenerateVoucher() {
     if (!selectedRunId) {

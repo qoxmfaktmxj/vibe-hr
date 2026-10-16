@@ -2,6 +2,7 @@ package com.vibehr.platform.security;
 
 import com.vibehr.auth.AuthProperties;
 import com.vibehr.platform.config.CorsProperties;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,6 +54,7 @@ public class SecurityConfiguration {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/health", "/api/v1/health", "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc", "/swagger-ui/**", "/webjars/**").permitAll()
                         .requestMatchers("/api/v1/auth/enter-cds").permitAll()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 type UseGridPaginationOptions = {
   page: number;
@@ -16,15 +16,17 @@ export function useGridPagination({
   onPageChange,
 }: UseGridPaginationOptions) {
   const [pageInput, setPageInput] = useState(String(page));
+  const [previousPage, setPreviousPage] = useState(page);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(totalCount / pageSize)),
     [pageSize, totalCount],
   );
 
-  useEffect(() => {
+  if (previousPage !== page) {
+    setPreviousPage(page);
     setPageInput(String(page));
-  }, [page]);
+  }
 
   const goToPage = useCallback(
     (rawValue: string) => {

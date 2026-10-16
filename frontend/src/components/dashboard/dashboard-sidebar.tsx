@@ -12,7 +12,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type UIEvent, type MouseEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type UIEvent, type MouseEvent, useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -98,17 +98,37 @@ function collectActiveCodes(nodes: MenuNode[], currentPath: string, acc: Set<str
 }
 
 const OPEN_CODES_STORAGE_KEY = "vibe_hr_sidebar_open_codes";
+const OPEN_CODES_CHANGE_EVENT = "vibehr-sidebar-open-codes-change";
 const SIDEBAR_SCROLL_TOP_STORAGE_KEY = "vibe_hr_sidebar_scroll_top";
 const SIDEBAR_CENTER_TARGET_PATH_STORAGE_KEY = "vibe_hr_sidebar_center_target_path";
 
-/** sessionStorage에서 열린 그룹 코드 Set 복원 */
-function loadOpenCodes(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+function subscribeToOpenCodes(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(OPEN_CODES_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(OPEN_CODES_CHANGE_EVENT, onChange);
+  };
+}
+
+function getOpenCodesSnapshot(): string {
   try {
-    const raw = window.sessionStorage.getItem(OPEN_CODES_STORAGE_KEY);
+    return window.sessionStorage.getItem(OPEN_CODES_STORAGE_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function getServerOpenCodesSnapshot(): null {
+  return null;
+}
+
+/** sessionStorage에서 열린 그룹 코드 Set 복원 */
+function loadOpenCodes(raw: string | null): Set<string> {
+  try {
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) return new Set(parsed as string[]);
+    if (Array.isArray(parsed)) return new Set(parsed.filter((code): code is string => typeof code === "string"));
   } catch {
     // 파싱 실패 시 무시
   }
@@ -119,7 +139,10 @@ function loadOpenCodes(): Set<string> {
 function saveOpenCodes(codes: Set<string>): void {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(OPEN_CODES_STORAGE_KEY, JSON.stringify([...codes]));
+    const next = JSON.stringify([...codes]);
+    if (window.sessionStorage.getItem(OPEN_CODES_STORAGE_KEY) === next) return;
+    window.sessionStorage.setItem(OPEN_CODES_STORAGE_KEY, next);
+    window.dispatchEvent(new Event(OPEN_CODES_CHANGE_EVENT));
   } catch {
     // 저장 실패 시 무시
   }
@@ -302,7 +325,12 @@ export function DashboardSidebar() {
   const profileReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const openingMobileProfileRef = useRef(false);
   const [contextPanelCollapsed, setContextPanelCollapsed] = useState(false);
-  const [selectedDomainCode, setSelectedDomainCode] = useState<string | null>(null);
+  const routeDomainCode = navigationMenus.find((node) => hasActiveDescendant(node, pathname))?.code;
+  const [domainSelection, setDomainSelection] = useState({ pathname, menus: navigationMenus, code: routeDomainCode ?? null });
+  if (domainSelection.pathname !== pathname || domainSelection.menus !== navigationMenus) {
+    setDomainSelection({ pathname, menus: navigationMenus, code: routeDomainCode ?? domainSelection.code });
+  }
+  const selectedDomainCode = domainSelection.code;
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 1024px)");
@@ -311,18 +339,23 @@ export function DashboardSidebar() {
     return () => desktop.removeEventListener("change", closeMobileMenu);
   }, []);
 
-  // 열림 상태를 그룹 code의 Set으로 관리
-  // - SSR/CSR hydration mismatch 방지: 초기값은 빈 Set (서버와 동일)
-  // - 클라이언트 마운트 후 sessionStorage에서 복원
-  const [openCodes, setOpenCodes] = useState<Set<string>>(new Set());
-  const [sidebarHydrated, setSidebarHydrated] = useState(false);
-
-  // 클라이언트 마운트 후 sessionStorage에서 열림 상태 복원
-  useEffect(() => {
-    const stored = loadOpenCodes();
-    setOpenCodes(stored);
-    setSidebarHydrated(true);
-  }, []);
+  const openCodesSnapshot = useSyncExternalStore<string | null>(subscribeToOpenCodes, getOpenCodesSnapshot, getServerOpenCodesSnapshot);
+  const sidebarHydrated = openCodesSnapshot !== null;
+  const [groupState, setGroupState] = useState(() => ({
+    snapshot: openCodesSnapshot,
+    pathname,
+    menusInitialized: false,
+    codes: loadOpenCodes(openCodesSnapshot),
+  }));
+  const initializeMenus = sidebarHydrated && menus.length > 0 && !groupState.menusInitialized;
+  if (groupState.snapshot !== openCodesSnapshot || groupState.pathname !== pathname || initializeMenus) {
+    const next = groupState.snapshot !== openCodesSnapshot ? loadOpenCodes(openCodesSnapshot) : new Set(groupState.codes);
+    if (initializeMenus || groupState.pathname !== pathname) {
+      for (const code of collectActiveCodes(menus, pathname)) next.add(code);
+    }
+    setGroupState({ snapshot: openCodesSnapshot, pathname, menusInitialized: groupState.menusInitialized || initializeMenus, codes: next });
+  }
+  const openCodes = groupState.codes;
 
   // openCodes 변경 시 sessionStorage에 저장 (hydration 완료 후에만)
   useEffect(() => {
@@ -330,38 +363,12 @@ export function DashboardSidebar() {
     saveOpenCodes(openCodes);
   }, [openCodes, sidebarHydrated]);
 
-  // menus 로드 완료 시 현재 경로의 상위 그룹 열기 (초기 마운트 대응)
-  const menusInitializedRef = useRef(false);
-  useEffect(() => {
-    if (!sidebarHydrated || menus.length === 0) return;
-    if (menusInitializedRef.current) return;
-    menusInitializedRef.current = true;
-    setOpenCodes((prev) => {
-      const active = collectActiveCodes(menus, pathname);
-      // 기존에 사용자가 열어둔 것 + 현재 경로 상위 그룹 합산
-      return new Set([...prev, ...active]);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menus, sidebarHydrated]);
-
-  // pathname 변경 시: 새 경로의 상위 그룹을 추가로 열기 (기존 열린 그룹은 유지)
-  const prevPathnameRef = useRef(pathname);
-  useEffect(() => {
-    if (prevPathnameRef.current === pathname) return;
-    prevPathnameRef.current = pathname;
-    if (menus.length === 0) return;
-    setOpenCodes((prev) => {
-      const active = collectActiveCodes(menus, pathname);
-      return new Set([...prev, ...active]);
-    });
-  }, [pathname, menus]);
-
   const toggleGroup = useCallback((code: string) => {
-    setOpenCodes((prev) => {
-      const next = new Set(prev);
+    setGroupState((previous) => {
+      const next = new Set(previous.codes);
       if (next.has(code)) next.delete(code);
       else next.add(code);
-      return next;
+      return { ...previous, codes: next };
     });
   }, []);
   const restoreMenuScroll = useCallback((element: HTMLElement | null) => {
@@ -376,11 +383,6 @@ export function DashboardSidebar() {
 
   const displayName = user?.display_name ?? "User";
   const initials = getInitials(displayName) || "U";
-
-  useEffect(() => {
-    const routeDomain = navigationMenus.find((node) => hasActiveDescendant(node, pathname));
-    if (routeDomain) setSelectedDomainCode(routeDomain.code);
-  }, [navigationMenus, pathname]);
 
   const activeDomain = useMemo(
     () => navigationMenus.find((node) => node.code === selectedDomainCode) ?? navigationMenus[0] ?? null,
@@ -408,14 +410,14 @@ export function DashboardSidebar() {
   const menuExpanded = contextGroupCodes.some((code) => openCodes.has(code));
 
   const toggleContextGroups = () => {
-    setOpenCodes((previous) => {
-      const next = new Set(previous);
-      const shouldCollapse = contextGroupCodes.some((code) => previous.has(code));
+    setGroupState((previous) => {
+      const next = new Set(previous.codes);
+      const shouldCollapse = contextGroupCodes.some((code) => previous.codes.has(code));
       for (const code of contextGroupCodes) {
         if (shouldCollapse) next.delete(code);
         else next.add(code);
       }
-      return next;
+      return { ...previous, codes: next };
     });
   };
 
@@ -518,7 +520,7 @@ export function DashboardSidebar() {
             node={node}
             active={activeDomain?.code === node.code}
             onSelect={() => {
-              setSelectedDomainCode(node.code);
+              setDomainSelection((previous) => ({ ...previous, code: node.code }));
               setContextPanelCollapsed(false);
             }}
           />
@@ -554,7 +556,7 @@ export function DashboardSidebar() {
           active={activeDomain?.code === node.code}
           compact
           onSelect={() => {
-            setSelectedDomainCode(node.code);
+            setDomainSelection((previous) => ({ ...previous, code: node.code }));
             setContextPanelCollapsed(false);
           }}
         />

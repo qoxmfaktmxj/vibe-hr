@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
 import { Input } from "@/components/ui/input";
-import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type { OrgDeptChangeHistoryItem, OrgDeptChangeHistoryListResponse } from "@/types/organization";
@@ -51,13 +51,11 @@ function formatFieldName(field: string): string {
 
 export function OrgDeptHistoryManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/org/dept-history");
-  const [rows, setRows] = useState<OrgDeptChangeHistoryItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<DeptHistoryGridRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [searchDeptId, setSearchDeptId] = useState("");
   const [searchLimit, setSearchLimit] = useState("200");
-  const [appliedDeptId, setAppliedDeptId] = useState("");
-  const [appliedLimit, setAppliedLimit] = useState("200");
 
   const gridApiRef = useRef<GridApi<OrgDeptChangeHistoryItem> | null>(null);
 
@@ -138,25 +136,23 @@ export function OrgDeptHistoryManager() {
     [],
   );
 
-  const fetchHistory = useCallback(async (deptId: string, limit: string) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (deptId.trim()) params.set("department_id", deptId.trim());
-      const parsedLimit = parseInt(limit, 10);
-      if (!isNaN(parsedLimit) && parsedLimit > 0) params.set("limit", String(parsedLimit));
+  const fetchHistory = useCallback((deptId: string, limit: string) => {
+    const params = new URLSearchParams();
+    if (deptId.trim()) params.set("department_id", deptId.trim());
+    const parsedLimit = parseInt(limit, 10);
+    if (!isNaN(parsedLimit) && parsedLimit > 0) params.set("limit", String(parsedLimit));
 
-      const url = params.size > 0 ? `/api/org/dept-history?${params.toString()}` : "/api/org/dept-history";
-      const res = await fetch(url, { cache: "no-store" });
+    const url = params.size > 0 ? `/api/org/dept-history?${params.toString()}` : "/api/org/dept-history";
+    return fetch(url, { cache: "no-store" }).then(async (res) => {
       if (!res.ok) throw new Error("이력을 불러오지 못했습니다.");
       const data = (await res.json()) as OrgDeptChangeHistoryListResponse;
-      setRows(data.items);
-    } catch (e) {
+      setRows(data.items.map((item) => ({ ...item, _status: "clean" as const })));
+    }).catch((e) => {
       toast.error(e instanceof Error ? e.message : "이력 조회 실패");
-    } finally {
+    }).finally(() => {
       setLoading(false);
       setInitialLoaded(true);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -172,8 +168,7 @@ export function OrgDeptHistoryManager() {
   }, [loading, rows.length]);
 
   function handleQuery() {
-    setAppliedDeptId(searchDeptId);
-    setAppliedLimit(searchLimit);
+    setLoading(true);
     void fetchHistory(searchDeptId, searchLimit);
   }
 

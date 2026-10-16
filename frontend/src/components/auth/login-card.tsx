@@ -74,12 +74,8 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
   const [corporationError, setCorporationError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const loadCorporations = useCallback(async () => {
-    setIsLoadingEnterCd(true);
-    setCorporationError(null);
-
-    try {
-      const response = await fetch("/api/auth/enter-cds", { cache: "no-store" });
+  const loadCorporations = useCallback(() =>
+    fetch("/api/auth/enter-cds", { cache: "no-store" }).then(async (response) => {
       const data = (await response.json().catch(() => null)) as LoginCorporationListResponse | null;
 
       const nextCorporations =
@@ -99,14 +95,13 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
       if (!response.ok || !Array.isArray(data?.corporations) || (data?.corporations?.length ?? 0) === 0) {
         setCorporationError("회사 목록을 불러오지 못해 기본 회사 VIBE-HR로 열어두었습니다.");
       }
-    } catch {
+    }).catch(() => {
       setCorporations(FALLBACK_CORPORATIONS);
       setSelectedEnterCd("VIBE");
       setCorporationError("회사 목록을 불러오지 못해 기본 회사 VIBE-HR로 열어두었습니다.");
-    } finally {
+    }).finally(() => {
       setIsLoadingEnterCd(false);
-    }
-  }, []);
+    }), []);
 
   useEffect(() => {
     void loadCorporations();
@@ -180,7 +175,11 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
                 variant="ghost"
                 size="sm"
                 className="h-9 shrink-0 px-3 text-xs font-semibold"
-                onClick={() => void loadCorporations()}
+                onClick={() => {
+                  setIsLoadingEnterCd(true);
+                  setCorporationError(null);
+                  void loadCorporations();
+                }}
               >
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 다시 시도

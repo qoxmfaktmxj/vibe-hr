@@ -12,7 +12,7 @@ import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/co
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
@@ -72,7 +72,10 @@ export function TraMyApplicationsManager() {
     { revalidateOnFocus: false },
   );
 
-  const rowData = data?.items ?? [];
+  const rowData = useMemo<TraMyAppGridRow[]>(
+    () => (data?.items ?? []).map((item) => ({ ...item, _status: "clean" as const })),
+    [data?.items],
+  );
   const courses = (coursesData?.items ?? []) as CourseRow[];
 
   const selectedRows = rowData.filter((row) => selectedIds.includes(row.id));

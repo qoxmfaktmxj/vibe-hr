@@ -2,6 +2,10 @@ import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
 test("personal status shows Korean dynamic columns without write controls", async ({ page }) => {
+  const calendarWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("displayIndex")) calendarWarnings.push(message.text());
+  });
   mkdirSync("output/playwright", { recursive: true });
 
   await page.route("**/api/org/mapping-personal-status**", async (route) => {
@@ -28,10 +32,23 @@ test("personal status shows Korean dynamic columns without write controls", asyn
   });
 
   await page.goto("/org/type-personal-status");
-  await expect(page.getByText("조직구분개인별현황")).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("heading", { name: "조직구분개인별현황", exact: true })).toBeVisible();
   await expect(page.getByText("원가센터", { exact: true })).toBeVisible();
   await expect(page.getByText("원가센터 A", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "저장" })).toHaveCount(0);
   await expect(page.locator(".ag-root")).toBeVisible();
+  await page.getByRole("button", { name: "기준일", exact: true }).click();
+  await page.getByLabel("Select year", { exact: true }).selectOption("2027");
+  await page.getByLabel("Select month", { exact: true }).selectOption("0");
+  await page.getByRole("button", { name: "Next month", exact: true }).click();
+  await expect(page.getByLabel("Select month", { exact: true })).toHaveValue("1");
+  await page.getByRole("button", { name: /2027년 2월 10일/ }).click();
+  await expect(page.getByRole("button", { name: "기준일", exact: true })).toHaveText("2027-02-10");
+  await Promise.all([
+    page.waitForRequest((request) => new URL(request.url()).pathname === "/api/org/mapping-personal-status"
+      && new URL(request.url()).searchParams.get("reference_date") === "2027-02-10"),
+    page.getByRole("button", { name: "조회", exact: true }).first().click(),
+  ]);
+  expect(calendarWarnings).toEqual([]);
   await page.screenshot({ path: "output/playwright/org-type-personal-status-ko.png", fullPage: true });
 });

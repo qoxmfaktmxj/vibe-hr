@@ -66,24 +66,28 @@ function toGridRow(item: PayPayrollRunItem): RowData {
 export function PayrollRunManager() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [rows, setRows] = useState<RowData[]>([]);
-  const [employeeRows, setEmployeeRows] = useState<PayPayrollRunEmployeeItem[]>([]);
-  const [detailRows, setDetailRows] = useState<PayPayrollRunEmployeeDetailItem[]>([]);
+  const [employeeResult, setEmployeeResult] = useState<{ runId: number; items: PayPayrollRunEmployeeItem[] } | null>(null);
+  const [detailResult, setDetailResult] = useState<{ runId: number; runEmployeeId: number; items: PayPayrollRunEmployeeDetailItem[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [snapshotLoading, setSnapshotLoading] = useState(false);
-  const [snapshotData, setSnapshotData] = useState<PayRunTargetDetailResponse | null>(null);
+  const [snapshotResult, setSnapshotResult] = useState<{
+    runId: number;
+    employeeId: number;
+    employees: PayPayrollRunEmployeeItem[];
+    data: PayRunTargetDetailResponse | null;
+  } | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"items" | "snapshot" | "events">("items");
   const [searchYearMonth, setSearchYearMonth] = useState(currentMonth);
   const [searchStatus, setSearchStatus] = useState("");
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
-  const [selectedRunEmployeeId, setSelectedRunEmployeeId] = useState<number | null>(null);
+  const [employeeSelection, setEmployeeSelection] = useState<{ runId: number; id: number | null } | null>(null);
   const [createYearMonth, setCreateYearMonth] = useState(currentMonth);
   const [createPayrollCodeId, setCreatePayrollCodeId] = useState("1");
   const [createRunName, setCreateRunName] = useState("");
   const [page, setPage] = useState(1);
 
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
+  const requestSequence = useRef({ runs: 0, employees: 0, detail: 0, snapshot: 0 });
   const pageSize = 100;
   const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
   const singleRowSelection = useMemo(
@@ -96,117 +100,135 @@ export function PayrollRunManager() {
   );
   const changeSummary = useMemo(() => summarizeGridStatuses(rows, (row) => row._status), [rows]);
 
-  const loadRuns = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (searchYearMonth.trim()) params.set("year_month", searchYearMonth.trim());
-      if (searchStatus.trim()) params.set("status", searchStatus.trim());
-      const queryString = params.toString();
-      const response = await fetch(`/api/pay/runs${queryString ? `?${queryString}` : ""}`, {
-        cache: "no-store",
-      });
+  const employeeRows = useMemo(
+    () => employeeResult?.runId === selectedRunId ? employeeResult.items : [],
+    [employeeResult, selectedRunId],
+  );
+  const selectedRunEmployeeId = employeeSelection?.runId === selectedRunId
+    && employeeRows.some((row) => row.id === employeeSelection.id)
+    ? employeeSelection.id
+    : employeeRows[0]?.id ?? null;
+  const selectedEmployeeRow = useMemo(
+    () => employeeRows.find((row) => row.id === selectedRunEmployeeId) ?? null,
+    [employeeRows, selectedRunEmployeeId],
+  );
+  const detailMatchesSelection = detailResult?.runId === selectedRunId
+    && detailResult?.runEmployeeId === selectedRunEmployeeId;
+  const detailRows = useMemo(
+    () => detailMatchesSelection ? detailResult?.items ?? [] : [],
+    [detailMatchesSelection, detailResult],
+  );
+  const detailLoading = !!selectedRunEmployeeId && !detailMatchesSelection;
+  const snapshotEmployeeId = selectedEmployeeRow?.employee_id ?? null;
+  const snapshotMatchesSelection = snapshotResult?.runId === selectedRunId
+    && snapshotResult?.employeeId === snapshotEmployeeId
+    && snapshotResult?.employees === employeeRows;
+  const snapshotData = snapshotMatchesSelection ? snapshotResult?.data ?? null : null;
+  const snapshotLoading = !!snapshotEmployeeId && !snapshotMatchesSelection;
+
+  const loadRuns = useCallback((signal?: AbortSignal) => {
+    const requestId = ++requestSequence.current.runs;
+    const params = new URLSearchParams();
+    if (searchYearMonth.trim()) params.set("year_month", searchYearMonth.trim());
+    if (searchStatus.trim()) params.set("status", searchStatus.trim());
+    const queryString = params.toString();
+    return fetch(`/api/pay/runs${queryString ? `?${queryString}` : ""}`, {
+      cache: "no-store",
+      signal,
+    }).then(async (response) => {
       if (!response.ok) {
         throw new Error("급여 Run 목록을 불러오지 못했습니다.");
       }
       const json = (await response.json()) as { items: PayPayrollRunItem[] };
+      if (signal?.aborted || requestId !== requestSequence.current.runs) return;
       setRows((json.items ?? []).map(toGridRow));
       setPage(1);
-    } catch (error) {
+    }).catch((error: unknown) => {
+      if (signal?.aborted || requestId !== requestSequence.current.runs) return;
       toast.error(error instanceof Error ? error.message : "목록 조회에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    }).finally(() => {
+      if (!signal?.aborted && requestId === requestSequence.current.runs) setLoading(false);
+    });
   }, [searchStatus, searchYearMonth]);
 
-  const loadRunEmployees = useCallback(async (runId: number) => {
-    try {
-      const response = await fetch(`/api/pay/runs/${runId}/employees`, { cache: "no-store" });
+  const loadRunEmployees = useCallback((runId: number, signal?: AbortSignal) => {
+    const requestId = ++requestSequence.current.employees;
+    return fetch(`/api/pay/runs/${runId}/employees`, { cache: "no-store", signal }).then(async (response) => {
       if (!response.ok) {
         throw new Error("Run 대상자 결과를 불러오지 못했습니다.");
       }
       const json = (await response.json()) as EmployeeResponse;
+      if (signal?.aborted || requestId !== requestSequence.current.employees) return;
       const nextItems = json.items ?? [];
-      setEmployeeRows(nextItems);
-      setSelectedRunEmployeeId((prev) => {
-        if (prev && nextItems.some((item) => item.id === prev)) {
+      setEmployeeResult({ runId, items: nextItems });
+      setEmployeeSelection((prev) => {
+        if (prev?.runId === runId && nextItems.some((item) => item.id === prev.id)) {
           return prev;
         }
-        return nextItems[0]?.id ?? null;
+        return { runId, id: nextItems[0]?.id ?? null };
       });
-    } catch (error) {
-      setEmployeeRows([]);
-      setSelectedRunEmployeeId(null);
+    }).catch((error: unknown) => {
+      if (signal?.aborted || requestId !== requestSequence.current.employees) return;
+      setEmployeeResult({ runId, items: [] });
+      setEmployeeSelection({ runId, id: null });
       toast.error(error instanceof Error ? error.message : "대상자 조회에 실패했습니다.");
-    }
+    });
   }, []);
 
-  const loadRunEmployeeDetail = useCallback(async (runId: number, runEmployeeId: number) => {
-    setDetailLoading(true);
-    try {
-      const response = await fetch(`/api/pay/runs/${runId}/employees/${runEmployeeId}`, { cache: "no-store" });
+  const loadRunEmployeeDetail = useCallback((runId: number, runEmployeeId: number, signal: AbortSignal) => {
+    const requestId = ++requestSequence.current.detail;
+    return fetch(`/api/pay/runs/${runId}/employees/${runEmployeeId}`, { cache: "no-store", signal }).then(async (response) => {
       if (!response.ok) {
         throw new Error("대상자 항목 상세를 불러오지 못했습니다.");
       }
       const json = (await response.json()) as PayPayrollRunEmployeeDetailResponse;
-      setDetailRows(json.items ?? []);
-    } catch (error) {
-      setDetailRows([]);
+      if (signal.aborted || requestId !== requestSequence.current.detail) return;
+      setDetailResult({ runId, runEmployeeId, items: json.items ?? [] });
+    }).catch((error: unknown) => {
+      if (signal.aborted || requestId !== requestSequence.current.detail) return;
+      setDetailResult({ runId, runEmployeeId, items: [] });
       toast.error(error instanceof Error ? error.message : "항목 상세 조회에 실패했습니다.");
-    } finally {
-      setDetailLoading(false);
-    }
+    });
   }, []);
 
-  const loadRunTargetDetail = useCallback(async (runId: number, employeeId: number) => {
-    setSnapshotLoading(true);
-    try {
-      const response = await fetch(`/api/pay/runs/${runId}/targets/${employeeId}`, { cache: "no-store" });
-      if (!response.ok) {
-        setSnapshotData(null);
-        return;
-      }
-      const json = (await response.json()) as PayRunTargetDetailResponse;
-      setSnapshotData(json);
-    } catch {
-      setSnapshotData(null);
-    } finally {
-      setSnapshotLoading(false);
-    }
+  const loadRunTargetDetail = useCallback((runId: number, employeeId: number, employees: PayPayrollRunEmployeeItem[], signal: AbortSignal) => {
+    const requestId = ++requestSequence.current.snapshot;
+    return fetch(`/api/pay/runs/${runId}/targets/${employeeId}`, { cache: "no-store", signal }).then(async (response) => {
+      const data = response.ok ? (await response.json()) as PayRunTargetDetailResponse : null;
+      if (signal.aborted || requestId !== requestSequence.current.snapshot) return;
+      setSnapshotResult({ runId, employeeId, employees, data });
+    }).catch(() => {
+      if (signal.aborted || requestId !== requestSequence.current.snapshot) return;
+      setSnapshotResult({ runId, employeeId, employees, data: null });
+    });
   }, []);
 
   useEffect(() => {
-    void loadRuns();
+    const controller = new AbortController();
+    void loadRuns(controller.signal);
+    return () => controller.abort();
   }, [loadRuns]);
 
   useEffect(() => {
-    if (selectedRunId) {
-      void loadRunEmployees(selectedRunId);
-      return;
-    }
-    setEmployeeRows([]);
-    setSelectedRunEmployeeId(null);
-    setDetailRows([]);
+    if (!selectedRunId) return;
+    const controller = new AbortController();
+    void loadRunEmployees(selectedRunId, controller.signal);
+    return () => controller.abort();
   }, [selectedRunId, loadRunEmployees]);
 
   useEffect(() => {
-    if (selectedRunId && selectedRunEmployeeId) {
-      void loadRunEmployeeDetail(selectedRunId, selectedRunEmployeeId);
-      return;
-    }
-    setDetailRows([]);
+    if (!selectedRunId || !selectedRunEmployeeId) return;
+    const controller = new AbortController();
+    void loadRunEmployeeDetail(selectedRunId, selectedRunEmployeeId, controller.signal);
+    return () => controller.abort();
   }, [selectedRunId, selectedRunEmployeeId, loadRunEmployeeDetail]);
 
   useEffect(() => {
-    if (selectedRunId && selectedRunEmployeeId) {
-      const empRow = employeeRows.find((row) => row.id === selectedRunEmployeeId);
-      if (empRow?.employee_id) {
-        void loadRunTargetDetail(selectedRunId, empRow.employee_id);
-        return;
-      }
-    }
-    setSnapshotData(null);
-  }, [selectedRunId, selectedRunEmployeeId, employeeRows, loadRunTargetDetail]);
+    if (!selectedRunId || !snapshotEmployeeId) return;
+    const controller = new AbortController();
+    void loadRunTargetDetail(selectedRunId, snapshotEmployeeId, employeeRows, controller.signal);
+    return () => controller.abort();
+  }, [selectedRunId, snapshotEmployeeId, employeeRows, loadRunTargetDetail]);
 
   const totalCount = rows.length;
   const pagedRows = useMemo(() => {
@@ -342,10 +364,6 @@ export function PayrollRunManager() {
     () => rows.find((row) => row.id === selectedRunId) ?? null,
     [rows, selectedRunId],
   );
-  const selectedEmployeeRow = useMemo(
-    () => employeeRows.find((row) => row.id === selectedRunEmployeeId) ?? null,
-    [employeeRows, selectedRunEmployeeId],
-  );
   const selectedRunStatus = selectedRow?.status ?? null;
   const canCalculate = selectedRunStatus === "draft" || selectedRunStatus === "calculated";
   const calculateActionLabel = selectedRunStatus === "calculated" ? "재계산" : "계산";
@@ -397,6 +415,7 @@ export function PayrollRunManager() {
       const json = (await response.json()) as PayPayrollRunActionResponse;
       toast.success(`Run 생성 완료 (ID: ${json.run.id})`);
       setSelectedRunId(json.run.id);
+      setLoading(true);
       await loadRuns();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Run 생성에 실패했습니다.");
@@ -433,6 +452,7 @@ export function PayrollRunManager() {
       }
 
       toast.success(successMessage);
+      setLoading(true);
       await loadRuns();
       await loadRunEmployees(selectedRunId);
     } catch (error) {
@@ -452,13 +472,13 @@ export function PayrollRunManager() {
 
   return (
     <ManagerPageShell>
-      <ManagerSearchSection title="정기급여 Run 관리" onQuery={() => void loadRuns()}>
+      <ManagerSearchSection title="정기급여 Run 관리" onQuery={() => { setLoading(true); void loadRuns(); }}>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">조회 급여월</div>
             <Input
               value={searchYearMonth}
-              onChange={(event) => setSearchYearMonth(event.target.value)}
+              onChange={(event) => { setLoading(true); setSearchYearMonth(event.target.value); }}
               placeholder="YYYY-MM"
               className="h-9 text-sm"
             />
@@ -467,7 +487,7 @@ export function PayrollRunManager() {
             <div className="text-xs text-muted-foreground">상태</div>
             <Input
               value={searchStatus}
-              onChange={(event) => setSearchStatus(event.target.value)}
+              onChange={(event) => { setLoading(true); setSearchStatus(event.target.value); }}
               placeholder="draft/calculated/closed/paid"
               className="h-9 text-sm"
             />
@@ -517,7 +537,7 @@ export function PayrollRunManager() {
         headerRight={
           <GridToolbarActions
             actions={[
-              { key: "query", label: "조회", icon: Search, onClick: () => void loadRuns(), disabled: working },
+              { key: "query", label: "조회", icon: Search, onClick: () => { setLoading(true); void loadRuns(); }, disabled: working },
               { key: "create", label: "Run 생성", icon: Plus, onClick: () => void createRun(), disabled: working },
               {
                 key: "copy",
@@ -576,7 +596,9 @@ export function PayrollRunManager() {
             getRowId={(params) => String(params.data.id)}
             onGridReady={onGridReady}
             onRowClicked={(event) => {
-              if (!event.data) return;
+              if (!event.data || event.data.id === selectedRunId) return;
+              setDetailResult(null);
+              setSnapshotResult(null);
               setSelectedRunId(event.data.id);
             }}
             localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
@@ -602,8 +624,10 @@ export function PayrollRunManager() {
               animateRows={false}
               getRowId={(params) => String(params.data.id)}
               onRowClicked={(event) => {
-                if (!event.data) return;
-                setSelectedRunEmployeeId(event.data.id);
+                if (!event.data || !selectedRunId || event.data.id === selectedRunEmployeeId) return;
+                setDetailResult(null);
+                setSnapshotResult(null);
+                setEmployeeSelection({ runId: selectedRunId, id: event.data.id });
               }}
               localeText={{ page: "페이지", noRowsToShow: "데이터가 없습니다." }}
               overlayNoRowsTemplate='<span class="text-sm text-muted-foreground">대상자 계산 결과가 없습니다.</span>'

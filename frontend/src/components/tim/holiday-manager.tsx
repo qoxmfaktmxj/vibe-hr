@@ -200,23 +200,26 @@ export function HolidayManager() {
   const rowClassRules = useMemo(() => buildGridRowClassRules<HolidayRow>(), []);
 
   /* -- 로딩 -------------------------------------------------------- */
-  const loadData = useCallback(async (targetYear: number) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/tim/holidays?year=${targetYear}`, { cache: "no-store" });
+  const loadData = useCallback((targetYear: number, signal?: AbortSignal) =>
+    fetch(`/api/tim/holidays?year=${targetYear}`, { cache: "no-store", signal }).then(async (res) => {
       if (!res.ok) throw new Error("공휴일 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as { items: TimHolidayItem[] };
+      if (signal?.aborted) return;
       const nextRows = data.items.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
-    } catch (e) {
+    }).catch((e) => {
+      if (signal?.aborted) return;
       toast.error(e instanceof Error ? e.message : "로딩 실패");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }).finally(() => {
+      if (!signal?.aborted) setLoading(false);
+    }), []);
 
-  useEffect(() => { void loadData(year); }, [loadData, year]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadData(currentYear, controller.signal);
+    return () => controller.abort();
+  }, [currentYear, loadData]);
 
   const getRowKey = useCallback((row: HolidayRow) => String(row.id), []);
 
@@ -454,6 +457,8 @@ export function HolidayManager() {
       return;
     }
     setYear(parsed);
+    setLoading(true);
+    await loadData(parsed);
     tempIdRef.current = -1;
     gridApiRef.current = null;
     setGridMountKey((k) => k + 1);
@@ -500,6 +505,8 @@ export function HolidayManager() {
       // 복사한 연도로 이동
       setYearInput(String(to));
       setYear(to);
+      setLoading(true);
+      await loadData(to);
       setGridMountKey((k) => k + 1);
       setPage(1);
     } catch (e) {
@@ -610,14 +617,14 @@ export function HolidayManager() {
     }
   }
 
+  const toolbarDisabled = saving || importing || copyLoading || menuActionLoading;
   const toolbarActions = [
-    { key: "create", label: "입력", icon: Plus, onClick: addRow },
-    { key: "copy", label: "복사", icon: CopyPlus, onClick: copySelectedRows },
-    { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
-    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key))
-    .map((action) => ({ ...action, disabled: saving || importing || copyLoading || menuActionLoading }));
+    ...(can(ACTION_CODE_BY_KEY.create ?? "create") ? [{ key: "create", label: "입력", icon: Plus, onClick: () => addRow(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.copy ?? "copy") ? [{ key: "copy", label: "복사", icon: CopyPlus, onClick: () => copySelectedRows(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.template ?? "template") ? [{ key: "template", label: "양식 다운로드", icon: Search, onClick: () => void handleTemplateDownload(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.upload ?? "upload") ? [{ key: "upload", label: "업로드", icon: Search, onClick: () => void handleUpload(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.download ?? "download") ? [{ key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel(), disabled: toolbarDisabled }] : []),
+  ];
 
   const toolbarSaveAction = can("save")
     ? {

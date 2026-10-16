@@ -68,28 +68,26 @@ export function OrgMappingPersonalStatusManager() {
   const gridApiRef = useRef<GridApi<RowData> | null>(null);
   const pageSize = 100;
 
-  const loadRows = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        reference_date: appliedReferenceDate,
-        page: String(page),
-        limit: String(pageSize),
-      });
-      const response = await fetch(`/api/org/mapping-personal-status?${params.toString()}`, { cache: "no-store" });
+  const loadRows = useCallback(() => {
+    const params = new URLSearchParams({
+      reference_date: appliedReferenceDate,
+      page: String(page),
+      limit: String(pageSize),
+    });
+    return fetch(`/api/org/mapping-personal-status?${params.toString()}`, { cache: "no-store" }).then(async (response) => {
       if (!response.ok) throw new Error(I18N.loadError);
       const data = (await response.json()) as OrgMappingPersonalStatusListResponse;
       setRows((data.items ?? []).map(toGridRow));
       setTypeColumns(data.type_columns ?? []);
       setTotalCount(data.total_count ?? 0);
-    } catch (error) {
+    }).catch((error) => {
       toast.error(error instanceof Error ? error.message : I18N.loadError);
       setRows([]);
       setTypeColumns([]);
       setTotalCount(0);
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [appliedReferenceDate, page]);
 
   useEffect(() => {
@@ -123,7 +121,11 @@ export function OrgMappingPersonalStatusManager() {
     page,
     totalCount,
     pageSize,
-    onPageChange: setPage,
+    onPageChange: (nextPage) => {
+      if (nextPage === page) return;
+      setLoading(true);
+      setPage(nextPage);
+    },
   });
 
   const downloadXlsx = useCallback(async () => {
@@ -142,6 +144,7 @@ export function OrgMappingPersonalStatusManager() {
   }, [rows, typeColumns]);
 
   const handleQuery = useCallback(() => {
+    setLoading(true);
     setPage(1);
     setAppliedReferenceDate(referenceDate);
     setReloadVersion((version) => version + 1);

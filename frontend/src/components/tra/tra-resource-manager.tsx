@@ -95,7 +95,7 @@ function stringifyErrorDetail(value: unknown): string | null {
 }
 
 export function TraResourceManager({ config }: TraResourceManagerProps) {
-  const [rows, setRows] = useState<TraResourceRow[]>([]);
+  const [rowDraft, setRowDraft] = useState<{ source: TraResourceRow[]; rows: TraResourceRow[] } | null>(null);
   const [saving, setSaving] = useState(false);
   const [searchFilters, setSearchFilters] = useState<Record<string, string>>(
     Object.fromEntries(config.searchFields.map((field) => [field.key, ""])),
@@ -106,7 +106,6 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
 
   const gridApiRef = useRef<GridApi<TraResourceRow> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const rowsRef = useRef<TraResourceRow[]>([]);
   const tempIdRef = useRef(-1);
 
   const trackedFields = useMemo(
@@ -119,9 +118,8 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
     dedupingInterval: 30_000,
   });
 
-  useEffect(() => {
-    if (!data) return;
-    const nextRows = (data.items ?? []).map((item) => {
+  const sourceRows = useMemo(() => {
+    return (data?.items ?? []).map((item) => {
       const rawId = item.id;
       const normalizedId = typeof rawId === "number" ? rawId : Number(rawId ?? 0);
       const row = {
@@ -133,15 +131,19 @@ export function TraResourceManager({ config }: TraResourceManagerProps) {
       row._prevStatus = undefined;
       return row;
     });
-    rowsRef.current = nextRows;
-    setRows(nextRows);
   }, [data, trackedFields]);
+  const rows = rowDraft?.source === sourceRows ? rowDraft.rows : sourceRows;
+  const rowsRef = useRef({ source: sourceRows, rows });
+
+  useEffect(() => {
+    rowsRef.current = { source: sourceRows, rows };
+  }, [rows, sourceRows]);
 
   const commitRows = useCallback((updater: (prevRows: TraResourceRow[]) => TraResourceRow[]) => {
-    const prevRows = rowsRef.current;
-    const nextRows = updater(prevRows);
-    rowsRef.current = nextRows;
-    setRows(nextRows);
+    const previous = rowsRef.current;
+    const next = { source: previous.source, rows: updater(previous.rows) };
+    rowsRef.current = next;
+    setRowDraft(next);
   }, []);
 
   const issueTempId = useCallback(() => {

@@ -226,6 +226,7 @@ export function PapAppraisalManager() {
   const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
     gridApiRef.current?.stopEditing();
     gridApiRef.current?.deselectAll();
+    setLoading(true);
 
     if (discardDirtyRows) {
       rowsRef.current = [];
@@ -276,34 +277,33 @@ export function PapAppraisalManager() {
     return (await response.json()) as PapAppraisalListResponse;
   }, [pageSize]);
 
-  const loadFinalResults = useCallback(async () => {
-    const response = await fetch("/api/pap/final-results?all=true&limit=500", { cache: "no-store" });
-    if (response.status === 401 || response.status === 403) {
-      setFinalResults([]);
-      return;
-    }
-    if (!response.ok) {
-      throw new Error(await parseErrorDetail(response, "최종등급 목록을 불러오지 못했습니다."));
-    }
-    const json = (await response.json()) as PapFinalResultListResponse;
-    setFinalResults(json.items ?? []);
+  const loadFinalResults = useCallback(() => {
+    return fetch("/api/pap/final-results?all=true&limit=500", { cache: "no-store" }).then(async (response) => {
+      if (response.status === 401 || response.status === 403) {
+        setFinalResults([]);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(await parseErrorDetail(response, "최종등급 목록을 불러오지 못했습니다."));
+      }
+      const json = (await response.json()) as PapFinalResultListResponse;
+      setFinalResults(json.items ?? []);
+    });
   }, []);
 
-  const runQuery = useCallback(async (filters: SearchFilters, pageNo: number) => {
-    setLoading(true);
-    try {
-      const response = await fetchRows(filters, pageNo);
+  const runQuery = useCallback((filters: SearchFilters, pageNo: number) => {
+    return fetchRows(filters, pageNo).then((response) => {
       const nextRows = response.items.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
       setTotalCount(response.total_count ?? response.items.length);
       setSelectedId(nextRows[0]?.id ?? null);
-    } catch (error) {
+    }).catch((error) => {
       toast.error(error instanceof Error ? error.message : I18N.loadError);
-    } finally {
+    }).finally(() => {
       setLoading(false);
       setInitialLoading(false);
-    }
+    });
   }, [fetchRows]);
 
   useEffect(() => {
@@ -441,6 +441,7 @@ export function PapAppraisalManager() {
         }),
       );
       toast.success(`${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`);
+      setLoading(true);
       await runQuery(appliedFilters, page);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFail);
@@ -717,12 +718,12 @@ export function PapAppraisalManager() {
   }
 
   const toolbarActions = [
-    { key: "create", label: I18N.addRow, icon: Plus, onClick: addRow, disabled: saving },
-    { key: "copy", label: I18N.copy, icon: Copy, onClick: copyRow, disabled: saving || !selectedRow },
-    { key: "template", label: I18N.templateDownload, icon: FileDown, onClick: () => void downloadTemplate(), disabled: saving },
-    { key: "upload", label: I18N.upload, icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: saving },
-    { key: "download", label: I18N.download, icon: Download, onClick: () => void downloadXlsx(), disabled: saving },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+    ...(can(ACTION_CODE_BY_KEY.create ?? "create") ? [{ key: "create", label: I18N.addRow, icon: Plus, onClick: addRow, disabled: saving }] : []),
+    ...(can(ACTION_CODE_BY_KEY.copy ?? "copy") ? [{ key: "copy", label: I18N.copy, icon: Copy, onClick: copyRow, disabled: saving || !selectedRow }] : []),
+    ...(can(ACTION_CODE_BY_KEY.template ?? "template") ? [{ key: "template", label: I18N.templateDownload, icon: FileDown, onClick: () => void downloadTemplate(), disabled: saving }] : []),
+    ...(can(ACTION_CODE_BY_KEY.upload ?? "upload") ? [{ key: "upload", label: I18N.upload, icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: saving }] : []),
+    ...(can(ACTION_CODE_BY_KEY.download ?? "download") ? [{ key: "download", label: I18N.download, icon: Download, onClick: () => void downloadXlsx(), disabled: saving }] : []),
+  ];
 
   const toolbarSaveAction = can("save")
     ? {

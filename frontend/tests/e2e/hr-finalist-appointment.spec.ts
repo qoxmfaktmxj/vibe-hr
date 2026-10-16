@@ -1,83 +1,46 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { EmployeeListResponse } from "../../src/types/employee";
+import type { HrRecruitCreateEmployeesResponse } from "../../src/types/hr-recruit";
 
 const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
 const ADMIN_LOGIN = { enter_cd: "VIBE", login_id: "admin", password: "admin" };
 
-type AuthHeaders = { Authorization: string };
-
-async function loginAsAdmin(request: APIRequestContext): Promise<AuthHeaders> {
-  const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
+async function loginAsAdmin(request: APIRequestContext): Promise<void> {
+  const loginRes = await request.post(`${FRONTEND_URL}/api/auth/login`, {
     data: ADMIN_LOGIN,
+    headers: { "x-vibehr-client-ip": "127.0.0.1" },
   });
   expect(loginRes.ok()).toBeTruthy();
-
-  const { access_token: accessToken } = (await loginRes.json()) as { access_token: string };
-  return { Authorization: `Bearer ${accessToken}` };
-}
-
-async function findEmployeeIdByNo(
-  request: APIRequestContext,
-  headers: AuthHeaders,
-  employeeNo: string | null,
-): Promise<number | null> {
-  if (!employeeNo) {
-    return null;
-  }
-
-  const response = await request.get(`${API_URL}/api/v1/employees?all=true&employee_no=${encodeURIComponent(employeeNo)}`, {
-    headers,
-  });
-  expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as { employees?: Array<{ id: number }> };
-  return body.employees?.[0]?.id ?? null;
-}
-
-async function resolveEmployeeNoFromFinalist(
-  request: APIRequestContext,
-  headers: AuthHeaders,
-  candidateNo: string | null,
-): Promise<string | null> {
-  if (!candidateNo) {
-    return null;
-  }
-
-  const response = await request.get(
-    `${API_URL}/api/v1/hr/recruit/finalists?search=${encodeURIComponent(candidateNo)}`,
-    { headers },
-  );
-  expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as {
-    items?: Array<{ candidate_no?: string | null; employee_no?: string | null }>;
-  };
-  const finalist = body.items?.find((item) => item.candidate_no === candidateNo);
-  return finalist?.employee_no ?? null;
 }
 
 async function cleanupHrE2eData(
   request: APIRequestContext,
-  headers: AuthHeaders | null,
+  authenticated: boolean,
   finalistId: number | null,
-  candidateNo: string | null,
+  employeeId: number | null,
   employeeNo: string | null,
+  fullName: string,
+  email: string,
 ): Promise<void> {
-  if (!headers) {
+  if (!authenticated) {
     return;
   }
 
-  const resolvedEmployeeNo = employeeNo ?? (await resolveEmployeeNoFromFinalist(request, headers, candidateNo));
-  const employeeId = await findEmployeeIdByNo(request, headers, resolvedEmployeeNo);
-
   if (employeeId) {
-    const deleteEmployeeRes = await request.delete(`${API_URL}/api/v1/employees/${employeeId}`, {
-      headers,
-    });
+    const employeeUrl = `${FRONTEND_URL}/api/employees/${employeeId}`;
+    expect(employeeNo).not.toBeNull();
+    const response = await request.get(`${FRONTEND_URL}/api/employees?all=true&employee_no=${encodeURIComponent(employeeNo!)}`);
+    expect(response.ok()).toBeTruthy();
+    const { employees } = await response.json() as EmployeeListResponse;
+    const matches = employees.filter((employee) => employee.id === employeeId);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ id: employeeId, employee_no: employeeNo, display_name: fullName, email });
+    const deleteEmployeeRes = await request.delete(employeeUrl);
     expect([204, 404]).toContain(deleteEmployeeRes.status());
   }
 
   if (finalistId) {
-    const deleteFinalistRes = await request.delete(`${API_URL}/api/v1/hr/recruit/finalists`, {
-      headers,
+    const deleteFinalistRes = await request.delete(`${FRONTEND_URL}/api/hr/recruit/finalists`, {
       data: { ids: [finalistId] },
     });
     expect([200, 404]).toContain(deleteFinalistRes.status());
@@ -90,16 +53,16 @@ test("합격자 -> 사원 생성 -> 발령 확정 -> 인사기본 반영", async
   const email = `pw.${suffix}@hr.minosek91.cloud`;
   const today = new Date();
   const joinDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  let headers: AuthHeaders | null = null;
+  let authenticated = false;
   let finalistId: number | null = null;
-  let candidateNo: string | null = null;
+  let employeeId: number | null = null;
   let employeeNo: string | null = null;
 
   try {
-    headers = await loginAsAdmin(request);
+    await loginAsAdmin(request);
+    authenticated = true;
 
-    const finalistRes = await request.post(`${API_URL}/api/v1/hr/recruit/finalists`, {
-      headers,
+    const finalistRes = await request.post(`${FRONTEND_URL}/api/hr/recruit/finalists`, {
       data: {
         source_type: "manual",
         full_name: fullName,
@@ -116,10 +79,10 @@ test("합격자 -> 사원 생성 -> 발령 확정 -> 인사기본 반영", async
     expect(finalistRes.ok()).toBeTruthy();
 
     const finalistBody = (await finalistRes.json()) as {
-      item?: { id?: number; candidate_no?: string | null };
+      item?: { id?: number };
     };
     finalistId = finalistBody.item?.id ?? null;
-    candidateNo = finalistBody.item?.candidate_no ?? null;
+    expect(finalistId).not.toBeNull();
 
     await page.goto(`${FRONTEND_URL}/login`);
     await page.selectOption('select[name="enterCd"]', "VIBE");
@@ -135,18 +98,29 @@ test("합격자 -> 사원 생성 -> 발령 확정 -> 인사기본 반영", async
 
     const finalistRow = page.locator(".ag-row").filter({ hasText: fullName }).first();
     await expect(finalistRow).toBeVisible({ timeout: 20_000 });
-    await finalistRow.click();
+    const finalistSelection = page.locator(`.ag-pinned-left-cols-container .ag-row[row-id="${finalistId}"] .ag-selection-checkbox input[type="checkbox"]`);
+    await finalistSelection.check();
 
+    const employeeCreation = page.waitForResponse((response) => response.url().endsWith("/api/hr/recruit/finalists/create-employees")
+      && response.request().method() === "POST");
     await page.getByRole("button", { name: "사원 생성" }).click();
+    const employeeCreationResponse = await employeeCreation;
+    const creation = await employeeCreationResponse.json() as HrRecruitCreateEmployeesResponse;
+    const created = creation.results?.find((result) => result.finalist_id === finalistId && result.outcome === "created");
+    employeeId = created?.employee_id ?? null;
+    employeeNo = created?.employee_no ?? null;
+    expect(employeeCreationResponse.ok(), JSON.stringify(creation)).toBeTruthy();
+    expect(creation).toMatchObject({ created_count: 1, error_count: 0 });
+    expect(employeeId).not.toBeNull();
+    expect(employeeNo).not.toBeNull();
     await expect(page.getByText("사원 생성 완료")).toBeVisible({ timeout: 20_000 });
 
-    await finalistRow.click();
+    await finalistSelection.check();
     await page.getByRole("button", { name: "발령 이동" }).click();
     await page.waitForURL("**/hr/appointment/records**", { timeout: 20_000 });
 
     const appointmentUrl = new URL(page.url());
-    employeeNo = appointmentUrl.searchParams.get("employeeNo");
-    expect(employeeNo).toBeTruthy();
+    expect(appointmentUrl.searchParams.get("employeeNo")).toBe(employeeNo);
 
     await page.getByRole("button", { name: "입력" }).click();
     const appointmentRow = page.locator(".ag-row").filter({ hasText: fullName }).first();
@@ -170,6 +144,6 @@ test("합격자 -> 사원 생성 -> 발령 확정 -> 인사기본 반영", async
     await expect(page.getByText("발령 이력")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("cell", { name: "입사발령" })).toBeVisible({ timeout: 20_000 });
   } finally {
-    await cleanupHrE2eData(request, headers, finalistId, candidateNo, employeeNo);
+    await cleanupHrE2eData(request, authenticated, finalistId, employeeId, employeeNo, fullName, email);
   }
 });

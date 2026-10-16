@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
@@ -103,11 +103,9 @@ export function OutsourceAttendanceManager() {
   const summaryItems = useMemo(() => summaryData?.items ?? [], [summaryData?.items]);
   const allSummaryItems = useMemo(() => allSummaryData?.items ?? [], [allSummaryData?.items]);
 
-  useEffect(() => {
-    if (!selectedContractId && allSummaryItems.length > 0) {
-      setSelectedContractId(allSummaryItems[0].contract_id);
-    }
-  }, [allSummaryItems, selectedContractId]);
+  if (selectedContractId === null && allSummaryItems.length > 0) {
+    setSelectedContractId(allSummaryItems[0].contract_id);
+  }
 
   const selectedSummary = useMemo(
     () => allSummaryItems.find((item) => item.contract_id === selectedContractId) ?? null,

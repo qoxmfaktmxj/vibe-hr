@@ -70,14 +70,6 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
   selectAll: "전체 선택", noMatches: "일치 항목 없음",
 };
 
-const ACTION_CODE_BY_KEY: Record<string, string> = {
-  create: "create",
-  copy: "copy",
-  template: "template_download",
-  upload: "upload",
-  download: "download",
-};
-
 /* ------------------------------------------------------------------ */
 /* 보조 함수                                                           */
 /* ------------------------------------------------------------------ */
@@ -148,13 +140,11 @@ export function PayGlMappingManager() {
     [glAccounts],
   );
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [mappingRes, accountRes] = await Promise.all([
-        fetch("/api/pay/gl-mappings", { cache: "no-store" }),
-        fetch("/api/pay/gl-accounts", { cache: "no-store" }),
-      ]);
+  const loadData = useCallback(() => {
+    return Promise.all([
+      fetch("/api/pay/gl-mappings", { cache: "no-store" }),
+      fetch("/api/pay/gl-accounts", { cache: "no-store" }),
+    ]).then(async ([mappingRes, accountRes]) => {
       if (!mappingRes.ok) throw new Error("급여계정매핑 목록을 불러오지 못했습니다.");
       if (!accountRes.ok) throw new Error("계정과목 목록을 불러오지 못했습니다.");
       const mappingData = (await mappingRes.json()) as { items: PayGlMappingItem[] };
@@ -163,11 +153,11 @@ export function PayGlMappingManager() {
       rowsRef.current = nextRows;
       setRows(nextRows);
       setGlAccounts(accountData.items);
-    } catch (e) {
+    }).catch((e: unknown) => {
       toast.error(e instanceof Error ? e.message : "로딩 실패");
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, []);
 
   useEffect(() => { void loadData(); }, [loadData]);
@@ -409,6 +399,7 @@ export function PayGlMappingManager() {
   }
 
   async function handleQuery() {
+    setLoading(true);
     setAppliedName(searchName);
     await loadData();
     tempIdRef.current = -1;
@@ -530,12 +521,12 @@ export function PayGlMappingManager() {
   }
 
   const toolbarActions = [
-    { key: "create", label: "입력", icon: Plus, onClick: addRow },
-    { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-    { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload, disabled: saving || uploading || menuActionLoading },
-    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+    ...(can("create") ? [{ key: "create", label: "입력", icon: Plus, onClick: addRow }] : []),
+    ...(can("copy") ? [{ key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows }] : []),
+    ...(can("template_download") ? [{ key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload }] : []),
+    ...(can("upload") ? [{ key: "upload", label: "업로드", icon: Search, onClick: handleUpload, disabled: saving || uploading || menuActionLoading }] : []),
+    ...(can("download") ? [{ key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() }] : []),
+  ];
 
   const toolbarSaveAction = can("save")
     ? {

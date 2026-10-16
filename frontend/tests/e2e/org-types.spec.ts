@@ -115,7 +115,7 @@ test("types uses protected option sources and canonical toolbar", async ({ page 
   });
 
   await page.goto("/org/types");
-  await expect(page.getByText("조직구분")).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("heading", { name: "조직구분", exact: true })).toBeVisible();
   await expect(page.locator(".ag-root")).toBeVisible();
   await expect(page.getByText("CC-100")).toBeVisible();
   await expect(page.getByRole("button", { name: "업로드" })).toHaveCount(0);

@@ -22,13 +22,14 @@ This migration remains in progress while required canonical routes are missing. 
 ## Complete Allowlist
 
 The complete-mode allowlist contains only explicit, reviewed extensions in `COMPLETE_ALLOWLIST` in the generator; never use it to hide a domain still in progress.
+
 - `POST /api/v1/hri/requests/submit`: Approved atomic HRI submission extension; see docs/HRI_SUBMISSION_API.md.
 
 ## Route Summary
 
 - Canonical source routes: 281
 - Canonical operational routes: 9
-- Spring Java files scanned: 140
+- Spring Java files scanned: 141
 - Spring controllers found: 20
 - Unresolved Spring annotations: 0
 

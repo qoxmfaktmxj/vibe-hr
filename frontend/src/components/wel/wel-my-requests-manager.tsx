@@ -12,7 +12,6 @@ import { GridToolbarActions } from "@/components/grid/grid-toolbar-actions";
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";

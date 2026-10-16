@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
@@ -170,25 +170,17 @@ export function HrSeveranceCalcManager() {
     [],
   );
 
-  useEffect(() => {
-    if (isSubmitting || !pagedCalcData) return;
-    if (calcItems.length === 0) {
-      if (selectedCalcId !== null) setSelectedCalcId(null);
-      return;
-    }
-    if (selectedCalcId && calcItems.some((item) => item.id === selectedCalcId)) return;
-    setSelectedCalcId(firstCalcId);
-  }, [calcItems, firstCalcId, selectedCalcId, isSubmitting, pagedCalcData]);
+  if (!isSubmitting && pagedCalcData) {
+    const nextCalcId = calcItems.some((item) => item.id === selectedCalcId) ? selectedCalcId : firstCalcId;
+    if (selectedCalcId !== nextCalcId) setSelectedCalcId(nextCalcId);
+  }
 
-  useEffect(() => {
-    if (!calcDetail) {
-      setAdjustmentAmount("0");
-      setAdjustmentReason("");
-      return;
-    }
-    setAdjustmentAmount(String(calcDetail.calc.adjustment_amount));
-    setAdjustmentReason(calcDetail.calc.adjustment_reason ?? "");
-  }, [calcDetail]);
+  const [adjustmentSource, setAdjustmentSource] = useState<typeof calcDetail>(undefined);
+  if (calcDetail !== adjustmentSource) {
+    setAdjustmentSource(calcDetail);
+    setAdjustmentAmount(String(calcDetail?.calc.adjustment_amount ?? 0));
+    setAdjustmentReason(calcDetail?.calc.adjustment_reason ?? "");
+  }
 
   async function handleRecalculate() {
     if (!calcDetail) return;

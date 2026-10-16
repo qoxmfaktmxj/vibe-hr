@@ -514,7 +514,7 @@ export function CommonCodeManager() {
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  executeAction({ type: "selectGroup", groupId: row.id });
+                  executeActionRef.current({ type: "selectGroup", groupId: row.id });
                 }}
               >
                 {isSelected ? "선택됨" : "선택"}
@@ -767,6 +767,13 @@ export function CommonCodeManager() {
         setGroupTotalCount(data.total_count ?? nextRows.length);
         setSelectedGroupId(nextSelectedId);
         setSelectedDetailId(null);
+        if (nextSelectedId == null) {
+          ++detailFetchIdRef.current;
+          detailRowsRef.current = [];
+          setDetailRows([]);
+          setDetailTotalCount(0);
+          setDetailLoading(false);
+        }
         setGroupSelectionHint(undefined);
         setInitialLoading(false);
       } catch (error) {
@@ -787,15 +794,7 @@ export function CommonCodeManager() {
   }, [appliedFilters, fetchGroups, groupPage, groupReloadKey, groupSelectionHint]);
 
   useEffect(() => {
-    if (!selectedGroupId) {
-      detailRowsRef.current = [];
-      setDetailRows([]);
-      setDetailTotalCount(0);
-      setSelectedDetailId(null);
-      setDetailLoading(false);
-      setInitialLoading(false);
-      return;
-    }
+    if (!selectedGroupId) return;
 
     let cancelled = false;
     const requestId = ++detailFetchIdRef.current;
@@ -1000,7 +999,7 @@ export function CommonCodeManager() {
   });
 
   const filterToolbarActions = useCallback(
-    (actions: GridToolbarAction[]) =>
+    (actions: Omit<GridToolbarAction, "onClick">[]) =>
       actions
         .filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key))
         .map((action) => ({ ...action, disabled: Boolean(action.disabled) || menuActionLoading })),
@@ -1238,76 +1237,84 @@ export function CommonCodeManager() {
       key: "create",
       label: I18N.add,
       icon: Plus,
-      onClick: addGroupRow,
       disabled: groupSaving || groupLoading,
     },
     {
       key: "copy",
       label: I18N.copy,
       icon: Copy,
-      onClick: copyGroupRow,
       disabled: groupSaving || !selectedGroup,
     },
     {
       key: "template",
       label: I18N.template,
       icon: FileDown,
-      onClick: () => handleTemplateDownload("group"),
       disabled: groupSaving,
     },
     {
       key: "upload",
       label: I18N.upload,
       icon: Upload,
-      onClick: () => handleUpload("group"),
       disabled: groupSaving,
     },
     {
       key: "download",
       label: I18N.download,
       icon: Download,
-      onClick: () => groupGridApiRef.current?.exportDataAsCsv({ fileName: "common-code-groups.csv" }),
       disabled: groupLoading || groupRows.length === 0,
     },
-  ]);
+  ]).map((action) => ({
+    ...action,
+    onClick: () => {
+      if (action.key === "create") addGroupRow();
+      else if (action.key === "copy") copyGroupRow();
+      else if (action.key === "template") handleTemplateDownload("group");
+      else if (action.key === "upload") handleUpload("group");
+      else if (action.key === "download") groupGridApiRef.current?.exportDataAsCsv({ fileName: "common-code-groups.csv" });
+    },
+  }));
 
   const detailToolbarActions = filterToolbarActions([
     {
       key: "create",
       label: I18N.add,
       icon: Plus,
-      onClick: addDetailRow,
       disabled: detailSaving || !selectedGroupId,
     },
     {
       key: "copy",
       label: I18N.copy,
       icon: Copy,
-      onClick: copyDetailRow,
       disabled: detailSaving || !selectedDetail,
     },
     {
       key: "template",
       label: I18N.template,
       icon: FileDown,
-      onClick: () => handleTemplateDownload("detail"),
       disabled: detailSaving || !selectedGroupId,
     },
     {
       key: "upload",
       label: I18N.upload,
       icon: Upload,
-      onClick: () => handleUpload("detail"),
       disabled: detailSaving || !selectedGroupId,
     },
     {
       key: "download",
       label: I18N.download,
       icon: Download,
-      onClick: () => detailGridApiRef.current?.exportDataAsCsv({ fileName: "common-code-details.csv" }),
       disabled: detailLoading || detailRows.length === 0 || !selectedGroupId,
     },
-  ]);
+  ]).map((action) => ({
+    ...action,
+    onClick: () => {
+      if (action.key === "create") addDetailRow();
+      else if (action.key === "copy") copyDetailRow();
+      else if (action.key === "template") handleTemplateDownload("detail");
+      else if (action.key === "upload") handleUpload("detail");
+      else if (action.key === "download") detailGridApiRef.current?.exportDataAsCsv({ fileName: "common-code-details.csv" });
+    },
+  }));
 
   const groupSaveAction = can("save")
     ? {

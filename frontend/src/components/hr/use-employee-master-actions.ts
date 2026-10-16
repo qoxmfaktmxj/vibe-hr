@@ -262,12 +262,12 @@ export function useEmployeeMasterActions({
   }, [commitRows, gridApiRef, labels.saveDone, labels.saveFailed, labels.validationError, mutateEmployeePage, rows, saving, setSaving, setSyncedPageKey, snapshotOriginal, validateRow, onSaved]);
 
   const toolbarActions = useMemo(() => [
-    { key: "add", label: labels.addRow, icon: Plus, onClick: () => addRows(1), disabled: !departmentsReady },
-    { key: "copy", label: labels.copy, icon: Copy, onClick: copySelectedRows },
-    { key: "template", label: labels.templateDownload, icon: FileDown, onClick: () => void downloadTemplateExcel() },
-    { key: "upload", label: labels.upload, icon: Upload, onClick: () => uploadInputRef.current?.click() },
-    { key: "download", label: labels.download, icon: Download, onClick: () => void downloadCurrentSheetExcel() },
-  ].map((action) => ({ ...action, disabled: saving || ("disabled" in action && action.disabled) })), [addRows, copySelectedRows, departmentsReady, downloadCurrentSheetExcel, downloadTemplateExcel, labels.addRow, labels.copy, labels.download, labels.templateDownload, labels.upload, saving, uploadInputRef]);
+    { key: "add", label: labels.addRow, icon: Plus, onClick: () => addRows(1), disabled: saving || !departmentsReady },
+    { key: "copy", label: labels.copy, icon: Copy, onClick: copySelectedRows, disabled: saving },
+    { key: "template", label: labels.templateDownload, icon: FileDown, onClick: () => void downloadTemplateExcel(), disabled: saving },
+    { key: "upload", label: labels.upload, icon: Upload, onClick: () => uploadInputRef.current?.click(), disabled: saving },
+    { key: "download", label: labels.download, icon: Download, onClick: () => void downloadCurrentSheetExcel(), disabled: saving },
+  ], [addRows, copySelectedRows, departmentsReady, downloadCurrentSheetExcel, downloadTemplateExcel, labels.addRow, labels.copy, labels.download, labels.templateDownload, labels.upload, saving, uploadInputRef]);
 
   const toolbarSaveAction = useMemo(() => ({
     key: "save",

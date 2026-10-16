@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ColDef } from "ag-grid-community";
 import useSWR, { useSWRConfig } from "swr";
 import { toast } from "sonner";
@@ -99,27 +99,20 @@ export function HrRetireApprovalManager() {
     [],
   );
 
-  useEffect(() => {
-    if (isSubmitting || !pagedCaseData) return;
-    if (caseItems.length === 0) {
-      if (selectedCaseId !== null) setSelectedCaseId(null);
-      return;
-    }
-    if (selectedCaseId && caseItems.some((item) => item.id === selectedCaseId)) return;
-    setSelectedCaseId(firstCaseId);
-  }, [caseItems, firstCaseId, selectedCaseId, isSubmitting, pagedCaseData]);
+  if (!isSubmitting && pagedCaseData) {
+    const nextCaseId = caseItems.some((item) => item.id === selectedCaseId) ? selectedCaseId : firstCaseId;
+    if (selectedCaseId !== nextCaseId) setSelectedCaseId(nextCaseId);
+  }
 
-  useEffect(() => {
-    if (!caseDetail) {
-      setNoteDrafts({});
-      return;
-    }
+  const [noteSource, setNoteSource] = useState<typeof caseDetail>(undefined);
+  if (caseDetail !== noteSource) {
+    setNoteSource(caseDetail);
     const next: Record<number, string> = {};
-    for (const item of caseDetail.checklist_items) {
+    for (const item of caseDetail?.checklist_items ?? []) {
       next[item.id] = item.note ?? "";
     }
     setNoteDrafts(next);
-  }, [caseDetail]);
+  }
 
   async function handleCreateCase() {
     if (!newEmployeeId || !newRetireDate) {

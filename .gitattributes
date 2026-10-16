@@ -17,3 +17,6 @@ backend-spring/src/main/resources/db/migration/V1__alembic_head_baseline.sql tex
 backend-spring/src/main/resources/db/migration/V2__retire_alembic_version_marker.sql text eol=lf
 backend-spring/src/main/resources/db/migration/V3__required_reference_data.sql text eol=lf
 scripts/spring-migration/*.sh text eol=lf
+backend-spring/gradlew text eol=lf
+# Preserve the upstream stylesheet bytes checked by the asset contract.
+frontend/src/styles/vendor/shadcn-3.8.5.css text eol=lf

@@ -62,46 +62,44 @@ export function HriFormTypeManager() {
   }, [moduleQuery, query, rows]);
 
   useEffect(() => {
+    async function loadRows() {
+      try {
+        const res = await fetch("/api/hri/form-types", { cache: "no-store" });
+        const raw = (await res.json().catch(() => null)) as unknown;
+        if (!res.ok) {
+          const errorData = raw as { detail?: string } | null;
+          throw new Error(errorData?.detail ?? "신청서 코드 목록 조회에 실패했습니다.");
+        }
+        const data = raw as HriFormTypeListResponse;
+        setRows(data.items);
+        setSelectedId((prev) => prev ?? data.items[0]?.id ?? null);
+      } catch (error) {
+        setNoticeType("error");
+        setNotice(error instanceof Error ? error.message : "신청서 코드 목록 조회에 실패했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
     void loadRows();
   }, []);
 
-  useEffect(() => {
-    if (createMode) {
-      setForm(EMPTY_FORM);
-      return;
-    }
-    if (!selected) return;
-    setForm({
-      id: selected.id,
-      form_code: selected.form_code,
-      form_name_ko: selected.form_name_ko,
-      form_name_en: selected.form_name_en ?? "",
-      module_code: selected.module_code,
-      is_active: selected.is_active,
-      allow_draft: selected.allow_draft,
-      allow_withdraw: selected.allow_withdraw,
-      requires_receive: selected.requires_receive,
-      default_priority: String(selected.default_priority),
-    });
-  }, [createMode, selected]);
-
-  async function loadRows() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/hri/form-types", { cache: "no-store" });
-      const raw = (await res.json().catch(() => null)) as unknown;
-      if (!res.ok) {
-        const errorData = raw as { detail?: string } | null;
-        throw new Error(errorData?.detail ?? "신청서 코드 목록 조회에 실패했습니다.");
-      }
-      const data = raw as HriFormTypeListResponse;
-      setRows(data.items);
-      setSelectedId((prev) => prev ?? data.items[0]?.id ?? null);
-    } catch (error) {
-      setNoticeType("error");
-      setNotice(error instanceof Error ? error.message : "신청서 코드 목록 조회에 실패했습니다.");
-    } finally {
-      setLoading(false);
+  const [formSource, setFormSource] = useState<typeof selected>(null);
+  if (selected !== formSource) {
+    setFormSource(selected);
+    if (!createMode && selected) {
+      setForm({
+        id: selected.id,
+        form_code: selected.form_code,
+        form_name_ko: selected.form_name_ko,
+        form_name_en: selected.form_name_en ?? "",
+        module_code: selected.module_code,
+        is_active: selected.is_active,
+        allow_draft: selected.allow_draft,
+        allow_withdraw: selected.allow_withdraw,
+        requires_receive: selected.requires_receive,
+        default_priority: String(selected.default_priority),
+      });
     }
   }
 
@@ -191,6 +189,7 @@ export function HriFormTypeManager() {
   }
 
   function startCreate() {
+    setForm(EMPTY_FORM);
     setCreateMode(true);
     setSelectedId(null);
     setNotice(null);

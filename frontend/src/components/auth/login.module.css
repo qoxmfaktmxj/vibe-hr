@@ -7,6 +7,7 @@
 }
 
 .scene { position: fixed; inset: 0; z-index: -1; overflow: hidden; }
+.scenePicture { position: absolute; inset: 0; }
 .sceneImage { object-fit: cover; object-position: center; }
 .sceneCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .35s ease-out; }
 .sceneCanvas[data-ready="true"] { opacity: 1; }

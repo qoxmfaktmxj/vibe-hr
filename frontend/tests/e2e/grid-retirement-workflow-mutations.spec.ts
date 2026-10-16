@@ -178,11 +178,13 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
   test("퇴직 체크리스트 등록은 실제 입력값을 POST하고 목록을 갱신한다", async ({ page }) => {
     const writes = await installHrRoutes(page);
     await page.goto("/hr/retire/checklist");
-    await page.getByPlaceholder("코드 예: asset_return").fill("badge_return");
-    await page.getByRole("textbox", { name: "제목", exact: true }).fill("출입증 반납");
-    await page.getByRole("textbox", { name: "설명", exact: true }).fill("보안팀 확인");
-    await page.getByPlaceholder("정렬순서").fill("7");
-    await page.getByRole("button", { name: "등록", exact: true }).click();
+    await page.getByRole("button", { name: "입력", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("체크리스트 코드", { exact: true }).fill("badge_return");
+    await dialog.getByLabel("제목", { exact: true }).fill("출입증 반납");
+    await dialog.getByLabel("설명", { exact: true }).fill("보안팀 확인");
+    await dialog.getByLabel("정렬순서", { exact: true }).fill("7");
+    await dialog.getByRole("button", { name: "등록", exact: true }).click();
     await expectGridRow(page, "출입증 반납");
     expect(writes).toEqual([{ method: "POST", path: "/api/hr/retire/checklist", body: { code: "badge_return", title: "출입증 반납", description: "보안팀 확인", is_required: true, is_active: true, sort_order: 7 } }]);
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Download, Receipt } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,26 +57,24 @@ function parseYearMonth(ym: string): string {
 export function MyPayslipViewer() {
   const [payslips, setPayslips] = useState<PayslipSummary[]>([]);
   const [detail, setDetail] = useState<PayslipDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchPayslips = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/pay/my/payslips", { cache: "no-store" });
-      if (!res.ok) throw new Error("급여 목록 조회 실패");
-      const data = (await res.json()) as { items: PayslipSummary[]; total_count: number };
-      setPayslips(data.items);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "조회 실패");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    async function fetchPayslips() {
+      try {
+        const res = await fetch("/api/pay/my/payslips", { cache: "no-store" });
+        if (!res.ok) throw new Error("급여 목록 조회 실패");
+        const data = (await res.json()) as { items: PayslipSummary[]; total_count: number };
+        setPayslips(data.items);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "조회 실패");
+      } finally {
+        setLoading(false);
+      }
+    }
     void fetchPayslips();
-  }, [fetchPayslips]);
+  }, []);
 
   async function openDetail(runId: number) {
     setDetailLoading(true);

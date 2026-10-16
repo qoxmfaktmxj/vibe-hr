@@ -36,8 +36,9 @@ class TimeAuthorization {
     }
 
     int employeeIdForUser(int userId) {
-        Object employeeId = entityManager.createNativeQuery("select id from hr_employees where user_id = :userId")
-                .setParameter("userId", userId).getResultStream().findFirst().orElse(null);
+        List<?> employees = entityManager.createNativeQuery("select id from hr_employees where user_id = :userId")
+                .setParameter("userId", userId).setMaxResults(1).getResultList();
+        Object employeeId = employees.isEmpty() ? null : employees.getFirst();
         if (employeeId == null) throw ApiException.notFound("사원 프로필을 찾을 수 없습니다.");
         return ((Number) employeeId).intValue();
     }

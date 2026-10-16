@@ -5,9 +5,10 @@ import { createServer } from "node:http";
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
   "default", "login-401", "login-429", "login-503", "enter-cds-failure",
-  "profile-failure", "empty-profile", "member", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview", "training-applications", "retirement-selection", "appraisal-targets", "file-actions",
+  "profile-failure", "empty-profile", "member", "account-switch", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview", "training-applications", "retirement-selection", "appraisal-targets", "file-actions",
 ]);
 let scenario = "default";
+let accountSwitched = false;
 const completedTasks = new Set();
 const taskActions = [];
 const hriRequestWrites = [];
@@ -19,6 +20,7 @@ let trainingApplications = [];
 const trainingActions = [];
 let rejectNextSave = true;
 const user = { id: 1, email: "employee@example.test", display_name: "테스트 사용자", roles: ["admin"] };
+const switchedUser = { id: 2, email: "member@example.test", display_name: "전환 구성원", roles: ["employee"] };
 const employee = {
   id: 1, employee_no: "TEST-001", login_id: "test-user", display_name: user.display_name,
   email: user.email, department_id: 1, department_name: "테스트 부서", position_title: "매니저",
@@ -41,10 +43,10 @@ const actions = ["query", "create", "copy", "template_download", "upload", "save
 function loginResponse() {
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const payload = Buffer.from(JSON.stringify({ sub: scenario === "member" ? "synthetic-member" : "synthetic-test-user", iat: now, exp: now + 7200 })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ sub: accountSwitched ? "synthetic-switched-member" : scenario === "member" ? "synthetic-member" : "synthetic-test-user", iat: now, exp: now + 7200 })).toString("base64url");
   const signature = createHmac("sha256", process.env.AUTH_TOKEN_SECRET).update(`${header}.${payload}`).digest("base64url");
   return {
-    access_token: `${header}.${payload}.${signature}`, user: scenario === "member" ? { ...user, roles: ["employee"] } : user,
+    access_token: `${header}.${payload}.${signature}`, user: accountSwitched ? switchedUser : scenario === "member" ? { ...user, roles: ["employee"] } : user,
     access_ttl_min: 120, refresh_threshold_min: 60, remember_enabled: true,
     remember_ttl_min: 43_200, show_countdown: true,
   };
@@ -66,6 +68,7 @@ createServer(async (request, response) => {
     const input = JSON.parse(body || "null");
     if (!scenarios.has(input?.scenario)) return json(response, 400, { detail: "Unknown synthetic scenario." });
     scenario = input.scenario;
+    accountSwitched = false;
     trainingActions.length = 0;
     trainingApplications = ["submitted", "submitted", "draft", "approved"].map((status, index) => ({
       id: 101 + index, application_no: `TRA-${101 + index}`, employee_id: 1,
@@ -84,6 +87,26 @@ createServer(async (request, response) => {
     checklistRows.length = 0;
     checklistRows.push({ id: 1, code: "asset_return", title: "회사 자산 반납", description: "지급 자산 확인", is_required: true, is_active: true, sort_order: 0, created_at: "2026-09-13T00:00:00Z", updated_at: "2026-09-13T00:00:00Z" });
     return json(response, 200, { scenario });
+  }
+  if (scenario === "account-switch") {
+    if (route === "GET /api/v1/auth/impersonation/users") {
+      return json(response, 200, { users: [{ ...switchedUser, login_id: "second-member" }] });
+    }
+    if (route === "POST /api/v1/auth/impersonation/login") {
+      let body = ""; for await (const chunk of request) body += chunk;
+      if (!request.headers.authorization?.startsWith("Bearer ") || JSON.parse(body).user_id !== switchedUser.id) {
+        return json(response, 403, { detail: "Synthetic switch target rejected." });
+      }
+      accountSwitched = true;
+      return json(response, 200, loginResponse());
+    }
+    if (accountSwitched) {
+      if (route === "GET /api/v1/auth/me") return json(response, 200, switchedUser);
+      if (route === "GET /api/v1/menus/tree") return json(response, 200, { menus: [menus[0]] });
+      if (route === "GET /api/v1/employees/me") return json(response, 200, {
+        employee: { ...employee, id: 2, employee_no: "TEST-002", login_id: "second-member", display_name: switchedUser.display_name, email: switchedUser.email },
+      });
+    }
   }
   if (scenario === "training-applications") {
     if (route === "GET /__training-actions") return json(response, 200, trainingActions);

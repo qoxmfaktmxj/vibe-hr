@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import toIco from "to-ico";
 
 const publicDir = path.resolve("public");
 const brandDir = path.join(publicDir, "brand");
@@ -205,7 +204,22 @@ async function renderPlatformIcons() {
         .toBuffer(),
     ),
   );
-  await writeFile(path.join(publicDir, "favicon.ico"), await toIco(faviconBuffers));
+  const directory = Buffer.alloc(6 + faviconBuffers.length * 16);
+  directory.writeUInt16LE(1, 2);
+  directory.writeUInt16LE(faviconBuffers.length, 4);
+  let imageOffset = directory.length;
+  faviconBuffers.forEach((png, index) => {
+    const entryOffset = 6 + index * 16;
+    const size = [16, 32, 48][index];
+    directory.writeUInt8(size, entryOffset);
+    directory.writeUInt8(size, entryOffset + 1);
+    directory.writeUInt16LE(1, entryOffset + 4);
+    directory.writeUInt16LE(32, entryOffset + 6);
+    directory.writeUInt32LE(png.length, entryOffset + 8);
+    directory.writeUInt32LE(imageOffset, entryOffset + 12);
+    imageOffset += png.length;
+  });
+  await writeFile(path.join(publicDir, "favicon.ico"), Buffer.concat([directory, ...faviconBuffers]));
 }
 
 async function renderThumbnail() {

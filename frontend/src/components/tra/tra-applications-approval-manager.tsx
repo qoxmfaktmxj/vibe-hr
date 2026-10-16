@@ -13,7 +13,7 @@ import { SearchTextField } from "@/components/grid/search-controls";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
@@ -65,10 +65,8 @@ export function TraApplicationsApprovalManager() {
     { revalidateOnFocus: false },
   );
 
-  const allRows = data?.items ?? [];
-
-  const rowData = useMemo(() => {
-    let rows = allRows;
+  const rowData = useMemo<TraApplicationGridRow[]>(() => {
+    let rows = data?.items ?? [];
     if (statusFilter) rows = rows.filter((r) => r.status === statusFilter);
     if (keyword) {
       const kw = keyword.toLowerCase();
@@ -81,9 +79,7 @@ export function TraApplicationsApprovalManager() {
       );
     }
     return rows.map((r) => ({ ...r, _status: "clean" as const }));
-  }, [allRows, keyword, statusFilter]);
-
-  const rowClassRules = useMemo(() => buildGridRowClassRules<TraApplicationGridRow>(), []);
+  }, [data?.items, keyword, statusFilter]);
 
   const selectedRows = rowData.filter((row) => selectedIds.includes(row.id));
   const canApprove = selectedRows.length > 0 && selectedRows.every((r) => r.status === "submitted");

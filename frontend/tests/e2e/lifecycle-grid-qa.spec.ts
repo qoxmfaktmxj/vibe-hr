@@ -1,11 +1,6 @@
-import { expect, test, type ConsoleMessage, type Page } from "@playwright/test";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
-import path from "node:path";
+import { expect, test, type ConsoleMessage, type Page, type Response } from "@playwright/test";
 
 const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-
-const OUTPUT_DIR = path.resolve(__dirname, "../../../output/playwright/lifecycle-grid-20260708");
-const REPORT_PATH = path.join(OUTPUT_DIR, "report.json");
 
 type ScreenResult = {
   route: string;
@@ -53,30 +48,14 @@ function isNoiseMessage(text: string): boolean {
     "[Fast Refresh]",
     "[HMR]",
     "Download the React DevTools",
-    "webpack-internal",
     "was preloaded using link preload",
   ];
   return noisePatterns.some((pattern) => text.includes(pattern));
 }
 
-function appendResult(result: ScreenResult): void {
-  mkdirSync(OUTPUT_DIR, { recursive: true });
-  let results: ScreenResult[] = [];
-  if (existsSync(REPORT_PATH)) {
-    try {
-      results = JSON.parse(readFileSync(REPORT_PATH, "utf-8")) as ScreenResult[];
-    } catch {
-      results = [];
-    }
-  }
-  const filtered = results.filter((entry) => entry.route !== result.route);
-  filtered.push(result);
-  writeFileSync(REPORT_PATH, JSON.stringify(filtered, null, 2), "utf-8");
-}
-
 async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
   const slug = routeSlug(route);
-  const screenshotPath = path.join(OUTPUT_DIR, `${slug}.png`);
+  const screenshotPath = test.info().outputPath(`${slug}.png`);
   const consoleErrors: string[] = [];
 
   const onConsole = (msg: ConsoleMessage) => {
@@ -85,9 +64,17 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
     }
   };
   page.on("console", onConsole);
-  page.on("pageerror", (err) => {
+  const onPageError = (err: Error) => {
     consoleErrors.push(`pageerror: ${err.message}`);
-  });
+  };
+  const onResponse = (response: Response) => {
+    const url = new URL(response.url());
+    if (url.origin === new URL(FRONTEND_URL).origin && url.pathname.startsWith("/api/") && response.status() >= 400) {
+      consoleErrors.push(`API ${response.status()} ${url.pathname}`);
+    }
+  };
+  page.on("pageerror", onPageError);
+  page.on("response", onResponse);
 
   let loaded = false;
   let hasGrid = false;
@@ -98,9 +85,6 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
     const response = await page.goto(`${FRONTEND_URL}${route}`, { waitUntil: "domcontentloaded", timeout: 30_000 });
     const status = response?.status() ?? 0;
 
-    // Allow client-side render to settle.
-    await page.waitForTimeout(1500);
-
     // 인증 만료/실패 가드: storageState 재사용 세션이 끊기면 클라이언트 라우팅으로 /login에 떨어진다.
     // 원인 진단이 쉽도록 이 경우 명확한 에러 메시지로 즉시 실패시킨다.
     if (new URL(page.url()).pathname.startsWith("/login")) {
@@ -109,6 +93,10 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
           "storageState 세션이 만료되었거나 global-setup 로그인에 실패했을 수 있습니다.",
       );
     }
+
+    const gridLocator = page.locator(".ag-root, [class*='ag-theme']").first();
+    await expect(gridLocator).toBeVisible({ timeout: 20_000 });
+    hasGrid = true;
 
     const bodyText = await page.locator("body").innerText().catch(() => "");
     const isErrorPage =
@@ -126,31 +114,19 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
       note = `load failed: status=${status}, errorPageDetected=${isErrorPage}`;
     }
 
-    const gridLocator = page.locator(".ag-root, [class*='ag-theme']").first();
-    hasGrid = (await gridLocator.count()) > 0;
-
-    if (hasGrid) {
-      try {
-        await page.waitForSelector(".ag-center-cols-container .ag-row, .ag-body-viewport .ag-row", {
-          timeout: 8_000,
-        });
-      } catch {
-        // no rows rendered within timeout; rowCount will reflect actual count below
-      }
-      rowCount = await page.locator(".ag-center-cols-container .ag-row").count();
-    } else {
-      note = note || "no AG Grid element found on this screen (expected for non-registered custom screens)";
-    }
+    await expect(page.locator(".ag-center-cols-container .ag-row, .ag-overlay-no-rows-wrapper").first())
+      .toBeVisible({ timeout: 20_000 });
+    rowCount = await page.locator(".ag-center-cols-container .ag-row").count();
   } catch (error) {
     loaded = false;
     note = `navigation error: ${(error as Error).message}`;
   }
 
-  await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {
-    note += " | screenshot failed";
-  });
+  await page.screenshot({ path: screenshotPath, fullPage: true });
 
   page.off("console", onConsole);
+  page.off("pageerror", onPageError);
+  page.off("response", onResponse);
 
   const result: ScreenResult = {
     route,
@@ -161,24 +137,18 @@ async function inspectScreen(page: Page, route: string): Promise<ScreenResult> {
     screenshot: screenshotPath,
     note: note.trim(),
   };
-  appendResult(result);
+  await test.info().attach("screen-result", { body: JSON.stringify(result, null, 2), contentType: "application/json" });
   return result;
 }
 
 test.describe("HR lifecycle grid QA", () => {
-  test.beforeAll(() => {
-    mkdirSync(OUTPUT_DIR, { recursive: true });
-    if (existsSync(REPORT_PATH)) {
-      writeFileSync(REPORT_PATH, "[]", "utf-8");
-    }
-  });
-
   for (const route of ROUTES) {
     test(`screen check: ${route}`, async ({ page }) => {
       const result = await test.step(`inspect ${route}`, async () => inspectScreen(page, route));
 
       expect(result.loaded, `${route} failed to load: ${result.note}`).toBeTruthy();
       expect(result.hasGrid, `${route} AG Grid missing: ${result.note}`).toBeTruthy();
+      expect(result.consoleErrors, `${route} browser/API errors`).toEqual([]);
     });
   }
 });

@@ -101,17 +101,21 @@ export function HrAppointmentCodeManager() {
     },
   );
 
-  useEffect(() => {
-    if (!data) return;
+  const [rowsSource, setRowsSource] = useState<typeof data>(undefined);
+  if (data && data !== rowsSource) {
+    setRowsSource(data);
     const nextRows = (data.items ?? []).map((row) => ({
       ...row,
       _status: "clean" as const,
       _original: snapshotFields(row, TRACKED_FIELDS),
       _prevStatus: undefined,
     }));
-    rowsRef.current = nextRows;
     setRows(nextRows);
-  }, [data]);
+  }
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
 
   const getRowKey = useCallback((row: AppointmentCodeRow) => String(row.id), []);
 

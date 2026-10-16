@@ -3,6 +3,7 @@ package com.vibehr.time;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.vibehr.auth.CurrentUser;
 import com.vibehr.payroll.PayrollEntities;
 import com.vibehr.platform.error.ApiException;
 import jakarta.persistence.EntityManager;
@@ -35,8 +36,10 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -54,7 +57,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         })
 class TimePostgreSqlIntegrationTest {
     private static final int EMPLOYEE_ID = 900001;
-    private static final int USER_ID = 900001;
+    private static final int USER_ID = 900002;
     private static final int DEPARTMENT_ID = 900001;
     private static final MutableClock CLOCK = new MutableClock(Instant.parse("2026-08-01T15:01:00Z"));
 
@@ -150,6 +153,38 @@ class TimePostgreSqlIntegrationTest {
                 select data_type from information_schema.columns
                  where table_schema='public' and table_name='tim_employee_daily_schedules' and column_name='planned_start_at'
                 """, String.class)).isEqualTo("timestamp without time zone");
+    }
+
+    @Test
+    void employeeAuthorizationResolvesOnlyTheLinkedEmployeeWithoutAnOuterTransaction() {
+        int otherUserId = USER_ID + 10;
+        int otherEmployeeId = EMPLOYEE_ID + 10;
+        Timestamp now = timestamp(CLOCK.instant());
+        jdbc.update("""
+                insert into auth_users(id,login_id,email,password_hash,display_name,is_active,created_at,updated_at)
+                values (?,?,?,?,?,?,?,?)
+                """, otherUserId, "tim-other-user", "tim-other@example.test", "not-used", "Other employee", true, now, now);
+        jdbc.update("""
+                insert into hr_employees(id,user_id,employee_no,department_id,position_title,hire_date,employment_status,created_at,updated_at)
+                values (?,?,?,?,?,?,?,?,?)
+                """, otherEmployeeId, otherUserId, "TIM-OTHER-001", DEPARTMENT_ID, "Engineer", LocalDate.of(2020, 1, 1), "active", now, now);
+        try {
+            TimeAuthorization authorization = new TimeAuthorization(entityManager);
+            var authentication = new TestingAuthenticationToken(new CurrentUser(USER_ID, Set.of("employee")), null, "ROLE_employee");
+
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            assertThat(authorization.employeeIdForUser(USER_ID)).isEqualTo(EMPLOYEE_ID);
+            assertThat(authorization.employeeIdForUser(otherUserId)).isEqualTo(otherEmployeeId);
+            authorization.requireSelfOrManager(authentication, null);
+            authorization.requireSelfOrManager(authentication, EMPLOYEE_ID);
+            assertApiError(() -> authorization.requireSelfOrManager(authentication, otherEmployeeId), 403, "권한이 없습니다.");
+            assertApiError(() -> authorization.employeeIdForUser(USER_ID + 20), 404, "사원 프로필을 찾을 수 없습니다.");
+            assertApiError(() -> authorization.userId(null), 401, "인증이 필요합니다.");
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+        } finally {
+            jdbc.update("delete from hr_employees where id=?", otherEmployeeId);
+            jdbc.update("delete from auth_users where id=?", otherUserId);
+        }
     }
 
     @Test

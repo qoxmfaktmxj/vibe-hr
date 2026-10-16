@@ -46,7 +46,7 @@ test("chart saves Korean screenshot", async ({ page }) => {
   });
 
   await page.goto("/org/chart");
-  await expect(page.getByText("조직도관리")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("heading", { name: "조직도관리", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "조직코드관리에서 편집" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "본부" })).toBeVisible();
   await expect(page.getByText("CC-100")).toBeVisible();

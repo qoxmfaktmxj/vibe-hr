@@ -35,7 +35,7 @@ import {
   ManagerPageShell,
   ManagerSearchSection,
 } from "@/components/grid/manager-layout";
-import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
+import { getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
 import type {
@@ -656,23 +656,10 @@ function RequestDetailDialog({
   const [editVals, setEditVals] = useState<FormValues>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  // 데이터 로드 시 편집 상태 초기화
-  useSWR(
-    request ? `init-edit-${request.id}-${request.updated_at}` : null,
-    () => {
-      if (request) {
-        setEditTitle(request.title);
-        setEditVals(formValuesFromDetail(request.form_code ?? null, request.detail_data));
-      }
-      return null;
-    },
-    { revalidateOnFocus: false },
-  );
-
-  // request가 바뀔 때 편집 상태 초기화
-  const prevIdRef = useRef<number | null>(null);
-  if (request && request.id !== prevIdRef.current) {
-    prevIdRef.current = request.id;
+  const editKey = request ? `${request.id}-${request.updated_at}` : null;
+  const [editSource, setEditSource] = useState<string | null>(null);
+  if (request && editKey !== editSource) {
+    setEditSource(editKey);
     setEditTitle(request.title);
     setEditVals(formValuesFromDetail(request.form_code ?? null, request.detail_data));
   }
@@ -1086,7 +1073,7 @@ export function HriApplicationHub() {
     [welfareBenefitTypeData?.items],
   );
 
-  const filteredRows = useMemo(() => {
+  const filteredRows = useMemo<HriRequestGridRow[]>(() => {
     return (myData?.items ?? []).filter((item) => {
       if (
         appliedTitle &&
@@ -1096,7 +1083,7 @@ export function HriApplicationHub() {
         return false;
       if (appliedStatus && item.status_code !== appliedStatus) return false;
       return true;
-    });
+    }).map((item) => ({ ...item, _status: "clean" as const }));
   }, [myData?.items, appliedTitle, appliedStatus]);
 
   function handleQuery() {

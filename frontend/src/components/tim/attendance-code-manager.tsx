@@ -155,23 +155,26 @@ export function AttendanceCodeManager() {
   const rowClassRules = useMemo(() => buildGridRowClassRules<AttendanceCodeRow>(), []);
 
   /* -- 로딩 -------------------------------------------------------- */
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/tim/attendance-codes", { cache: "no-store" });
+  const loadData = useCallback((signal?: AbortSignal) =>
+    fetch("/api/tim/attendance-codes", { cache: "no-store", signal }).then(async (res) => {
       if (!res.ok) throw new Error("근태코드 목록을 불러오지 못했습니다.");
       const data = (await res.json()) as { items: TimAttendanceCodeItem[] };
+      if (signal?.aborted) return;
       const nextRows = data.items.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
-    } catch (e) {
+    }).catch((e) => {
+      if (signal?.aborted) return;
       toast.error(e instanceof Error ? e.message : "로딩 실패");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }).finally(() => {
+      if (!signal?.aborted) setLoading(false);
+    }), []);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadData(controller.signal);
+    return () => controller.abort();
+  }, [loadData]);
 
   /* -- 그리드 행 다시그리기 ---------------------------------------- */
   const getRowKey = useCallback((row: AttendanceCodeRow) => String(row.id), []);
@@ -480,6 +483,7 @@ export function AttendanceCodeManager() {
   async function handleQuery() {
     setAppliedName(searchName);
     setAppliedCategory(searchCategory);
+    setLoading(true);
     await loadData();
     tempIdRef.current = -1;
     gridApiRef.current = null;
@@ -610,14 +614,14 @@ export function AttendanceCodeManager() {
     }
   }
 
+  const toolbarDisabled = saving || importing || menuActionLoading;
   const toolbarActions = [
-    { key: "create", label: "입력", icon: Plus, onClick: addRow },
-    { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-    { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-    { key: "upload", label: "업로드", icon: Search, onClick: handleUpload },
-    { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key))
-    .map((action) => ({ ...action, disabled: saving || importing || menuActionLoading }));
+    ...(can(ACTION_CODE_BY_KEY.create ?? "create") ? [{ key: "create", label: "입력", icon: Plus, onClick: () => addRow(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.copy ?? "copy") ? [{ key: "copy", label: "복사", icon: Copy, onClick: () => copySelectedRows(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.template ?? "template") ? [{ key: "template", label: "양식 다운로드", icon: Search, onClick: () => void handleTemplateDownload(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.upload ?? "upload") ? [{ key: "upload", label: "업로드", icon: Search, onClick: () => void handleUpload(), disabled: toolbarDisabled }] : []),
+    ...(can(ACTION_CODE_BY_KEY.download ?? "download") ? [{ key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel(), disabled: toolbarDisabled }] : []),
+  ];
 
   const toolbarSaveAction = can("save")
     ? {

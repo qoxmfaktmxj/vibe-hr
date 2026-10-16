@@ -175,6 +175,43 @@ class HrPostgreSqlSchemaIntegrationTest {
     }
 
     @Test
+    void finalistEmployeeCreationPersistsTheBasicProfileWithBothRequiredTimestamps() {
+        HrRequests.FinalistCreate finalist = new HrRequests.FinalistCreate();
+        finalist.fullName = "Profile regression candidate";
+        finalist.loginId = "finalist-profile";
+        finalist.employeeNo = "EMP-710001";
+        finalist.birthDate = LocalDate.of(1990, 1, 2);
+        finalist.residentNoMasked = "test-masked-id";
+        finalist.expectedJoinDate = LocalDate.of(2026, 8, 1);
+        int finalistId = ((Number) castMap(service.createFinalist(finalist).get("item")).get("id")).intValue();
+
+        Map<String, Object> response = service.createEmployeesFromFinalists(ids(finalistId));
+
+        assertThat(response).containsEntry("created_count", 1).containsEntry("skipped_count", 0).containsEntry("error_count", 0);
+        List<?> results = (List<?>) response.get("results");
+        assertThat(results).hasSize(1);
+        Map<String, Object> result = castMap(results.getFirst());
+        assertThat(result).containsEntry("outcome", "created").containsEntry("employee_no", finalist.employeeNo);
+        int employeeId = ((Number) result.get("employee_id")).intValue();
+        Map<String, Object> profile = jdbc.queryForMap("""
+                select p.employee_id,p.birth_date,p.resident_no_masked,p.created_at,p.updated_at,
+                       e.position_title,e.employment_status
+                  from hr_employee_basic_profiles p join hr_employees e on e.id=p.employee_id
+                 where p.employee_id=?
+                """, employeeId);
+        assertThat(profile).containsEntry("employee_id", employeeId)
+                .containsEntry("birth_date", java.sql.Date.valueOf(finalist.birthDate))
+                .containsEntry("resident_no_masked", finalist.residentNoMasked)
+                .containsEntry("position_title", "채용대기").containsEntry("employment_status", "leave");
+        assertThat(profile.get("created_at")).isNotNull();
+        assertThat(profile.get("updated_at")).isNotNull();
+        assertThat(jdbc.queryForObject("select updated_at>=created_at from hr_employee_basic_profiles where employee_id=?",
+                Boolean.class, employeeId)).isTrue();
+        assertThat(jdbc.queryForObject("select status_code from hr_recruit_finalists where id=?", String.class, finalistId))
+                .isEqualTo("ready");
+    }
+
+    @Test
     void employeeNumbersUseOneNamespaceForReservationsAndConcurrentFinalistAllocation() throws Exception {
         insertFinalist("RC20260802-0001", "EMP-700001", "reserved-login");
 

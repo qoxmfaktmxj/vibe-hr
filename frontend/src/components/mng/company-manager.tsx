@@ -153,7 +153,7 @@ export function CompanyManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/mng/companies");
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(EMPTY_FILTERS);
-  const [rows, setRows] = useState<CompanyGridRow[]>([]);
+  const [draft, setDraft] = useState<{ source: MngCompanyListResponse | undefined; rows: CompanyGridRow[] } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const gridApiRef = useRef<GridApi<CompanyGridRow> | null>(null);
@@ -170,12 +170,11 @@ export function CompanyManager() {
     },
   );
 
+  const rows = useMemo(() => draft && draft.source === data ? draft.rows : (data?.companies ?? []).map(toGridRow), [data, draft]);
+
   useEffect(() => {
-    if (!data) return;
-    const nextRows = (data.companies ?? []).map(toGridRow);
-    rowsRef.current = nextRows;
-    setRows(nextRows);
-  }, [data]);
+    rowsRef.current = rows;
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     const companyCode = appliedFilters.companyCode.trim().toLowerCase();
@@ -261,10 +260,10 @@ export function CompanyManager() {
       const prevRows = rowsRef.current;
       const nextRows = updater(prevRows);
       rowsRef.current = nextRows;
-      setRows(nextRows);
+      setDraft({ source: data, rows: nextRows });
       applyGridTransaction(prevRows, nextRows);
     },
-    [applyGridTransaction],
+    [applyGridTransaction, data],
   );
 
   const patchRowById = useCallback(
@@ -674,50 +673,42 @@ export function CompanyManager() {
     return getGridRowClass(params.data?._status);
   }, []);
 
-  const toolbarActions = [
-    {
+  const filteredToolbarActions = [
+    ...(can(ACTION_CODE_BY_KEY.create ?? "create") ? [{
       key: "create",
       label: "입력",
       icon: Plus,
       onClick: addRow,
       disabled: isLoading || saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.copy ?? "copy") ? [{
       key: "copy",
       label: "복사",
       icon: Copy,
       onClick: copyRows,
       disabled: isLoading || saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.template ?? "template") ? [{
       key: "template",
       label: "양식 다운로드",
       icon: FileDown,
       onClick: () => void downloadTemplate(),
       disabled: isLoading || saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.upload ?? "upload") ? [{
       key: "upload",
       label: "업로드",
       icon: Upload,
       onClick: () => uploadInputRef.current?.click(),
       disabled: isLoading || saving,
-    },
-    {
-      key: "save",
-      label: saving ? "저장중..." : "저장",
-      icon: Save,
-      onClick: () => void saveAll(),
-      disabled: isLoading || saving,
-      variant: "save" as const,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.download ?? "download") ? [{
       key: "download",
       label: "다운로드",
       icon: Download,
       onClick: () => void downloadCurrentSheet(),
       disabled: isLoading || saving,
-    },
+    }] : []),
   ];
 
   function onGridReady(event: GridReadyEvent<CompanyGridRow>) {
@@ -734,18 +725,14 @@ export function CompanyManager() {
     handleQuery();
   }
 
-  const filteredToolbarActions = toolbarActions.filter(
-    (action) => action.key !== "save" && can(ACTION_CODE_BY_KEY[action.key] ?? action.key),
-  );
-  const rawSaveAction = toolbarActions.find((action) => action.key === "save");
-  const toolbarSaveAction =
-    can("save") && rawSaveAction
-      ? {
-          ...rawSaveAction,
-          disabled: Boolean(rawSaveAction.disabled) || menuActionLoading,
-          variant: "save" as const,
-        }
-      : undefined;
+  const toolbarSaveAction = can("save") ? {
+      key: "save",
+      label: saving ? "저장중..." : "저장",
+      icon: Save,
+      onClick: () => void saveAll(),
+      disabled: isLoading || saving || menuActionLoading,
+      variant: "save" as const,
+    } : undefined;
 
   return (
     <ManagerPageShell>

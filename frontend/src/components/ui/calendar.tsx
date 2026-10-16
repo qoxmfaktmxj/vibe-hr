@@ -23,6 +23,7 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => ({
 
 function CalendarCaption({ calendarMonth, className, ...props }: MonthCaptionProps) {
   const { goToMonth, nextMonth, previousMonth, dayPickerProps } = useDayPicker();
+  const captionProps = Object.fromEntries(Object.entries(props).filter(([key]) => key !== "displayIndex"));
 
   const displayMonth = calendarMonth.date;
   const currentYear = displayMonth.getFullYear();
@@ -51,7 +52,7 @@ function CalendarCaption({ calendarMonth, className, ...props }: MonthCaptionPro
   };
 
   return (
-    <div className={cn("flex items-center justify-between gap-2", className)} {...props}>
+    <div className={cn("flex items-center justify-between gap-2", className)} {...captionProps}>
       <button
         type="button"
         aria-label="Previous month"

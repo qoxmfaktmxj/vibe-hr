@@ -11,8 +11,8 @@ import type { RoleItem } from "@/types/menu-admin";
 export function RoleAdminManager() {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [nameDraft, setNameDraft] = useState<{ role: RoleItem | null; value: string } | null>(null);
+  const [codeDraft, setCodeDraft] = useState<{ role: RoleItem | null; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -22,42 +22,31 @@ export function RoleAdminManager() {
     () => roles.find((role) => role.id === selectedRoleId) ?? null,
     [roles, selectedRoleId]
   );
+  const name = nameDraft?.role === selectedRole ? nameDraft.value : (selectedRole?.name ?? "");
+  const code = codeDraft?.role === selectedRole ? codeDraft.value : (selectedRole?.code ?? "");
 
-  async function loadRoles() {
-    setError(null);
-    const rolesRes = await fetch("/api/menus/admin/roles", { cache: "no-store" });
-    if (!rolesRes.ok) throw new Error("역할 목록을 불러오지 못했습니다.");
-
-    const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
-    setRoles(rolesJson.roles);
-    setSelectedRoleId((prev) => prev ?? rolesJson.roles[0]?.id ?? null);
+  function loadRoles(signal?: AbortSignal) {
+    return fetch("/api/menus/admin/roles", { cache: "no-store", signal }).then(async (rolesRes) => {
+      if (!rolesRes.ok) throw new Error("역할 목록을 불러오지 못했습니다.");
+      const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
+      if (signal?.aborted) return;
+      setRoles(rolesJson.roles);
+      setSelectedRoleId((prev) => prev ?? rolesJson.roles[0]?.id ?? null);
+    });
   }
 
   useEffect(() => {
-    void (async () => {
-      try {
-        await loadRoles();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "초기화 실패");
-      }
-    })();
+    const controller = new AbortController();
+    void loadRoles(controller.signal).catch((e) => {
+      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "초기화 실패");
+    });
+    return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    if (!selectedRoleId) {
-      setCode("");
-      setName("");
-      return;
-    }
-
-    setName(selectedRole?.name ?? "");
-    setCode(selectedRole?.code ?? "");
-  }, [selectedRoleId, selectedRole]);
 
   function startCreateMode() {
     setSelectedRoleId(null);
-    setCode("");
-    setName("");
+    setCodeDraft(null);
+    setNameDraft(null);
     setError(null);
     setNotice(null);
     setNoticeType(null);
@@ -177,14 +166,14 @@ export function RoleAdminManager() {
               <Label>권한 코드</Label>
               <Input
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCodeDraft({ role: selectedRole, value: e.target.value })}
                 placeholder="예: reviewer"
                 disabled={Boolean(selectedRoleId)}
               />
             </div>
             <div className="space-y-2">
               <Label>권한 이름</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 검토자" />
+              <Input value={name} onChange={(e) => setNameDraft({ role: selectedRole, value: e.target.value })} placeholder="예: 검토자" />
             </div>
           </div>
 

@@ -283,6 +283,7 @@ export function CorporationManager() {
   const runReloadAction = useCallback((action: PendingReloadAction, discardDirtyRows: boolean) => {
     gridApiRef.current?.stopEditing();
     gridApiRef.current?.deselectAll();
+    setLoading(true);
 
     if (discardDirtyRows) {
       rowsRef.current = [];
@@ -344,21 +345,19 @@ export function CorporationManager() {
     return (await response.json()) as OrganizationCorporationListResponse;
   }, [pageSize]);
 
-  const runQuery = useCallback(async (filters: SearchFilters, pageNo: number) => {
-    setLoading(true);
-    try {
-      const response = await fetchCorporations(filters, pageNo);
+  const runQuery = useCallback((filters: SearchFilters, pageNo: number) => {
+    return fetchCorporations(filters, pageNo).then((response) => {
       const nextRows = response.corporations.map(toGridRow);
       rowsRef.current = nextRows;
       setRows(nextRows);
       setTotalCount(response.total_count ?? response.corporations.length);
       setSelectedId(nextRows[0]?.id ?? null);
-    } catch (error) {
+    }).catch((error) => {
       toast.error(error instanceof Error ? error.message : I18N.loadError);
-    } finally {
+    }).finally(() => {
       setLoading(false);
       setInitialLoading(false);
-    }
+    });
   }, [fetchCorporations]);
 
   useEffect(() => {
@@ -758,6 +757,7 @@ export function CorporationManager() {
       toast.success(
         `${I18N.saveDone} (입력 ${toInsert.length}건 / 수정 ${toUpdate.length}건 / 삭제 ${toDelete.length}건)`,
       );
+      setLoading(true);
       await runQuery(appliedFilters, page);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : I18N.saveFail);
@@ -792,42 +792,42 @@ export function CorporationManager() {
   }
 
   const toolbarActions = [
-    {
+    ...(can(ACTION_CODE_BY_KEY.add ?? "add") ? [{
       key: "add",
       label: I18N.addRow,
       icon: Plus,
       onClick: addRow,
       disabled: saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.copy ?? "copy") ? [{
       key: "copy",
       label: I18N.copy,
       icon: Copy,
       onClick: copyRow,
       disabled: saving || !selectedRow,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.template ?? "template") ? [{
       key: "template",
       label: I18N.templateDownload,
       icon: FileDown,
       onClick: () => void downloadTemplate(),
       disabled: saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.upload ?? "upload") ? [{
       key: "upload",
       label: I18N.upload,
       icon: Upload,
       onClick: uploadTemplate,
       disabled: saving,
-    },
-    {
+    }] : []),
+    ...(can(ACTION_CODE_BY_KEY.download ?? "download") ? [{
       key: "download",
       label: I18N.download,
       icon: Download,
       onClick: () => void downloadXlsx(),
       disabled: saving,
-    },
-  ].filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+    }] : []),
+  ];
 
   const toolbarSaveAction = can("save")
     ? {

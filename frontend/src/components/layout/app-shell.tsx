@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
@@ -85,7 +85,41 @@ type TabContextMenuState = {
 } | null;
 
 const TAB_STORAGE_KEY = "vibe_hr_open_tabs";
+const TAB_STORAGE_CHANGE_EVENT = "vibehr-open-tabs-change";
 const MAX_OPEN_TABS = 10;
+
+function subscribeToStoredTabs(onChange: () => void): () => void {
+  window.addEventListener("storage", onChange);
+  window.addEventListener(TAB_STORAGE_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(TAB_STORAGE_CHANGE_EVENT, onChange);
+  };
+}
+
+function getStoredTabsSnapshot(): string {
+  try {
+    return window.localStorage.getItem(TAB_STORAGE_KEY) ?? "[]";
+  } catch {
+    return "[]";
+  }
+}
+
+function getServerTabsSnapshot(): null {
+  return null;
+}
+
+function readStoredTabs(raw: string | null): OpenTab[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((tab): tab is OpenTab => Boolean(tab) && typeof tab.path === "string" && typeof tab.label === "string" && tab.path !== "/dashboard")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 function buildMenuLabelIndex(menus: MenuNode[]): Map<string, string> {
   const labelByPath = new Map<string, string>();
@@ -121,34 +155,17 @@ export function AppShell({ title, description, children }: AppShellProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { menus } = useMenu();
-  const [storedTabs, setStoredTabs] = useState<OpenTab[]>([]);
-  const [tabsHydrated, setTabsHydrated] = useState(false);
+  const tabsSnapshot = useSyncExternalStore<string | null>(subscribeToStoredTabs, getStoredTabsSnapshot, getServerTabsSnapshot);
+  const tabsHydrated = tabsSnapshot !== null;
   const tabStripRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0 });
 
   const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
-  const [suppressNextAutoAdd, setSuppressNextAutoAdd] = useState(false);
 
   const isAdmin = useMemo(() => Boolean(user?.roles?.includes("admin")), [user?.roles]);
   const idleReady = useIdleMount();
-
-  // 로그인 사용자가 바뀌면(계정 전환/로그아웃 후 재로그인) 탭 전체 초기화
-  const prevUserIdRef = useRef<number | null | undefined>(undefined);
-  useEffect(() => {
-    const currentId = user?.id ?? null;
-    // undefined => 최초 마운트는 스킵, null/숫자 => 실제 값이 들어온 이후 변경만 감지
-    if (prevUserIdRef.current === undefined) {
-      prevUserIdRef.current = currentId;
-      return;
-    }
-    if (prevUserIdRef.current !== currentId) {
-      prevUserIdRef.current = currentId;
-      setStoredTabs([]);
-      window.localStorage.removeItem(TAB_STORAGE_KEY);
-    }
-  }, [user?.id]);
 
   const menuLabelByPath = useMemo(() => buildMenuLabelIndex(menus), [menus]);
 
@@ -163,82 +180,49 @@ export function AppShell({ title, description, children }: AppShellProps) {
     [menus, pathname],
   );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(TAB_STORAGE_KEY);
-    if (!raw) {
-      setTabsHydrated(true);
-      return;
+  const userId = user?.id ?? null;
+  const [tabState, setTabState] = useState(() => ({
+    snapshot: tabsSnapshot,
+    userId,
+    pathname,
+    menuIndex: menuLabelByPath,
+    initialized: false,
+    tabs: readStoredTabs(tabsSnapshot),
+    suppressNextAutoAdd: false,
+  }));
+  if (tabState.snapshot !== tabsSnapshot || tabState.userId !== userId || tabState.pathname !== pathname || tabState.menuIndex !== menuLabelByPath || (tabsHydrated && !tabState.initialized)) {
+    const userChanged = tabState.userId !== userId;
+    const restored = userChanged ? [] : tabState.snapshot !== tabsSnapshot ? readStoredTabs(tabsSnapshot) : tabState.tabs;
+    const nextTabs = restored
+      .filter((tab) => tab.path !== "/dashboard" && (menus.length === 0 || menuLabelByPath.has(tab.path)))
+      .map((tab) => ({ ...tab, label: resolveLabel(tab.path) }));
+    const isHomePath = pathname === "/dashboard" || pathname === "/login" || pathname === "/unauthorized";
+    const shouldAutoAdd = tabsHydrated && !userChanged && !tabState.suppressNextAutoAdd && (
+      !tabState.initialized || tabState.pathname !== pathname || tabState.menuIndex !== menuLabelByPath
+    );
+    if (shouldAutoAdd && pathname && !isHomePath && (menus.length === 0 || menuLabelByPath.has(pathname)) && !nextTabs.some((tab) => tab.path === pathname)) {
+      nextTabs.push({ path: pathname, label: resolveLabel(pathname) });
     }
-
-    try {
-      const parsed = JSON.parse(raw) as OpenTab[];
-      if (!Array.isArray(parsed)) {
-        setTabsHydrated(true);
-        return;
-      }
-
-      setStoredTabs(
-        parsed.filter(
-          (tab) =>
-            typeof tab.path === "string" &&
-            typeof tab.label === "string" &&
-            tab.path !== "/dashboard",
-        ),
-      );
-    } catch {
-      setStoredTabs([]);
-    } finally {
-      setTabsHydrated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!tabsHydrated) return;
-
-    setStoredTabs((prev) => {
-      const normalized = prev
-        .filter((tab) => tab.path !== "/dashboard")
-        .map((tab) => ({ ...tab, label: resolveLabel(tab.path) }));
-
-      if (suppressNextAutoAdd) {
-        if (
-          pathname === "/dashboard" ||
-          pathname === "/login" ||
-          pathname === "/unauthorized"
-        ) {
-          setSuppressNextAutoAdd(false);
-        }
-        return normalized.slice(-MAX_OPEN_TABS);
-      }
-
-      if (
-        !pathname ||
-        pathname === "/login" ||
-        pathname === "/unauthorized" ||
-        pathname === "/dashboard"
-      ) {
-        return normalized.slice(-MAX_OPEN_TABS);
-      }
-
-      const exists = normalized.some((tab) => tab.path === pathname);
-      if (exists) {
-        return normalized.slice(-MAX_OPEN_TABS);
-      }
-
-      return [...normalized, { path: pathname, label: resolveLabel(pathname) }].slice(-MAX_OPEN_TABS);
+    setTabState({
+      snapshot: tabsSnapshot,
+      userId,
+      pathname,
+      menuIndex: menuLabelByPath,
+      initialized: tabsHydrated,
+      tabs: nextTabs.slice(-MAX_OPEN_TABS),
+      suppressNextAutoAdd: userChanged || isHomePath ? false : tabState.suppressNextAutoAdd,
     });
-  }, [pathname, resolveLabel, suppressNextAutoAdd, tabsHydrated]);
+  }
 
   const openTabs = useMemo(
     () =>
-      storedTabs
+      tabState.tabs
         .map((tab) => ({
           ...tab,
           label: resolveLabel(tab.path),
         }))
         .slice(-MAX_OPEN_TABS),
-    [resolveLabel, storedTabs],
+    [resolveLabel, tabState.tabs],
   );
   const contextTabIndex = contextMenu ? openTabs.findIndex((tab) => tab.path === contextMenu.targetPath) : -1;
 
@@ -257,19 +241,15 @@ export function AppShell({ title, description, children }: AppShellProps) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !tabsHydrated) return;
-    window.localStorage.setItem(TAB_STORAGE_KEY, JSON.stringify(openTabs));
+    const next = JSON.stringify(openTabs);
+    if (window.localStorage.getItem(TAB_STORAGE_KEY) === next) return;
+    window.localStorage.setItem(TAB_STORAGE_KEY, next);
+    window.dispatchEvent(new Event(TAB_STORAGE_CHANGE_EVENT));
   }, [openTabs, tabsHydrated]);
-
-  // 메뉴(권한) 변경 시: 새 메뉴에 없는 탭 자동 제거
-  // - 계정 전환 후 이전 계정 탭명이 그대로 노출되는 현상 방지
-  useEffect(() => {
-    if (!tabsHydrated || menus.length === 0) return;
-    setStoredTabs((prev) => prev.filter((tab) => menuLabelByPath.has(tab.path)));
-  }, [menuLabelByPath, menus.length, tabsHydrated]);
 
   function closeTab(path: string) {
     const next = openTabs.filter((tab) => tab.path !== path);
-    setStoredTabs(next);
+    setTabState((previous) => ({ ...previous, tabs: next }));
 
     if (pathname === path) {
       const fallbackPath = next[next.length - 1]?.path ?? "/dashboard";
@@ -278,8 +258,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
   }
 
   function closeAllTabs() {
-    setSuppressNextAutoAdd(true);
-    setStoredTabs([]);
+    setTabState((previous) => ({ ...previous, tabs: [], suppressNextAutoAdd: true }));
     router.push("/dashboard");
     setContextMenu(null);
   }
@@ -288,7 +267,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
     const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
     if (targetIndex <= 0) return;
     const next = openTabs.slice(targetIndex);
-    setStoredTabs(next);
+    setTabState((previous) => ({ ...previous, tabs: next }));
     if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") router.push(targetPath);
     setContextMenu(null);
     contextMenuAnchorRef.current?.focus();
@@ -298,7 +277,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
     const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
     if (targetIndex < 0 || targetIndex >= openTabs.length - 1) return;
     const next = openTabs.slice(0, targetIndex + 1);
-    setStoredTabs(next);
+    setTabState((previous) => ({ ...previous, tabs: next }));
     if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") router.push(targetPath);
     setContextMenu(null);
     contextMenuAnchorRef.current?.focus();

@@ -216,46 +216,48 @@ export function HrAppointmentRecordManager() {
     return id;
   }, []);
 
-  const refresh = useCallback(async (filters: SearchFilters) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.appointmentNo.trim()) params.set("appointment_no", filters.appointmentNo.trim());
-      if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
-      if (filters.name.trim()) params.set("name", filters.name.trim());
-      if (filters.department.trim()) params.set("department", filters.department.trim());
-      if (filters.orderStatus) params.set("order_status", filters.orderStatus);
+  const refresh = useCallback((filters: SearchFilters) => {
+    const params = new URLSearchParams();
+    if (filters.appointmentNo.trim()) params.set("appointment_no", filters.appointmentNo.trim());
+    if (filters.employeeNo.trim()) params.set("employee_no", filters.employeeNo.trim());
+    if (filters.name.trim()) params.set("name", filters.name.trim());
+    if (filters.department.trim()) params.set("department", filters.department.trim());
+    if (filters.orderStatus) params.set("order_status", filters.orderStatus);
 
-      const response = await fetch(`/api/hr/appointments/records?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(await parseErrorDetail(response, "발령처리 조회에 실패했습니다."));
+    return fetch(`/api/hr/appointments/records?${params.toString()}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await parseErrorDetail(response, "발령처리 조회에 실패했습니다."));
 
-      const data = (await response.json()) as HrAppointmentRecordListResponse;
-      const nextRows = (data.items ?? []).map((row) => ({
-        ...row,
-        effective_date: normalizeDate(row.effective_date),
-        start_date: normalizeDate(row.start_date),
-        end_date: normalizeDate(row.end_date),
-        _status: "clean" as const,
-        _original: snapshotFields(row, TRACKED_FIELDS),
-        _prevStatus: undefined,
-      }));
-      rowsRef.current = nextRows;
-      setRows(nextRows);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "발령처리 조회에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
+        const data = (await response.json()) as HrAppointmentRecordListResponse;
+        const nextRows = (data.items ?? []).map((row) => ({
+          ...row,
+          effective_date: normalizeDate(row.effective_date),
+          start_date: normalizeDate(row.start_date),
+          end_date: normalizeDate(row.end_date),
+          _status: "clean" as const,
+          _original: snapshotFields(row, TRACKED_FIELDS),
+          _prevStatus: undefined,
+        }));
+        rowsRef.current = nextRows;
+        setRows(nextRows);
+      })
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "발령처리 조회에 실패했습니다.");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     void refresh(appliedFilters);
   }, [appliedFilters, refresh]);
 
-  useEffect(() => {
-    setSearchFilters((prev) => (isSameFilters(prev, initialFilters) ? prev : initialFilters));
-    setAppliedFilters((prev) => (isSameFilters(prev, initialFilters) ? prev : initialFilters));
-  }, [initialFilters]);
+  const [previousInitialFilters, setPreviousInitialFilters] = useState(initialFilters);
+  if (!isSameFilters(previousInitialFilters, initialFilters)) {
+    setPreviousInitialFilters(initialFilters);
+    setSearchFilters(initialFilters);
+    setAppliedFilters(initialFilters);
+    setLoading(true);
+  }
 
   const handleQuery = useCallback(() => {
     const nextFilters = { ...searchFilters };
@@ -266,6 +268,7 @@ export function HrAppointmentRecordManager() {
       return;
     }
     gridApiRef.current?.deselectAll();
+    setLoading(true);
     setAppliedFilters(nextFilters);
   }, [hasDirtyRows, searchFilters]);
 
@@ -466,6 +469,7 @@ export function HrAppointmentRecordManager() {
       );
 
       toast.success(`저장 완료 (입력 ${toInsert.length} / 수정 ${toUpdate.length} / 삭제 ${toDelete.length})`);
+      setLoading(true);
       await refresh(appliedFilters);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -481,6 +485,7 @@ export function HrAppointmentRecordManager() {
       if (!response.ok) throw new Error(await parseErrorDetail(response, "발령 확정에 실패했습니다."));
       const data = (await response.json()) as HrAppointmentOrderConfirmResponse;
       toast.success(`발령 확정 완료 (적용 ${data.applied_count}건)`);
+      setLoading(true);
       await refresh(appliedFilters);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "발령 확정에 실패했습니다.");
@@ -806,6 +811,7 @@ export function HrAppointmentRecordManager() {
     gridApiRef.current?.deselectAll();
     rowsRef.current = [];
     setRows([]);
+    setLoading(true);
     setAppliedFilters(pendingFilters);
     setPendingFilters(null);
     setDiscardDialogOpen(false);

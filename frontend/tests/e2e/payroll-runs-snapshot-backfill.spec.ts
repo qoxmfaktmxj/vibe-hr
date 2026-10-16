@@ -1,35 +1,21 @@
-import { expect, test, type APIRequestContext, type BrowserContext } from "@playwright/test";
+import { expect, test, type BrowserContext } from "@playwright/test";
+import type { PayRunTargetSnapshotItem } from "../../src/types/pay";
 
 const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-const API_URL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
 const ADMIN_LOGIN = { enter_cd: "VIBE", login_id: "admin", password: "admin" };
 
 async function authenticateBrowserSession(
   context: BrowserContext,
-  request: APIRequestContext,
 ): Promise<void> {
-  const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
+  const loginRes = await context.request.post(`${FRONTEND_URL}/api/auth/login`, {
     data: ADMIN_LOGIN,
+    headers: { "x-vibehr-client-ip": "127.0.0.1" },
   });
   expect(loginRes.ok()).toBeTruthy();
-
-  const { access_token: accessToken } = (await loginRes.json()) as { access_token: string };
-  await context.addCookies([
-    {
-      name: "vibe_hr_token",
-      value: accessToken,
-      url: FRONTEND_URL,
-    },
-    {
-      name: "vibe_hr_enter_cd",
-      value: ADMIN_LOGIN.enter_cd,
-      url: FRONTEND_URL,
-    },
-  ]);
 }
 
-test("정기급여 Run 화면에서 스냅샷 갱신을 호출한다", async ({ context, page, request }) => {
-  await authenticateBrowserSession(context, request);
+test("정기급여 Run 화면에서 스냅샷 갱신을 호출한다", async ({ context, page }) => {
+  await authenticateBrowserSession(context);
 
   const now = "2026-03-15T12:00:00.000Z";
   const run = {
@@ -93,6 +79,15 @@ test("정기급여 Run 화면에서 스냅샷 갱신을 호출한다", async ({ 
     },
   ];
   let snapshotRefreshCount = 0;
+  let snapshotReadCount = 0;
+  const snapshot: PayRunTargetSnapshotItem = {
+    employee_id: employee.employee_id, employee_no: employee.employee_no, employee_name: employee.employee_name,
+    department_id: 1, department_name: "검증 부서", position_title: "사원", hire_date: "2025-01-01",
+    employment_status: "active", retire_date: null, profile_id: 301, payroll_code_id: 1, item_group_id: 1,
+    base_salary: 4_200_000, pay_type_code: "monthly", payment_day_type: "fixed", payment_day_value: 25,
+    holiday_adjustment: null, effective_from: "2026-03-01", effective_to: null,
+    period_start: "2026-03-01", period_end: "2026-03-31", event_count: 0, review_required: false,
+  };
 
   await page.route("**/api/pay/runs**", async (route) => {
     const requestUrl = new URL(route.request().url());
@@ -123,8 +118,15 @@ test("정기급여 Run 화면에서 스냅샷 갱신을 호출한다", async ({ 
       return;
     }
 
+    if (method === "GET" && pathname.endsWith("/api/pay/runs/2/targets/6018")) {
+      snapshotReadCount += 1;
+      await route.fulfill({ status: 200, json: { snapshot, events: [] } });
+      return;
+    }
+
     if (method === "POST" && pathname.endsWith("/api/pay/runs/2/snapshot-backfill")) {
       snapshotRefreshCount += 1;
+      snapshot.base_salary = 4_300_000;
       run.updated_at = "2026-03-15T12:05:00.000Z";
       await route.fulfill({
         status: 200,
@@ -148,9 +150,15 @@ test("정기급여 Run 화면에서 스냅샷 갱신을 호출한다", async ({ 
   await expect(page.getByRole("button", { name: "지급완료" })).toBeDisabled();
 
   await expect(page.locator(".ag-row").filter({ hasText: "EMP-900001" }).first()).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "스냅샷", exact: true }).click();
+  const baseSalary = page.getByText("기본급", { exact: true }).locator("..");
+  await expect(baseSalary).toContainText("4,200,000");
   await page.getByRole("button", { name: "스냅샷 갱신" }).click();
 
   await expect.poll(() => snapshotRefreshCount).toBe(1);
   await expect(page.getByText("대상자 스냅샷을 갱신했습니다.")).toBeVisible({ timeout: 20_000 });
+  await expect.poll(() => snapshotReadCount).toBeGreaterThanOrEqual(2);
+  await expect(baseSalary).toContainText("4,300,000");
+  await page.getByRole("button", { name: "계산결과", exact: true }).click();
   await expect(page.getByText("경고: payroll events: 기본급 변경")).toBeVisible({ timeout: 20_000 });
 });

@@ -2,6 +2,7 @@
 
 import * as LucideIcons from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { SetStateAction } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,8 +217,8 @@ export function MenuAdminManager() {
   const [menus, setMenus] = useState<MenuAdminItem[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [selectedMenuId, setSelectedMenuId] = useState<number | null>(null);
-  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
-  const [form, setForm] = useState<MenuFormState>(initialForm);
+  const [menuRoleDraft, setMenuRoleDraft] = useState<{ menuId: number; roleIds: number[] } | null>(null);
+  const [formDraft, setFormDraft] = useState<{ menu: MenuAdminItem | null; value: MenuFormState } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -230,63 +231,69 @@ export function MenuAdminManager() {
     () => (selectedMenuId ? findMenu(menus, selectedMenuId) : null),
     [menus, selectedMenuId]
   );
+  const selectedRoleIds = menuRoleDraft?.menuId === selectedMenuId ? menuRoleDraft.roleIds : [];
+  const selectedMenuForm: MenuFormState = selectedMenu ? {
+    code: selectedMenu.code,
+    name: selectedMenu.name,
+    parent_id: selectedMenu.parent_id ? String(selectedMenu.parent_id) : "",
+    path: selectedMenu.path ?? "",
+    icon: normalizeMenuIconName(selectedMenu.icon) ?? "",
+    sort_order: String(selectedMenu.sort_order),
+    is_active: selectedMenu.is_active,
+  } : initialForm;
+  const form = formDraft?.menu === selectedMenu ? formDraft.value : selectedMenuForm;
 
-  async function loadBase() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [menusRes, rolesRes] = await Promise.all([
-        fetch("/api/menus/admin/tree", { cache: "no-store" }),
-        fetch("/api/menus/admin/roles", { cache: "no-store" }),
-      ]);
+  function setForm(updater: SetStateAction<MenuFormState>) {
+    setFormDraft((previous) => {
+      const current = previous?.menu === selectedMenu ? previous.value : selectedMenuForm;
+      return { menu: selectedMenu, value: typeof updater === "function" ? updater(current) : updater };
+    });
+  }
+
+  function loadBase(signal?: AbortSignal) {
+    return Promise.all([
+      fetch("/api/menus/admin/tree", { cache: "no-store", signal }),
+      fetch("/api/menus/admin/roles", { cache: "no-store", signal }),
+    ]).then(async ([menusRes, rolesRes]) => {
       if (!menusRes.ok) throw new Error("메뉴 목록을 불러오지 못했습니다.");
       if (!rolesRes.ok) throw new Error("역할 목록을 불러오지 못했습니다.");
 
       const menusJson = (await menusRes.json()) as { menus: MenuAdminItem[] };
       const rolesJson = (await rolesRes.json()) as { roles: RoleItem[] };
+      if (signal?.aborted) return;
       setMenus(menusJson.menus);
       setRoles(rolesJson.roles);
 
       const firstId = menusJson.menus[0]?.id ?? null;
       setSelectedMenuId((prev) => prev ?? firstId);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "불러오기에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadMenuRoles(menuId: number) {
-    const res = await fetch(`/api/menus/admin/${menuId}/roles`, { cache: "no-store" });
-    if (!res.ok) {
-      setSelectedRoleIds([]);
-      return;
-    }
-    const data = (await res.json()) as { menu_id: number; roles: RoleItem[] };
-    setSelectedRoleIds(data.roles.map((r) => r.id));
+    }).catch((e) => {
+      if (!signal?.aborted) setError(e instanceof Error ? e.message : "불러오기에 실패했습니다.");
+    }).finally(() => {
+      if (!signal?.aborted) setLoading(false);
+    });
   }
 
   useEffect(() => {
-    void loadBase();
+    const controller = new AbortController();
+    void loadBase(controller.signal);
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (!selectedMenuId) return;
-    void loadMenuRoles(selectedMenuId);
+    const menuId = selectedMenuId;
+    const controller = new AbortController();
+    void fetch(`/api/menus/admin/${menuId}/roles`, { cache: "no-store", signal: controller.signal })
+      .then(async (res) => {
+        const data = res.ok ? (await res.json()) as { roles: RoleItem[] } : null;
+        if (!controller.signal.aborted) {
+          setMenuRoleDraft({ menuId, roleIds: data?.roles.map((role) => role.id) ?? [] });
+        }
+      }).catch((e) => {
+        if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "불러오기에 실패했습니다.");
+      });
+    return () => controller.abort();
   }, [selectedMenuId]);
-
-  useEffect(() => {
-    if (!selectedMenu) return;
-    setForm({
-      code: selectedMenu.code,
-      name: selectedMenu.name,
-      parent_id: selectedMenu.parent_id ? String(selectedMenu.parent_id) : "",
-      path: selectedMenu.path ?? "",
-      icon: normalizeMenuIconName(selectedMenu.icon) ?? "",
-      sort_order: String(selectedMenu.sort_order),
-      is_active: selectedMenu.is_active,
-    });
-  }, [selectedMenu]);
 
   async function saveMenu() {
     if (!selectedMenuId) return;
@@ -308,6 +315,7 @@ export function MenuAdminManager() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.detail ?? "저장 실패");
 
+      setLoading(true);
       await loadBase();
       setSelectedMenuId(selectedMenuId);
       setNoticeType("success");
@@ -343,6 +351,7 @@ export function MenuAdminManager() {
 
       setShowCreate(false);
       setForm(initialForm);
+      setLoading(true);
       await loadBase();
       setNoticeType("success");
       setNotice("생성이 완료되었습니다.");
@@ -370,6 +379,7 @@ export function MenuAdminManager() {
         throw new Error(data?.detail ?? "삭제 실패");
       }
       setSelectedMenuId(null);
+      setLoading(true);
       await loadBase();
       setNoticeType("success");
       setNotice("삭제가 완료되었습니다.");
@@ -514,9 +524,10 @@ export function MenuAdminManager() {
                         <Checkbox
                           checked={checked}
                           onCheckedChange={(v) => {
-                            setSelectedRoleIds((prev) =>
-                              v ? [...prev, role.id] : prev.filter((id) => id !== role.id)
-                            );
+                            setMenuRoleDraft((previous) => {
+                              const roleIds = previous?.menuId === selectedMenu.id ? previous.roleIds : [];
+                              return { menuId: selectedMenu.id, roleIds: v ? [...roleIds, role.id] : roleIds.filter((id) => id !== role.id) };
+                            });
                           }}
                         />
                         {role.name} ({role.code})

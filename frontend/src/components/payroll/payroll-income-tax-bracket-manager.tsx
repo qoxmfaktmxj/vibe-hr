@@ -63,12 +63,6 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
     selectAll: "전체 선택", noMatches: "일치 항목 없음",
 };
 
-const ACTION_CODE_BY_KEY: Record<string, string> = {
-    create: "create",
-    copy: "copy",
-    download: "download",
-};
-
 function snapshotOriginal(row: PayIncomeTaxBracketItem): Record<string, unknown> {
     return snapshotFields(row, TRACKED_FIELDS);
 }
@@ -128,20 +122,18 @@ export function PayrollIncomeTaxBracketManager() {
     const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
     const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch("/api/pay/setup/income-tax-brackets", { cache: "no-store" });
+    const loadData = useCallback(() => {
+        return fetch("/api/pay/setup/income-tax-brackets", { cache: "no-store" }).then(async (res) => {
             if (!res.ok) throw new Error("소득세 구간 목록을 불러오지 못했습니다.");
             const data = (await res.json()) as { items: PayIncomeTaxBracketItem[] };
             const nextRows = data.items.map(toGridRow);
             rowsRef.current = nextRows;
             setRows(nextRows);
-        } catch (e) {
+        }).catch((e: unknown) => {
             toast.error(e instanceof Error ? e.message : "로딩 실패");
-        } finally {
+        }).finally(() => {
             setLoading(false);
-        }
+        });
     }, []);
 
     useEffect(() => { void loadData(); }, [loadData]);
@@ -408,6 +400,7 @@ export function PayrollIncomeTaxBracketManager() {
     }
 
     async function handleQuery() {
+        setLoading(true);
         setAppliedYear(searchYear);
         await loadData();
         tempIdRef.current = -1;
@@ -501,12 +494,12 @@ export function PayrollIncomeTaxBracketManager() {
     }, [filteredRows, page, pageSize]);
     const pagination = useGridPagination({ page, totalCount, pageSize, onPageChange: setPage });
 
-    const toolbarActions = [
-        { key: "create", label: "입력", icon: Plus, onClick: addRow },
-        { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-        { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+    const filteredToolbarActions = [
+        ...(can("create") ? [{ key: "create", label: "입력", icon: Plus, onClick: addRow }] : []),
+        ...(can("copy") ? [{ key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows }] : []),
+        ...(can("download") ? [{ key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() }] : []),
     ];
-    const filteredToolbarActions = toolbarActions.filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+
     const toolbarSaveAction = can("save")
         ? {
             key: "save",

@@ -20,10 +20,11 @@ function buildYearGrid(year: number, items: TimMonthCloseItem[]): (TimMonthClose
 
 export function TimMonthCloseManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/tim/month-closing");
-  const [searchYear, setSearchYear] = useState(new Date().getFullYear());
-  const [appliedYear, setAppliedYear] = useState(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const [searchYear, setSearchYear] = useState(currentYear);
+  const [appliedYear, setAppliedYear] = useState(currentYear);
   const [items, setItems] = useState<TimMonthCloseItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
@@ -31,26 +32,29 @@ export function TimMonthCloseManager() {
   const [actionNote, setActionNote] = useState("");
   const [acting, setActing] = useState(false);
 
-  const fetchData = useCallback(async (year: number) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/tim/month-close?year=${year}`, { cache: "no-store" });
+  const fetchData = useCallback((year: number, signal?: AbortSignal) =>
+    fetch(`/api/tim/month-close?year=${year}`, { cache: "no-store", signal }).then(async (res) => {
       if (!res.ok) throw new Error("월마감 현황을 불러오지 못했습니다.");
       const data = (await res.json()) as TimMonthCloseListResponse;
+      if (signal?.aborted) return;
       setItems(data.items);
-    } catch (e) {
+    }).catch((e) => {
+      if (signal?.aborted) return;
       toast.error(e instanceof Error ? e.message : "조회 실패");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }).finally(() => {
+      if (!signal?.aborted) setLoading(false);
+    }), []);
 
   useEffect(() => {
-    void fetchData(appliedYear);
-  }, [appliedYear, fetchData]);
+    const controller = new AbortController();
+    void fetchData(currentYear, controller.signal);
+    return () => controller.abort();
+  }, [currentYear, fetchData]);
 
   function handleQuery() {
+    setLoading(true);
     setAppliedYear(searchYear);
+    void fetchData(searchYear);
   }
 
   function requestClose(month: number) {
@@ -80,6 +84,7 @@ export function TimMonthCloseManager() {
         return;
       }
       toast.success(`${appliedYear}년 ${targetMonth}월 마감 완료`);
+      setLoading(true);
       await fetchData(appliedYear);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "마감 처리 실패");
@@ -104,6 +109,7 @@ export function TimMonthCloseManager() {
         return;
       }
       toast.success(`${appliedYear}년 ${targetMonth}월 마감 해제됨`);
+      setLoading(true);
       await fetchData(appliedYear);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "재오픈 처리 실패");
@@ -153,7 +159,7 @@ export function TimMonthCloseManager() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void fetchData(appliedYear)}
+            onClick={() => { setLoading(true); void fetchData(appliedYear); }}
             disabled={loading}
           >
             <RefreshCw className="mr-1 h-3.5 w-3.5" />

@@ -64,14 +64,6 @@ const AG_GRID_LOCALE_KO: Record<string, string> = {
     selectAll: "전체 선택", noMatches: "일치 항목 없음",
 };
 
-const ACTION_CODE_BY_KEY: Record<string, string> = {
-    create: "create",
-    copy: "copy",
-    template: "template_download",
-    upload: "upload",
-    download: "download",
-};
-
 function snapshotOriginal(row: PayItemGroupItem): Record<string, unknown> {
     return snapshotFields(row, TRACKED_FIELDS);
 }
@@ -127,20 +119,18 @@ export function PayItemGroupManager() {
     const hasChanges = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
     const rowClassRules = useMemo(() => buildGridRowClassRules<RowData>(), []);
 
-    const loadData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch("/api/pay/setup/item-groups", { cache: "no-store" });
+    const loadData = useCallback(() => {
+        return fetch("/api/pay/setup/item-groups", { cache: "no-store" }).then(async (res) => {
             if (!res.ok) throw new Error("그룹 목록을 불러오지 못했습니다.");
             const data = (await res.json()) as { items: PayItemGroupItem[] };
             const nextRows = data.items.map(toGridRow);
             rowsRef.current = nextRows;
             setRows(nextRows);
-        } catch (e) {
+        }).catch((e: unknown) => {
             toast.error(e instanceof Error ? e.message : "로딩 실패");
-        } finally {
+        }).finally(() => {
             setLoading(false);
-        }
+        });
     }, []);
 
     useEffect(() => { void loadData(); }, [loadData]);
@@ -364,6 +354,7 @@ export function PayItemGroupManager() {
     }
 
     async function handleQuery() {
+        setLoading(true);
         setAppliedName(searchName);
         await loadData();
         tempIdRef.current = -1;
@@ -484,14 +475,14 @@ export function PayItemGroupManager() {
         }
     }
 
-    const toolbarActions = [
-        { key: "create", label: "입력", icon: Plus, onClick: addRow },
-        { key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows },
-        { key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload },
-        { key: "upload", label: "업로드", icon: Search, onClick: handleUpload, disabled: saving || uploading || menuActionLoading },
-        { key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() },
+    const filteredToolbarActions = [
+        ...(can("create") ? [{ key: "create", label: "입력", icon: Plus, onClick: addRow }] : []),
+        ...(can("copy") ? [{ key: "copy", label: "복사", icon: Copy, onClick: copySelectedRows }] : []),
+        ...(can("template_download") ? [{ key: "template", label: "양식 다운로드", icon: Search, onClick: handleTemplateDownload }] : []),
+        ...(can("upload") ? [{ key: "upload", label: "업로드", icon: Search, onClick: handleUpload, disabled: saving || uploading || menuActionLoading }] : []),
+        ...(can("download") ? [{ key: "download", label: "다운로드", icon: Download, onClick: () => void downloadExcel() }] : []),
     ];
-    const filteredToolbarActions = toolbarActions.filter((action) => can(ACTION_CODE_BY_KEY[action.key] ?? action.key));
+
     const toolbarSaveAction = can("save")
         ? {
             key: "save",

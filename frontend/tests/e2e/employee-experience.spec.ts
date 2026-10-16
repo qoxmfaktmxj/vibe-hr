@@ -49,6 +49,10 @@ test.beforeEach(async ({ request }) => {
 test("login has clear company/social labels and accessible password visibility", async ({ page }) => {
   // This checks the form's accessible controls. Keep it independent from the
   // decorative WebGL compositor; scene behavior is exercised below.
+  const imageWarnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes('parent element with invalid "position"')) imageWarnings.push(message.text());
+  });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
   await expect(page.getByLabel("회사", { exact: true })).toContainText("테스트 법인");
@@ -61,6 +65,7 @@ test("login has clear company/social labels and accessible password visibility",
   await page.getByRole("button", { name: /비밀번호 숨기기/ }).click();
   await expect(password).toHaveAttribute("type", "password");
   await capture(page, "login-desktop.png");
+  expect(imageWarnings).toEqual([]);
 });
 
 for (const [scenario, guidance] of [
@@ -270,6 +275,32 @@ test("regular members keep account access without administrator switching", asyn
   await expect(page.getByRole("button", { name: "내 계정 메뉴", exact: true })).toBeVisible();
   await openProfile(page);
   await expect(page.getByRole("dialog")).toContainText("구성원");
+});
+
+test("account switching clears previous tabs and reloads the current member profile", async ({ page, request }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "account-switch" } });
+  await signIn(page);
+  await page.goto("/mng/companies");
+  const tabs = page.getByRole("navigation", { name: "열린 업무" });
+  await expect(tabs.getByRole("button", { name: "고객사관리", exact: true })).toBeVisible();
+  await openProfile(page);
+  await expect(page.getByRole("dialog")).toContainText("TEST-001");
+  await page.getByRole("button", { name: "프로필 닫기", exact: true }).click();
+  await page.getByRole("button", { name: "다른 사용자로 로그인", exact: true }).click();
+  await page.getByRole("group", { name: "전환할 사용자" }).getByRole("button", { name: /전환 구성원/ }).click();
+  await page.getByRole("button", { name: "전환", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("button", { name: "다른 사용자로 로그인", exact: true })).toHaveCount(0);
+  await expect(tabs.getByRole("button", { name: "고객사관리", exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("vibe_hr_open_tabs") ?? "[]"))).toEqual([]);
+  await openProfile(page);
+  await expect(page.getByRole("dialog")).toContainText("TEST-002");
+  await expect(page.getByRole("dialog")).toContainText("전환 구성원");
+  await expect(page.getByRole("dialog")).not.toContainText("TEST-001");
+  await page.getByRole("button", { name: "프로필 닫기", exact: true }).click();
+  await page.reload();
+  await expect(tabs.getByRole("button", { name: "고객사관리", exact: true })).toHaveCount(0);
 });
 
 test("sidebar group and panel collapse hide links from keyboard navigation", async ({ page }) => {

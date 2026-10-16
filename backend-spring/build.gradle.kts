@@ -4,13 +4,17 @@ import java.util.HexFormat
 
 plugins {
     java
-    id("org.springframework.boot") version "4.1.0"
+    id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.vibehr"
 version = "0.1.0-SNAPSHOT"
 description = "Vibe-HR Spring platform migration"
+
+extra["jackson-2-bom.version"] = "2.21.7"
+extra["jackson-bom.version"] = "3.1.7"
+extra["tomcat.version"] = "11.0.27"
 
 java {
     toolchain {
