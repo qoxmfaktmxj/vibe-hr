@@ -53,7 +53,7 @@ One advisory requires an explicit qualification: upstream Jackson2 `GHSA-mhm7-75
 
 Additional live tests use a task-owned loopback PostgreSQL database and local Spring/BFF processes with temporary secrets and explicitly gated development fixtures. No production browser mutation or production seeding is permitted. Only task-owned processes and Docker resources are removed. The pre-existing unrelated untracked folders remain untouched.
 
-No additional commit or push has been made for this follow-up. Final test counts, failures, fixes, review and hosted release evidence are recorded after verification.
+The verified release changes were published to main as `01c3f5b6bc0a355885ccb4d547ebe2af77d168c8`. The later checkpoints below retain the investigation history; the latest hosted result and its correction are recorded at the end of this document.
 
 ## Confirmed personal time lookup failure, approved additional R3
 
@@ -142,3 +142,13 @@ Recovery uses the deployment workflow's retained previous Spring/frontend image 
 The interrupted live invocation has no completed report and is excluded. Lifecycle readiness now waits for visible rows or the grid's real no-rows overlay, preserving empty grids and every browser/API error assertion while removing the unconditional wait for impossible rows. In the restarted47-case run, two added assertions required fixture navigation corrections: select the search-area query button when two query buttons exist, and return from snapshot to calculation results before checking its existing warning. Those two cases then pass; the original request, warning, snapshot read-count and changed-salary assertions all remain. The final135-case map retains the older failing reports as diagnostic evidence and uses the passing reruns for those two corrected tests.
 
 All reviewed runtime source hashes remain fixed. The publication manifest contains102 approved files; generated output, temporary credentials/runtime state, Next-generated agent instructions and original unrelated untracked folders are excluded. Hosted same-SHA UI, backend/image gates and automatic deployment are checked after the authorized main push and reported with their actual run links in the task result.
+
+## Hosted login fixture collision and social-link prefetch
+
+The first published release, `01c3f5b`, passes the hosted backend/image test job. Its [UI run38889195049](https://github.com/qoxmfaktmxj/vibe-hr/actions/runs/38889195049) passes298 unit tests, eight UX cases,44 experience cases and the production build, then fails the25th production-audit login. The [Deploy run38889195061](https://github.com/qoxmfaktmxj/vibe-hr/actions/runs/38889195061) correctly blocks promotion because that exact SHA has a failed UI result. The failed release is not deployed.
+
+The trace shows `POST /api/auth/login` returning429 after tests share one trusted loopback client identity. The faster hosted runner reaches the existing24-attempt/60-second source limit; this is a fixture collision with a functioning security control. The same production trace also shows automatic RSC prefetch requests to Google/Kakao OAuth action URLs before a click, producing500 responses in the synthetic service.
+
+The approved CI correction continues within two frontend files. `spreadsheet-actions.spec.ts` derives a loopback identity from each test ID/repetition using the existing trusted-header fixture configuration, explicitly asserts successful password login, hovers both social links and rejects any unsolicited social-login request. All workbook cases and existing assertions remain. `login-card.tsx` sets `prefetch={false}` on those two existing links; their URLs, labels and click behavior remain unchanged. No production quota, trust configuration, permission policy, retry exemption, dependency or workflow gate is changed. An independent source review finds no actionable issue.
+
+Fresh scoped lint, grid validation,298 unit tests and the production build/TypeScript pass. A black-box probe against the owned synthetic production server completes in107ms: the first24 same-source requests return200, the25th returns429 and a different source returns200. Only sanitized status codes are retained. The complete31-case production audit passes with zero failed, skipped or flaky cases, including every spreadsheet login/hover assertion. Same-SHA hosted validation and deployment are checked after the authorized follow-up push and reported with their actual run links in the task result.

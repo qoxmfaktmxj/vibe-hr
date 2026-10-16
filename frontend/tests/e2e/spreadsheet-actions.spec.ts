@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { read, utils, write } from "xlsx";
@@ -265,13 +266,25 @@ async function capture(page: Page, filename: string) {
   await page.screenshot({ path: test.info().outputPath(filename), fullPage: true });
 }
 
-test.beforeEach(async ({ page, request }) => {
+test.beforeEach(async ({ page, request, context }, testInfo) => {
+  const source = createHash("sha256").update(`${testInfo.testId}:${testInfo.repeatEachIndex}`).digest();
+  await context.setExtraHTTPHeaders({ "x-vibehr-client-ip": `127.${source[0]}.${source[1]}.${source[2]}` });
   const response = await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "file-actions" } });
   expect(response.ok()).toBe(true);
+  const socialRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/auth/social/login/")) socialRequests.push(request.url());
+  });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
+  await page.getByRole("link", { name: "구글 로그인", exact: true }).hover();
+  await page.getByRole("link", { name: "카카오 로그인", exact: true }).hover();
+  const login = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/auth/login"
+    && response.request().method() === "POST");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
+  expect((await login).status()).toBe(200);
   await expect(page).toHaveURL(/\/dashboard$/);
+  expect(socialRequests).toEqual([]);
 });
 
 async function verifyImport(page: Page, screen: Screen, mobile = false) {

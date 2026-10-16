@@ -272,6 +272,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
             <Button asChild variant="outline" className={`h-11 w-full ${styles.socialButton}`}>
               <Link
                 href="/api/auth/social/login/google"
+                prefetch={false}
                 className="flex w-full items-center justify-center gap-2"
                 aria-label="구글 로그인"
                 title="구글 로그인"
@@ -293,6 +294,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
             <Button asChild variant="outline" className={`h-11 w-full ${styles.socialButton}`}>
               <Link
                 href="/api/auth/social/login/kakao"
+                prefetch={false}
                 className="flex w-full items-center justify-center gap-2"
                 aria-label="카카오 로그인"
                 title="카카오 로그인"
