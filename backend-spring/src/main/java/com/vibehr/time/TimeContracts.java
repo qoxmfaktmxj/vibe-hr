@@ -106,7 +106,7 @@ record TimScheduleTodayResponse(TimScheduleTodayItem item) { }
 record TimAttendanceDailyItem(Integer id, int employeeId, String employeeNo, String employeeName, int departmentId,
         String departmentName, LocalDate workDate, Instant checkInAt, Instant checkOutAt, Integer workedMinutes,
         String attendanceStatus, int actualMinutes, int regularMinutes, int overtimeMinutes, int nightMinutes,
-        int holidayWorkMinutes, int holidayOvertimeMinutes, int holidayNightMinutes, boolean isHolidayWork) { }
+        int holidayWorkMinutes, int holidayOvertimeMinutes, int holidayNightMinutes, boolean isHolidayWork, String approvedLeaveType) { }
 record TimAttendanceDailyListResponse(List<TimAttendanceDailyItem> items, int totalCount, int page, int limit, int totalPages) { }
 record TimAttendanceTodayResponse(TimAttendanceDailyItem item) { }
 record TimCheckInOutRequest(Integer employeeId) { }
@@ -138,7 +138,7 @@ record TimLeaveRequestCreateRequest(@NotBlank @Pattern(regexp = "annual|sick|hal
 record TimLeaveDecisionRequest(@Size(max = 500) String reason) { }
 
 record TimMonthCloseItem(Integer id, int year, int month, String closeStatus, int employeeCount, int presentDays,
-        int absentDays, int lateDays, int leaveDays, int totalOvertimeMinutes, int totalNightMinutes,
+        int absentDays, int lateDays, double leaveDays, int totalOvertimeMinutes, int totalNightMinutes,
         int totalHolidayWorkMinutes, int totalHolidayOvertimeMinutes, int totalHolidayNightMinutes, Integer closedBy,
         String closedByName, Instant closedAt, Integer reopenedBy, String reopenedByName, Instant reopenedAt, String note,
         Instant createdAt, Instant updatedAt) { }

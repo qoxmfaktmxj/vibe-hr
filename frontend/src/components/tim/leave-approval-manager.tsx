@@ -168,7 +168,7 @@ export function LeaveApprovalManager() {
             <CardTitle className="text-sm text-foreground">승인 처리 기준</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            각 행의 승인 또는 반려 버튼으로 휴가 요청을 즉시 처리할 수 있습니다.
+            승인한 휴가는 근태에 자동 반영되며, 무급휴가 공제는 급여 계산 시 적용됩니다. 취소하면 해당 자동 반영도 해제됩니다.
           </CardContent>
         </Card>
       }

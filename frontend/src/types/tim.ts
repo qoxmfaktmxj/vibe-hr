@@ -160,6 +160,7 @@ export type TimAttendanceDailyItem = {
   check_out_at: string | null;
   worked_minutes: number | null;
   attendance_status: "present" | "late" | "absent" | "leave" | "remote";
+  approved_leave_type?: "annual" | "sick" | "half_day" | "unpaid" | "other" | null;
   // ── 근무시간 자동계산 결과 ──
   actual_minutes: number;
   regular_minutes: number;

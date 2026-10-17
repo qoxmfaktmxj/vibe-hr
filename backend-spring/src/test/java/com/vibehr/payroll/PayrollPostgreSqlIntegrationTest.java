@@ -15,9 +15,12 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -305,6 +308,156 @@ class PayrollPostgreSqlIntegrationTest {
         assertThat(jdbc.queryForObject("select count(*) from pay_payroll_runs where year_month='2026-02' and payroll_code_id=?", Integer.class, payrollCodeId)).isOne();
     }
 
+    @Test
+    void automaticUnpaidUsesApprovedSnapshotsAndReachesPaidWithBalancedVouchersAndMatchingPayslip() {
+        int codeId = createAutomaticUnpaidSetup(2090000d);
+        int automaticId = insertLeave("unpaid", "approved", "2026-01-05", "{\"2026-01\":480}");
+        int legacyId = insertLeave("unpaid", "approved", "2026-01-06", null);
+        insertLeave("unpaid", "pending", "2026-01-07", "{\"2026-01\":480}");
+        insertLeave("unpaid", "rejected", "2026-01-08", "{\"2026-01\":480}");
+        insertLeave("unpaid", "cancelled", "2026-01-09", "{\"2026-01\":480}");
+        insertLeave("annual", "approved", "2026-01-12", "{\"2026-01\":480}");
+        jdbc.update("insert into pay_allowance_deductions(code,name,type,tax_type,calculation_type,is_active,sort_order,created_at,updated_at) values ('MANUAL','Manual deduction','deduction','tax','fixed',true,2,now(),now())");
+        service.saveGlMappings(new PayrollContracts.GlMappingBatchRequest(List.of(
+                new PayrollContracts.GlMappingBatchItem(null, "MANUAL", "2100", LocalDate.of(2020, 1, 1), null, true)), null));
+        service.saveVariableInputs(new PayrollContracts.VariableInputBatchRequest(List.of(
+                new PayrollContracts.VariableInputBatchItem(null, "2026-01", 1, "MANUAL", "deduction", 5000d, "Independent manual deduction")), null));
+        int runId = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Automatic unpaid finalization")).run().id();
+
+        PayrollContracts.PayrollRunItem calculated = service.calculatePayrollRun(runId).run();
+
+        assertThat(calculated.totalGross()).isEqualTo(2090000d);
+        assertThat(calculated.totalDeductions()).isEqualTo(85000d);
+        assertThat(calculated.totalNet()).isEqualTo(2005000d);
+        assertThat(jdbc.queryForObject("select taxable_income from pay_payroll_run_employees where run_id=?", Double.class, runId)).isEqualTo(2090000d);
+        assertThat(jdbc.queryForObject("select decision_code from pay_payroll_run_target_events where run_id=? and source_type='tim_leave' and source_id=?", String.class, runId, automaticId)).isEqualTo("apply");
+        assertThat(jdbc.queryForObject("select decision_code from pay_payroll_run_target_events where run_id=? and source_type='tim_leave' and source_id=?", String.class, runId, legacyId)).isEqualTo("review");
+        assertThat(service.calculatePayrollRun(runId).run().totalNet()).isEqualTo(2005000d);
+        assertThat(jdbc.queryForObject("select count(*) from pay_payroll_run_items where item_code='TIM_UNPAID'", Integer.class)).isOne();
+        service.closePayrollRun(runId);
+        int accrual = jdbc.queryForObject("select id from pay_vouchers where run_id=? and voucher_type='accrual'", Integer.class, runId);
+        service.confirmVoucher(accrual, 1);
+        service.markPayrollRunPaid(runId);
+        int disbursement = service.generateDisbursementVoucher(runId, 1).voucher().id();
+        service.confirmVoucher(disbursement, 1);
+        assertThat(jdbc.queryForObject("select count(*) from pay_vouchers where run_id=? and status='confirmed' and total_debit=total_credit", Integer.class, runId)).isEqualTo(2);
+        assertThat(service.myPayslipDetail(1, runId).summary().netPay()).isEqualTo(2005000d);
+        assertThat(service.myPayslipDetail(1, runId).items()).anySatisfy(item -> {
+            assertThat(item.itemCode()).isEqualTo("TIM_UNPAID");
+            assertThat(item.amount()).isEqualTo(80000d);
+            assertThat(item.sourceType()).isEqualTo("tim_leave");
+        });
+        assertThatThrownBy(() -> service.calculatePayrollRun(runId)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    void cancellationRemovesAutomaticDeductionAndManualInputsCannotDuplicateItsReservedCode() {
+        int codeId = createAutomaticUnpaidSetup(2090000d);
+        int leaveId = insertLeave("unpaid", "approved", "2026-01-05", "{\"2026-01\":480}");
+        int runId = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Cancellation")).run().id();
+        assertThat(service.calculatePayrollRun(runId).run().totalDeductions()).isEqualTo(80000d);
+        jdbc.update("update tim_leave_requests set request_status='cancelled' where id=?", leaveId);
+
+        assertThat(service.calculatePayrollRun(runId).run().totalDeductions()).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from pay_payroll_run_items where item_code='TIM_UNPAID'", Integer.class)).isZero();
+        assertThatThrownBy(() -> service.saveVariableInputs(new PayrollContracts.VariableInputBatchRequest(List.of(
+                new PayrollContracts.VariableInputBatchItem(null, "2026-01", 1, "TIM_UNPAID", "deduction", 80000d, "Must reject manual duplication")), null)))
+                .isInstanceOf(ApiException.class).satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(400));
+        assertThat(jdbc.queryForObject("select count(*) from pay_variable_inputs", Integer.class)).isZero();
+        jdbc.update("insert into pay_variable_inputs(year_month,employee_id,item_code,direction,amount,created_at,updated_at) values ('2026-01',1,'TIM_UNPAID','deduction',80000,now(),now())");
+        assertThatThrownBy(() -> service.calculatePayrollRun(runId)).isInstanceOf(ApiException.class)
+                .satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(409));
+        assertThatThrownBy(() -> service.closePayrollRun(runId)).isInstanceOf(ApiException.class)
+                .satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(409));
+        assertThat(jdbc.queryForObject("select total_deductions from pay_payroll_runs where id=?", Double.class, runId)).isZero();
+        assertThat(jdbc.queryForObject("select status from pay_payroll_runs where id=?", String.class, runId)).isEqualTo("calculated");
+    }
+
+    @Test
+    void closingRefreshesAutomaticAmountsAfterApprovalOrCancellationFollowingCalculation() {
+        int codeId = createAutomaticUnpaidSetup(2090000d);
+        int january = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Approval after calculation")).run().id();
+        service.calculatePayrollRun(january);
+        insertLeave("unpaid", "approved", "2026-01-05", "{\"2026-01\":480}");
+        assertThat(service.closePayrollRun(january).run().totalDeductions()).isEqualTo(80000d);
+
+        int leaveId = insertLeave("unpaid", "approved", "2026-02-02", "{\"2026-02\":480}");
+        int february = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-02", codeId, "Cancellation after calculation")).run().id();
+        assertThat(service.calculatePayrollRun(february).run().totalDeductions()).isEqualTo(80000d);
+        jdbc.update("update tim_leave_requests set request_status='cancelled' where id=?", leaveId);
+        assertThat(service.closePayrollRun(february).run().totalDeductions()).isZero();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"209,30,0", "627,30,2", "2090,30,5"})
+    void automaticUnpaidRoundsTheMonthlyAmountWithHalfEven(double salary, int minutes, double expected) {
+        int codeId = createAutomaticUnpaidSetup(salary);
+        insertLeave("unpaid", "approved", "2026-01-05", "{\"2026-01\":" + minutes + "}");
+        int runId = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Unpaid rounding")).run().id();
+
+        assertThat(service.calculatePayrollRun(runId).run().totalDeductions()).isEqualTo(expected);
+    }
+
+    @Test
+    void payrollCloseWaitsForTheExactTimeMonthAdvisoryLock() throws Exception {
+        int codeId = createAutomaticUnpaidSetup(2090000d);
+        int runId = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Shared month lock")).run().id();
+        service.calculatePayrollRun(runId);
+        try (var executor = Executors.newSingleThreadExecutor();
+             var holder = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            holder.setAutoCommit(false);
+            int holderPid;
+            try (var statement = holder.createStatement(); var pid = statement.executeQuery("select pg_backend_pid()")) {
+                pid.next(); holderPid = pid.getInt(1);
+            }
+            try (var statement = holder.createStatement()) {
+                statement.execute("select pg_advisory_xact_lock(hashtextextended('tim:month-close:2026:1', 0))");
+            }
+            Future<PayrollContracts.PayrollRunActionResponse> close = executor.submit(() -> service.closePayrollRun(runId));
+            boolean waiting = false;
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            try {
+                do {
+                    waiting = Boolean.TRUE.equals(jdbc.queryForObject("""
+                            select exists(select 1 from pg_locks waiter join pg_locks blocker
+                              on waiter.database=blocker.database and waiter.classid=blocker.classid
+                             and waiter.objid=blocker.objid and waiter.objsubid=blocker.objsubid
+                             where blocker.pid=? and blocker.locktype='advisory' and blocker.granted
+                               and waiter.locktype='advisory' and not waiter.granted)
+                            """, Boolean.class, holderPid));
+                    if (waiting || close.isDone()) break;
+                    Thread.sleep(25);
+                } while (System.nanoTime() < deadline);
+                assertThat(waiting).as("payroll must wait on the same 64-bit month lock as Time").isTrue();
+                assertThat(close.isDone()).isFalse();
+            } finally {
+                holder.rollback();
+            }
+            assertThat(close.get(10, TimeUnit.SECONDS).run().status()).isEqualTo("closed");
+        }
+    }
+
+    private int createAutomaticUnpaidSetup(double salary) {
+        int codeId = createPayrollCode();
+        createProfile(codeId);
+        jdbc.update("update pay_employee_profiles set base_salary=? where employee_id=1", salary);
+        createVoucherSetup();
+        service.saveGlAccounts(new PayrollContracts.GlAccountBatchRequest(List.of(
+                new PayrollContracts.GlAccountBatchItem(null, "1100", "Test cash", "asset", false, true, true, 3)), null));
+        service.saveAllowanceDeductions(new PayrollContracts.AllowanceDeductionBatchRequest(List.of(
+                new PayrollContracts.AllowanceDeductionBatchItem(null, "TIM_UNPAID", "무급휴가공제", "deduction", "tax", "hourly", true, 900)), null));
+        service.saveGlMappings(new PayrollContracts.GlMappingBatchRequest(List.of(
+                new PayrollContracts.GlMappingBatchItem(null, "TIM_UNPAID", "5100", LocalDate.of(2020, 1, 1), null, true)), null));
+        return codeId;
+    }
+
+    private int insertLeave(String type, String status, String date, String snapshot) {
+        return jdbc.queryForObject("""
+                insert into tim_leave_requests(employee_id,leave_type,start_date,end_date,reason,request_status,payroll_minutes_snapshot)
+                values (1,?,cast(? as date),cast(? as date),'Synthetic approval',?,cast(? as jsonb)) returning id
+                """, Integer.class, type, date, date, status, snapshot);
+    }
+
     private int createPayrollCode() {
         return service.savePayrollCodes(new PayrollContracts.PayrollCodeBatchRequest(
                 List.of(new PayrollContracts.PayrollCodeBatchItem(null, "REG", "Regular", "regular", "25", null, null, null)), null))
@@ -384,7 +537,7 @@ class PayrollPostgreSqlIntegrationTest {
                 "create table hr_employee_basic_profiles(employee_id integer primary key, retire_date date, foreign key(employee_id) references hr_employees(id))",
                 "create table hr_appointment_orders(id integer generated by default as identity primary key, appointment_no varchar(30) not null, title varchar(120) not null, effective_date date not null, status varchar(20) not null)",
                 "create table hr_appointment_order_items(id integer generated by default as identity primary key, order_id integer not null, employee_id integer not null, appointment_kind varchar(20) not null, action_type varchar(30) not null, start_date date not null, end_date date, from_department_id integer, to_department_id integer, from_position_title varchar(80), to_position_title varchar(80), from_employment_status varchar(20), to_employment_status varchar(20), temporary_reason varchar(500), note varchar(500), foreign key(order_id) references hr_appointment_orders(id), foreign key(employee_id) references hr_employees(id))",
-                "create table tim_leave_requests(id integer generated by default as identity primary key, employee_id integer not null, leave_type varchar(20) not null, start_date date not null, end_date date not null, reason varchar(500), request_status varchar(20) not null, approved_at timestamp, decision_comment varchar(500), foreign key(employee_id) references hr_employees(id))",
+                "create table tim_leave_requests(id integer generated by default as identity primary key, employee_id integer not null, leave_type varchar(20) not null, start_date date not null, end_date date not null, reason varchar(500), request_status varchar(20) not null, approved_at timestamp, decision_comment varchar(500), payroll_minutes_snapshot jsonb, foreign key(employee_id) references hr_employees(id))",
                 "create table wel_benefit_types(id integer generated by default as identity primary key, code varchar(40) not null unique, name varchar(100) not null, is_deduction boolean not null, pay_item_code varchar(60), is_active boolean not null)",
                 "create table wel_benefit_requests(id integer generated by default as identity primary key, request_no varchar(40) not null unique, benefit_type_code varchar(40) not null, benefit_type_name varchar(100) not null, employee_no varchar(40) not null, status_code varchar(30) not null, requested_amount bigint not null, approved_amount bigint, payroll_run_label varchar(120), description varchar(500), requested_at timestamp not null, approved_at timestamp, created_at timestamp not null, updated_at timestamp not null)",
                 "create table pay_payroll_codes(id integer generated by default as identity primary key, code varchar(20) not null, name varchar(100) not null, pay_type varchar(20) not null, payment_day varchar(20) not null, tax_deductible boolean not null, social_ins_deductible boolean not null, is_active boolean not null, created_at timestamp not null, updated_at timestamp not null, constraint uq_pay_payroll_codes_code unique(code))",

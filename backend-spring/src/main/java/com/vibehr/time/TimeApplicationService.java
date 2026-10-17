@@ -204,6 +204,7 @@ class TimeApplicationService {
         validateRange(request.dateFrom(), request.dateTo());
         if ("department".equals(request.target()) && request.departmentId() == null) throw ApiException.badRequest("부서 대상을 지정해야 합니다.");
         if ("employee".equals(request.target()) && (request.employeeIds() == null || request.employeeIds().isEmpty())) throw ApiException.badRequest("사원 대상을 지정해야 합니다.");
+        lockMonths(request.dateFrom(), request.dateTo());
         advisoryLock("tim:schedule:" + request.dateFrom() + ':' + request.dateTo());
         List<EmployeeReference> employees = employees(request);
         List<TimHoliday> holidays = entityManager.createQuery("from TimHoliday where holiday_date between :from and :to and is_active = true", TimHoliday.class)
@@ -280,11 +281,16 @@ class TimeApplicationService {
     TimAttendanceDailyItem checkIn(int employeeId) {
         LocalDate workDate = today();
         Instant current = now();
+        lockMonths(workDate, workDate);
         advisoryLock("tim:attendance:" + employeeId + ':' + workDate);
         TimEmployeeDailySchedule schedule = dailySchedule(employeeId, workDate);
         Instant plannedStart = schedule == null ? null : TimeFormula.normalizeNaivePlannedKst(schedule.planned_start_at);
         boolean late = plannedStart != null && current.isAfter(plannedStart);
         TimAttendanceDaily row = attendance(employeeId, workDate, LockModeType.PESSIMISTIC_WRITE);
+        if (row != null && row.approved_leave_request_id != null) {
+            assertNoFinalizedPayroll(employeeId, workDate, workDate);
+            assertNotFullDayLeave(row);
+        }
         boolean created = row == null;
         if (row == null) {
             row = new TimAttendanceDaily(); row.employee_id = employeeId; row.work_date = workDate;
@@ -293,6 +299,7 @@ class TimeApplicationService {
             throw ApiException.conflict("오늘 이미 출근 처리되었습니다.");
         }
         row.check_in_at = current; row.attendance_status = late ? "late" : "present"; row.updated_at = current;
+        if (row.approved_leave_request_id != null) row.leave_base_status = row.attendance_status;
         calculate(row);
         if (created) entityManager.persist(row);
         entityManager.flush();
@@ -303,8 +310,13 @@ class TimeApplicationService {
     TimAttendanceDailyItem checkOut(int employeeId) {
         LocalDate workDate = today();
         Instant current = now();
+        lockMonths(workDate, workDate);
         advisoryLock("tim:attendance:" + employeeId + ':' + workDate);
         TimAttendanceDaily row = attendance(employeeId, workDate, LockModeType.PESSIMISTIC_WRITE);
+        if (row != null && row.approved_leave_request_id != null) {
+            assertNoFinalizedPayroll(employeeId, workDate, workDate);
+            assertNotFullDayLeave(row);
+        }
         if (row == null || row.check_in_at == null) throw ApiException.badRequest("출근 기록이 없어 퇴근 처리할 수 없습니다.");
         if (row.check_out_at != null) throw ApiException.conflict("오늘 이미 퇴근 처리되었습니다.");
         row.check_out_at = current; row.updated_at = current; calculate(row);
@@ -314,15 +326,27 @@ class TimeApplicationService {
 
     @Transactional
     TimAttendanceDailyItem correctAttendance(int attendanceId, int actorEmployeeId, TimAttendanceCorrectRequest request) {
-        TimAttendanceDaily row = entityManager.find(TimAttendanceDaily.class, attendanceId, LockModeType.PESSIMISTIC_WRITE);
+        TimAttendanceDaily row = entityManager.find(TimAttendanceDaily.class, attendanceId);
+        if (row == null) throw ApiException.notFound("근태 기록을 찾을 수 없습니다.");
+        LocalDate workDate = row.work_date;
+        entityManager.detach(row);
+        lockMonths(workDate, workDate);
+        row = entityManager.find(TimAttendanceDaily.class, attendanceId, LockModeType.PESSIMISTIC_WRITE);
         if (row == null) throw ApiException.notFound("근태 기록을 찾을 수 없습니다.");
         assertMonthOpen(row.work_date.getYear(), row.work_date.getMonthValue());
+        assertNoFinalizedPayroll(row.employee_id, row.work_date, row.work_date);
+        String leaveType = approvedLeaveType(row);
+        if (leaveType != null && !"half_day".equals(leaveType)
+                && (!"leave".equals(request.newStatus()) || request.newCheckInAt() != null || request.newCheckOutAt() != null)) {
+            throw ApiException.conflict("승인된 전일 휴가를 취소한 뒤 근태를 교정해야 합니다.");
+        }
         TimAttendanceCorrection correction = new TimAttendanceCorrection();
         correction.attendance_id = attendanceId; correction.corrected_by_employee_id = actorEmployeeId; correction.old_status = row.attendance_status;
         correction.new_status = request.newStatus(); correction.old_check_in_at = row.check_in_at; correction.new_check_in_at = request.newCheckInAt();
         correction.old_check_out_at = row.check_out_at; correction.new_check_out_at = request.newCheckOutAt(); correction.reason = request.reason(); correction.corrected_at = now();
         entityManager.persist(correction);
         row.attendance_status = request.newStatus(); row.check_in_at = request.newCheckInAt(); row.check_out_at = request.newCheckOutAt(); row.updated_at = now();
+        if ("half_day".equals(leaveType)) row.leave_base_status = request.newStatus();
         calculate(row);
         return attendanceItem(row);
     }
@@ -355,13 +379,15 @@ class TimeApplicationService {
     @Transactional
     TimLeaveRequestItem createLeave(int employeeId, TimLeaveRequestCreateRequest request) {
         validateRange(request.startDate(), request.endDate());
-        validateHalfDay(request.leaveType(), request.startDate(), request.endDate());
+        lockMonths(request.startDate(), request.endDate());
         assertOpenMonths(request.startDate(), request.endDate());
+        List<LeaveWorkday> workdays = leaveWorkdays(employeeId, request.startDate(), request.endDate());
+        validateHalfDay(request.leaveType(), request.startDate(), request.endDate(), workdays);
         advisoryLock("tim:leave:" + employeeId);
         boolean overlap = !entityManager.createQuery("from TimLeaveRequest where employee_id = :employeeId and request_status in ('pending', 'approved') and start_date <= :end and end_date >= :start", TimLeaveRequest.class)
                 .setParameter("employeeId", employeeId).setParameter("start", request.startDate()).setParameter("end", request.endDate()).setMaxResults(1).getResultList().isEmpty();
         if (overlap) throw ApiException.conflict("중복 기간 휴가 요청이 존재합니다.");
-        validateAnnualLeaveBalance(annualLeaveCharges(employeeId, annualLeaveDeductions(request.leaveType(), request.startDate(), request.endDate())));
+        validateAnnualLeaveBalance(annualLeaveCharges(employeeId, annualLeaveDeductions(request.leaveType(), workdays)));
         TimLeaveRequest row = new TimLeaveRequest(); row.employee_id = employeeId; row.leave_type = request.leaveType(); row.start_date = request.startDate();
         row.end_date = request.endDate(); row.reason = request.reason(); row.request_status = "pending"; row.created_at = now(); row.updated_at = row.created_at;
         entityManager.persist(row); entityManager.flush();
@@ -376,13 +402,15 @@ class TimeApplicationService {
 
     @Transactional
     TimLeaveRequestItem decideLeave(int requestId, int approverEmployeeId, boolean approve, TimLeaveDecisionRequest request) {
-        TimLeaveRequest row = entityManager.find(TimLeaveRequest.class, requestId, LockModeType.PESSIMISTIC_WRITE);
-        if (row == null) throw ApiException.notFound("휴가 요청을 찾을 수 없습니다.");
+        TimLeaveRequest row = lockLeaveRequest(requestId);
         assertOpenMonths(row.start_date, row.end_date);
         if (!"pending".equals(row.request_status)) throw ApiException.badRequest("대기 상태의 요청만 처리할 수 있습니다.");
         if (approve) {
-            validateHalfDay(row.leave_type, row.start_date, row.end_date);
-            Map<Integer, Double> deductions = annualLeaveDeductions(row.leave_type, row.start_date, row.end_date);
+            assertNoFinalizedPayroll(row.employee_id, row.start_date, row.end_date);
+            List<LeaveWorkday> workdays = leaveWorkdays(row.employee_id, row.start_date, row.end_date);
+            validateHalfDay(row.leave_type, row.start_date, row.end_date, workdays);
+            List<LeaveAttendanceTarget> attendanceTargets = leaveAttendanceTargets(row, workdays);
+            Map<Integer, Double> deductions = annualLeaveDeductions(row.leave_type, workdays);
             List<AnnualLeaveCharge> charges = annualLeaveCharges(row.employee_id, deductions);
             validateAnnualLeaveBalance(charges);
             for (AnnualLeaveCharge charge : charges) {
@@ -392,6 +420,13 @@ class TimeApplicationService {
                 row.annual_charge_breakdown = new LinkedHashMap<>();
                 deductions.forEach((year, days) -> row.annual_charge_breakdown.put(year.toString(), days));
             }
+            if ("unpaid".equals(row.leave_type)) {
+                row.payroll_minutes_snapshot = new TreeMap<>();
+                for (LeaveWorkday day : workdays) {
+                    row.payroll_minutes_snapshot.merge(YearMonth.from(day.date()).toString(), day.minutes(), Integer::sum);
+                }
+            }
+            applyLeaveAttendance(row, attendanceTargets);
         }
         row.request_status = approve ? "approved" : "rejected"; row.approver_employee_id = approverEmployeeId; row.approved_at = now();
         row.decided_by = approverEmployeeId; row.decided_at = now(); row.decision_comment = request.reason(); row.updated_at = now();
@@ -401,12 +436,12 @@ class TimeApplicationService {
 
     @Transactional
     TimLeaveRequestItem cancelLeave(int requestId, int actorEmployeeId, TimLeaveDecisionRequest request) {
-        TimLeaveRequest row = entityManager.find(TimLeaveRequest.class, requestId, LockModeType.PESSIMISTIC_WRITE);
-        if (row == null) throw ApiException.notFound("휴가 요청을 찾을 수 없습니다.");
+        TimLeaveRequest row = lockLeaveRequest(requestId);
         if (row.employee_id != actorEmployeeId) throw ApiException.forbidden("본인 휴가 요청만 취소할 수 있습니다.");
         assertOpenMonths(row.start_date, row.end_date);
         if ("cancelled".equals(row.request_status) || "rejected".equals(row.request_status)) throw ApiException.conflict("취소할 수 없는 휴가 상태입니다.");
         if ("approved".equals(row.request_status)) {
+            assertNoFinalizedPayroll(row.employee_id, row.start_date, row.end_date);
             Map<Integer, Double> deductions = new TreeMap<>();
             if (row.annual_charge_breakdown != null) {
                 row.annual_charge_breakdown.forEach((year, days) -> deductions.put(Integer.parseInt(year), days));
@@ -416,6 +451,7 @@ class TimeApplicationService {
             for (AnnualLeaveCharge charge : annualLeaveCharges(row.employee_id, deductions)) {
                 charge.annual().used_days -= charge.days(); charge.annual().remaining_days += charge.days(); charge.annual().updated_at = now();
             }
+            restoreLeaveAttendance(row.id);
         }
         row.request_status = "cancelled"; row.decision_comment = request.reason(); row.decided_by = actorEmployeeId; row.decided_at = now(); row.updated_at = now();
         entityManager.flush();
@@ -445,6 +481,7 @@ class TimeApplicationService {
         if (row == null) { row = new TimMonthClose(); row.year = request.year(); row.month = request.month(); row.created_at = now(); }
         row.close_status = "closed"; row.employee_count = totals.employeeCount(); row.present_days = totals.presentDays(); row.late_days = totals.lateDays();
         row.absent_days = totals.absentDays(); row.leave_days = totals.leaveDays(); row.total_overtime_minutes = totals.overtimeMinutes();
+        row.half_day_count = totals.halfDayCount();
         row.total_night_minutes = totals.nightMinutes(); row.total_holiday_work_minutes = totals.holidayWorkMinutes();
         row.total_holiday_overtime_minutes = totals.holidayOvertimeMinutes(); row.total_holiday_night_minutes = totals.holidayNightMinutes();
         row.closed_by = userId; row.closed_at = now(); row.note = request.note(); row.updated_at = now();
@@ -478,13 +515,23 @@ class TimeApplicationService {
     private TimAttendanceCodeItem attendanceCodeItem(TimAttendanceCode row) { return new TimAttendanceCodeItem(row.id, row.code, row.name, row.category, row.unit, row.is_requestable, row.min_days, row.max_days, row.deduct_annual, row.is_active, row.sort_order, row.description, row.created_at, row.updated_at); }
     private TimWorkScheduleCodeItem workScheduleCodeItem(TimWorkScheduleCode row) { return new TimWorkScheduleCodeItem(row.id, row.code, row.name, row.work_start, row.work_end, row.break_minutes, row.is_overnight, row.work_hours, row.is_active, row.sort_order, row.description, row.created_at, row.updated_at); }
     private TimHolidayItem holidayItem(TimHoliday row) { return new TimHolidayItem(row.id, row.holiday_date, row.name, row.holiday_type, row.is_active, row.created_at, row.updated_at); }
-    private TimAttendanceDailyItem attendanceItem(AttendanceGridRow row) { return new TimAttendanceDailyItem(row.id(), row.employeeId(), row.employeeNo(), row.employeeName(), row.departmentId(), row.departmentName(), row.workDate(), row.checkInAt(), row.checkOutAt(), workedMinutes(row.checkInAt(), row.checkOutAt()), row.attendanceStatus(), row.actualMinutes(), row.regularMinutes(), row.overtimeMinutes(), row.nightMinutes(), row.holidayWorkMinutes(), row.holidayOvertimeMinutes(), row.holidayNightMinutes(), row.holidayWork()); }
-    private TimAttendanceDailyItem attendanceItem(TimAttendanceDaily row) { EmployeeDetail employee = employeeDetail(row.employee_id); return new TimAttendanceDailyItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentId(), employee.departmentName(), row.work_date, row.check_in_at, row.check_out_at, workedMinutes(row.check_in_at, row.check_out_at), row.attendance_status, row.actual_minutes, row.regular_minutes, row.overtime_minutes, row.night_minutes, row.holiday_work_minutes, row.holiday_overtime_minutes, row.holiday_night_minutes, row.is_holiday_work); }
+    private TimAttendanceDailyItem attendanceItem(AttendanceGridRow row) { return new TimAttendanceDailyItem(row.id(), row.employeeId(), row.employeeNo(), row.employeeName(), row.departmentId(), row.departmentName(), row.workDate(), row.checkInAt(), row.checkOutAt(), workedMinutes(row.checkInAt(), row.checkOutAt()), row.attendanceStatus(), row.actualMinutes(), row.regularMinutes(), row.overtimeMinutes(), row.nightMinutes(), row.holidayWorkMinutes(), row.holidayOvertimeMinutes(), row.holidayNightMinutes(), row.holidayWork(), row.approvedLeaveType()); }
+    private TimAttendanceDailyItem attendanceItem(TimAttendanceDaily row) { EmployeeDetail employee = employeeDetail(row.employee_id); return new TimAttendanceDailyItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentId(), employee.departmentName(), row.work_date, row.check_in_at, row.check_out_at, workedMinutes(row.check_in_at, row.check_out_at), row.attendance_status, row.actual_minutes, row.regular_minutes, row.overtime_minutes, row.night_minutes, row.holiday_work_minutes, row.holiday_overtime_minutes, row.holiday_night_minutes, row.is_holiday_work, approvedLeaveType(row)); }
+    private String approvedLeaveType(TimAttendanceDaily row) { TimLeaveRequest leave = row.approved_leave_request_id == null ? null : leaveRow(row.approved_leave_request_id); return leave != null && "approved".equals(leave.request_status) ? leave.leave_type : null; }
     private TimAttendanceCorrectionItem correctionItem(TimAttendanceCorrection row) { return new TimAttendanceCorrectionItem(row.id, row.attendance_id, row.corrected_by_employee_id, row.old_status, row.new_status, row.old_check_in_at, row.new_check_in_at, row.old_check_out_at, row.new_check_out_at, row.reason, row.corrected_at); }
     private TimAnnualLeaveItem annualLeaveItem(TimAnnualLeave row) { EmployeeDetail employee = employeeDetail(row.employee_id); return new TimAnnualLeaveItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentName(), row.year, row.granted_days, row.used_days, row.carried_over_days, row.remaining_days, row.grant_type, row.note); }
     private TimAnnualLeaveItem annualLeaveItem(AnnualLeaveGridRow row) { return new TimAnnualLeaveItem(row.id(), row.employeeId(), row.employeeNo(), row.employeeName(), row.departmentName(), row.year(), row.grantedDays(), row.usedDays(), row.carriedOverDays(), row.remainingDays(), row.grantType(), row.note()); }
-    private TimLeaveRequestItem leaveRequestItem(LeaveRequestGridRow row) { double calendar = java.time.temporal.ChronoUnit.DAYS.between(row.startDate(), row.endDate()) + 1; double deduction = row.annualDeductionDays() == null ? leaveDays(row.leaveType(), row.startDate(), row.endDate()) : row.annualDeductionDays(); return new TimLeaveRequestItem(row.id(), row.employeeId(), row.employeeNo(), row.employeeName(), row.departmentName(), row.leaveType(), row.startDate(), row.endDate(), calendar, deduction, deduction, row.reason(), row.requestStatus(), row.approverEmployeeId(), row.approvedAt(), row.decisionComment(), row.decidedBy(), row.decidedAt(), row.createdAt()); }
-    private TimLeaveRequestItem leaveRequestItem(TimLeaveRequest row) { EmployeeDetail employee = employeeDetail(row.employee_id); double calendar = java.time.temporal.ChronoUnit.DAYS.between(row.start_date, row.end_date) + 1; double deduction = row.annual_charge_breakdown == null ? leaveDays(row.leave_type, row.start_date, row.end_date) : row.annual_charge_breakdown.values().stream().mapToDouble(Double::doubleValue).sum(); return new TimLeaveRequestItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentName(), row.leave_type, row.start_date, row.end_date, calendar, deduction, deduction, row.reason, row.request_status, row.approver_employee_id, row.approved_at, row.decision_comment, row.decided_by, row.decided_at, row.created_at); }
+    private TimLeaveRequestItem leaveRequestItem(LeaveRequestGridRow row) { double calendar = java.time.temporal.ChronoUnit.DAYS.between(row.startDate(), row.endDate()) + 1; double deduction = row.approvedLeaveDays() == null ? leaveDays(row.leaveType(), row.startDate(), row.endDate()) : row.approvedLeaveDays(); return new TimLeaveRequestItem(row.id(), row.employeeId(), row.employeeNo(), row.employeeName(), row.departmentName(), row.leaveType(), row.startDate(), row.endDate(), calendar, deduction, deduction, row.reason(), row.requestStatus(), row.approverEmployeeId(), row.approvedAt(), row.decisionComment(), row.decidedBy(), row.decidedAt(), row.createdAt()); }
+    private TimLeaveRequestItem leaveRequestItem(TimLeaveRequest row) { EmployeeDetail employee = employeeDetail(row.employee_id); double calendar = java.time.temporal.ChronoUnit.DAYS.between(row.start_date, row.end_date) + 1; double deduction = approvedLeaveDays(row); return new TimLeaveRequestItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentName(), row.leave_type, row.start_date, row.end_date, calendar, deduction, deduction, row.reason, row.request_status, row.approver_employee_id, row.approved_at, row.decision_comment, row.decided_by, row.decided_at, row.created_at); }
+
+    private double approvedLeaveDays(TimLeaveRequest row) {
+        if (row.annual_charge_breakdown != null) return row.annual_charge_breakdown.values().stream().mapToDouble(Double::doubleValue).sum();
+        if ("unpaid".equals(row.leave_type) && "approved".equals(row.request_status) && row.payroll_minutes_snapshot != null) {
+            return entityManager.createQuery("select count(a) from TimAttendanceDaily a where approved_leave_request_id = :requestId", Long.class)
+                    .setParameter("requestId", row.id).getSingleResult().doubleValue();
+        }
+        return leaveDays(row.leave_type, row.start_date, row.end_date);
+    }
 
     private TimDepartmentScheduleAssignmentItem departmentAssignmentItem(TimDepartmentScheduleAssignment row) { DepartmentDetail department = departmentDetail(row.department_id); TimSchedulePattern pattern = entityManager.find(TimSchedulePattern.class, row.pattern_id); return new TimDepartmentScheduleAssignmentItem(row.id, row.department_id, department.code(), department.name(), department.organizationType(), department.costCenterCode(), department.employeeCount(), row.pattern_id, pattern == null ? null : pattern.code, pattern == null ? null : pattern.name, row.effective_from, row.effective_to, row.priority, row.is_active); }
     private TimEmployeeScheduleExceptionItem employeeExceptionItem(TimEmployeeScheduleException row) { EmployeeDetail employee = employeeDetail(row.employee_id); TimSchedulePattern pattern = entityManager.find(TimSchedulePattern.class, row.pattern_id); return new TimEmployeeScheduleExceptionItem(row.id, row.employee_id, employee.employeeNo(), employee.name(), employee.departmentId(), employee.departmentCode(), employee.departmentName(), row.pattern_id, pattern == null ? null : pattern.code, pattern == null ? null : pattern.name, row.effective_from, row.effective_to, row.reason, row.priority, row.is_active); }
@@ -587,25 +634,109 @@ class TimeApplicationService {
     }
 
     private double defaultGrantedDays(LocalDate hireDate, int year) { return Period.between(hireDate, LocalDate.of(year, 12, 31)).getYears() < 1 ? 11.0 : 15.0; }
-    private void validateHalfDay(String type, LocalDate start, LocalDate end) {
-        if ("half_day".equals(type) && (!start.equals(end) || workingDays(start, end) != 1)) {
+    private void validateHalfDay(String type, LocalDate start, LocalDate end, List<LeaveWorkday> workdays) {
+        if ("half_day".equals(type) && (!start.equals(end) || start.getDayOfWeek().getValue() >= 6 || workdays.size() != 1)) {
             throw ApiException.badRequest("반차는 근무일 하루에만 신청할 수 있습니다.");
         }
     }
     private double leaveDays(String type, LocalDate start, LocalDate end) { return "half_day".equals(type) ? 0.5 : workingDays(start, end); }
-    private Map<Integer, Double> annualLeaveDeductions(String type, LocalDate start, LocalDate end) {
+    private Map<Integer, Double> annualLeaveDeductions(String type, List<LeaveWorkday> workdays) {
         Map<Integer, Double> deductions = new TreeMap<>();
-        if ("half_day".equals(type)) {
-            deductions.put(start.getYear(), 0.5);
-        } else if ("annual".equals(type)) {
-            for (int year = start.getYear(); year <= end.getYear(); year++) {
-                LocalDate from = year == start.getYear() ? start : LocalDate.of(year, 1, 1);
-                LocalDate to = year == end.getYear() ? end : LocalDate.of(year, 12, 31);
-                double days = workingDays(from, to);
-                if (days > 0) deductions.put(year, days);
-            }
+        if ("half_day".equals(type) || "annual".equals(type)) {
+            for (LeaveWorkday day : workdays) deductions.merge(day.date().getYear(), "half_day".equals(type) ? 0.5 : 1.0, Double::sum);
         }
         return deductions;
+    }
+
+    private List<LeaveWorkday> leaveWorkdays(int employeeId, LocalDate start, LocalDate end) {
+        List<LeaveWorkday> result = new ArrayList<>();
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+            TimEmployeeDailySchedule schedule = dailySchedule(employeeId, date);
+            boolean workday = schedule == null ? date.getDayOfWeek().getValue() < 6 && holiday(date) == null
+                    : schedule.is_workday && !schedule.is_holiday;
+            if (workday) result.add(new LeaveWorkday(date, schedule == null ? 480 : Math.max(0, schedule.expected_minutes)));
+        }
+        return result;
+    }
+
+    private List<LeaveAttendanceTarget> leaveAttendanceTargets(TimLeaveRequest leave, List<LeaveWorkday> workdays) {
+        List<LeaveAttendanceTarget> result = new ArrayList<>();
+        for (LeaveWorkday day : workdays) {
+            advisoryLock("tim:attendance:" + leave.employee_id + ':' + day.date());
+            TimAttendanceDaily row = attendance(leave.employee_id, day.date(), LockModeType.PESSIMISTIC_WRITE);
+            if (row != null && (row.approved_leave_request_id != null
+                    || (!"half_day".equals(leave.leave_type) && (row.check_in_at != null || row.check_out_at != null)))) {
+                throw ApiException.conflict("휴가 기간에 출퇴근 기록 또는 다른 승인 휴가가 있습니다. 근태와 휴가를 확인해 주세요.");
+            }
+            result.add(new LeaveAttendanceTarget(day.date(), row));
+        }
+        return result;
+    }
+
+    private void applyLeaveAttendance(TimLeaveRequest leave, List<LeaveAttendanceTarget> targets) {
+        for (LeaveAttendanceTarget target : targets) {
+            TimAttendanceDaily row = target.attendance();
+            boolean created = row == null;
+            if (created) {
+                row = new TimAttendanceDaily(); row.employee_id = leave.employee_id; row.work_date = target.date();
+                row.created_at = now(); row.leave_generated = true; row.leave_base_status = "absent";
+            } else row.leave_base_status = row.attendance_status;
+            row.approved_leave_request_id = leave.id;
+            if (created || !"half_day".equals(leave.leave_type)) row.attendance_status = "leave";
+            row.updated_at = now();
+            calculate(row);
+            if (created) entityManager.persist(row);
+        }
+    }
+
+    private void restoreLeaveAttendance(int requestId) {
+        List<TimAttendanceDaily> rows = entityManager.createQuery("from TimAttendanceDaily where approved_leave_request_id = :requestId order by work_date, id", TimAttendanceDaily.class)
+                .setParameter("requestId", requestId).setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();
+        for (TimAttendanceDaily row : rows) {
+            boolean corrected = row.leave_generated && entityManager.createQuery("select count(c) from TimAttendanceCorrection c where attendance_id = :id", Long.class)
+                    .setParameter("id", row.id).getSingleResult() > 0;
+            if (row.leave_generated && row.check_in_at == null && row.check_out_at == null && !corrected) {
+                entityManager.remove(row);
+            } else {
+                row.attendance_status = row.leave_base_status;
+                row.approved_leave_request_id = null; row.leave_base_status = null; row.leave_generated = false;
+                row.updated_at = now(); calculate(row);
+            }
+        }
+    }
+
+    private void assertNotFullDayLeave(TimAttendanceDaily row) {
+        String type = approvedLeaveType(row);
+        if (type != null && !"half_day".equals(type)) throw ApiException.conflict("승인된 전일 휴가를 취소한 뒤 출퇴근을 처리해야 합니다.");
+    }
+
+    private TimLeaveRequest lockLeaveRequest(int requestId) {
+        TimLeaveRequest row = entityManager.find(TimLeaveRequest.class, requestId);
+        if (row == null) throw ApiException.notFound("휴가 요청을 찾을 수 없습니다.");
+        LocalDate start = row.start_date; LocalDate end = row.end_date;
+        entityManager.detach(row);
+        lockMonths(start, end);
+        row = entityManager.find(TimLeaveRequest.class, requestId, LockModeType.PESSIMISTIC_WRITE);
+        if (row == null) throw ApiException.notFound("휴가 요청을 찾을 수 없습니다.");
+        return row;
+    }
+
+    private void lockMonths(LocalDate start, LocalDate end) {
+        for (YearMonth month = YearMonth.from(start); !month.isAfter(YearMonth.from(end)); month = month.plusMonths(1)) {
+            advisoryLock("tim:month-close:" + month.getYear() + ':' + month.getMonthValue());
+        }
+    }
+
+    private void assertNoFinalizedPayroll(int employeeId, LocalDate start, LocalDate end) {
+        boolean finalized = !entityManager.createNativeQuery("""
+                select r.id from pay_payroll_runs r
+                  join pay_payroll_run_targets t on t.run_id = r.id
+                 where t.employee_id = :employeeId and r.year_month between :firstMonth and :lastMonth
+                   and r.status in ('closed', 'paid')
+                 limit 1
+                """).setParameter("employeeId", employeeId).setParameter("firstMonth", YearMonth.from(start).toString())
+                .setParameter("lastMonth", YearMonth.from(end).toString()).getResultList().isEmpty();
+        if (finalized) throw ApiException.conflict("마감 또는 지급 완료된 급여가 있어 근태와 승인 휴가를 변경할 수 없습니다.");
     }
     private List<AnnualLeaveCharge> annualLeaveCharges(int employeeId, Map<Integer, Double> deductions) {
         List<AnnualLeaveCharge> charges = new ArrayList<>();
@@ -630,9 +761,9 @@ class TimeApplicationService {
     private List<EmployeeReference> employees(TimScheduleGenerateRequest request) { String sql = "select id, department_id from hr_employees"; if ("department".equals(request.target())) sql += " where department_id = :departmentId"; if ("employee".equals(request.target())) sql += " where id = any(:employeeIds)"; var query = entityManager.createNativeQuery(sql); if (request.departmentId() != null) query.setParameter("departmentId", request.departmentId()); if (request.employeeIds() != null) query.setParameter("employeeIds", request.employeeIds().toArray(Integer[]::new)); @SuppressWarnings("unchecked") List<Object[]> rows = query.getResultList(); return rows.stream().map(row -> new EmployeeReference(((Number) row[0]).intValue(), ((Number) row[1]).intValue())).toList(); }
     private EmployeeDetail employeeDetail(int employeeId) { @SuppressWarnings("unchecked") List<Object[]> rows = entityManager.createNativeQuery("select e.employee_no, u.display_name, e.department_id, d.code, d.name, e.hire_date from hr_employees e join auth_users u on u.id = e.user_id join org_departments d on d.id = e.department_id where e.id = :id").setParameter("id", employeeId).getResultList(); if (rows.isEmpty()) throw ApiException.notFound("사원 프로필을 찾을 수 없습니다."); Object[] row = rows.getFirst(); LocalDate hireDate = row[5] instanceof LocalDate date ? date : ((java.sql.Date) row[5]).toLocalDate(); return new EmployeeDetail((String) row[0], (String) row[1], ((Number) row[2]).intValue(), (String) row[3], (String) row[4], hireDate); }
     private DepartmentDetail departmentDetail(int departmentId) { @SuppressWarnings("unchecked") List<Object[]> rows = entityManager.createNativeQuery("select d.code, d.name, d.organization_type, d.cost_center_code, count(e.id) from org_departments d left join hr_employees e on e.department_id = d.id where d.id = :id group by d.code, d.name, d.organization_type, d.cost_center_code").setParameter("id", departmentId).getResultList(); if (rows.isEmpty()) return new DepartmentDetail("DEPT-" + departmentId, "미확인 조직", null, null, 0); Object[] row = rows.getFirst(); return new DepartmentDetail((String) row[0], (String) row[1], (String) row[2], (String) row[3], ((Number) row[4]).intValue()); }
-    private MonthTotals totals(int year, int month) { YearMonth value = YearMonth.of(year, month); List<TimAttendanceDaily> rows = entityManager.createQuery("from TimAttendanceDaily where work_date between :start and :end", TimAttendanceDaily.class).setParameter("start", value.atDay(1)).setParameter("end", value.atEndOfMonth()).getResultList(); List<Integer> employeeIds = rows.stream().map(row -> row.employee_id).distinct().toList(); return new MonthTotals(employeeIds.size(), sumStatus(rows, "present"), sumStatus(rows, "late"), sumStatus(rows, "absent"), sumStatus(rows, "leave"), rows.stream().mapToInt(row -> row.overtime_minutes).sum(), rows.stream().mapToInt(row -> row.night_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_work_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_overtime_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_night_minutes).sum()); }
+    private MonthTotals totals(int year, int month) { YearMonth value = YearMonth.of(year, month); List<TimAttendanceDaily> rows = entityManager.createQuery("from TimAttendanceDaily where work_date between :start and :end", TimAttendanceDaily.class).setParameter("start", value.atDay(1)).setParameter("end", value.atEndOfMonth()).getResultList(); List<Integer> employeeIds = rows.stream().map(row -> row.employee_id).distinct().toList(); int halfDays = (int) rows.stream().filter(row -> "half_day".equals(approvedLeaveType(row))).count(); int fullDays = (int) rows.stream().filter(row -> "leave".equals(row.attendance_status) && !"half_day".equals(approvedLeaveType(row))).count(); return new MonthTotals(employeeIds.size(), sumStatus(rows, "present"), sumStatus(rows, "late"), sumStatus(rows, "absent"), fullDays, halfDays, rows.stream().mapToInt(row -> row.overtime_minutes).sum(), rows.stream().mapToInt(row -> row.night_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_work_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_overtime_minutes).sum(), rows.stream().mapToInt(row -> row.holiday_night_minutes).sum()); }
     private int sumStatus(List<TimAttendanceDaily> rows, String status) { return (int) rows.stream().filter(row -> status.equals(row.attendance_status)).count(); }
-    private TimMonthCloseItem monthCloseItem(TimMonthClose row) { return new TimMonthCloseItem(row.id, row.year, row.month, row.close_status, row.employee_count, row.present_days, row.absent_days, row.late_days, row.leave_days, row.total_overtime_minutes, row.total_night_minutes, row.total_holiday_work_minutes, row.total_holiday_overtime_minutes, row.total_holiday_night_minutes, row.closed_by, displayName(row.closed_by), row.closed_at, row.reopened_by, displayName(row.reopened_by), row.reopened_at, row.note, row.created_at, row.updated_at); }
+    private TimMonthCloseItem monthCloseItem(TimMonthClose row) { return new TimMonthCloseItem(row.id, row.year, row.month, row.close_status, row.employee_count, row.present_days, row.absent_days, row.late_days, row.leave_days + row.half_day_count / 2.0, row.total_overtime_minutes, row.total_night_minutes, row.total_holiday_work_minutes, row.total_holiday_overtime_minutes, row.total_holiday_night_minutes, row.closed_by, displayName(row.closed_by), row.closed_at, row.reopened_by, displayName(row.reopened_by), row.reopened_at, row.note, row.created_at, row.updated_at); }
     private TimMonthCloseItem virtualOpen(int year, int month) { return new TimMonthCloseItem(null, year, month, "open", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, null, null, null, null, null, null, null, null, null); }
     private String displayName(Integer userId) { if (userId == null) return null; Object value = entityManager.createNativeQuery("select display_name from auth_users where id = :id").setParameter("id", userId).getResultStream().findFirst().orElse(null); return value == null ? null : value.toString(); }
     private void assertMonthOpen(int year, int month) { TimMonthClose row = monthClose(year, month, LockModeType.NONE); if (row != null && "closed".equals(row.close_status)) throw ApiException.locked(year + "년 " + month + "월은 마감된 기간입니다. 수정할 수 없습니다."); }
@@ -646,9 +777,11 @@ class TimeApplicationService {
     private LocalDate today() { return LocalDate.ofInstant(clock.instant(), TimeFormula.KST); }
 
     private record AssignmentResolution(Integer patternId, String source) { }
+    private record LeaveWorkday(LocalDate date, int minutes) { }
+    private record LeaveAttendanceTarget(LocalDate date, TimAttendanceDaily attendance) { }
     private record AnnualLeaveCharge(TimAnnualLeave annual, double days) { }
     private record EmployeeReference(int id, int departmentId) { }
     private record EmployeeDetail(String employeeNo, String name, int departmentId, String departmentCode, String departmentName, LocalDate hireDate) { }
     private record DepartmentDetail(String code, String name, String organizationType, String costCenterCode, int employeeCount) { }
-    private record MonthTotals(int employeeCount, int presentDays, int lateDays, int absentDays, int leaveDays, int overtimeMinutes, int nightMinutes, int holidayWorkMinutes, int holidayOvertimeMinutes, int holidayNightMinutes) { }
+    private record MonthTotals(int employeeCount, int presentDays, int lateDays, int absentDays, int leaveDays, int halfDayCount, int overtimeMinutes, int nightMinutes, int holidayWorkMinutes, int holidayOvertimeMinutes, int holidayNightMinutes) { }
 }

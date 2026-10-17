@@ -70,25 +70,52 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     const annual = await call(owner.request, "get", "/api/tim/annual-leave/my?year=2026");
     expect(annual.item.used_days).toBe(1.5);
     expect(annual.item.remaining_days).toBe(13.5);
+    async function attendanceRows() {
+      return (await call(api, "get", `/api/tim/attendance-daily?start_date=2026-10-01&end_date=2026-10-31&employee_id=${employee.id}`)).items;
+    }
+    const approvedAttendance = await attendanceRows();
+    expect(approvedAttendance.find((row: { work_date: string }) => row.work_date === "2026-10-06").attendance_status).toBe("leave");
+    const halfRow = approvedAttendance.find((row: { work_date: string }) => row.work_date === "2026-10-07");
+    expect(halfRow.approved_leave_type).toBe("half_day");
+    const halfWorked = await call(api, "post", `/api/tim/attendance-daily/${halfRow.id}/correct`, {
+      new_status: "present", new_check_in_at: "2026-10-07T00:00:00Z", new_check_out_at: "2026-10-07T05:00:00Z", reason: "Synthetic half-day work",
+    });
+    expect(halfWorked.actual_minutes).toBe(240);
+    expect(halfWorked.overtime_minutes).toBe(0);
+    await call(owner.request, "post", `/api/tim/leave-requests/${requests.half}/cancel`, {});
+    const restoredHalf = (await attendanceRows()).find((row: { id: number }) => row.id === halfRow.id);
+    expect(restoredHalf.attendance_status).toBe("present");
+    expect(restoredHalf.approved_leave_type).toBeNull();
+    expect(restoredHalf.actual_minutes).toBe(240);
+    expect((await call(owner.request, "get", "/api/tim/annual-leave/my?year=2026")).item.remaining_days).toBe(14);
+    requests.half = (await call(owner.request, "post", "/api/tim/leave-requests", { leave_type: "half_day", start_date: "2026-10-07", end_date: "2026-10-07", reason: `LOCAL TIME ${suffix} half renewed` })).id;
+    await call(api, "post", `/api/tim/leave-requests/${requests.half}/approve`, {});
+    const withUnpaid = (await call(api, "post", `/api/pay/runs/${run.id}/recalculate`)).run;
+    await call(owner.request, "post", `/api/tim/leave-requests/${requests.unpaid}/cancel`, {});
+    expect((await attendanceRows()).some((row: { work_date: string }) => row.work_date === "2026-10-08")).toBe(false);
+    const withoutUnpaid = (await call(api, "post", `/api/pay/runs/${run.id}/recalculate`)).run;
+    expect(withUnpaid.total_deductions - withoutUnpaid.total_deductions).toBe(80_000);
+    requests.unpaid = (await call(owner.request, "post", "/api/tim/leave-requests", { leave_type: "unpaid", start_date: "2026-10-08", end_date: "2026-10-08", reason: `LOCAL TIME ${suffix} unpaid renewed` })).id;
+    await call(api, "post", `/api/tim/leave-requests/${requests.unpaid}/approve`, {});
     await call(api, "post", `/api/pay/runs/${run.id}/snapshot-backfill`);
     const leaveEvents = JSON.parse(sql(`select coalesce(json_agg(json_build_object('code',event_code,'source_id',source_id,'decision',decision_code)), '[]') from pay_payroll_run_target_events where run_id=${run.id} and source_type='tim_leave'`));
-    expect(leaveEvents).toEqual([{ code: "unpaid_leave_approved", source_id: requests.unpaid, decision: "review" }]);
+    expect(leaveEvents).toEqual([{ code: "unpaid_leave_approved", source_id: requests.unpaid, decision: "apply" }]);
     // Historical punches are fixture inputs only; correction, calculation and closing use the real API.
     sql(`insert into tim_employee_daily_schedules(employee_id,work_date,schedule_source,is_holiday,is_workday,break_minutes,expected_minutes,is_overnight,generated_at,version_tag)
       values (${employee.id},'2026-10-05','company_default',false,true,60,480,true,now(),'isolated-time-payroll'),
              (${employee.id},'2026-10-11','company_default',true,false,60,480,false,now(),'isolated-time-payroll'),
              (${employee.id},'2026-10-12','company_default',true,false,60,480,true,now(),'isolated-time-payroll');
       insert into tim_attendance_daily(employee_id,work_date,attendance_status,actual_minutes,regular_minutes,overtime_minutes,night_minutes,holiday_work_minutes,holiday_overtime_minutes,holiday_night_minutes,is_holiday_work,created_at,updated_at)
-      select ${employee.id},day::date,'present',0,0,0,0,0,0,0,false,now(),now() from (values ('2026-10-05'),('2026-10-06'),('2026-10-11'),('2026-10-12')) dates(day);`);
+      select ${employee.id},day::date,'present',0,0,0,0,0,0,0,false,now(),now() from (values ('2026-10-05'),('2026-10-11'),('2026-10-12')) dates(day);`);
     const attendanceIds = JSON.parse(sql(`select json_object_agg(work_date,id) from tim_attendance_daily where employee_id=${employee.id}`));
     async function correct(day: string, checkIn: string | null, checkOut: string | null, status = "present") {
       return call(api, "post", `/api/tim/attendance-daily/${attendanceIds[day]}/correct`, { new_status: status, new_check_in_at: checkIn, new_check_out_at: checkOut, reason: "Synthetic punch verification" });
     }
     await correct("2026-10-05", "2026-10-05T12:00:00Z", "2026-10-05T22:00:00Z");
-    await correct("2026-10-06", null, null, "leave");
+    expect((await attendanceRows()).find((row: { work_date: string }) => row.work_date === "2026-10-06").approved_leave_type).toBe("annual");
     await correct("2026-10-11", "2026-10-11T00:00:00Z", "2026-10-11T11:00:00Z");
     await correct("2026-10-12", "2026-10-12T12:00:00Z", "2026-10-12T22:00:00Z");
-    const otherTotals = JSON.parse(sql(`select json_build_object('overtime',coalesce(sum(overtime_minutes),0),'night',coalesce(sum(night_minutes),0),'holiday',coalesce(sum(holiday_work_minutes),0),'holiday_overtime',coalesce(sum(holiday_overtime_minutes),0),'holiday_night',coalesce(sum(holiday_night_minutes),0),'leave',count(*) filter(where attendance_status='leave')) from tim_attendance_daily where work_date between '2026-10-01' and '2026-10-31' and employee_id<>${employee.id}`));
+    const otherTotals = JSON.parse(sql(`select json_build_object('overtime',coalesce(sum(a.overtime_minutes),0),'night',coalesce(sum(a.night_minutes),0),'holiday',coalesce(sum(a.holiday_work_minutes),0),'holiday_overtime',coalesce(sum(a.holiday_overtime_minutes),0),'holiday_night',coalesce(sum(a.holiday_night_minutes),0),'leave',coalesce(sum(case when r.leave_type='half_day' then 0.5 when a.attendance_status='leave' then 1 else 0 end),0)) from tim_attendance_daily a left join tim_leave_requests r on r.id=a.approved_leave_request_id where a.work_date between '2026-10-01' and '2026-10-31' and a.employee_id<>${employee.id}`));
     await page.goto("/tim/month-closing");
     const closeResponse = page.waitForResponse((result) => new URL(result.url()).pathname === "/api/tim/month-close" && result.request().method() === "POST");
     await page.getByRole("row").filter({ hasText: "2026년 10월" }).getByRole("button", { name: "마감", exact: true }).click();
@@ -100,7 +127,7 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     expect(closed.total_holiday_work_minutes - otherTotals.holiday).toBe(960);
     expect(closed.total_holiday_overtime_minutes - otherTotals.holiday_overtime).toBe(180);
     expect(closed.total_holiday_night_minutes - otherTotals.holiday_night).toBe(480);
-    expect(closed.leave_days - otherTotals.leave).toBe(1);
+    expect(closed.leave_days - otherTotals.leave).toBe(2.5);
     async function payInputs() {
       return (await call(api, "get", "/api/pay/variable-inputs?year_month=2026-10")).items.filter((row: { employee_id: number }) => row.employee_id === employee.id);
     }
@@ -126,14 +153,15 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     const employees = (await call(api, "get", `/api/pay/runs/${run.id}/employees`)).items;
     expect(employees).toHaveLength(1);
     expect(employees[0].employee_id).toBe(employee.id);
-    expect(employees[0].warning_message).toContain("무급휴가 승인");
+    expect(String(employees[0].warning_message ?? "")).not.toContain("무급휴가 승인");
     const detail = await call(api, "get", `/api/pay/runs/${run.id}/employees/${employees[0].id}`);
     expect(detail.items.find((row: { item_code: string }) => row.item_code === "BSC").amount).toBe(2_090_000);
     expect(detail.items.filter((row: { source_type: string }) => row.source_type === "variable")).toHaveLength(5);
-    // V1 requires an explicit reviewed deduction; 10,000 is a synthetic input, not a new leave formula.
+    expect(detail.items.find((row: { item_code: string }) => row.item_code === "TIM_UNPAID").amount).toBe(80_000);
+    // Independent manual deductions remain additive to the automatic unpaid item.
     const deductionCode = `TD${suffix}`;
     await call(api, "post", "/api/pay/setup/allowance-deductions/batch", {
-      items: [{ code: deductionCode, name: "격리 무급휴가 검토 공제", type: "deduction", tax_type: "tax", calculation_type: "fixed", is_active: true }], delete_ids: [],
+      items: [{ code: deductionCode, name: "격리 추가 공제", type: "deduction", tax_type: "tax", calculation_type: "fixed", is_active: true }], delete_ids: [],
     });
     const deductionMapping = (await call(api, "get", "/api/pay/gl-mappings")).items.find((row: { pay_item_code: string }) => row.pay_item_code === "EMP");
     expect(deductionMapping).toBeTruthy();
@@ -141,7 +169,7 @@ test("isolated leave approval and time close reconcile through paid payroll", as
       items: [{ pay_item_code: deductionCode, gl_account_code: deductionMapping.gl_account_code, effective_from: "2026-01-01", is_active: true }], delete_ids: [],
     });
     await call(api, "post", "/api/pay/variable-inputs/batch", {
-      items: [{ year_month: "2026-10", employee_id: employee.id, item_code: deductionCode, direction: "deduction", amount: 10_000, memo: "Synthetic reviewed unpaid leave" }], delete_ids: [],
+      items: [{ year_month: "2026-10", employee_id: employee.id, item_code: deductionCode, direction: "deduction", amount: 10_000, memo: "Synthetic independent manual deduction" }], delete_ids: [],
     });
     const reviewed = (await call(api, "post", `/api/pay/runs/${run.id}/recalculate`)).run;
     expect(reviewed.total_gross).toBe(calculated.total_gross);
@@ -165,15 +193,21 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     expect(payslip.summary.run_status).toBe("paid");
     expect(payslip.summary.gross_pay).toBe(2_605_000);
     expect(payslip.summary.net_pay).toBe(reviewed.total_net);
+    expect(payslip.items.find((row: { item_code: string }) => row.item_code === "TIM_UNPAID").amount).toBe(80_000);
     expect(payslip.items.find((row: { item_code: string }) => row.item_code === deductionCode).amount).toBe(10_000);
     expect(payslip.items.filter((row: { source_type: string; direction: string }) => row.source_type === "variable" && row.direction === "earning").map((row: { item_code: string; amount: number }) => [row.item_code, row.amount])).toEqual(detail.items.filter((row: { source_type: string }) => row.source_type === "variable").map((row: { item_code: string; amount: number }) => [row.item_code, row.amount]));
     const pdf = await owner.request.get(`/api/pay/my/payslips/${run.id}/pdf`);
     expect(pdf.status()).toBe(200);
     expect((await pdf.body()).subarray(0, 5).toString()).toBe("%PDF-");
     for (const action of ["recalculate", "snapshot-backfill", "mark-paid"]) expect((await api.post(`/api/pay/runs/${run.id}/${action}`)).status()).toBe(409);
+    await call(api, "post", "/api/tim/month-close/2026/10/reopen");
+    expect((await owner.request.post(`/api/tim/leave-requests/${requests.annual}/cancel`, { data: {} })).status()).toBe(409);
+    expect((await api.post(`/api/tim/attendance-daily/${halfRow.id}/correct`, { data: { new_status: "present", reason: "Must preserve paid payroll" } })).status()).toBe(409);
+    expect((await call(owner.request, "get", `/api/pay/my/payslips/${run.id}`)).summary.net_pay).toBe(reviewed.total_net);
+    await call(api, "post", "/api/tim/month-close", { year: 2026, month: 10, note: "Finalized payroll preserved" });
     await expect(page.getByRole("button", { name: "지급완료", exact: true })).toBeDisabled();
     await page.screenshot({ path: testInfo.outputPath("local-time-payroll-paid.png"), fullPage: true });
-    await writeFile(testInfo.outputPath("synthetic-time-payroll.json"), JSON.stringify({ synthetic: true, employeeId: employee.id, employeeNo, runId: run.id, leaveRequests: requests, annual: annual.item, inputs: firstInputs, gross: reviewed.total_gross, deductions: reviewed.total_deductions, net: reviewed.total_net, explicitDeduction: 10_000, status: payslip.summary.run_status, vouchers: [accrual.id, voucher.id], unpaidPolicy: "review event plus explicit deduction; no automatic deduction formula in V1" }, null, 2));
+    await writeFile(testInfo.outputPath("synthetic-time-payroll.json"), JSON.stringify({ synthetic: true, employeeId: employee.id, employeeNo, runId: run.id, leaveRequests: requests, annual: annual.item, inputs: firstInputs, gross: reviewed.total_gross, deductions: reviewed.total_deductions, net: reviewed.total_net, automaticUnpaid: 80_000, independentManualDeduction: 10_000, status: payslip.summary.run_status, vouchers: [accrual.id, voucher.id], unpaidPolicy: "automatic base salary / 209 multiplied by frozen approved scheduled hours" }, null, 2));
   } finally { await owner.close(); }
 });
 

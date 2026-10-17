@@ -50,6 +50,10 @@ class TimeLockingTest {
         TimePayrollGateway payrollGateway = mock(TimePayrollGateway.class);
         @SuppressWarnings("unchecked") TypedQuery<TimMonthClose> monthQuery = mock(TypedQuery.class);
         @SuppressWarnings("unchecked") TypedQuery<TimHoliday> holidayQuery = mock(TypedQuery.class);
+        @SuppressWarnings("unchecked") TypedQuery<TimEmployeeDailySchedule> scheduleQuery = mock(TypedQuery.class, org.mockito.Mockito.RETURNS_SELF);
+        @SuppressWarnings("unchecked") TypedQuery<TimAttendanceDaily> attendanceQuery = mock(TypedQuery.class, org.mockito.Mockito.RETURNS_SELF);
+        Query advisoryQuery = mock(Query.class, org.mockito.Mockito.RETURNS_SELF);
+        Query finalizedQuery = mock(Query.class, org.mockito.Mockito.RETURNS_SELF);
         Query employeeQuery = mock(Query.class);
         TimLeaveRequest leave = new TimLeaveRequest();
         leave.id = 22;
@@ -62,6 +66,13 @@ class TimeLockingTest {
         leave.created_at = java.time.Instant.parse("2026-08-01T00:00:00Z");
         when(entityManager.find(TimLeaveRequest.class, 22, LockModeType.PESSIMISTIC_WRITE)).thenReturn(leave);
         when(entityManager.find(TimLeaveRequest.class, 22)).thenReturn(leave);
+        when(entityManager.createNativeQuery(org.mockito.ArgumentMatchers.contains("pg_advisory_xact_lock"))).thenReturn(advisoryQuery);
+        when(entityManager.createNativeQuery(org.mockito.ArgumentMatchers.contains("from pay_payroll_runs"))).thenReturn(finalizedQuery);
+        when(finalizedQuery.getResultList()).thenReturn(List.of());
+        when(entityManager.createQuery(anyString(), org.mockito.ArgumentMatchers.eq(TimEmployeeDailySchedule.class))).thenReturn(scheduleQuery);
+        when(scheduleQuery.getResultList()).thenReturn(List.of());
+        when(entityManager.createQuery(anyString(), org.mockito.ArgumentMatchers.eq(TimAttendanceDaily.class))).thenReturn(attendanceQuery);
+        when(attendanceQuery.getResultList()).thenReturn(List.of());
         when(entityManager.createQuery(anyString(), org.mockito.ArgumentMatchers.eq(TimMonthClose.class))).thenReturn(monthQuery);
         when(monthQuery.setParameter(anyString(), any())).thenReturn(monthQuery);
         when(monthQuery.setLockMode(LockModeType.NONE)).thenReturn(monthQuery);

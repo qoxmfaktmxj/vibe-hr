@@ -18,7 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** Proves the V4/V5 replay store is present on a pristine V1-V6 Flyway installation. */
+/** Proves the V4/V5 replay store is present on a pristine V1-V7 Flyway installation. */
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class FreshFlywayReplayStoreSchemaIntegrationTest {
@@ -38,9 +38,9 @@ class FreshFlywayReplayStoreSchemaIntegrationTest {
     }
 
     @Test
-    void freshV1ThroughV6InstallCreatesTheBoundedReplayStoreSchema() throws Exception {
+    void freshV1ThroughV7InstallCreatesTheBoundedReplayStoreSchema() throws Exception {
         try (Connection connection = connection()) {
-            assertThat(appliedVersions(connection)).containsExactly("1", "2", "3", "4", "5", "6");
+            assertThat(appliedVersions(connection)).containsExactly("1", "2", "3", "4", "5", "6", "7");
             assertColumn(connection, "nonce", "character varying", 128, false);
             assertColumn(connection, "scope_hash", "character varying", 43, false);
             assertColumn(connection, "source_hash", "character varying", 43, false);

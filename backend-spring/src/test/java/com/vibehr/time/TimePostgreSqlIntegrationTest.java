@@ -20,6 +20,7 @@ import java.util.TimeZone;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -103,6 +104,8 @@ class TimePostgreSqlIntegrationTest {
     @BeforeEach
     void resetData() {
         dropFailureTrigger();
+        jdbc.update("delete from pay_payroll_run_targets where employee_id=?", EMPLOYEE_ID);
+        jdbc.update("delete from pay_payroll_runs where run_name='time-finalized-guard'");
         jdbc.update("delete from pay_variable_inputs where employee_id=?", EMPLOYEE_ID);
         jdbc.update("delete from pay_employee_profiles where employee_id=?", EMPLOYEE_ID);
         jdbc.update("delete from tim_attendance_corrections where corrected_by_employee_id=? or attendance_id in (select id from tim_attendance_daily where employee_id=?)", EMPLOYEE_ID, EMPLOYEE_ID);
@@ -138,9 +141,9 @@ class TimePostgreSqlIntegrationTest {
     }
 
     @Test
-    void canonicalFlywayV1ThroughV6AndHibernateValidationProvideTheActualTimSchema() {
+    void canonicalFlywayV1ThroughV7AndHibernateValidationProvideTheActualTimSchema() {
         assertThat(jdbc.queryForList("select version from flyway_schema_history where success order by installed_rank", String.class))
-                .containsExactly("1", "2", "3", "4", "5", "6");
+                .containsExactly("1", "2", "3", "4", "5", "6", "7");
         assertThat(Set.copyOf(jdbc.queryForList("""
                 select table_name from information_schema.tables
                  where table_schema='public' and table_name like 'tim_%'
@@ -379,6 +382,229 @@ class TimePostgreSqlIntegrationTest {
                 Integer.class, EMPLOYEE_ID)).isOne();
         assertAnnualLeave(2026, 10, 0);
         assertAnnualLeave(2027, 10, 0);
+    }
+
+    @Test
+    void unpaidApprovalAppearsInAttendanceAndReportsAndCancellationRemovesOnlyItsGeneratedRow() {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day, day, "무급 휴가"));
+
+        service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+
+        TimAttendanceDailyItem attendance = service.attendanceDaily(day, day, EMPLOYEE_ID, "leave", 1, 50).items().getFirst();
+        assertThat(attendance.attendanceStatus()).isEqualTo("leave");
+        assertThat(attendance.approvedLeaveType()).isEqualTo("unpaid");
+        assertThat(attendance.checkInAt()).isNull();
+        assertThat(jdbc.queryForObject("select (payroll_minutes_snapshot->>'2026-08')::integer from tim_leave_requests where id=?",
+                Integer.class, leave.id())).isEqualTo(480);
+        assertThat(service.report(day, day).statusCounts().leave()).isOne();
+        CLOCK.set(Instant.parse("2026-08-03T00:00:00Z"));
+        assertThat(service.attendanceToday(EMPLOYEE_ID).item().approvedLeaveType()).isEqualTo("unpaid");
+        assertThatThrownBy(() -> service.checkIn(EMPLOYEE_ID)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.correctAttendance(attendance.id(), EMPLOYEE_ID,
+                new TimAttendanceCorrectRequest("present", "교정", null, null))).isInstanceOf(ApiException.class);
+
+        service.cancelLeave(leave.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertThat(service.attendanceDaily(day, day, EMPLOYEE_ID, null, 1, 50).totalCount()).isZero();
+        assertThat(service.report(day, day).statusCounts().leave()).isZero();
+        assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, leave.id())).isEqualTo("cancelled");
+    }
+
+    @Test
+    void paidHalfDayKeepsRealWorkIsIncludedInLeaveFilterAndClosesAsHalfADay() {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        Instant checkIn = Instant.parse("2026-08-03T00:00:00Z");
+        Instant checkOut = Instant.parse("2026-08-03T05:00:00Z");
+        insertAttendance(day, checkIn, checkOut);
+        insertAnnualLeave(2026, 2, 0);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("half_day", day, day, "오전 반차"));
+
+        service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+
+        TimAttendanceDailyItem attendance = service.attendanceDaily(day, day, EMPLOYEE_ID, "leave", 1, 50).items().getFirst();
+        assertThat(attendance.attendanceStatus()).isEqualTo("present");
+        assertThat(attendance.approvedLeaveType()).isEqualTo("half_day");
+        assertThat(attendance.checkInAt()).isEqualTo(checkIn);
+        assertThat(attendance.checkOutAt()).isEqualTo(checkOut);
+        assertThat(attendance.actualMinutes()).isEqualTo(240);
+        assertThat(attendance.overtimeMinutes()).isZero();
+        assertThat(service.report(day, day).statusCounts().present()).isOne();
+        assertThat(service.report(day, day).statusCounts().leave()).isOne();
+        assertThat(service.closeMonth(new TimMonthCloseRequest(2026, 8, "half-day close"), USER_ID).item().leaveDays()).isEqualTo(0.5);
+        assertThat(jdbc.queryForObject("select leave_days from tim_month_closes where year=2026 and month=8", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select half_day_count from tim_month_closes where year=2026 and month=8", Integer.class)).isOne();
+
+        service.reopenMonth(2026, 8, USER_ID);
+        service.correctAttendance(attendance.id(), EMPLOYEE_ID, new TimAttendanceCorrectRequest("remote", "재택 교정", checkIn, checkOut));
+        service.cancelLeave(leave.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        TimAttendanceDailyItem restored = service.attendanceDetail(attendance.id());
+        assertThat(restored.attendanceStatus()).isEqualTo("remote");
+        assertThat(restored.approvedLeaveType()).isNull();
+        assertThat(restored.actualMinutes()).isEqualTo(240);
+        assertAnnualLeave(2026, 2, 0);
+    }
+
+    @Test
+    void aLaterPunchConflictRollsBackEveryAttendanceLinkAndAnnualCharge() {
+        insertAnnualLeave(2026, 5, 0);
+        insertAttendance(LocalDate.of(2026, 8, 4), Instant.parse("2026-08-04T00:00:00Z"), Instant.parse("2026-08-04T09:00:00Z"));
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("annual",
+                LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 4), "연차"));
+
+        assertThatThrownBy(() -> service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null)))
+                .isInstanceOf(ApiException.class).satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(409));
+
+        assertAnnualLeave(2026, 5, 0);
+        assertThat(jdbc.queryForObject("select count(*) from tim_attendance_daily where employee_id=? and approved_leave_request_id is not null", Integer.class, EMPLOYEE_ID)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from tim_attendance_daily where employee_id=?", Integer.class, EMPLOYEE_ID)).isOne();
+        assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, leave.id())).isEqualTo("pending");
+    }
+
+    @Test
+    void unpaidMinutesUseGeneratedWorkdaysAndRemainFrozenAcrossCalendarChanges() {
+        LocalDate first = LocalDate.of(2026, 12, 31);
+        LocalDate holiday = LocalDate.of(2027, 1, 1);
+        insertSchedule(first, first.atTime(9, 0), first.atTime(16, 0), false, true);
+        jdbc.update("update tim_employee_daily_schedules set expected_minutes=360 where employee_id=? and work_date=?", EMPLOYEE_ID, first);
+        insertSchedule(holiday, holiday.atTime(9, 0), holiday.atTime(18, 0), true, false);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", first, LocalDate.of(2027, 1, 4), "연말 휴가"));
+
+        service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+
+        assertThat(jdbc.queryForObject("select payroll_minutes_snapshot = cast(? as jsonb) from tim_leave_requests where id=?", Boolean.class,
+                "{\"2026-12\":360,\"2027-01\":480}", leave.id())).isTrue();
+        assertThat(service.attendanceDaily(first, LocalDate.of(2027, 1, 4), EMPLOYEE_ID, "leave", 1, 50).totalCount()).isEqualTo(2);
+        jdbc.update("update tim_employee_daily_schedules set is_workday=false, expected_minutes=0 where employee_id=?", EMPLOYEE_ID);
+
+        service.cancelLeave(leave.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertThat(jdbc.queryForObject("select count(*) from tim_attendance_daily where employee_id=?", Integer.class, EMPLOYEE_ID)).isZero();
+        assertThat(jdbc.queryForObject("select (payroll_minutes_snapshot->>'2026-12')::integer from tim_leave_requests where id=?", Integer.class, leave.id())).isEqualTo(360);
+    }
+
+    @Test
+    void scheduledWorkingSaturdayUnpaidLeaveShowsOneDayInApprovalAndList() {
+        LocalDate saturday = LocalDate.of(2026, 8, 8);
+        insertSchedule(saturday, saturday.atTime(9, 0), saturday.atTime(18, 0), false, true);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", saturday, saturday, "토요일 근무 휴가"));
+
+        TimLeaveRequestItem approved = service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+
+        assertThat(approved.leaveDays()).isEqualTo(1);
+        assertThat(approved.deductionDays()).isEqualTo(1);
+        assertThat(service.leaveRequests(EMPLOYEE_ID, "approved", false, 1, 50).items().getFirst().leaveDays()).isEqualTo(1);
+        assertThat(service.attendanceDaily(saturday, saturday, EMPLOYEE_ID, "leave", 1, 50).totalCount()).isOne();
+        assertThat(jdbc.queryForObject("select (payroll_minutes_snapshot->>'2026-08')::integer from tim_leave_requests where id=?", Integer.class, created.id())).isEqualTo(480);
+    }
+
+    @Test
+    void approvedZeroWorkdayUnpaidSnapshotShowsZeroDaysInApprovalAndList() {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        insertSchedule(day, day.atTime(9, 0), day.atTime(18, 0), false, false);
+        TimLeaveRequestItem created = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day, day, "비근무일"));
+
+        TimLeaveRequestItem approved = service.decideLeave(created.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+
+        assertThat(approved.leaveDays()).isZero();
+        assertThat(service.leaveRequests(EMPLOYEE_ID, "approved", false, 1, 50).items().getFirst().leaveDays()).isZero();
+        assertThat(jdbc.queryForObject("select payroll_minutes_snapshot = '{}'::jsonb from tim_leave_requests where id=?", Boolean.class, created.id())).isTrue();
+        assertThat(service.attendanceDaily(day, day, EMPLOYEE_ID, "leave", 1, 50).totalCount()).isZero();
+    }
+
+    @Test
+    void correctedGeneratedHalfDayRetainsItsHistoryAndUnderlyingStatusOnCancellation() {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        insertAnnualLeave(2026, 1, 0);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("half_day", day, day, "반차"));
+        service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+        int attendanceId = service.attendanceDaily(day, day, EMPLOYEE_ID, null, 1, 50).items().getFirst().id();
+        service.correctAttendance(attendanceId, EMPLOYEE_ID, new TimAttendanceCorrectRequest("remote", "재택 교정", null, null));
+
+        service.cancelLeave(leave.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null));
+
+        assertThat(service.attendanceDetail(attendanceId).attendanceStatus()).isEqualTo("remote");
+        assertThat(service.corrections(attendanceId).totalCount()).isOne();
+        assertThat(jdbc.queryForObject("select approved_leave_request_id is null and not leave_generated from tim_attendance_daily where id=?", Boolean.class, attendanceId)).isTrue();
+    }
+
+    @Test
+    void finalizedPayrollStillBlocksApprovalAndCancellationAfterTimeMonthReopens() {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        TimLeaveRequestItem approved = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day, day, "무급"));
+        service.decideLeave(approved.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "before payroll"), USER_ID);
+        service.reopenMonth(2026, 8, USER_ID);
+        Integer codeId = jdbc.queryForObject("select id from pay_payroll_codes order by id limit 1", Integer.class);
+        Integer runId = jdbc.queryForObject("""
+                insert into pay_payroll_runs(year_month,payroll_code_id,run_name,status,total_employees,total_gross,total_deductions,total_net,created_at,updated_at)
+                values ('2026-08',?,'time-finalized-guard','paid',1,0,0,0,?,?) returning id
+                """, Integer.class, codeId, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+        jdbc.update("""
+                insert into pay_payroll_run_targets(run_id,employee_id,event_count,review_required,snapshot_json,created_at,updated_at)
+                values (?,?,0,false,'{}'::json,?,?)
+                """, runId, EMPLOYEE_ID, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+        TimLeaveRequestItem pending = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day.plusDays(1), day.plusDays(1), "대기"));
+
+        assertThatThrownBy(() -> service.cancelLeave(approved.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null)))
+                .isInstanceOf(ApiException.class).satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(409));
+        assertThatThrownBy(() -> service.decideLeave(pending.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null)))
+                .isInstanceOf(ApiException.class).satisfies(error -> assertThat(((ApiException) error).status().value()).isEqualTo(409));
+
+        assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, approved.id())).isEqualTo("approved");
+        assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, pending.id())).isEqualTo("pending");
+        assertThat(jdbc.queryForObject("select status from pay_payroll_runs where id=?", String.class, runId)).isEqualTo("paid");
+        assertThat(service.attendanceDaily(day, day.plusDays(1), EMPLOYEE_ID, "leave", 1, 50).totalCount()).isOne();
+    }
+
+    @Test
+    void approvalAndMonthCloseSerializeToOneConsistentAttendanceSnapshot() throws Exception {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day, day, "무급"));
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Object> approval = executor.submit(() -> leaveActionAfter(start,
+                    () -> service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null))));
+            Future<Object> close = executor.submit(() -> closeAfter(start));
+            start.countDown();
+            Object result = approval.get(20, TimeUnit.SECONDS);
+            assertThat(close.get(20, TimeUnit.SECONDS)).isInstanceOf(TimMonthCloseActionResponse.class);
+            if (result instanceof ApiException error) {
+                assertThat(error.status().value()).isEqualTo(423);
+                assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, leave.id())).isEqualTo("pending");
+                assertThat(jdbc.queryForObject("select leave_days from tim_month_closes where year=2026 and month=8", Integer.class)).isZero();
+            } else {
+                assertThat(result).isInstanceOf(TimLeaveRequestItem.class);
+                assertThat(jdbc.queryForObject("select leave_days from tim_month_closes where year=2026 and month=8", Integer.class)).isOne();
+            }
+        }
+    }
+
+    @Test
+    void cancellationAndMonthCloseCannotFreezeCancelledLeaveAttendance() throws Exception {
+        LocalDate day = LocalDate.of(2026, 8, 3);
+        TimLeaveRequestItem leave = service.createLeave(EMPLOYEE_ID, new TimLeaveRequestCreateRequest("unpaid", day, day, "무급"));
+        service.decideLeave(leave.id(), EMPLOYEE_ID, true, new TimLeaveDecisionRequest(null));
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<Object> cancellation = executor.submit(() -> leaveActionAfter(start,
+                    () -> service.cancelLeave(leave.id(), EMPLOYEE_ID, new TimLeaveDecisionRequest(null))));
+            Future<Object> close = executor.submit(() -> closeAfter(start));
+            start.countDown();
+            Object result = cancellation.get(20, TimeUnit.SECONDS);
+            assertThat(close.get(20, TimeUnit.SECONDS)).isInstanceOf(TimMonthCloseActionResponse.class);
+            if (result instanceof ApiException error) {
+                assertThat(error.status().value()).isEqualTo(423);
+                assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, leave.id())).isEqualTo("approved");
+                assertThat(jdbc.queryForObject("select leave_days from tim_month_closes where year=2026 and month=8", Integer.class)).isOne();
+            } else {
+                assertThat(result).isInstanceOf(TimLeaveRequestItem.class);
+                assertThat(jdbc.queryForObject("select request_status from tim_leave_requests where id=?", String.class, leave.id())).isEqualTo("cancelled");
+                assertThat(jdbc.queryForObject("select leave_days from tim_month_closes where year=2026 and month=8", Integer.class)).isZero();
+                assertThat(jdbc.queryForObject("select count(*) from tim_attendance_daily where employee_id=?", Integer.class, EMPLOYEE_ID)).isZero();
+            }
+        }
     }
 
     @Test

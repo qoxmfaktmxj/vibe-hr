@@ -60,7 +60,8 @@ const ClockDisplay = memo(function ClockDisplay() {
   return <p className="font-mono text-lg font-semibold tracking-wide">{clock || "\u00a0"}</p>;
 });
 
-function toAttendanceStatusLabel(status: string | null | undefined) {
+function toAttendanceStatusLabel(status: string | null | undefined, approvedLeaveType?: string | null) {
+  if (approvedLeaveType === "half_day") return "반차";
   if (!status) return "-";
   if (status === "present") return "정상출근";
   if (status === "late") return "지각";
@@ -80,6 +81,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
   const { data, isLoading } = useSWR<TimTodayScheduleResponse>(scheduleKey, fetcher, {
     revalidateOnFocus: false,
   });
+  const fullDayLeave = Boolean(data?.attendance?.approved_leave_type && data.attendance.approved_leave_type !== "half_day");
 
   const workedLabel = useMemo(() => {
     const minutes = data?.attendance?.worked_minutes;
@@ -140,7 +142,7 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
         <div className="rounded-md border bg-muted/20 p-3">출근: {fmtTimeOnly(data?.attendance?.check_in_at ?? null)}</div>
         <div className="rounded-md border bg-muted/20 p-3">근무시간: {workedLabel}</div>
         <div className="rounded-md border bg-muted/20 p-3">퇴근: {fmtTimeOnly(data?.attendance?.check_out_at ?? null)}</div>
-        <div className="rounded-md border bg-muted/20 p-3">상태: {toAttendanceStatusLabel(data?.attendance?.attendance_status)}</div>
+        <div className="rounded-md border bg-muted/20 p-3">상태: {toAttendanceStatusLabel(data?.attendance?.attendance_status, data?.attendance?.approved_leave_type)}</div>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-3">
@@ -150,9 +152,10 @@ export function DashboardAttendancePanel({ compact = false }: DashboardAttendanc
       </div>
 
       <div className="mt-3 flex gap-2">
-        <Button size="sm" onClick={doCheckIn} disabled={isLoading}>출근</Button>
-        <Button size="sm" variant="outline" onClick={doCheckOut} disabled={isLoading}>퇴근</Button>
+        <Button size="sm" onClick={doCheckIn} disabled={isLoading || fullDayLeave}>출근</Button>
+        <Button size="sm" variant="outline" onClick={doCheckOut} disabled={isLoading || fullDayLeave}>퇴근</Button>
       </div>
+      {fullDayLeave ? <p className="mt-2 text-xs text-muted-foreground">승인된 전일 휴가입니다. 출퇴근 기록이 필요하면 먼저 휴가를 취소해 주세요.</p> : null}
     </div>
   );
 }

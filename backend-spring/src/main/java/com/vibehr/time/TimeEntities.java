@@ -133,6 +133,9 @@ class TimAttendanceDaily extends TimeAudit {
     @JdbcTypeCode(SqlTypes.TIMESTAMP) @Column(columnDefinition = "timestamp without time zone") public Instant check_in_at;
     @JdbcTypeCode(SqlTypes.TIMESTAMP) @Column(columnDefinition = "timestamp without time zone") public Instant check_out_at;
     @Column(nullable = false, length = 20) public String attendance_status;
+    public Integer approved_leave_request_id;
+    @Column(length = 20) public String leave_base_status;
+    @Column(nullable = false) public boolean leave_generated;
     @Column(nullable = false) public int actual_minutes;
     @Column(nullable = false) public int regular_minutes;
     @Column(nullable = false) public int overtime_minutes;
@@ -182,6 +185,7 @@ class TimLeaveRequest extends TimeAudit {
     @Column(length = 500) public String reason;
     @Column(nullable = false, length = 20) public String request_status;
     @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") public Map<String, Double> annual_charge_breakdown;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") public Map<String, Integer> payroll_minutes_snapshot;
     public Integer approver_employee_id;
     @JdbcTypeCode(SqlTypes.TIMESTAMP) @Column(columnDefinition = "timestamp without time zone") public Instant approved_at;
     @Column(length = 500) public String decision_comment;
@@ -200,6 +204,7 @@ class TimMonthClose extends TimeAudit {
     @Column(nullable = false) public int absent_days;
     @Column(nullable = false) public int late_days;
     @Column(nullable = false) public int leave_days;
+    @Column(nullable = false) public int half_day_count;
     @Column(nullable = false) public int total_overtime_minutes;
     @Column(nullable = false) public int total_night_minutes;
     @Column(nullable = false) public int total_holiday_work_minutes;

@@ -359,12 +359,17 @@ jobs:
             return 1
           }
           rollback_release() {
-            echo "[deploy] restoring the previous Spring images and configuration" >&2
+            local recovery_backend="$rollback_backend"
+            if [[ "${schema_changed:-false}" == "true" ]]; then
+              recovery_backend="$backend_release"
+              echo "[deploy] schema changed; retaining the candidate-validated backend with the previous frontend" >&2
+            fi
+            echo "[deploy] recovering backend=${recovery_backend} frontend=${rollback_frontend}; evidence=${backup_dir}" >&2
             restore_operator_config
             cat > "$backup_dir/rollback.override.yml" <<EOF
           services:
             backend:
-              image: ${rollback_backend}
+              image: ${recovery_backend}
             frontend:
               image: ${rollback_frontend}
           EOF
@@ -387,12 +392,13 @@ jobs:
           }
           fail() {
             echo "[deploy] $*" >&2
-            if [[ "${rollback_ready:-false}" == "true" ]]; then
+            if [[ "${rollback_ready:-false}" == "true" && "${promotion_started:-false}" == "true" ]]; then
               if ! rollback_release; then
                 echo "::error::Spring rollback recovery failed" >&2
               fi
             else
               restore_operator_config
+              echo "[deploy] promotion has not started; preserving running containers. If migration committed, recovery requires a compatible forward release. Evidence: ${backup_dir:-unavailable}" >&2
             fi
             exit 1
           }
@@ -426,6 +432,17 @@ jobs:
           cp .env.deploy.secret "$backup_dir/.env.deploy.secret"
           previous_frontend=$(docker inspect --format '{{.Image}}' vibehr-frontend 2>/dev/null) || fail "no running frontend release is available for automatic rollback"
           previous_backend=$(docker inspect --format '{{.Image}}' vibehr-backend-spring 2>/dev/null) || fail "no running Spring backend release is available; a non-Spring release is not a rollback target"
+          previous_backend_sha=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$previous_backend") || fail "previous backend revision is unavailable"
+          [[ "$previous_backend_sha" =~ ^[0-9a-f]{40}$ ]] || fail "previous backend revision is invalid; refusing migration"
+          git cat-file -e "${previous_backend_sha}^{commit}" || fail "previous backend commit is unavailable; refusing migration"
+          schema_changed=false
+          if git diff --quiet "$previous_backend_sha" "$expected_sha" -- backend-spring/src/main/resources/db/migration; then
+            :
+          else
+            inventory_status=$?
+            [[ "$inventory_status" -eq 1 ]] || fail "migration inventory comparison failed"
+            schema_changed=true
+          fi
           rollback_backend="vibehr-backend-spring:rollback-${timestamp}"
           rollback_frontend="vibehr-frontend:rollback-${timestamp}"
           docker image tag "$previous_backend" "$rollback_backend" || fail "unable to retain the previous Spring backend image"
@@ -477,6 +494,7 @@ jobs:
             frontend:
               image: ${frontend_release}
           EOF
+          promotion_started=true
           docker compose -f docker-compose.deploy.yml -f "$backup_dir/release.override.yml" up -d --no-build --remove-orphans --force-recreate || fail "promotion compose failed"
           wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness || fail "promotion readiness check failed"
           wait_for_candidate http://127.0.0.1:8080/openapi.json || fail "promotion OpenAPI check failed"

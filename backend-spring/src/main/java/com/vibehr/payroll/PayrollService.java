@@ -320,6 +320,7 @@ public class PayrollService {
     public VariableInputBatchResponse saveVariableInputs(VariableInputBatchRequest request) {
         int deleted = deleteByIds(VariableInput.class, request.deleteIds()); int inserted = 0; int updated = 0;
         for (VariableInputBatchItem item : request.items()) {
+            if ("TIM_UNPAID".equals(item.itemCode().strip())) throw ApiException.badRequest("승인 무급휴가 공제는 자동 계산되므로 수동 변동입력으로 저장할 수 없습니다.");
             parseYearMonth(item.yearMonth());
             if (!employeeExists(item.employeeId())) throw ApiException.badRequest("Invalid employee_id: " + item.employeeId());
             if (!exists("select a.id from AllowanceDeduction a where a.code = :code", "code", item.itemCode())) throw ApiException.badRequest("Invalid item_code: " + item.itemCode());
@@ -396,6 +397,18 @@ public class PayrollService {
         PayrollRunActionResponse response = transactionTemplate.execute(status -> {
             PayrollRun run = lockRun(runId);
             if (!"calculated".equals(run.status)) throw ApiException.conflict("Only calculated run can be closed.");
+            List<PayrollRunTarget> targets = entityManager.createQuery("select t from PayrollRunTarget t where t.runId = :runId", PayrollRunTarget.class)
+                    .setParameter("runId", run.id).getResultList();
+            syncAutomaticLeaveEvents(run, parseYearMonth(run.yearMonth), targets);
+            Map<Integer, Double> storedUnpaid = new HashMap<>();
+            for (Object[] item : entityManager.createQuery("""
+                    select e.employeeId, i.amount from PayrollRunEmployee e, RunItemEntity i
+                     where e.runId = :runId and i.runEmployeeId = e.id
+                       and i.itemCode = 'TIM_UNPAID' and i.sourceType = 'tim_leave'
+                    """, Object[].class).setParameter("runId", run.id).getResultList()) {
+                storedUnpaid.put(((Number) item[0]).intValue(), ((Number) item[1]).doubleValue());
+            }
+            if (!storedUnpaid.equals(automaticUnpaidAmounts(run, targets))) calculateLocked(run);
             run.status = "closed"; run.closedAt = now(); run.updatedAt = now(); addRunEvent(run.id, "closed", "Payroll run closed.");
             entityManager.flush();
             return runAction(run);
@@ -552,6 +565,8 @@ public class PayrollService {
         List<PayrollRunTarget> targets = entityManager.createQuery("select t from PayrollRunTarget t where t.runId = :runId order by t.employeeId, t.id", PayrollRunTarget.class)
                 .setParameter("runId", run.id).getResultList();
         if (targets.isEmpty()) targets = materializeTargetsAndRead(run, period);
+        syncAutomaticLeaveEvents(run, period, targets);
+        Map<Integer, Double> automaticUnpaid = automaticUnpaidAmounts(run, targets);
 
         List<Integer> priorIds = entityManager.createQuery("select e.id from PayrollRunEmployee e where e.runId = :runId", Integer.class)
                 .setParameter("runId", run.id).getResultList();
@@ -592,6 +607,11 @@ public class PayrollService {
                 } else deductions += variable.amount;
                 addRunItem(employee.id, variable.itemCode, definition == null ? variable.itemCode : definition.name, variable.direction,
                         money(variable.amount), taxType, definition == null ? "manual" : definition.calculationType, "variable");
+            }
+            double unpaid = automaticUnpaid.getOrDefault(target.employeeId, 0d);
+            if (unpaid > 0) {
+                deductions += unpaid;
+                addRunItem(employee.id, "TIM_UNPAID", "무급휴가공제", "deduction", unpaid, "tax", "hourly", "tim_leave");
             }
             for (PayrollProjectionMapper.WelfareProjection request : welfare.getOrDefault(target.employeeId, List.of())) {
                 double amount = request.amount();
@@ -835,10 +855,58 @@ public class PayrollService {
             PayrollRunTarget target = targets.get(leave.employeeId());
             if (target == null || !"unpaid".equals(leave.leaveType())) continue;
             persistTargetEvent(run, target, "unpaid_leave_approved", "무급휴가 승인", "tim_leave", "tim_leave_requests",
-                    leave.id(), leave.startDate(), "review", leaveEventPayload(leave));
+                    leave.id(), leave.startDate(), leave.automaticPayroll() ? "apply" : "review", leaveEventPayload(leave));
             eventCount++;
         }
         return eventCount;
+    }
+
+    private Map<Integer, Double> automaticUnpaidAmounts(PayrollRun run, List<PayrollRunTarget> targets) {
+        Map<Integer, Double> result = new HashMap<>();
+        if (targets.isEmpty()) return result;
+        List<Integer> employeeIds = targets.stream().map(target -> target.employeeId).toList();
+        if (exists("select v.id from VariableInput v where v.yearMonth = :month and v.itemCode = 'TIM_UNPAID' and v.employeeId in :employees",
+                Map.of("month", run.yearMonth, "employees", employeeIds))) {
+            throw ApiException.conflict("TIM_UNPAID 수동 입력을 먼저 검토하고 삭제한 뒤 자동 무급휴가 공제를 계산하세요.");
+        }
+        YearMonth period = parseYearMonth(run.yearMonth);
+        Map<Integer, Long> minutes = new HashMap<>();
+        for (PayrollProjectionMapper.UnpaidMinutes row : projections.findAutomaticUnpaidMinutes(
+                employeeIds, period.atDay(1), period.atEndOfMonth(), run.yearMonth)) {
+            minutes.put(row.employeeId(), row.minutes());
+        }
+        for (PayrollRunTarget target : targets) {
+            long approvedMinutes = minutes.getOrDefault(target.employeeId, 0L);
+            if (approvedMinutes <= 0) continue;
+            double amount = BigDecimal.valueOf(snapshot(target.snapshotJson).baseSalary).multiply(BigDecimal.valueOf(approvedMinutes))
+                    .divide(BigDecimal.valueOf(209L * 60), 0, RoundingMode.HALF_EVEN).doubleValue();
+            if (amount > 0) result.put(target.employeeId, amount);
+        }
+        return result;
+    }
+
+    private void syncAutomaticLeaveEvents(PayrollRun run, YearMonth period, List<PayrollRunTarget> targets) {
+        if (targets.isEmpty()) return;
+        Map<Integer, PayrollRunTarget> targetMap = new HashMap<>();
+        targets.forEach(target -> targetMap.put(target.employeeId, target));
+        Map<Integer, PayrollProjectionMapper.LeaveProjection> approved = new LinkedHashMap<>();
+        for (PayrollProjectionMapper.LeaveProjection leave : projections.findApprovedLeaveEvents(
+                new ArrayList<>(targetMap.keySet()), period.atDay(1), period.atEndOfMonth())) {
+            if ("unpaid".equals(leave.leaveType()) && leave.automaticPayroll()) approved.put(leave.id(), leave);
+        }
+        List<PayrollRunTargetEvent> existing = entityManager.createQuery("""
+                select e from PayrollRunTargetEvent e where e.runId = :runId and e.sourceType = 'tim_leave' and e.decisionCode = 'apply'
+                """, PayrollRunTargetEvent.class).setParameter("runId", run.id).getResultList();
+        for (PayrollRunTargetEvent event : existing) {
+            if (approved.remove(event.sourceId) != null) continue;
+            entityManager.remove(event);
+            PayrollRunTarget target = targetMap.get(event.employeeId);
+            if (target != null) target.eventCount--;
+        }
+        for (PayrollProjectionMapper.LeaveProjection leave : approved.values()) {
+            persistTargetEvent(run, targetMap.get(leave.employeeId()), "unpaid_leave_approved", "무급휴가 승인", "tim_leave", "tim_leave_requests",
+                    leave.id(), leave.startDate(), "apply", leaveEventPayload(leave));
+        }
     }
 
     private int materializeWelfareEvents(PayrollRun run, Map<Integer, PayrollRunTarget> targets) {
@@ -914,6 +982,9 @@ public class PayrollService {
     private PayrollRun lockRun(int runId) {
         PayrollRun run = entityManager.find(PayrollRun.class, runId, LockModeType.PESSIMISTIC_WRITE);
         if (run == null) throw ApiException.notFound("Payroll run not found.");
+        YearMonth period = parseYearMonth(run.yearMonth);
+        entityManager.createNativeQuery("select pg_advisory_xact_lock(hashtextextended(cast(:key as text), 0))")
+                .setParameter("key", "tim:month-close:" + period.getYear() + ':' + period.getMonthValue()).getSingleResult();
         return run;
     }
 
@@ -1071,6 +1142,7 @@ public class PayrollService {
         value.put("leave_type", leave.leaveType()); value.put("start_date", leave.startDate()); value.put("end_date", leave.endDate());
         value.put("reason", leave.reason()); value.put("request_status", leave.requestStatus()); value.put("approved_at", leave.approvedAt());
         value.put("decision_comment", leave.decisionComment());
+        if (leave.automaticPayroll()) value.put("automatic_payroll", true);
         return eventPayload(value);
     }
 

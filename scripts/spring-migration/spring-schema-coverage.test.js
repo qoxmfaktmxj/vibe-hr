@@ -102,7 +102,7 @@ for (const [tableName, columnName] of integerEntityContracts) {
 }
 assert.strictEqual(integerEntityContracts.length, 42);
 assert.deepStrictEqual(productionCoverage.verification.reviewed_schema_extension_inconsistencies, []);
-assert.strictEqual(productionCoverage.reviewed_schema_extensions.length, 1);
+assert.strictEqual(productionCoverage.reviewed_schema_extensions.length, 6);
 const leaveTable = productionCoverage.tables.find((table) => table.table_name === "tim_leave_requests");
 assert.ok(!leaveTable.sqlmodel.columns.some((column) => column.name === "annual_charge_breakdown"), "V6 must not rewrite the frozen legacy reference");
 assert.deepStrictEqual(leaveTable.extra_columns, []);
@@ -302,9 +302,13 @@ try {
 const extensionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "spring-schema-extension-"));
 try {
   const ledger = {
-    expected_table_count: 1,
-    source_table_count: 1,
-    tables: [{ table_name: "tim_leave_requests", class_name: "TimLeaveRequest", columns: [column("id", { primary_key: true })] }],
+    expected_table_count: 3,
+    source_table_count: 3,
+    tables: [
+      { table_name: "tim_leave_requests", class_name: "TimLeaveRequest", columns: [column("id", { primary_key: true })] },
+      { table_name: "tim_attendance_daily", class_name: "TimAttendanceDaily", columns: [column("id", { primary_key: true })] },
+      { table_name: "tim_month_closes", class_name: "TimMonthClose", columns: [column("id", { primary_key: true })] },
+    ],
   };
   const legacyContents = `${JSON.stringify(ledger, null, 2)}\n`;
   writeFile(extensionRoot, "docs/spring-migration/schema-ledger.json", legacyContents);
@@ -317,11 +321,24 @@ try {
     class TimLeaveRequest {
       @Id Integer id;
       @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") Map<String, Double> annual_charge_breakdown;
+      @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") Map<String, Integer> payroll_minutes_snapshot;
+    }
+    @Entity(name = "TimAttendanceDaily") @Table(name = "tim_attendance_daily")
+    class TimAttendanceDaily {
+      @Id Integer id;
+      Integer approved_leave_request_id;
+      @Column(length = 20) String leave_base_status;
+      @Column(nullable = false) boolean leave_generated;
+    }
+    @Entity(name = "TimMonthClose") @Table(name = "tim_month_closes")
+    class TimMonthClose {
+      @Id Integer id;
+      @Column(nullable = false) int half_day_count;
     }
   `;
   function extensionCoverage(source) {
     writeFile(extensionRoot, "backend-spring/src/main/java/fixture/TimeEntities.java", source);
-    return buildCoverage(extensionRoot, { expectedTableCount: 1 });
+    return buildCoverage(extensionRoot, { expectedTableCount: 3 });
   }
   function extensionFailures(source) {
     return verifyCoverage(extensionCoverage(source), extensionRoot, { complete: true, checkOutput: false }).join(" ");
@@ -355,6 +372,12 @@ try {
   const notNullable = extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "jsonb", nullable = false');
   assert.match(extensionFailures(notNullable), /nullability differs/);
   assert.match(extensionFailures(extensionSource.replace('columnDefinition = "jsonb"', 'columnDefinition = "jsonb", nullable = NULLABLE_CONSTANT')), /nullability differs or is unresolved/);
+  assert.match(extensionFailures(extensionSource.replace(/\s*@JdbcTypeCode\(SqlTypes.JSON\).*payroll_minutes_snapshot;/, "")), /payroll_minutes_snapshot.*expected one mapped column, found 0/);
+  assert.match(extensionFailures(extensionSource.replace("Map<String, Integer> payroll_minutes_snapshot", "Map<String, Long> payroll_minutes_snapshot")), /payroll_minutes_snapshot.*Java type differs/);
+  assert.match(extensionFailures(extensionSource.replace("Integer approved_leave_request_id;", "Long approved_leave_request_id;")), /approved_leave_request_id.*Java type differs/);
+  assert.match(extensionFailures(extensionSource.replace("String leave_base_status;", "Integer leave_base_status;")), /leave_base_status.*Java type differs/);
+  assert.match(extensionFailures(extensionSource.replace("@Column(nullable = false) boolean leave_generated", "boolean leave_generated")), /leave_generated.*nullability differs/);
+  assert.match(extensionFailures(extensionSource.replace("int half_day_count", "long half_day_count")), /half_day_count.*Java type differs/);
   assert.match(verifyCoverage(extensionCoverage(notNullable), extensionRoot, { checkOutput: false }).join(" "), /nullability differs/, "reviewed extension drift must also fail normal verification");
 } finally {
   fs.rmSync(extensionRoot, { recursive: true, force: true });

@@ -16,6 +16,31 @@ const REVIEWED_SCHEMA_EXTENSIONS = [{
   jdbc_type_code: "SqlTypes.JSON",
   column_definition: "jsonb",
   nullable: true,
+}, {
+  table_name: "tim_leave_requests", entity_name: "TimLeaveRequest", class_name: "TimLeaveRequest",
+  column_name: "payroll_minutes_snapshot",
+  migration_file: "backend-spring/src/main/resources/db/migration/V7__leave_attendance_and_unpaid_automation.sql",
+  java_type: "Map<String, Integer>", jdbc_type_code: "SqlTypes.JSON", column_definition: "jsonb", nullable: true,
+}, {
+  table_name: "tim_attendance_daily", entity_name: "TimAttendanceDaily", class_name: "TimAttendanceDaily",
+  column_name: "approved_leave_request_id",
+  migration_file: "backend-spring/src/main/resources/db/migration/V7__leave_attendance_and_unpaid_automation.sql",
+  java_type: "Integer", jdbc_type_code: "", column_definition: "", nullable: true,
+}, {
+  table_name: "tim_attendance_daily", entity_name: "TimAttendanceDaily", class_name: "TimAttendanceDaily",
+  column_name: "leave_base_status",
+  migration_file: "backend-spring/src/main/resources/db/migration/V7__leave_attendance_and_unpaid_automation.sql",
+  java_type: "String", jdbc_type_code: "", column_definition: "", nullable: true,
+}, {
+  table_name: "tim_attendance_daily", entity_name: "TimAttendanceDaily", class_name: "TimAttendanceDaily",
+  column_name: "leave_generated",
+  migration_file: "backend-spring/src/main/resources/db/migration/V7__leave_attendance_and_unpaid_automation.sql",
+  java_type: "boolean", jdbc_type_code: "", column_definition: "", nullable: false,
+}, {
+  table_name: "tim_month_closes", entity_name: "TimMonthClose", class_name: "TimMonthClose",
+  column_name: "half_day_count",
+  migration_file: "backend-spring/src/main/resources/db/migration/V7__leave_attendance_and_unpaid_automation.sql",
+  java_type: "int", jdbc_type_code: "", column_definition: "", nullable: false,
 }];
 
 function compareText(left, right) {
@@ -897,7 +922,7 @@ function renderMarkdown(coverage) {
     "",
     "Frozen SQLModel reference columns remain unchanged. These reviewed additions are required when their reference table is present; other extra columns still fail complete verification.",
     "",
-    ...coverage.reviewed_schema_extensions.map((extension) => `- \`${extension.table_name}.${extension.column_name}\`: \`${extension.entity_name}\` / \`${extension.class_name}\`, \`${extension.java_type}\`, \`@JdbcTypeCode(${extension.jdbc_type_code})\`, \`${extension.column_definition}\`, nullable=${extension.nullable}. Source: [${extension.migration_file}](../../${extension.migration_file}).`),
+    ...coverage.reviewed_schema_extensions.map((extension) => `- \`${extension.table_name}.${extension.column_name}\`: \`${extension.entity_name}\` / \`${extension.class_name}\`, \`${extension.java_type}\`, ${extension.jdbc_type_code ? `\`@JdbcTypeCode(${extension.jdbc_type_code})\`` : "no JDBC override"}, ${extension.column_definition ? `\`${extension.column_definition}\`` : "inferred physical type"}, nullable=${extension.nullable}. Source: [${extension.migration_file}](../../${extension.migration_file}).`),
     "",
     "## Table Coverage",
     "",

@@ -104,20 +104,25 @@ export function AttendanceStatusManager() {
         headerName: "출근",
         width: 120,
         valueFormatter: (params) =>
-          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-",
+          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }) : "-",
       },
       {
         field: "check_out_at",
         headerName: "퇴근",
         width: 120,
         valueFormatter: (params) =>
-          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : "-",
+          params.value ? new Date(params.value).toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }) : "-",
       },
       {
         field: "attendance_status",
         headerName: "상태",
         width: 120,
-        valueFormatter: (params) => STATUS_LABELS[String(params.value ?? "")] ?? params.value,
+        valueFormatter: (params) => {
+          const status = STATUS_LABELS[String(params.value ?? "")] ?? String(params.value ?? "");
+          return params.data?.approved_leave_type === "half_day"
+            ? (params.value === "leave" ? "반차" : `반차 (${status})`)
+            : status;
+        },
       },
       {
         headerName: "정정",

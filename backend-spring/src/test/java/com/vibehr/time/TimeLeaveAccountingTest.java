@@ -254,18 +254,27 @@ class TimeLeaveAccountingTest {
         private Fixture() {
             Query advisory = mock(Query.class, RETURNS_SELF);
             Query employee = mock(Query.class, RETURNS_SELF);
+            Query finalized = mock(Query.class, RETURNS_SELF);
             TypedQuery<TimMonthClose> month = mock(TypedQuery.class, RETURNS_SELF);
             TypedQuery<TimHoliday> holiday = mock(TypedQuery.class, RETURNS_SELF);
+            TypedQuery<TimEmployeeDailySchedule> schedule = mock(TypedQuery.class, RETURNS_SELF);
+            TypedQuery<TimAttendanceDaily> attendance = mock(TypedQuery.class, RETURNS_SELF);
             TypedQuery<TimLeaveRequest> overlap = mock(TypedQuery.class, RETURNS_SELF);
             TypedQuery<TimAnnualLeave> annual = mock(TypedQuery.class, RETURNS_SELF);
             AtomicInteger year = new AtomicInteger();
             when(entityManager.createNativeQuery(contains("pg_advisory_xact_lock"))).thenReturn(advisory);
+            when(entityManager.createNativeQuery(contains("from pay_payroll_runs"))).thenReturn(finalized);
+            when(finalized.getResultList()).thenReturn(List.of());
             when(entityManager.createNativeQuery(contains("from hr_employees"))).thenReturn(employee);
             when(employee.getResultList()).thenReturn(List.<Object[]>of(new Object[]{"E-11", "Kim", 3, "PEOPLE", "People", java.sql.Date.valueOf("2020-01-01")}));
             when(entityManager.createQuery(anyString(), eq(TimMonthClose.class))).thenReturn(month);
             when(month.getResultList()).thenReturn(List.of());
             when(entityManager.createQuery(anyString(), eq(TimHoliday.class))).thenReturn(holiday);
             when(holiday.getResultList()).thenAnswer(invocation -> holidays);
+            when(entityManager.createQuery(anyString(), eq(TimEmployeeDailySchedule.class))).thenReturn(schedule);
+            when(schedule.getResultList()).thenReturn(List.of());
+            when(entityManager.createQuery(anyString(), eq(TimAttendanceDaily.class))).thenReturn(attendance);
+            when(attendance.getResultList()).thenReturn(List.of());
             when(entityManager.createQuery(anyString(), eq(TimLeaveRequest.class))).thenReturn(overlap);
             when(overlap.getResultList()).thenReturn(List.of());
             when(entityManager.createQuery(anyString(), eq(TimAnnualLeave.class))).thenReturn(annual);

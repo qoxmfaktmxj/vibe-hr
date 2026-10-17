@@ -323,13 +323,13 @@ export function PayrollRunManager() {
     () => [
       { headerName: "이벤트코드", field: "event_code", width: 130 },
       { headerName: "이벤트명", field: "event_name", width: 180 },
-      { headerName: "발생원천", field: "source_type", width: 110 },
+      { headerName: "발생원천", field: "source_type", width: 110, valueFormatter: (params) => params.value === "tim_leave" ? "휴가" : params.value },
       { headerName: "적용일", field: "effective_date", width: 110 },
       {
         headerName: "반영여부",
         field: "decision_code",
         width: 100,
-        valueFormatter: (params) => (params.value === "apply" ? "반영" : "제외"),
+        valueFormatter: (params) => (params.value === "apply" ? "반영" : params.value === "review" ? "검토" : "제외"),
       },
       { headerName: "소스테이블", field: "source_table", width: 160 },
       { headerName: "소스ID", field: "source_id", width: 90 },
@@ -355,7 +355,7 @@ export function PayrollRunManager() {
       },
       { headerName: "과세구분", field: "tax_type", width: 120 },
       { headerName: "계산방식", field: "calculation_type", width: 120 },
-      { headerName: "발생원천", field: "source_type", width: 110 },
+      { headerName: "발생원천", field: "source_type", width: 110, valueFormatter: (params) => params.value === "tim_leave" ? "휴가 자동 반영" : params.value },
     ],
     [],
   );

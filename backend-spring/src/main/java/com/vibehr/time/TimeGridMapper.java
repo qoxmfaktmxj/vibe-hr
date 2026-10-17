@@ -17,14 +17,22 @@ interface TimeGridMapper {
                    a.actual_minutes as actualMinutes, a.regular_minutes as regularMinutes, a.overtime_minutes as overtimeMinutes,
                    a.night_minutes as nightMinutes, a.holiday_work_minutes as holidayWorkMinutes,
                    a.holiday_overtime_minutes as holidayOvertimeMinutes, a.holiday_night_minutes as holidayNightMinutes,
-                   a.is_holiday_work as holidayWork
+                    a.is_holiday_work as holidayWork, r.leave_type as approvedLeaveType
               from tim_attendance_daily a
+               left join tim_leave_requests r on r.id = a.approved_leave_request_id and r.request_status = 'approved'
               join hr_employees e on e.id = a.employee_id
               join auth_users u on u.id = e.user_id
               join org_departments d on d.id = e.department_id
              where a.work_date between #{startDate} and #{endDate}
               <if test='employeeId != null'> and a.employee_id = #{employeeId}</if>
-              <if test='status != null and status != ""'> and a.attendance_status = #{status}</if>
+               <if test='status != null and status != ""'>
+                 <choose>
+                   <when test='status == "leave"'> and (a.attendance_status = 'leave' or exists (
+                     select 1 from tim_leave_requests lr where lr.id = a.approved_leave_request_id
+                       and lr.request_status = 'approved' and lr.leave_type = 'half_day'))</when>
+                   <otherwise> and a.attendance_status = #{status}</otherwise>
+                 </choose>
+               </if>
              order by a.work_date desc, a.id desc
              limit #{limit} offset #{offset}
             </script>
@@ -37,7 +45,14 @@ interface TimeGridMapper {
             select count(*) from tim_attendance_daily a
              where a.work_date between #{startDate} and #{endDate}
               <if test='employeeId != null'> and a.employee_id = #{employeeId}</if>
-              <if test='status != null and status != ""'> and a.attendance_status = #{status}</if>
+               <if test='status != null and status != ""'>
+                 <choose>
+                   <when test='status == "leave"'> and (a.attendance_status = 'leave' or exists (
+                     select 1 from tim_leave_requests lr where lr.id = a.approved_leave_request_id
+                       and lr.request_status = 'approved' and lr.leave_type = 'half_day'))</when>
+                   <otherwise> and a.attendance_status = #{status}</otherwise>
+                 </choose>
+               </if>
             </script>
             """)
     int countAttendance(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate,
@@ -48,9 +63,11 @@ interface TimeGridMapper {
               coalesce(sum(case when attendance_status = 'present' then 1 else 0 end), 0) as present,
               coalesce(sum(case when attendance_status = 'late' then 1 else 0 end), 0) as late,
               coalesce(sum(case when attendance_status = 'absent' then 1 else 0 end), 0) as absent,
-              coalesce(sum(case when attendance_status = 'leave' then 1 else 0 end), 0) as leaveCount,
+               coalesce(sum(case when attendance_status = 'leave' or exists (
+                 select 1 from tim_leave_requests r where r.id = a.approved_leave_request_id
+                   and r.request_status = 'approved' and r.leave_type = 'half_day') then 1 else 0 end), 0) as leaveCount,
               coalesce(sum(case when attendance_status = 'remote' then 1 else 0 end), 0) as remote
-            from tim_attendance_daily where work_date between #{startDate} and #{endDate}
+             from tim_attendance_daily a where work_date between #{startDate} and #{endDate}
             """)
     AttendanceStatusAggregate attendanceStatus(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
@@ -69,7 +86,7 @@ interface TimeGridMapper {
             select leave_type as leaveType, count(*) as requestCount,
               coalesce(sum(case when request_status = 'approved' then 1 else 0 end), 0) as approvedCount,
               coalesce(sum(case when request_status = 'pending' then 1 else 0 end), 0) as pendingCount
-            from tim_leave_requests where start_date &lt;= #{endDate} and end_date &gt;= #{startDate}
+             from tim_leave_requests where start_date <= #{endDate} and end_date >= #{startDate}
             group by leave_type order by leave_type
             """)
     List<LeaveTypeReportRow> leaveTypeSummary(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
@@ -98,7 +115,9 @@ interface TimeGridMapper {
                    r.decided_at as decidedAt, r.created_at as createdAt,
                    case when r.annual_charge_breakdown is not null then
                      (select coalesce(sum(value::double precision), 0) from jsonb_each_text(r.annual_charge_breakdown))
-                   end as annualDeductionDays
+                    when r.leave_type = 'unpaid' and r.request_status = 'approved' and r.payroll_minutes_snapshot is not null then
+                      (select count(*)::double precision from tim_attendance_daily a where a.approved_leave_request_id = r.id)
+                    end as approvedLeaveDays
               from tim_leave_requests r join hr_employees e on e.id = r.employee_id
               join auth_users u on u.id = e.user_id join org_departments d on d.id = e.department_id
              where 1 = 1
@@ -115,7 +134,7 @@ interface TimeGridMapper {
 record AttendanceGridRow(Integer id, int employeeId, String employeeNo, String employeeName, int departmentId,
         String departmentName, LocalDate workDate, Instant checkInAt, Instant checkOutAt, String attendanceStatus,
         int actualMinutes, int regularMinutes, int overtimeMinutes, int nightMinutes, int holidayWorkMinutes,
-        int holidayOvertimeMinutes, int holidayNightMinutes, boolean holidayWork) { }
+        int holidayOvertimeMinutes, int holidayNightMinutes, boolean holidayWork, String approvedLeaveType) { }
 record AttendanceStatusAggregate(int total, int present, int late, int absent, int leaveCount, int remote) { }
 record DepartmentReportRow(int departmentId, String departmentName, int attendanceCount, double presentRate, double lateRate, double absentRate) { }
 record LeaveTypeReportRow(String leaveType, int requestCount, int approvedCount, int pendingCount) { }
@@ -124,4 +143,4 @@ record AnnualLeaveGridRow(Integer id, int employeeId, String employeeNo, String 
 record LeaveRequestGridRow(Integer id, int employeeId, String employeeNo, String employeeName, String departmentName,
         String leaveType, LocalDate startDate, LocalDate endDate, String reason, String requestStatus,
         Integer approverEmployeeId, Instant approvedAt, String decisionComment, Integer decidedBy, Instant decidedAt, Instant createdAt,
-        Double annualDeductionDays) { }
+        Double approvedLeaveDays) { }

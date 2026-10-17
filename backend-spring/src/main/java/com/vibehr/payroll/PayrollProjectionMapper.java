@@ -87,7 +87,8 @@ public interface PayrollProjectionMapper {
     @Select("""
             <script>
             select id, employee_id, leave_type, start_date, end_date, reason,
-                   request_status, approved_at, decision_comment
+                   request_status, approved_at, decision_comment,
+                   payroll_minutes_snapshot is not null as automatic_payroll
               from tim_leave_requests
              where employee_id in
                <foreach item="employeeId" collection="employeeIds" open="(" separator="," close=")">#{employeeId}</foreach>
@@ -104,12 +105,31 @@ public interface PayrollProjectionMapper {
             @Result(column = "end_date", property = "endDate"),
             @Result(column = "request_status", property = "requestStatus"),
             @Result(column = "approved_at", property = "approvedAt"),
-            @Result(column = "decision_comment", property = "decisionComment")
+            @Result(column = "decision_comment", property = "decisionComment"),
+            @Result(column = "automatic_payroll", property = "automaticPayroll")
     })
     List<LeaveProjection> findApprovedLeaveEvents(
             @Param("employeeIds") List<Integer> employeeIds,
             @Param("periodStart") LocalDate periodStart,
             @Param("periodEnd") LocalDate periodEnd);
+
+    @Select("""
+            <script>
+            select employee_id as employeeId,
+                   sum(coalesce((payroll_minutes_snapshot -&gt;&gt; #{yearMonth})::integer, 0)) as minutes
+              from tim_leave_requests
+             where request_status = 'approved' and leave_type = 'unpaid' and payroll_minutes_snapshot is not null
+               and start_date &lt;= #{periodEnd} and end_date &gt;= #{periodStart}
+               and employee_id in
+               <foreach item="employeeId" collection="employeeIds" open="(" separator="," close=")">#{employeeId}</foreach>
+             group by employee_id
+            </script>
+            """)
+    List<UnpaidMinutes> findAutomaticUnpaidMinutes(@Param("employeeIds") List<Integer> employeeIds,
+            @Param("periodStart") LocalDate periodStart, @Param("periodEnd") LocalDate periodEnd,
+            @Param("yearMonth") String yearMonth);
+
+    record UnpaidMinutes(int employeeId, long minutes) { }
 
     @Select("""
             <script>
@@ -213,6 +233,8 @@ public interface PayrollProjectionMapper {
     class LeaveProjection {
         private int id; private int employeeId; private String leaveType; private LocalDate startDate; private LocalDate endDate;
         private String reason; private String requestStatus; private LocalDateTime approvedAt; private String decisionComment;
+        private boolean automaticPayroll;
+        public boolean automaticPayroll() { return automaticPayroll; } public void setAutomaticPayroll(boolean value) { automaticPayroll = value; }
         public int id() { return id; } public void setId(int value) { id = value; }
         public int employeeId() { return employeeId; } public void setEmployeeId(int value) { employeeId = value; }
         public String leaveType() { return leaveType; } public void setLeaveType(String value) { leaveType = value; }

@@ -341,6 +341,13 @@ test.describe("Korean business date defaults", () => {
     await expect(leaveDates.nth(1)).toHaveValue("2026-10-21");
     await capture(page, "leave-korea-date-defaults.png");
 
+    await page.route("**/api/tim/attendance-daily?**", (route) => route.fulfill({ json: {
+      items: [{ id: 901, employee_id: 11, employee_no: "HALF-11", employee_name: "반차검증직원", department_id: 1, department_name: "검증팀",
+        work_date: "2026-10-16", check_in_at: "2026-10-16T00:00:00Z", check_out_at: "2026-10-16T05:00:00Z", worked_minutes: 300,
+        attendance_status: "present", approved_leave_type: "half_day", actual_minutes: 240, regular_minutes: 240,
+        overtime_minutes: 0, night_minutes: 0, holiday_work_minutes: 0, holiday_overtime_minutes: 0, holiday_night_minutes: 0, is_holiday_work: false }],
+      total_count: 1, page: 1, limit: 50, total_pages: 1,
+    } }));
     const queryRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/tim/attendance-daily");
     await page.goto("/tim/status");
     const attendanceDates = page.locator('input[type="date"]');
@@ -349,10 +356,23 @@ test.describe("Korean business date defaults", () => {
     const query = new URL((await queryRequest).url()).searchParams;
     expect(query.get("start_date")).toBe("2026-10-01");
     expect(query.get("end_date")).toBe("2026-10-17");
+    await expect(page.getByRole("row").filter({ hasText: "HALF-11" })).toContainText("반차 (정상출근)");
+    await expect(page.getByRole("row").filter({ hasText: "HALF-11" })).toContainText(/오전\s*09:00/);
+    await expect(page.getByRole("row").filter({ hasText: "HALF-11" })).toContainText(/오후\s*02:00/);
     await capture(page, "attendance-korea-date-defaults.png");
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: "다운로드", exact: true }).click();
     expect((await download).suggestedFilename()).toBe("attendance-status-2026-10-17.xlsx");
+    await page.route("**/api/tim/attendance-daily/today-schedule*", (route) => route.fulfill({ json: {
+      schedule: { work_date: "2026-10-17", day_type: "workday", schedule_code: "CUSTOM", schedule_name: "검증 일정", work_start: "09:00", work_end: "18:00", break_minutes: 60, work_hours: 8, is_holiday: false, holiday_name: null },
+      attendance: { id: 902, employee_id: 11, employee_no: "FULL-11", employee_name: "전일휴가검증직원", department_id: 1, department_name: "검증팀", work_date: "2026-10-17", check_in_at: null, check_out_at: null, worked_minutes: null, attendance_status: "leave", approved_leave_type: "annual", actual_minutes: 0, regular_minutes: 0, overtime_minutes: 0, night_minutes: 0, holiday_work_minutes: 0, holiday_overtime_minutes: 0, holiday_night_minutes: 0, is_holiday_work: false },
+      derived: { is_late: false, overtime_minutes: 0, is_weekend_work: false },
+    } }));
+    await page.goto("/dashboard");
+    await expect(page.getByText("승인된 전일 휴가입니다.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "출근", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "퇴근", exact: true })).toBeDisabled();
+    await capture(page, "approved-full-day-dashboard-korean.png");
   });
 });
 

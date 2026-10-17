@@ -34,7 +34,7 @@ class TimeControllerTest {
         MenuPermissionService menuPermissions = mock(MenuPermissionService.class);
         Authentication authentication = mock(Authentication.class);
         TimAttendanceDailyItem expected = new TimAttendanceDailyItem(1, 22, "E-22", "Kim", 3, "People", null,
-                null, null, null, "present", 0, 0, 0, 0, 0, 0, 0, false);
+                null, null, null, "present", 0, 0, 0, 0, 0, 0, 0, false, null);
         when(authorization.userId(authentication)).thenReturn(7);
         when(authorization.employeeIdForUser(7)).thenReturn(22);
         when(service.checkIn(22)).thenReturn(expected);

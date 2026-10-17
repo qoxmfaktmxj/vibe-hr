@@ -42,7 +42,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayOwnershipTransferIntegrationTest {
 
-    private static final long EXPECTED_REFERENCE_ROWS = 1_377;
+    private static final long EXPECTED_REFERENCE_ROWS = 1_379;
 
     @Container
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine")
@@ -92,7 +92,7 @@ class FlywayOwnershipTransferIntegrationTest {
     }
 
     @Test
-    void currentRuntimeSchemaAllowsOnlyTheExactV6ExtensionWhileAdoptionKeepsTheBaseline() throws Exception {
+    void currentRuntimeSchemaAllowsOnlyTheExactV6AndV7ExtensionsWhileAdoptionKeepsTheBaseline() throws Exception {
         migrateFresh();
         try (Connection connection = connection(); var statement = connection.createStatement()) {
             PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
@@ -103,6 +103,29 @@ class FlywayOwnershipTransferIntegrationTest {
             assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("schema metadata drift");
             statement.execute("alter table tim_leave_requests drop column unexpected_column");
+
+            statement.execute("alter table tim_attendance_daily alter column leave_generated set default true");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V7 leave_generated");
+            statement.execute("alter table tim_attendance_daily alter column leave_generated set default false");
+            statement.execute("alter table tim_attendance_daily drop constraint fk_tim_attendance_approved_leave");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V7 fk_tim_attendance_approved_leave is missing");
+            statement.execute("alter table tim_attendance_daily add constraint fk_tim_attendance_approved_leave foreign key (approved_leave_request_id) references tim_leave_requests(id)");
+            statement.execute("alter table tim_attendance_daily drop constraint fk_tim_attendance_approved_leave");
+            statement.execute("alter table tim_attendance_daily add constraint fk_tim_attendance_approved_leave foreign key (approved_leave_request_id) references hr_employees(id)");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V7 fk_tim_attendance_approved_leave");
+            statement.execute("alter table tim_attendance_daily drop constraint fk_tim_attendance_approved_leave");
+            statement.execute("alter table tim_attendance_daily add constraint fk_tim_attendance_approved_leave foreign key (approved_leave_request_id) references tim_leave_requests(id)");
+            statement.execute("alter table tim_leave_requests alter column payroll_minutes_snapshot set default '{}'::jsonb");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V7 payroll_minutes_snapshot");
+            statement.execute("alter table tim_leave_requests alter column payroll_minutes_snapshot drop default");
+            statement.execute("alter table tim_month_closes alter column half_day_count type bigint");
+            assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("V7 half_day_count");
+            statement.execute("alter table tim_month_closes alter column half_day_count type integer");
 
             statement.execute("alter table tim_leave_requests alter column annual_charge_breakdown set not null");
             assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
@@ -115,6 +138,9 @@ class FlywayOwnershipTransferIntegrationTest {
             statement.execute("alter table tim_leave_requests drop column annual_charge_breakdown");
             assertThatThrownBy(() -> PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("snapshot column is missing");
+            statement.execute("alter table tim_attendance_daily drop column approved_leave_request_id, drop column leave_base_status, drop column leave_generated");
+            statement.execute("alter table tim_leave_requests drop column payroll_minutes_snapshot");
+            statement.execute("alter table tim_month_closes drop column half_day_count");
             PostgreSqlSchemaManifest.assertMatchesCheckedInManifest(connection);
         }
     }
@@ -176,12 +202,12 @@ class FlywayOwnershipTransferIntegrationTest {
         migrateFresh();
         try (Connection connection = connection()) {
             assertThat(applicationTableCount(connection)).isEqualTo(106);
-            assertThat(flywayHistoryCount(connection)).isEqualTo(6);
+            assertThat(flywayHistoryCount(connection)).isEqualTo(7);
             assertThat(relationExists(connection, "alembic_version")).isFalse();
             assertThat(deterministicTableEvidence(connection, "tim_department_schedule_assignments"))
                     .isEqualTo(assignmentsBefore);
             assertThat(longValue(connection, "select count(*) from tim_department_schedule_assignments where is_active")).isEqualTo(100);
-            // The 1,377 canonical rows plus 50 preserved extra assignments and one noncanonical actor rule.
+            // Current reference rows plus 50 preserved extra assignments and one noncanonical actor rule.
             assertThat(requiredReferenceRowCount(connection)).isEqualTo(EXPECTED_REFERENCE_ROWS + 51);
             PostgreSqlSchemaManifest.assertMatchesCurrentSchema(connection);
         }

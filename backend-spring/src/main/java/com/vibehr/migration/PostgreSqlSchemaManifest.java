@@ -83,8 +83,43 @@ public final class PostgreSqlSchemaManifest {
             }
         }
         if (!found) throw new IllegalStateException("PostgreSQL schema metadata drift detected: the V6 annual leave deduction snapshot column is missing.");
-        // Adoption keeps the immutable V1 baseline; runtime permits only this exact V6 extension.
+        removeExactExtension(metadata, "tim_attendance_daily", "columns",
+                columnMetadata("approved_leave_request_id", "integer", "int4").put("numeric_precision", "32").put("numeric_scale", "0"));
+        removeExactExtension(metadata, "tim_attendance_daily", "columns",
+                columnMetadata("leave_base_status", "character varying", "varchar").put("character_maximum_length", "20"));
+        removeExactExtension(metadata, "tim_attendance_daily", "columns",
+                columnMetadata("leave_generated", "boolean", "bool").put("nullable", "NO").put("default", "false"));
+        removeExactExtension(metadata, "tim_leave_requests", "columns",
+                columnMetadata("payroll_minutes_snapshot", "jsonb", "jsonb"));
+        removeExactExtension(metadata, "tim_month_closes", "columns",
+                columnMetadata("half_day_count", "integer", "int4").put("nullable", "NO").put("default", "0")
+                        .put("numeric_precision", "32").put("numeric_scale", "0"));
+        removeExactExtension(metadata, "tim_attendance_daily", "constraints", OBJECT_MAPPER.createObjectNode()
+                .put("name", "fk_tim_attendance_approved_leave").put("type", "f")
+                .put("definition", "FOREIGN KEY (approved_leave_request_id) REFERENCES tim_leave_requests(id)"));
+        // Adoption keeps the immutable V1 baseline; runtime permits only these exact V6/V7 extensions.
         assertMatchesBaselineMetadata(metadata);
+    }
+
+    private static ObjectNode columnMetadata(String name, String dataType, String udtName) {
+        return OBJECT_MAPPER.createObjectNode().put("name", name).put("data_type", dataType).put("udt_name", udtName)
+                .put("nullable", "YES").putNull("default").putNull("character_maximum_length")
+                .putNull("numeric_precision").putNull("numeric_scale").putNull("datetime_precision");
+    }
+
+    private static void removeExactExtension(ObjectNode metadata, String tableName, String section, ObjectNode expected) {
+        for (JsonNode table : metadata.withArray("tables")) {
+            if (!tableName.equals(table.path("name").asText())) continue;
+            ArrayNode values = (ArrayNode) table.path(section);
+            for (int index = 0; index < values.size(); index++) {
+                JsonNode value = values.get(index);
+                if (!expected.path("name").equals(value.path("name"))) continue;
+                if (!expected.equals(value)) throw new IllegalStateException("PostgreSQL schema metadata drift detected in V7 " + expected.path("name").asText());
+                values.remove(index);
+                return;
+            }
+        }
+        throw new IllegalStateException("PostgreSQL schema metadata drift detected: V7 " + expected.path("name").asText() + " is missing.");
     }
 
     private static void assertMatchesBaselineMetadata(JsonNode metadata) {
