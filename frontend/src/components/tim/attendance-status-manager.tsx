@@ -13,6 +13,7 @@ import {
 import { SearchFieldGrid } from "@/components/grid/search-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getKoreaDateKey } from "@/lib/business-date";
 import { fetcher } from "@/lib/fetcher";
 import type { TimAttendanceDailyItem, TimAttendanceDailyListResponse } from "@/types/tim";
 
@@ -45,7 +46,7 @@ async function downloadRowsAsXlsx<Row extends ReadonlyGridRow>(
   const sheet = utils.aoa_to_sheet([headers, ...data]);
   const workbook = utils.book_new();
   utils.book_append_sheet(workbook, sheet, toXlsxSheetName(title));
-  writeFileXLSX(workbook, `${fileName}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  writeFileXLSX(workbook, `${fileName}-${getKoreaDateKey()}.xlsx`);
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -58,7 +59,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function AttendanceStatusManager() {
   const router = useRouter();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getKoreaDateKey();
   const monthStart = `${today.slice(0, 8)}01`;
 
   const [filters, setFilters] = useState({

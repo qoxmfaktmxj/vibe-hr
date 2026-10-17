@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { getGridRowClass, getGridStatusCellClass } from "@/lib/grid/grid-status";
 import { toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { fetcher } from "@/lib/fetcher";
+import { parseErrorDetail } from "@/lib/hr/employee-master-helpers";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import type { TraApplicationItem, TraApplicationListResponse } from "@/types/tra";
 import type { TraResourceListResponse } from "@/types/tra";
@@ -118,11 +119,10 @@ export function TraMyApplicationsManager() {
       const res = await fetch("/api/tra/my-applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course_id: Number(selectedCourseId), note: note || null }),
+        body: JSON.stringify({ course_id: Number(selectedCourseId), year_plan_yn: false, note: note || null }),
       });
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { detail?: string };
-        toast.error(err.detail ?? "신청에 실패했습니다.");
+        toast.error(await parseErrorDetail(res, "신청에 실패했습니다."));
         return;
       }
       toast.success("교육 신청이 완료되었습니다.");
@@ -145,8 +145,7 @@ export function TraMyApplicationsManager() {
     try {
       const res = await fetch(`/api/tra/applications/${appId}/withdraw`, { method: "PUT" });
       if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { detail?: string };
-        toast.error(err.detail ?? "회수에 실패했습니다.");
+        toast.error(await parseErrorDetail(res, "회수에 실패했습니다."));
         return;
       }
       toast.success("신청이 회수되었습니다.");

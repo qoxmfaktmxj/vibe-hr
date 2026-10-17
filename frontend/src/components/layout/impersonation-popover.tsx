@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Loader2, Search, UsersRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -28,56 +28,71 @@ export function ImpersonationPopover() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const lookupController = useRef<AbortController | null>(null);
 
   const selectedUser = useMemo(
     () => users.find((user) => user.id === selectedUserId) ?? null,
     [selectedUserId, users],
   );
 
-  const loadUsers = useCallback(async (searchQuery: string) => {
+  function handleOpenChange(nextOpen: boolean) {
+    lookupController.current?.abort();
+    setSelectedUserId(null);
+    setUsers([]);
+    setIsLoading(nextOpen);
+    setOpen(nextOpen);
+  }
+
+  const loadUsers = useCallback(async (searchQuery: string, signal: AbortSignal) => {
+    if (signal.aborted) return;
     setIsLoading(true);
     try {
       const response = await fetch(
         `/api/auth/impersonation/users?query=${encodeURIComponent(searchQuery)}&limit=30`,
-        { cache: "no-store" },
+        { cache: "no-store", signal },
       );
 
       const json = (await response.json().catch(() => null)) as CandidateResponse | null;
+      if (signal.aborted) return;
       if (!response.ok) {
         setUsers([]);
         toast.error(json?.detail ?? "전환 대상 목록을 불러오지 못했습니다.");
         return;
       }
 
-      const nextUsers = json?.users ?? [];
-      setUsers(nextUsers);
-      if (nextUsers.length > 0) {
-        setSelectedUserId((prev) => prev ?? nextUsers[0].id);
-      } else {
-        setSelectedUserId(null);
+      setUsers(json?.users ?? []);
+    } catch {
+      if (!signal.aborted) {
+        setUsers([]);
+        toast.error("전환 대상 목록을 불러오지 못했습니다.");
       }
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!open) return;
+    const controller = new AbortController();
+    lookupController.current = controller;
     const handle = window.setTimeout(() => {
-      void loadUsers(query);
+      void loadUsers(query, controller.signal);
     }, 180);
 
-    return () => window.clearTimeout(handle);
+    return () => {
+      window.clearTimeout(handle);
+      controller.abort();
+    };
   }, [loadUsers, open, query]);
 
   async function impersonate() {
-    if (!selectedUserId) return;
+    if (!open || !selectedUser || isLoading || isSubmitting) return;
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/auth/impersonation/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: selectedUserId }),
+        body: JSON.stringify({ user_id: selectedUser.id }),
       });
 
       const json = (await response.json().catch(() => null)) as { detail?: string } | null;
@@ -90,7 +105,7 @@ export function ImpersonationPopover() {
 
       await refreshSession();
       await refreshMenus();
-      setOpen(false);
+      handleOpenChange(false);
       toast.success(`${selectedUser?.display_name ?? "선택 사용자"} 계정으로 전환되었습니다.`);
       router.replace("/dashboard");
       router.refresh();
@@ -100,7 +115,7 @@ export function ImpersonationPopover() {
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -123,7 +138,13 @@ export function ImpersonationPopover() {
             <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                lookupController.current?.abort();
+                setSelectedUserId(null);
+                setUsers([]);
+                setIsLoading(true);
+                setQuery(event.target.value);
+              }}
               placeholder="이름/로그인ID 검색"
               className="h-9 pl-7 text-sm"
             />
@@ -167,7 +188,7 @@ export function ImpersonationPopover() {
               size="sm"
               variant="query"
               onClick={impersonate}
-              disabled={!selectedUserId || isSubmitting}
+              disabled={!selectedUser || isLoading || isSubmitting}
             >
               {isSubmitting ? "전환 중..." : "전환"}
             </Button>

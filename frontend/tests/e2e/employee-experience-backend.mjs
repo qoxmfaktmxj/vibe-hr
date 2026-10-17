@@ -4,11 +4,16 @@ import { createServer } from "node:http";
 // Synthetic data for local UI tests only. No database, real identity, or production
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
-  "default", "login-401", "login-429", "login-503", "enter-cds-failure",
+  "default", "production-repairs", "login-401", "login-429", "login-503", "enter-cds-failure",
   "profile-failure", "empty-profile", "member", "account-switch", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview", "training-applications", "retirement-selection", "appraisal-targets", "file-actions",
 ]);
 let scenario = "default";
 let accountSwitched = false;
+const impersonationLogins = [];
+const ownLeaveRequests = [];
+const leaveCancellations = [];
+const approvalLeaveRequests = [];
+const leaveApprovalActions = [];
 const completedTasks = new Set();
 const taskActions = [];
 const hriRequestWrites = [];
@@ -69,6 +74,20 @@ createServer(async (request, response) => {
     if (!scenarios.has(input?.scenario)) return json(response, 400, { detail: "Unknown synthetic scenario." });
     scenario = input.scenario;
     accountSwitched = false;
+    impersonationLogins.length = 0;
+    leaveCancellations.length = 0;
+    leaveApprovalActions.length = 0;
+    approvalLeaveRequests.length = 0;
+    approvalLeaveRequests.push(...["pending", "cancelled", "pending"].map((request_status, index) => ({
+      id: 201 + index, employee_id: 120, employee_no: "EMP-120", employee_name: "검색대상직원", department_name: "테스트 부서",
+      leave_type: "half_day", start_date: "2026-10-20", end_date: "2026-10-20", leave_days: 0.5, request_status,
+      reason: ["대기 중인 합성 요청", "취소된 합성 요청", "다른 대기 합성 요청"][index],
+    })));
+    ownLeaveRequests.length = 0;
+    ownLeaveRequests.push(...["pending", "approved", "cancelled"].map((request_status, index) => ({
+      id: 201 + index, employee_id: 1, leave_type: "half_day", start_date: "2026-10-20", end_date: "2026-10-20",
+      leave_days: 0.5, request_status, reason: ["대기 중인 합성 휴가", "승인된 합성 휴가", "취소된 합성 휴가"][index],
+    })));
     trainingActions.length = 0;
     trainingApplications = ["submitted", "submitted", "draft", "approved"].map((status, index) => ({
       id: 101 + index, application_no: `TRA-${101 + index}`, employee_id: 1,
@@ -89,12 +108,20 @@ createServer(async (request, response) => {
     return json(response, 200, { scenario });
   }
   if (scenario === "account-switch") {
+    if (route === "GET /__impersonation-logins") return json(response, 200, impersonationLogins);
     if (route === "GET /api/v1/auth/impersonation/users") {
-      return json(response, 200, { users: [{ ...switchedUser, login_id: "second-member" }] });
+      const query = (url.searchParams.get("query") ?? "").toLowerCase();
+      const users = [
+        { id: 3, display_name: "이전 구성원", login_id: "first-member" },
+        { ...switchedUser, login_id: "second-member" },
+      ].filter((candidate) => candidate.display_name.toLowerCase().includes(query) || candidate.login_id.includes(query));
+      return json(response, 200, { users });
     }
     if (route === "POST /api/v1/auth/impersonation/login") {
       let body = ""; for await (const chunk of request) body += chunk;
-      if (!request.headers.authorization?.startsWith("Bearer ") || JSON.parse(body).user_id !== switchedUser.id) {
+      const input = JSON.parse(body);
+      impersonationLogins.push(input);
+      if (!request.headers.authorization?.startsWith("Bearer ") || input.user_id !== switchedUser.id) {
         return json(response, 403, { detail: "Synthetic switch target rejected." });
       }
       accountSwitched = true;
@@ -106,6 +133,27 @@ createServer(async (request, response) => {
       if (route === "GET /api/v1/employees/me") return json(response, 200, {
         employee: { ...employee, id: 2, employee_no: "TEST-002", login_id: "second-member", display_name: switchedUser.display_name, email: switchedUser.email },
       });
+    }
+  }
+  if (scenario === "production-repairs") {
+    if (route === "GET /__leave-approval-actions") return json(response, 200, leaveApprovalActions);
+    const approval = url.pathname.match(/^\/api\/v1\/tim\/leave-requests\/(\d+)\/(approve|reject)$/);
+    if (request.method === "POST" && approval) {
+      let body = ""; for await (const chunk of request) body += chunk;
+      const id = Number(approval[1]);
+      leaveApprovalActions.push({ id, action: approval[2], method: request.method, body: JSON.parse(body) });
+      const item = approvalLeaveRequests.find((item) => item.id === id);
+      if (item?.request_status !== "pending") return json(response, 409, { detail: "Only pending requests can be processed." });
+      item.request_status = approval[2] === "approve" ? "approved" : "rejected";
+      return json(response, 200, item);
+    }
+    if (route === "GET /__leave-cancellations") return json(response, 200, leaveCancellations);
+    if (route === "GET /api/v1/tim/leave-requests/my") return json(response, 200, { items: ownLeaveRequests, total_count: ownLeaveRequests.length });
+    if (route === "POST /api/v1/tim/leave-requests/201/cancel") {
+      let body = ""; for await (const chunk of request) body += chunk;
+      leaveCancellations.push({ id: 201, method: request.method, body: JSON.parse(body) });
+      ownLeaveRequests[0].request_status = "cancelled";
+      return json(response, 200, ownLeaveRequests[0]);
     }
   }
   if (scenario === "training-applications") {
@@ -125,6 +173,9 @@ createServer(async (request, response) => {
       if (route === "POST /api/v1/tra/my-applications") {
         let body = ""; for await (const part of request) body += part;
         const input = JSON.parse(body);
+        if (typeof input.year_plan_yn !== "boolean") return json(response, 422, {
+          detail: [{ type: "json_invalid", loc: ["body", "year_plan_yn"], msg: "JSON decode error", input: {} }],
+        });
         const item = { ...trainingApplications[0], ...input, id: 105, application_no: "TRA-105", status: "submitted" };
         trainingActions.push({ action: "create", method: request.method, body: input });
         trainingApplications.push(item);
@@ -168,6 +219,14 @@ createServer(async (request, response) => {
       is_active: true, allow_draft: false, allow_withdraw: true, requires_receive: false, default_priority: 1,
     }], total_count: 1 });
     if (route === "GET /api/v1/hri/requests/my") return json(response, 200, { items: hriRequests, total_count: hriRequests.length, page: 1, limit: 50 });
+    if (route === "GET /api/v1/hri/requests/401") return json(response, 200, {
+      request: { ...hriRequests.find((item) => item.id === 401), form_code: "GENERIC_REQUEST", steps: [], detail_data: hriRequests[0]?.content_json ?? {} },
+    });
+    if (route === "POST /api/v1/hri/requests/401/withdraw") {
+      hriRequestWrites.push({ path: url.pathname, method: request.method });
+      hriRequests.find((item) => item.id === 401).status_code = "WITHDRAWN";
+      return json(response, 200, { request_id: 401, status_code: "WITHDRAWN" });
+    }
     if (request.method === "POST" && ["/api/v1/hri/requests/submit", "/api/v1/hri/requests/draft"].includes(url.pathname)) {
       let body = "";
       for await (const part of request) body += part;
@@ -227,6 +286,14 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "production-repairs") return json(response, 200, { menus: [...menus,
+        { id: 120, code: "hr.basic", name: "인사기본", path: "/hr/basic", icon: "Users", sort_order: 3, children: [] },
+        { id: 121, code: "tim.month-close", name: "근태 월마감", path: "/tim/month-close", icon: "Calendar", sort_order: 4, children: [] },
+        { id: 122, code: "tim.month-closing", name: "월마감 관리", path: "/tim/month-closing", icon: "Calendar", sort_order: 5, children: [] },
+        { id: 123, code: "tim.leave-approval", name: "휴가 승인", path: "/tim/leave-approval", icon: "Calendar", sort_order: 6, children: [] },
+        { id: 124, code: "tim.leave-request", name: "휴가신청", path: "/tim/leave-request", icon: "Calendar", sort_order: 7, children: [] },
+        { id: 125, code: "tim.status", name: "근태현황", path: "/tim/status", icon: "Calendar", sort_order: 8, children: [] },
+      ] });
       if (scenario === "appraisal-targets") return json(response, 200, { menus: [...menus,
         { id: 90, code: "pap.targets", name: "평가 대상자 관리", path: "/pap/targets", icon: "Users", sort_order: 3, children: [] },
       ] });
@@ -274,6 +341,22 @@ createServer(async (request, response) => {
       if (scenario === "profile-failure") return json(response, 503, { detail: "프로필 정보를 불러오지 못했습니다." });
       return json(response, 200, { employee: scenario === "empty-profile" ? null : employee });
     case "GET /api/v1/employees":
+      if (scenario === "production-repairs") {
+        let employees = Array.from({ length: 120 }, (_, index) => ({ ...employee, id: index + 1,
+          employee_no: index === 118 ? "EMP-120-ALT" : `EMP-${String(index + 1).padStart(3, "0")}`,
+          display_name: index === 119 ? "검색대상직원" : index === 118 ? "늦은검색직원" : `기본직원${index + 1}`,
+        }));
+        if (url.searchParams.get("employee_no")?.startsWith("PAGE-")) employees = Array.from({ length: 101 }, (_, index) => ({
+          ...employee, id: 200 + index,
+          employee_no: index === 100 ? "PAGE-EXACT" : `PAGE-EXACT-${index + 1}`,
+          display_name: index === 100 ? "다음페이지직원" : `부분일치직원${index + 1}`,
+        }));
+        const filtered = employees.filter((row) => (!url.searchParams.get("name") || row.display_name.includes(url.searchParams.get("name")))
+          && (!url.searchParams.get("employee_no") || row.employee_no.includes(url.searchParams.get("employee_no"))));
+        const limit = Number(url.searchParams.get("limit") || 100);
+        const page = Number(url.searchParams.get("page") || 1);
+        return json(response, 200, { employees: url.searchParams.get("all") === "true" ? filtered : filtered.slice((page - 1) * limit, page * limit), total_count: filtered.length, page, limit });
+      }
       if (scenario.startsWith("employee-ux")) {
         const positions = url.searchParams.getAll("positions"), statuses = url.searchParams.getAll("employment_statuses");
         const filtered = uxEmployees.filter((row) => (!url.searchParams.get("name") || row.display_name.includes(url.searchParams.get("name")))
@@ -293,6 +376,12 @@ createServer(async (request, response) => {
       return json(response, 200, { options: [{ code: "ACTIVE", name: "재직" }, { code: "LEAVE", name: "휴직" }, { code: "RESIGNED", name: "퇴직" }] });
     case "GET /api/v1/tim/holidays":
       return json(response, 200, { items: [], holidays: [], total_count: 0 });
+    case "GET /api/v1/tim/month-close":
+      return json(response, 200, { items: [], total_count: 0 });
+    case "GET /api/v1/tim/leave-requests": {
+      const items = approvalLeaveRequests.filter((item) => !url.searchParams.get("status") || item.request_status === url.searchParams.get("status"));
+      return json(response, 200, { items, total_count: items.length, page: 1, limit: 50 });
+    }
     case "GET /api/v1/hr/retire/cases":
       return json(response, 200, { items: [{ id: 1, employee_id: 1, employee_no: "TEST-001", employee_name: "테스트 사용자", department_name: "테스트 부서", position_title: "매니저", retire_date: "2026-10-31", reason: "화면 검증용", status: "draft", created_at: "2026-09-13T00:00:00Z" }], total_count: 1, page: 1, limit: 50 });
     case "GET /api/v1/hr/retire/checklist":

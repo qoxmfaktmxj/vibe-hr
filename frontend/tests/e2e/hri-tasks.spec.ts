@@ -2,6 +2,65 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { read, utils } from "xlsx";
 
+test("own withdrawal requires in-app confirmation and sends one request while busy", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "hri-tasks" } });
+  const nativeDialogs: string[] = [];
+  page.on("dialog", (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss(); });
+  await page.goto("/login");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/hri/requests/mine");
+  await page.getByRole("button", { name: "신청서 작성", exact: true }).click();
+  const create = page.getByRole("dialog");
+  await create.getByRole("button", { name: "일반 신청", exact: true }).click();
+  await create.getByPlaceholder("신청서 제목").fill("회수 확인 신청");
+  await create.locator("textarea").fill("회수 확인용 합성 사유");
+  await create.getByRole("button", { name: "결재신청", exact: true }).click();
+  await expect(create).toHaveCount(0);
+  await page.getByRole("grid").getByText("회수 확인 신청", { exact: true }).click();
+  const detail = page.getByRole("dialog", { name: "일반 신청", exact: true });
+  await detail.getByRole("button", { name: "회수", exact: true }).click();
+  const confirmation = page.getByRole("dialog", { name: "신청서를 회수하시겠습니까?", exact: true });
+  await expect(confirmation).toBeVisible();
+  expect(await (await request.get("http://127.0.0.1:3101/__hri-request-writes")).json()).toHaveLength(1);
+  await confirmation.getByRole("button", { name: "취소", exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(detail).toBeVisible();
+  await detail.getByRole("button", { name: "회수", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toBeHidden();
+  expect(await (await request.get("http://127.0.0.1:3101/__hri-request-writes")).json()).toHaveLength(1);
+
+  let withdrawalRequests = 0;
+  let releaseWithdrawal!: () => void;
+  const withdrawalDelay = new Promise<void>((resolve) => { releaseWithdrawal = resolve; });
+  await page.route("**/api/hri/requests/401/withdraw", async (route) => {
+    withdrawalRequests += 1;
+    await withdrawalDelay;
+    await route.continue();
+  });
+  await detail.getByRole("button", { name: "회수", exact: true }).click();
+  await confirmation.getByRole("button", { name: "확인", exact: true }).click();
+  try {
+    await expect.poll(() => withdrawalRequests).toBe(1);
+    await expect(confirmation.getByRole("button", { name: "처리 중...", exact: true })).toBeDisabled();
+    await expect(confirmation.getByRole("button", { name: "취소", exact: true })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(confirmation).toBeVisible();
+    await confirmation.screenshot({ path: test.info().outputPath("hri-withdraw-confirmation-korean.png") });
+    expect(withdrawalRequests).toBe(1);
+  } finally {
+    releaseWithdrawal();
+  }
+  await expect(confirmation).toBeHidden();
+  await expect(detail).toBeHidden();
+  await expect(page.getByRole("grid").locator('.ag-row[row-id="401"]')).toContainText("회수");
+  const writes = await (await request.get("http://127.0.0.1:3101/__hri-request-writes")).json();
+  expect(writes).toHaveLength(2);
+  expect(writes[1]).toEqual({ path: "/api/v1/hri/requests/401/withdraw", method: "POST" });
+  expect(nativeDialogs).toEqual([]);
+});
+
 for (const width of [1440, 390]) {
   test(`draft-disabled form submits atomically and keeps failed edits at ${width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width, height: 1000 });

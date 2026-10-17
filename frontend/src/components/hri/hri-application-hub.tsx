@@ -21,6 +21,7 @@ import {
 import { AgGridReact } from "ag-grid-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -655,6 +656,7 @@ function RequestDetailDialog({
   const [editTitle, setEditTitle] = useState("");
   const [editVals, setEditVals] = useState<FormValues>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [withdrawRequestId, setWithdrawRequestId] = useState<number | null>(null);
 
   const editKey = request ? `${request.id}-${request.updated_at}` : null;
   const [editSource, setEditSource] = useState<string | null>(null);
@@ -732,7 +734,7 @@ function RequestDetailDialog({
   }
 
   async function handleWithdraw() {
-    if (!request || !confirm("신청서를 회수하시겠습니까?")) return;
+    if (!open || !request || !canWithdraw || saving || withdrawRequestId !== request.id) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/hri/requests/${request.id}/withdraw`, { method: "POST" });
@@ -741,6 +743,7 @@ function RequestDetailDialog({
       toast.success("신청서가 회수되었습니다.");
       await mutateDetail();
       onRefresh();
+      setWithdrawRequestId(null);
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "회수 실패");
@@ -750,7 +753,7 @@ function RequestDetailDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { setWithdrawRequestId(null); onClose(); } }}>
       <DialogContent
         className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden p-0"
         showClose
@@ -856,7 +859,7 @@ function RequestDetailDialog({
                 variant="outline"
                 size="sm"
                 disabled={saving}
-                onClick={() => void handleWithdraw()}
+                onClick={() => setWithdrawRequestId(request.id)}
                 className="mr-auto text-red-600 hover:bg-red-50 hover:text-red-700"
               >
                 회수
@@ -880,6 +883,14 @@ function RequestDetailDialog({
           </DialogFooter>
         )}
       </DialogContent>
+      <ConfirmDialog
+        open={open && withdrawRequestId !== null && withdrawRequestId === request?.id}
+        onOpenChange={(next) => { if (!next) setWithdrawRequestId(null); }}
+        title="신청서를 회수하시겠습니까?"
+        description="확인을 누르면 신청서가 회수됩니다."
+        busy={saving}
+        onConfirm={() => void handleWithdraw()}
+      />
     </Dialog>
   );
 }

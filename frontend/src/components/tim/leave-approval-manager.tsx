@@ -35,15 +35,14 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
 };
 
 export function LeaveApprovalManager() {
-  const [statusInput, setStatusInput] = useState("");
-  const [appliedStatus, setAppliedStatus] = useState("");
+  const [statusInput, setStatusInput] = useState("pending");
+  const [appliedStatus, setAppliedStatus] = useState("pending");
   const [rejectReason, setRejectReason] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
-      pending_only: appliedStatus ? "false" : "true",
       page: String(page),
       limit: String(pageSize),
     });
@@ -150,7 +149,7 @@ export function LeaveApprovalManager() {
             value={statusInput}
             onChange={(event) => setStatusInput(event.target.value)}
           >
-            <option value="">승인 대기만 보기</option>
+            <option value="">전체 상태</option>
             <option value="pending">대기</option>
             <option value="approved">승인</option>
             <option value="rejected">반려</option>

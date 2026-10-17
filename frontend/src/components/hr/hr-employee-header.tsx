@@ -1,18 +1,19 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Search, UserCircle2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import useSWR from "swr";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { EmployeeItem } from "@/types/employee";
+import { fetcher } from "@/lib/fetcher";
+import type { EmployeeItem, EmployeeListResponse } from "@/types/employee";
 
 type Props = {
-  employees: EmployeeItem[];
-  selectedEmployeeId: number | null;
-  onSelectEmployee: (id: number) => void;
+  selectedEmployee: EmployeeItem | null;
+  onSelectEmployee: (employee: EmployeeItem) => void;
 };
 
 function tenureText(hireDate?: string): string {
@@ -26,19 +27,28 @@ function tenureText(hireDate?: string): string {
   return `${y}년 ${m}개월`;
 }
 
-export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmployee }: Props) {
+export function HrEmployeeHeader({ selectedEmployee: selected, onSelectEmployee }: Props) {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
 
-  const filtered = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return employees.slice(0, 8);
-    return employees
-      .filter((item) => item.display_name.toLowerCase().includes(keyword) || item.employee_no.toLowerCase().includes(keyword))
-      .slice(0, 8);
-  }, [employees, query]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
-  const selected = useMemo(() => employees.find((item) => item.id === selectedEmployeeId) ?? null, [employees, selectedEmployeeId]);
+  const keyword = query.trim();
+  const searchKey = keyword && keyword === debouncedQuery
+    ? [
+        `/api/employees?page=1&limit=8&name=${encodeURIComponent(keyword)}`,
+        `/api/employees?page=1&limit=8&employee_no=${encodeURIComponent(keyword)}`,
+      ]
+    : null;
+  const { data: results } = useSWR<EmployeeItem[]>(searchKey, async (urls: string[]) => {
+    const responses = await Promise.all(urls.map((url) => fetcher<EmployeeListResponse>(url)));
+    return [...new Map(responses.flatMap((response) => response.employees).map((item) => [item.id, item])).values()].slice(0, 8);
+  }, { revalidateOnFocus: false });
+  const filtered = keyword === debouncedQuery ? results ?? [] : [];
 
   return (
     <Card className="mx-4 mt-4 border border-border bg-card/70 shadow-sm lg:mx-8">
@@ -72,7 +82,7 @@ export function HrEmployeeHeader({ employees, selectedEmployeeId, onSelectEmploy
                     type="button"
                     className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-muted"
                     onClick={() => {
-                      onSelectEmployee(item.id);
+                      onSelectEmployee(item);
                       setQuery("");
                     }}
                   >

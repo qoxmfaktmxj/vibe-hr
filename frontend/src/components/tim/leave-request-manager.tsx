@@ -5,15 +5,19 @@ import { toast } from "sonner";
 import useSWR, { mutate } from "swr";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { getKoreaDateKey } from "@/lib/business-date";
 import { fetcher } from "@/lib/fetcher";
 import type { TimLeaveRequestListResponse } from "@/types/tim";
 
 export function LeaveRequestManager() {
   const [leaveType, setLeaveType] = useState("annual");
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(getKoreaDateKey);
+  const [endDate, setEndDate] = useState(getKoreaDateKey);
   const [reason, setReason] = useState("");
+  const [cancelRequestId, setCancelRequestId] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const { data, isLoading } = useSWR<TimLeaveRequestListResponse>("/api/tim/leave-requests/my", fetcher, {
     revalidateOnFocus: false,
@@ -38,17 +42,25 @@ export function LeaveRequestManager() {
     await mutate("/api/tim/leave-requests/my");
   }
 
-  async function cancelRequest(id: number) {
-    if (!confirm("해당 신청을 취소할까요?")) return;
-    const response = await fetch(`/api/tim/leave-requests/${id}/cancel`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason: "사용자 취소" }),
-    });
+  async function cancelRequest() {
+    if (cancelling || !data?.items.some((item) => item.id === cancelRequestId && item.request_status === "pending")) return;
+    setCancelling(true);
+    try {
+      const response = await fetch(`/api/tim/leave-requests/${cancelRequestId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "사용자 취소" }),
+      });
 
-    if (!response.ok) return toast.error("취소 실패");
-    toast.success("취소 완료");
-    await mutate("/api/tim/leave-requests/my");
+      if (!response.ok) return toast.error("취소 실패");
+      toast.success("취소 완료");
+      setCancelRequestId(null);
+      await mutate("/api/tim/leave-requests/my");
+    } catch {
+      toast.error("취소 실패");
+    } finally {
+      setCancelling(false);
+    }
   }
 
   return (
@@ -94,7 +106,7 @@ export function LeaveRequestManager() {
                   <td className="py-2">{item.reason ?? "-"}</td>
                   <td className="py-2">
                     {item.request_status === "pending" ? (
-                      <Button size="sm" variant="outline" onClick={() => cancelRequest(item.id)}>취소</Button>
+                      <Button size="sm" variant="outline" disabled={cancelling} onClick={() => setCancelRequestId(item.id)}>취소</Button>
                     ) : "-"}
                   </td>
                 </tr>
@@ -104,6 +116,14 @@ export function LeaveRequestManager() {
           </table>
         </div>
       </div>
+      <ConfirmDialog
+        open={cancelRequestId !== null}
+        onOpenChange={(open) => { if (!open) setCancelRequestId(null); }}
+        title="해당 신청을 취소할까요?"
+        description="확인을 누르면 신청이 취소됩니다."
+        busy={cancelling}
+        onConfirm={() => void cancelRequest()}
+      />
     </div>
   );
 }

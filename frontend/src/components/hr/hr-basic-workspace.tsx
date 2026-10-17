@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
 
@@ -12,30 +12,35 @@ import type { HrBasicDetailResponse } from "@/types/hr-employee-profile";
 
 export function HrBasicWorkspace() {
   const searchParams = useSearchParams();
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeItem | null>(null);
   const requestedEmployeeNo = searchParams.get("employeeNo")?.trim() ?? "";
 
-  const { data: employeeData } = useSWR<{ employees?: EmployeeItem[] }>("/api/employees", fetcher, {
+  const { data: employeeData } = useSWR<EmployeeListResponse>("/api/employees?page=1&limit=8", fetcher, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
     dedupingInterval: 60_000,
   });
   const requestedEmployeeKey = requestedEmployeeNo
-    ? `/api/employees?all=true&employee_no=${encodeURIComponent(requestedEmployeeNo)}`
+    ? `/api/employees?page=1&limit=100&employee_no=${encodeURIComponent(requestedEmployeeNo)}`
     : null;
-  const { data: requestedEmployeeData } = useSWR<EmployeeListResponse>(requestedEmployeeKey, fetcher, {
+  const { data: requestedEmployee = null } = useSWR<EmployeeItem | null>(requestedEmployeeKey, async (url: string) => {
+    const params = new URLSearchParams(url.split("?")[1]);
+    for (let page = 1; ; page += 1) {
+      params.set("page", String(page));
+      const response = await fetcher<EmployeeListResponse>(`/api/employees?${params.toString()}`);
+      const exactMatch = response.employees.find(
+        (item) => item.employee_no.toLowerCase() === requestedEmployeeNo.toLowerCase(),
+      );
+      if (exactMatch) return exactMatch;
+      if (page * 100 >= response.total_count) return null;
+    }
+  }, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
     dedupingInterval: 60_000,
   });
-  const requestedEmployee = requestedEmployeeData?.employees?.[0] ?? null;
-  const employees = useMemo(() => {
-    const base = employeeData?.employees ?? [];
-    if (!requestedEmployee) return base;
-    return base.some((item) => item.id === requestedEmployee.id) ? base : [requestedEmployee, ...base];
-  }, [employeeData?.employees, requestedEmployee]);
-
-  const resolvedEmployeeId = selectedEmployeeId ?? requestedEmployee?.id ?? employees[0]?.id ?? null;
+  const resolvedEmployee = selectedEmployee ?? (requestedEmployeeNo ? requestedEmployee : employeeData?.employees[0] ?? null);
+  const resolvedEmployeeId = resolvedEmployee?.id ?? null;
 
   const detailKey = resolvedEmployeeId ? `/api/hr/basic/${resolvedEmployeeId}` : null;
   const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
@@ -44,17 +49,11 @@ export function HrBasicWorkspace() {
     dedupingInterval: 20_000,
   });
 
-  const selectedEmployee = useMemo(
-    () => employees.find((item) => item.id === resolvedEmployeeId) ?? null,
-    [employees, resolvedEmployeeId],
-  );
-
   return (
     <>
       <HrEmployeeHeader
-        employees={employees}
-        selectedEmployeeId={resolvedEmployeeId}
-        onSelectEmployee={setSelectedEmployeeId}
+        selectedEmployee={resolvedEmployee}
+        onSelectEmployee={setSelectedEmployee}
       />
       <HrBasicTabs
         employeeId={resolvedEmployeeId}
@@ -64,15 +63,15 @@ export function HrBasicWorkspace() {
         }}
         detail={
           detail ??
-          (selectedEmployee
+          (resolvedEmployee
             ? {
                 profile: {
-                  employee_id: selectedEmployee.id,
-                  employee_no: selectedEmployee.employee_no,
-                  full_name: selectedEmployee.display_name,
-                  hire_date: selectedEmployee.hire_date,
-                  department_name: selectedEmployee.department_name,
-                  position_title: selectedEmployee.position_title,
+                  employee_id: resolvedEmployee.id,
+                  employee_no: resolvedEmployee.employee_no,
+                  full_name: resolvedEmployee.display_name,
+                  hire_date: resolvedEmployee.hire_date,
+                  department_name: resolvedEmployee.department_name,
+                  position_title: resolvedEmployee.position_title,
                 },
                 appointments: [],
                 rewards_penalties: [],
