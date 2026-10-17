@@ -173,6 +173,43 @@ class PayrollPostgreSqlIntegrationTest {
     }
 
     @Test
+    void paidRunProducesOneBalancedDisbursementAndKeepsFinalizedResultsImmutable() {
+        int codeId = createPayrollCode();
+        createProfile(codeId);
+        createVoucherSetup();
+        service.saveGlAccounts(new PayrollContracts.GlAccountBatchRequest(List.of(
+                new PayrollContracts.GlAccountBatchItem(null, "1100", "Test cash", "asset", false, true, true, 3)), null));
+        int runId = service.createPayrollRun(new PayrollContracts.PayrollRunCreateRequest("2026-01", codeId, "Payment finalization")).run().id();
+        assertThatThrownBy(() -> service.markPayrollRunPaid(runId)).isInstanceOf(ApiException.class);
+        service.calculatePayrollRun(runId);
+        service.closePayrollRun(runId);
+        int accrualId = jdbc.queryForObject("select id from pay_vouchers where run_id=? and voucher_type='accrual'", Integer.class, runId);
+        assertThatThrownBy(() -> service.generateDisbursementVoucher(runId, 1)).isInstanceOf(ApiException.class);
+        PayrollContracts.PayrollRunItem paid = service.markPayrollRunPaid(runId).run();
+        assertThat(paid.status()).isEqualTo("paid");
+        assertThat(paid.paidAt()).isNotNull();
+        assertThat(paid.totalNet()).isEqualTo(1000d);
+        assertThatThrownBy(() -> service.generateDisbursementVoucher(runId, 1)).isInstanceOf(ApiException.class);
+        service.confirmVoucher(accrualId, 1);
+        int disbursementId = service.generateDisbursementVoucher(runId, 1).voucher().id();
+        service.confirmVoucher(disbursementId, 1);
+        assertThat(service.voucherDetail(disbursementId).voucher().status()).isEqualTo("confirmed");
+        assertThat(jdbc.queryForMap("select sum(debit_amount) as debit, sum(credit_amount) as credit from pay_voucher_lines where voucher_id=?", disbursementId))
+                .containsEntry("debit", 1000d).containsEntry("credit", 1000d);
+        assertThat(jdbc.queryForObject("select count(*) from pay_voucher_lines where voucher_id=?", Integer.class, disbursementId)).isEqualTo(2);
+        assertThat(service.myPayslipDetail(1, runId).summary().netPay()).isEqualTo(1000d);
+        assertThatThrownBy(() -> service.myPayslipDetail(2, runId)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.markPayrollRunPaid(runId)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.calculatePayrollRun(runId)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.refreshPayrollRunSnapshot(runId)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> service.generateDisbursementVoucher(runId, 1)).isInstanceOf(ApiException.class);
+        assertThat(jdbc.queryForObject("select count(*) from pay_payroll_run_events where run_id=? and event_type='paid'", Integer.class, runId)).isOne();
+        assertThat(jdbc.queryForObject("select count(*) from pay_vouchers where run_id=?", Integer.class, runId)).isEqualTo(2);
+        assertThat(service.listPayrollRunEmployees(runId).items()).hasSize(1);
+        assertThat(service.myPayslipDetail(1, runId).summary().netPay()).isEqualTo(1000d);
+    }
+
+    @Test
     void materializesSourceEventsAndAppliesWelfareAmountsWithRepeatableGoldenTotals() {
         int payrollCodeId = createPayrollCode();
         createProfile(payrollCodeId);

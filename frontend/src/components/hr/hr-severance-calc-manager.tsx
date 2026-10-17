@@ -260,7 +260,7 @@ export function HrSeveranceCalcManager() {
     }
   }
 
-  const isDraft = calcDetail?.calc.status === "draft";
+  const isEditable = calcDetail?.calc.status === "draft" || calcDetail?.calc.status === "reviewed";
 
   return (
     <div className="space-y-4 px-4 py-4">
@@ -382,7 +382,7 @@ export function HrSeveranceCalcManager() {
                     type="number"
                     value={adjustmentAmount}
                     onChange={(event) => setAdjustmentAmount(event.target.value)}
-                    disabled={isSubmitting || !isDraft}
+                    disabled={isSubmitting || !isEditable}
                   />
                 </div>
                 <div className="space-y-1 md:col-span-2">
@@ -391,7 +391,7 @@ export function HrSeveranceCalcManager() {
                     value={adjustmentReason}
                     onChange={(event) => setAdjustmentReason(event.target.value)}
                     placeholder="조정 사유를 입력해 주세요."
-                    disabled={isSubmitting || !isDraft}
+                    disabled={isSubmitting || !isEditable}
                   />
                 </div>
                 <div className="md:col-span-3">
@@ -399,7 +399,7 @@ export function HrSeveranceCalcManager() {
                     type="button"
                     variant="outline"
                     onClick={handleSaveAdjustment}
-                    disabled={isSubmitting || !isDraft}
+                    disabled={isSubmitting || !isEditable}
                   >
                     조정액 저장
                   </Button>
@@ -407,10 +407,10 @@ export function HrSeveranceCalcManager() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={handleRecalculate} disabled={isSubmitting || !isDraft}>
+                <Button type="button" variant="outline" onClick={handleRecalculate} disabled={isSubmitting || !isEditable}>
                   재산정
                 </Button>
-                <Button type="button" onClick={handleConfirmCalc} disabled={isSubmitting || !isDraft}>
+                <Button type="button" onClick={handleConfirmCalc} disabled={isSubmitting || !isEditable}>
                   퇴직금 확정
                 </Button>
               </div>

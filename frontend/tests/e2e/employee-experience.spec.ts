@@ -46,6 +46,33 @@ test.beforeEach(async ({ request }) => {
   await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "default" } });
 });
 
+test.describe("login before hydration", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("native login submission keeps credentials out of the URL", async ({ page }) => {
+    await page.route("**/login*", async (route) => {
+      const submission = route.request();
+      const url = new URL(submission.url());
+      if (submission.method() === "POST" || url.searchParams.has("password")) {
+        await route.fulfill({ contentType: "text/html", body: "Native submission captured." });
+        return;
+      }
+      await route.continue();
+    });
+    await page.goto("/login");
+    await page.getByLabel("아이디", { exact: true }).fill("native-fixture");
+    await page.getByLabel("비밀번호", { exact: true }).fill("native-fixture-password");
+    const submitted = page.waitForRequest((request) => request.isNavigationRequest()
+      && (request.method() === "POST" || new URL(request.url()).searchParams.has("password")));
+    await page.getByRole("button", { name: "로그인", exact: true }).click();
+    const submission = await submitted;
+    expect(submission.method()).toBe("POST");
+    const query = new URL(submission.url()).searchParams;
+    expect(query.has("password")).toBe(false);
+    expect(query.has("loginId")).toBe(false);
+  });
+});
+
 test("month-close routes retain the shell, menu, tabs and home navigation", async ({ page, request }) => {
   await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "production-repairs" } });
   await signIn(page);

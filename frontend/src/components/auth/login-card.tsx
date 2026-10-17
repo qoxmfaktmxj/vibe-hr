@@ -136,7 +136,7 @@ function AuthCardForm({ initialErrorMessage }: { initialErrorMessage?: string | 
 
   return (
     <CardContent className="space-y-4 px-6 pb-6 pt-2">
-      <form className="space-y-4" onSubmit={handleSubmit}>
+      <form method="post" className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1.5">
           <Label htmlFor="enterCd" className="font-semibold text-foreground">
             회사

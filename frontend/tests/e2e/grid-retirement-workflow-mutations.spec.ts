@@ -103,7 +103,7 @@ async function installHrRoutes(page: Page): Promise<Write[]> {
     if (path === "/api/hr/severance/calcs" && method === "GET") return reply(route, list([calc], url));
     if (path === "/api/hr/severance/calcs/501" && method === "GET") return reply(route, calcDetail());
     if (path === "/api/hr/severance/calcs/501" && method === "PUT") {
-      Object.assign(calc, { adjustment_amount: payload?.adjustment_amount, adjustment_reason: payload?.adjustment_reason, final_amount: 19375150, updated_at: NOW }); return reply(route, calcDetail());
+      Object.assign(calc, { status: "reviewed", adjustment_amount: payload?.adjustment_amount, adjustment_reason: payload?.adjustment_reason, final_amount: 19375150, updated_at: NOW }); return reply(route, calcDetail());
     }
     if (path === "/api/hr/severance/calcs/501/recalculate" && method === "POST") return reply(route, calcDetail());
     if (path === "/api/hr/severance/calcs/501/confirm" && method === "POST") {
@@ -221,6 +221,9 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
     await page.getByRole("button", { name: "재산정", exact: true }).click();
     await page.getByRole("button", { name: "퇴직금 확정", exact: true }).click();
     await expect(page.getByText("상태 확정", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "조정액 저장", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "재산정", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "퇴직금 확정", exact: true })).toBeDisabled();
     expect(writes).toEqual([
       { method: "PUT", path: "/api/hr/severance/calcs/501", body: { adjustment_amount: 1000, adjustment_reason: "정산 차이" } },
       { method: "POST", path: "/api/hr/severance/calcs/501/recalculate", body: null },

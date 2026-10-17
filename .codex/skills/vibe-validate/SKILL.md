@@ -4,7 +4,7 @@
 Keywords: `vibe-validate`, `validate all`, `full check`, `전체검증`
 
 ## Description
-Runs the Spring backend and frontend validation gates. Read `docs/TEST_STRATEGY.md` and `docs/UI_VALIDATION_CI.md` first. The hosted UI gate covers 98 synthetic browser cases; it does not cover every repository E2E scenario or production authentication.
+Runs the Spring backend and frontend validation gates. Read `docs/TEST_STRATEGY.md` and `docs/UI_VALIDATION_CI.md` first. The hosted UI gate covers 99 synthetic browser cases; it does not cover every repository E2E scenario or production authentication.
 
 ## Steps
 Run from the repository root. Docker is required for PostgreSQL integration coverage.

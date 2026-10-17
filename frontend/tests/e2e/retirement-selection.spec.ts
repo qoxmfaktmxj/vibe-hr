@@ -101,12 +101,14 @@ async function installRoutes(page: Page) {
         return reply(route, selected);
       }
     }
-    const calcMatch = url.pathname.match(/^\/api\/hr\/severance\/calcs\/(\d+)(\/recalculate)?$/);
+    const calcMatch = url.pathname.match(/^\/api\/hr\/severance\/calcs\/(\d+)(\/recalculate|\/confirm)?$/);
     if (calcMatch) {
       const selected = calcs.find((item) => item.id === Number(calcMatch[1]));
       if (!selected) throw new Error(`Unknown calculation requested: ${url.pathname}`);
       if (method === "PUT" && !calcMatch[2]) {
-        Object.assign(selected, { adjustment_amount: payload?.adjustment_amount, adjustment_reason: payload?.adjustment_reason });
+        Object.assign(selected, { status: "reviewed", adjustment_amount: payload?.adjustment_amount, adjustment_reason: payload?.adjustment_reason });
+      } else if (method === "POST" && calcMatch[2] === "/confirm") {
+        Object.assign(selected, { status: "confirmed", confirmed_at: NOW, confirmed_by: 1 });
       } else if (!(method === "GET" && !calcMatch[2]) && !(method === "POST" && calcMatch[2])) {
         throw new Error(`Unexpected calculation request: ${method} ${url.pathname}`);
       }
@@ -203,6 +205,12 @@ test("severance page 2 keeps the selected employee through adjustment and recalc
     { method: "PUT", path: "/api/hr/severance/calcs/52", body: { adjustment_amount: 1000, adjustment_reason: "직원52 정산 확인" } },
     { method: "POST", path: "/api/hr/severance/calcs/52/recalculate", body: null },
   ]);
+  await page.getByRole("button", { name: "퇴직금 확정", exact: true }).click();
+  await expect(page.getByRole("button", { name: "퇴직금 확정", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "조정액 저장", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "재산정", exact: true })).toBeDisabled();
+  await expectSelected(page, 52);
+  expect(fixture.writes[2]).toEqual({ method: "POST", path: "/api/hr/severance/calcs/52/confirm", body: null });
   await page.getByRole("grid").screenshot({ path: test.info().outputPath("severance-selected-grid.png") });
   await page.screenshot({ path: test.info().outputPath("severance-selected-page-2.png"), fullPage: true });
   await page.getByRole("button", { name: "이전", exact: true }).click();
