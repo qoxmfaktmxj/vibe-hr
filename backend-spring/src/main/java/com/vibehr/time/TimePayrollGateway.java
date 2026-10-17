@@ -15,17 +15,18 @@ interface TimePayrollGateway {
                    coalesce(sum(a.holiday_work_minutes), 0) as holidayWorkMinutes,
                    coalesce(sum(a.holiday_overtime_minutes), 0) as holidayOvertimeMinutes,
                    coalesce(sum(a.holiday_night_minutes), 0) as holidayNightMinutes,
-                   profile.base_salary as baseSalary
+                   coalesce(profile.base_salary, 0) as baseSalary
               from tim_attendance_daily a
-              join lateral (
+              left join lateral (
                     select p.base_salary
                       from pay_employee_profiles p
                      where p.employee_id = a.employee_id
                        and p.is_active = true
                        and p.effective_from <= #{lastDay}
-                     order by p.effective_from desc
+                       and (p.effective_to is null or p.effective_to >= #{firstDay})
+                     order by p.effective_from desc, p.id desc
                      limit 1
-              ) profile on profile.base_salary > 0
+              ) profile on true
              where a.work_date between #{firstDay} and #{lastDay}
              group by a.employee_id, profile.base_salary
              order by a.employee_id

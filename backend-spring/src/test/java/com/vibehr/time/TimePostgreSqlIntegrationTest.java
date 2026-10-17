@@ -478,6 +478,60 @@ class TimePostgreSqlIntegrationTest {
                 Integer.class, EMPLOYEE_ID)).isZero();
     }
 
+    @Test
+    void monthCloseUsesTheLatestProfileOverlappingTheMonthRatherThanANewerExpiredProfile() {
+        seedAugustPayWork();
+        Integer payrollCodeId = jdbc.queryForObject("select id from pay_payroll_codes order by id limit 1", Integer.class);
+        jdbc.update("""
+                insert into pay_employee_profiles
+                       (employee_id,payroll_code_id,base_salary,pay_type_code,payment_day_type,holiday_adjustment,
+                        effective_from,effective_to,is_active,created_at,updated_at)
+                values (?,?,4180000,'regular','fixed_day','previous_business_day',
+                        date '2025-01-01',date '2026-07-31',true,?,?)
+                """, EMPLOYEE_ID, payrollCodeId, timestamp(CLOCK.instant()), timestamp(CLOCK.instant()));
+
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "profile period"), USER_ID);
+
+        assertPayInputs(List.of(
+                new PayInputRow("HDN", 160000), new PayInputRow("HDO", 60000), new PayInputRow("HDW", 240000),
+                new PayInputRow("NGT", 40000), new PayInputRow("OTX", 15000)));
+    }
+
+    @Test
+    void monthCloseDoesNotGeneratePayInputsForProfilesEndingBeforeTheMonth() {
+        seedAugustPayWork();
+        jdbc.update("update pay_employee_profiles set effective_to=date '2026-07-31' where employee_id=?", EMPLOYEE_ID);
+
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "expired profile"), USER_ID);
+
+        assertPayInputs(List.of());
+    }
+
+    @Test
+    void recloseClearsPreviouslyGeneratedAmountsWhenNoProfileStillOverlapsTheMonth() {
+        seedAugustPayWork();
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "initial close"), USER_ID);
+        service.reopenMonth(2026, 8, USER_ID);
+        jdbc.update("update pay_employee_profiles set effective_to=date '2026-07-31' where employee_id=?", EMPLOYEE_ID);
+
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "expired profile reclose"), USER_ID);
+
+        assertPayInputs(List.of(new PayInputRow("HDN", 0), new PayInputRow("HDO", 0), new PayInputRow("HDW", 0),
+                new PayInputRow("NGT", 0), new PayInputRow("OTX", 0)));
+    }
+
+    @Test
+    void profileEndingOnTheFirstDayOfTheMonthStillMatchesPayrollPeriodSelection() {
+        seedAugustPayWork();
+        jdbc.update("update pay_employee_profiles set effective_to=date '2026-08-01' where employee_id=?", EMPLOYEE_ID);
+
+        service.closeMonth(new TimMonthCloseRequest(2026, 8, "inclusive profile boundary"), USER_ID);
+
+        assertPayInputs(List.of(
+                new PayInputRow("HDN", 160000), new PayInputRow("HDO", 60000), new PayInputRow("HDW", 240000),
+                new PayInputRow("NGT", 40000), new PayInputRow("OTX", 15000)));
+    }
+
     private void seedAugustPayWork() {
         insertPayProfile();
         insertSchedule(LocalDate.of(2026, 8, 3), LocalDateTime.of(2026, 8, 3, 21, 0),

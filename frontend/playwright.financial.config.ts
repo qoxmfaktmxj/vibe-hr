@@ -3,7 +3,7 @@ import live from "./playwright.config";
 
 export default defineConfig({
   ...live,
-  testMatch: "financial-finalization.spec.ts",
+  testMatch: /(?:financial-finalization|time-payroll-chain)\.spec\.ts/,
   timeout: 240_000,
   expect: { timeout: 15_000 },
   outputDir: "./test-results/financial-finalization",

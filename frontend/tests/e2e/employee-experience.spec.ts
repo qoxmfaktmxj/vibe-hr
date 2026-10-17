@@ -85,6 +85,14 @@ test("month-close routes retain the shell, menu, tabs and home navigation", asyn
     await expect(tabs.getByRole("button", { name: label, exact: true })).toBeVisible();
     await expect(page.getByRole("main")).toContainText("근태 월마감");
     await capture(page, `${path.split("/").at(-1)}-shell-korean.png`);
+    await page.getByRole("row").filter({ hasText: `${new Date().getFullYear()}년 1월` }).getByRole("button", { name: "마감", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByPlaceholder("마감 사유 또는 메모")).toBeVisible();
+    await expect(dialog.locator("p p, p div")).toHaveCount(0);
+    await capture(page, `${path.split("/").at(-1)}-confirmation-korean.png`);
+    await dialog.getByRole("button", { name: "취소", exact: true }).click();
+    await expect(dialog).toBeHidden();
     await tabs.getByRole("button", { name: "홈", exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
   }

@@ -307,39 +307,30 @@ export function TimMonthCloseManager() {
         open={closeDialogOpen}
         onOpenChange={setCloseDialogOpen}
         title={`${appliedYear}년 ${targetMonth ?? ""}월 근태를 마감하시겠습니까?`}
-        description={
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              마감 후에는 해당 월 근태 수정이 제한됩니다. 마감 해제(재오픈)는 가능합니다.
-            </p>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">메모 (선택)</label>
-              <Input
-                value={actionNote}
-                onChange={(e) => setActionNote(e.target.value)}
-                placeholder="마감 사유 또는 메모"
-                className="h-8 text-sm"
-              />
-            </div>
-          </div>
-        }
+        description="마감 후에는 해당 월 근태 수정이 제한됩니다. 마감 해제(재오픈)는 가능합니다."
         confirmLabel="마감"
         cancelLabel="취소"
         confirmVariant="default"
         busy={acting}
         onConfirm={() => void confirmClose()}
-      />
+      >
+        <div className="px-6 py-3">
+          <label className="mb-1 block text-xs text-muted-foreground">메모 (선택)</label>
+          <Input
+            value={actionNote}
+            onChange={(e) => setActionNote(e.target.value)}
+            placeholder="마감 사유 또는 메모"
+            className="h-8 text-sm"
+          />
+        </div>
+      </ConfirmDialog>
 
       {/* 재오픈 확인 */}
       <ConfirmDialog
         open={reopenDialogOpen}
         onOpenChange={setReopenDialogOpen}
         title={`${appliedYear}년 ${targetMonth ?? ""}월 마감을 해제하시겠습니까?`}
-        description={
-          <p className="text-sm text-muted-foreground">
-            마감 해제 후 해당 월 근태 데이터를 수정할 수 있습니다.
-          </p>
-        }
+        description="마감 해제 후 해당 월 근태 데이터를 수정할 수 있습니다."
         confirmLabel="재오픈"
         cancelLabel="취소"
         confirmVariant="destructive"

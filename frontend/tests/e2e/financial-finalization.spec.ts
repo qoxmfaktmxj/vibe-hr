@@ -13,7 +13,7 @@ test("isolated payroll payment and retirement reach their final states", async (
     expect(response.ok(), `${method} ${route}: ${response.status()}`).toBeTruthy();
     return response.json();
   }
-  await call(api, "post", "/api/auth/login", { enter_cd: "VIBE", login_id: "admin-local", password: "admin" });
+  expect((await call(api, "get", "/api/auth/me")).user.roles).toContain("admin");
   const initial = await call(api, "get", "/api/employees?all=true");
   expect(initial.employees.length).toBeGreaterThanOrEqual(2);
   expect(initial.employees.every((row: { employee_no: string }) => ["HR-0001", "HR-0002"].includes(row.employee_no) || row.employee_no.startsWith("FQ-")),
