@@ -16,7 +16,7 @@ export const PRODUCT_SCENES: readonly ProductScene[] = [
   { id: "06", title: "근무 배정", category: "근태", description: "조직의 기준과 개인의 예외를 함께.", detail: "부서별 근무패턴과 개인별 예외를 기간 단위로 관리합니다. 배정 변경은 초안으로 모아 저장합니다.", image: "/images/product/06.webp" },
   { id: "07", title: "근태 현황", category: "근태", description: "날짜와 상태로 읽는 하루의 기록.", detail: "기간별 출퇴근과 휴가 상태를 조회하고, 확인이 필요한 기록에서 정정 업무로 이어갑니다.", image: "/images/product/07.webp" },
   { id: "08", title: "근태 월마감", category: "근태", description: "열두 달의 상태를 한 화면에서.", detail: "월별 집계와 마감 여부를 비교합니다. 마감과 재오픈은 일반적인 표 편집과 구분된 확인 절차를 거칩니다.", image: "/images/product/08.webp" },
-  { id: "09", title: "사람이 중심이 되는 공간", category: "VIBE-HR", description: "일하는 화면 사이, 잠깐의 여유.", detail: "VIBE-HR의 기존 물결 배경입니다. 확대하면 자동으로 재생되며, 커서를 움직이면 물과 공간이 반응합니다.", image: "/images/conservatory-login-desktop.webp" },
+  { id: "09", title: "사람이 중심이 되는 공간", category: "VIBE-HR", description: "물결 위의 VIBE-HR, 커서를 따라 흐르는 글자.", detail: "미리보기에서는 물결과 글자의 움직임을 자동으로 보여드립니다. 확대하면 커서를 움직여 VIBE-HR 글자와 물결을 직접 제어할 수 있습니다.", image: "/images/conservatory-login-desktop.webp" },
   { id: "10", title: "급여 명세서", category: "급여", description: "월별 내역에서 상세 명세까지.", detail: "월별 지급 내역을 선택해 수당과 공제 내용을 확인합니다. 명세서는 읽기 쉬운 문서 형식을 유지합니다.", image: "/images/product/10.webp" },
   { id: "11", title: "급여 실행", category: "급여", description: "실행 상태와 대상자를 함께 확인.", detail: "급여 실행별 계산, 마감, 지급 상태와 대상자를 조회합니다. 실행 건의 집계와 상세 내역을 연결해 확인합니다.", image: "/images/product/11.webp" },
   { id: "12", title: "급여 전표", category: "급여", description: "계정별 근거까지 이어지는 급여.", detail: "전표의 차변과 대변을 계정별로 대조하고 합계를 확인합니다. 전표 라인은 조회 중심 그리드로 제공합니다.", image: "/images/product/12.webp" },

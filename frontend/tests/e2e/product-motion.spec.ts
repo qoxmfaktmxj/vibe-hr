@@ -5,6 +5,98 @@ import { PRODUCT_SCENES } from "../../src/components/landing/scenes";
 
 const activePlayers = '[data-motion-playing="true"]';
 
+test("water preview plays alone, pauses, and hands control to the live brand scene", async ({ page }) => {
+  const textures: string[] = [];
+  page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/images/conservatory/")) textures.push(request.url()); });
+  await page.goto("/");
+  const gallery = page.getByTestId("product-gallery");
+  await expect(gallery).toHaveAttribute("data-ready", "true");
+  await page.getByLabel("장면 바로 이동", { exact: true }).selectOption("8");
+  await expect(gallery).toHaveAttribute("data-motion-scene", "09");
+  await expect(gallery).toHaveAttribute("data-motion-playing", "true");
+  const time = await gallery.getAttribute("data-motion-time");
+  await expect.poll(() => gallery.getAttribute("data-motion-time")).not.toBe(time);
+  expect(textures).toEqual([]);
+  await page.getByRole("button", { name: "시연 일시 정지", exact: true }).click();
+  await expect(gallery).toHaveAttribute("data-motion-playing", "false");
+  const paused = await gallery.getAttribute("data-motion-time");
+  await page.waitForTimeout(350);
+  expect(await gallery.getAttribute("data-motion-time")).toBe(paused);
+  await page.getByRole("button", { name: "시연 재생", exact: true }).click();
+  await expect(gallery).toHaveAttribute("data-motion-playing", "true");
+  await page.getByRole("button", { name: "화면 확대", exact: true }).click();
+  await expect(page.getByTestId("water-exhibit")).toHaveAttribute("data-ready", "true", { timeout: 45000 });
+  await expect(gallery).toHaveAttribute("data-motion-playing", "false");
+  await expect(page.getByRole("dialog").getByRole("img", { name: "사람이 중심이 되는 VIBE-HR", exact: true })).toBeAttached();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("water-exhibit")).toHaveCount(0);
+  await expect(gallery).toHaveAttribute("data-motion-playing", "true");
+  await page.getByLabel("장면 바로 이동", { exact: true }).selectOption("0");
+  await expect(gallery).toHaveAttribute("data-motion-scene", "01");
+  await expect(page.locator(activePlayers)).toHaveCount(1);
+});
+
+test("water list preview pauses offscreen and reduced motion avoids the video", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/");
+  const item = page.getByRole("button", { name: "09 사람이 중심이 되는 공간 확대", exact: true });
+  await item.evaluate(el => el.scrollIntoView({ block: "center" }));
+  const motion = page.getByTestId("product-motion");
+  await expect(motion).toHaveAttribute("data-motion-scene", "09");
+  await expect(motion).toHaveAttribute("data-motion-playing", "true");
+  await expect(page.locator(activePlayers)).toHaveCount(1);
+  await motion.evaluate(el => { el.style.transform = "translateY(300vh)"; });
+  await expect(motion).toHaveAttribute("data-motion-playing", "false");
+  await motion.evaluate(el => { el.style.transform = ""; });
+  await expect(motion).toHaveAttribute("data-motion-playing", "true");
+  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: true }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect(motion).toHaveAttribute("data-motion-playing", "false");
+  await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, value: false }); document.dispatchEvent(new Event("visibilitychange")); });
+  await expect(motion).toHaveAttribute("data-motion-playing", "true");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const videos: string[] = [];
+  page.on("request", request => { if (request.url().includes("/09/preview.mp4")) videos.push(request.url()); });
+  await page.reload();
+  await item.evaluate(el => el.scrollIntoView({ block: "center" }));
+  await expect(page.getByTestId("product-motion")).toHaveCount(0);
+  expect(videos).toEqual([]);
+});
+
+test("the enlarged water brand visibly flows under the real pointer and settles afterward", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/");
+  await expect(page.getByTestId("product-gallery")).toHaveAttribute("data-ready", "true");
+  await page.getByLabel("장면 바로 이동", { exact: true }).selectOption("8");
+  await page.getByRole("button", { name: "화면 확대", exact: true }).click();
+  const water = page.getByTestId("water-exhibit");
+  await expect(water).toHaveAttribute("data-ready", "true", { timeout: 45000 });
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  const box = (await water.boundingBox())!;
+  const scale = box.width / Math.min(box.width, 960);
+  const width = Math.min(Math.min(box.width, 960) - 24, 460) * scale;
+  const title = { x: box.x + (box.width - width) / 2, y: box.y + 40 * scale + width * .12, width, height: width * .18 };
+  const before = await page.screenshot({ clip: title });
+  for (let step = 0; step < 60; step++) {
+    await page.mouse.move(title.x + width * (.1 + step / 60 * .8), title.y + title.height * .55 + Math.sin(step * .3) * 18);
+    await page.clock.runFor(20);
+  }
+  const active = await page.screenshot({ clip: title, path: "output/landing-20261018/water-preview/title-interactive.png" });
+  await water.evaluate(el => el.dispatchEvent(new PointerEvent("pointerleave")));
+  await page.clock.runFor(6000);
+  const settled = await page.screenshot({ clip: title, path: "output/landing-20261018/water-preview/title-settled.png" });
+  const decode = (buffer: Buffer) => sharp(buffer).removeAlpha().raw().toBuffer();
+  const [a, b, c] = await Promise.all([decode(before), decode(active), decode(settled)]);
+  let changed = 0, remaining = 0;
+  for (let i = 0; i < a.length; i += 3) {
+    const ink = (data: Buffer) => data[i] + data[i + 1] + data[i + 2] < 240;
+    if (ink(a) !== ink(b)) changed++;
+    if (ink(a) !== ink(c)) remaining++;
+  }
+  await test.info().attach("water-brand-pixels", { body: JSON.stringify({ changed, remaining }), contentType: "application/json" });
+  expect(changed).toBeGreaterThan(100);
+  expect(remaining).toBeLessThan(changed * .4);
+});
+
 test("overview stays static, one selected frame plays, and details take ownership", async ({ page }) => {
   const assets: string[] = [], writes: string[] = [];
   page.on("request", request => {

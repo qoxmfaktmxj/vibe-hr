@@ -107,7 +107,7 @@ export function ProductLanding() {
       </div> : <ol ref={listRef} className={styles.sceneList}>
         {PRODUCT_SCENES.map((scene, index) => <li key={scene.id} id={`scene-${scene.id}`} data-scene-index={index}>
           <button type="button" className={styles.sceneButton} onClick={() => open(index)} aria-label={`${scene.id} ${scene.title} 확대`}>
-            <div className={styles.poster}>{motionAvailable && active === index && !isOpen && scene.id !== "09" ? <ProductMotion scene={scene} playing={!motionPaused} /> : <Image src={scene.image} alt={`${scene.title} ${scene.id === "09" ? "물결 배경" : "제품 시연 화면"}`} width={1320} height={825} unoptimized loading={index < 2 ? "eager" : "lazy"} />}<span><Expand size={18} /></span></div>
+            <div className={styles.poster}>{motionAvailable && active === index && !isOpen ? <ProductMotion scene={scene} playing={!motionPaused} /> : <Image src={scene.image} alt={`${scene.title} ${scene.id === "09" ? "물결 배경" : "제품 시연 화면"}`} width={1320} height={825} unoptimized loading={index < 2 ? "eager" : "lazy"} />}<span><Expand size={18} /></span></div>
             <div className={styles.sceneCaption}><span>{scene.id}</span><h2>{scene.title}</h2><span>{scene.category}</span></div>
             <p>{scene.description}</p>
           </button>

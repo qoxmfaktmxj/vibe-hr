@@ -94,7 +94,7 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
   const projected = new THREE.Vector3();
   function syncMotion() {
     let inView = false;
-    if (selected >= 0 && selected !== 8) {
+    if (selected >= 0) {
       camera.updateMatrixWorld();
       frames[selected].getWorldPosition(projected).project(camera);
       inView = Math.abs(projected.x) < .9 && Math.abs(projected.y) < .9 && projected.z >= -1 && projected.z <= 1;
@@ -182,7 +182,7 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
       }
       motion.setPlaying(false);
       selected = index;
-      motion.setScene(index >= 0 && index !== 8 ? PRODUCT_SCENES[index].id : null);
+      motion.setScene(index >= 0 ? PRODUCT_SCENES[index].id : null);
       yaw = 0; pitch = 0;
       if (index < 0) {
         targetPosition.set(0, .2, overviewDepth());

@@ -18,12 +18,13 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
   let desired = false, disposed = false, failed = false;
   let frame = 0, elapsed = 0, previous = 0, lastDraw = 0, phase = 0;
   let lastStatus = "";
+  let video: HTMLVideoElement | null = null;
   const font = fontFamily || getComputedStyle(canvas).fontFamily || "sans-serif";
-  const ready = () => Boolean(clip && images.length === clip.steps.length);
-  const canPlay = () => desired && ready() && !disposed && !document.hidden;
+  const ready = () => video ? video.readyState >= 2 : Boolean(clip && images.length === clip.steps.length);
+  const canPlay = () => desired && ready() && !failed && !disposed && !document.hidden;
 
   function status() {
-    const value = { scene, playing: canPlay(), ready: ready(), failed, loading: request !== null, phase };
+    const value = { scene, playing: canPlay(), ready: ready(), failed, loading: request !== null || Boolean(video && !ready() && !failed), phase };
     canvas.dataset.motionScene = scene ?? "";
     canvas.dataset.motionPlaying = String(value.playing);
     canvas.dataset.ready = String(value.ready);
@@ -34,6 +35,12 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
     if (signature !== lastStatus) { lastStatus = signature; onStatus(value); }
   }
   function draw() {
+    if (video && ready() && scene && !disposed) {
+      ctx.drawImage(video, 0, 0, WIDTH, HEIGHT);
+      canvas.dataset.motionTime = String(Math.round(video.currentTime * 1000));
+      status(); onFrame(scene);
+      return;
+    }
     if (!clip || !images.length || !scene || disposed) return;
     const duration = clip.steps.length * STEP_MS;
     const local = elapsed % duration;
@@ -82,6 +89,17 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
   }
   async function load() {
     if (!scene || request || ready() || disposed || failed) return;
+    if (scene === "09") {
+      if (video) return;
+      const nextVideo = document.createElement("video");
+      video = nextVideo;
+      nextVideo.muted = true; nextVideo.loop = true; nextVideo.playsInline = true;
+      nextVideo.onloadeddata = () => { if (video === nextVideo && !disposed) { draw(); sync(); } };
+      nextVideo.onerror = () => { if (video === nextVideo && !disposed) { failed = true; sync(); } };
+      nextVideo.src = "/images/product/motion/09/preview.mp4";
+      nextVideo.load(); status();
+      return;
+    }
     const controller = new AbortController(), requestedScene = scene;
     request = controller;
     status();
@@ -117,7 +135,21 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
     cancelAnimationFrame(frame); frame = 0; previous = 0; lastDraw = 0;
     if (desired && !document.hidden && !failed && !ready()) void load();
     if (canPlay()) frame = requestAnimationFrame(tick);
+    if (video) {
+      if (canPlay()) {
+        const currentVideo = video;
+        void currentVideo.play().catch(error => {
+          if (error.name === "AbortError" || currentVideo !== video || disposed) return;
+          failed = true; sync();
+        });
+      } else video.pause();
+    }
     status();
+  }
+  function releaseVideo() {
+    if (!video) return;
+    video.onloadeddata = null; video.onerror = null;
+    video.pause(); video.removeAttribute("src"); video.load(); video = null;
   }
   const visibility = () => sync();
   document.addEventListener("visibilitychange", visibility);
@@ -125,6 +157,7 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
     setScene(id: string | null) {
       if (scene === id) return;
       request?.abort(); request = null;
+      releaseVideo();
       cancelAnimationFrame(frame); frame = 0;
       images.forEach(image => image.close()); images = []; clip = null;
       scene = id; failed = false; elapsed = 0; phase = 0;
@@ -133,12 +166,13 @@ export function createMotionPlayer(canvas: HTMLCanvasElement, onFrame: (scene: s
     setPlaying(value: boolean) {
       if (desired === value) return;
       desired = value;
-      if (value && failed) failed = false;
+      if (value && failed) { failed = false; releaseVideo(); }
       sync();
     },
     dispose() {
       disposed = true; desired = false;
       cancelAnimationFrame(frame); request?.abort();
+      releaseVideo();
       images.forEach(image => image.close()); images = []; clip = null;
       document.removeEventListener("visibilitychange", visibility);
       status();

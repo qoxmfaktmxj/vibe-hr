@@ -102,6 +102,8 @@ Mobile uses the complete list and plays one visible product demonstration. Reduc
 
 Opening the enlarged water exhibit automatically starts the existing renderer, without changing login scene sources or posters. Reduced-motion users retain the static poster without loading the renderer. Stop and resume remain available. Camera motion stops when settled except for the selected demonstration's texture updates. View changes and unmount cancel loads and release decoded frames and renderer resources. See `../docs/design/2026-10-18-product-scene-motion.md` for scene-level flows and playback ownership.
 
+The water frame now previews a silent12-second loop of the existing scene and VIBE-HR liquid title, including an automatic cursor sweep and recovery. The same single-player ownership applies in space and list modes; the full water renderer loads only on enlargement. The enlarged scene uses the original liquid-title implementation with a centered composition, real pointer input and static accessible lettering as fallback. Its original login implementation is unchanged. See `../docs/design/2026-10-18-water-brand-preview.md` for media regeneration and verification.
+
 See `../docs/design/2026-10-18-landing-implementation.md` for source boundaries, media provenance, verification and the distinction between static product images and live spatial motion.
 
 ## AG Grid visual reference

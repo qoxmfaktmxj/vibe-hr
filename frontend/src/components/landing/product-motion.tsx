@@ -32,7 +32,7 @@ export function ProductMotion({ scene, playing }: { scene: ProductScene; playing
 
   return <div className={styles.motionMedia}>
     <Image src={scene.image} alt="" width={1320} height={825} unoptimized />
-    <canvas ref={canvasRef} className={styles.motionCanvas} role="img" aria-label={`${scene.title} 업무 흐름 시연`} data-testid="product-motion" data-ready="false" data-motion-playing="false" />
+    <canvas ref={canvasRef} className={styles.motionCanvas} role="img" aria-label={`${scene.title} ${scene.id === "09" ? "물결과 VIBE-HR 자동 시연" : "업무 흐름 시연"}`} data-testid="product-motion" data-ready="false" data-motion-playing="false" />
     <span className={styles.motionLoading}>시연을 준비하고 있습니다.</span>
     <span className={styles.motionError}>시연을 불러오지 못했습니다. 화면을 다시 열어 주세요.</span>
   </div>;

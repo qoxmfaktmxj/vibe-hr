@@ -90,8 +90,9 @@
 .dialogFooter p { color: #3f4a5a; font-size: 13px; line-height: 1.7; max-width: 75ch; }
 .dialogFooter small { display: block; margin-top: 5px; color: var(--muted-ink); font-size: 11px; }
 .dialogFooter > div { display: flex; gap: 8px; }
-.water { position: relative; width: 100%; height: min(62dvh, 720px); overflow: hidden; }
+.water { position: relative; width: 100%; height: min(62dvh, 720px); overflow: hidden; container-type: inline-size; }
 .water > img { object-fit: cover; }
+.waterTitle { position: absolute; top: max(40px, 4.1667cqw); left: 50%; width: min(calc(100% - 24px), max(460px, 47.9167%)); transform: translateX(-50%); fill: #1b1b1a; }
 .waterCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .3s; }
 .waterCanvas[data-ready="true"] { opacity: 1; }
 .waterToggle { position: absolute; left: 24px; bottom: 22px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; background: #fff; border-radius: 4px; font-size: 13px; }

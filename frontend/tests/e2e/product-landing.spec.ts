@@ -208,7 +208,7 @@ test("opening water with reduced motion keeps the static poster without loading 
   page.on("request", request => { if (new URL(request.url()).pathname.startsWith("/images/conservatory/")) textures.push(request.url()); });
   await page.goto("/");
   await page.getByRole("button", { name: "09 사람이 중심이 되는 공간 확대", exact: true }).click();
-  await expect(page.getByRole("dialog").getByRole("img")).toBeVisible();
+  await expect(page.getByRole("dialog").getByRole("img", { name: "물결과 진주, 분홍빛 정원으로 이루어진 기존 VIBE-HR 배경" })).toBeVisible();
   await expect(page.getByTestId("water-exhibit")).toHaveCount(0);
   expect(textures).toEqual([]);
 });
