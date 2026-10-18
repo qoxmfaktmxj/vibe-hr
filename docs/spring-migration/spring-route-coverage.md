@@ -8,7 +8,7 @@ This report is generated deterministically by `scripts/spring-migration/spring-r
 - Required canonical routes: 290
 - Implemented in Spring: 290
 - Missing from Spring: 0
-- Extra Spring mappings: 1
+- Extra Spring mappings: 2
 - Duplicate Spring mapping groups: 0
 - Completion: 100.00%
 
@@ -23,6 +23,7 @@ This migration remains in progress while required canonical routes are missing. 
 
 The complete-mode allowlist contains only explicit, reviewed extensions in `COMPLETE_ALLOWLIST` in the generator; never use it to hide a domain still in progress.
 
+- `POST /api/v1/hr/basic/{param}/records/batch`: Approved atomic HR basic-record batch-save extension; see docs/design/2026-10-18-grid-save-contract.md.
 - `POST /api/v1/hri/requests/submit`: Approved atomic HRI submission extension; see docs/HRI_SUBMISSION_API.md.
 
 ## Route Summary

@@ -19,6 +19,7 @@ const EXPECTED_TRA_SHADOWED_HANDLER_COUNT = 6;
 const COMPLETE_ALLOWLIST = Object.freeze({
   missing: Object.freeze({}),
   extra: Object.freeze({
+    "POST /api/v1/hr/basic/{param}/records/batch": "Approved atomic HR basic-record batch-save extension; see docs/design/2026-10-18-grid-save-contract.md.",
     "POST /api/v1/hri/requests/submit": "Approved atomic HRI submission extension; see docs/HRI_SUBMISSION_API.md.",
   }),
 });
