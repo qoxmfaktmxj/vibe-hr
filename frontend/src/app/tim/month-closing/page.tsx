@@ -2,11 +2,8 @@ import { AppShell } from "@/components/layout/app-shell";
 import { TimMonthCloseManager } from "@/components/tim/tim-month-close-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
-export const GRID_SCREEN = {
-  engine: "ag-grid",
-  profile: "standard-v1",
-  registryKey: "tim.month-closing",
-} as const;
+const GRID_SCREEN = { engine: "ag-grid", profile: "standard-v2", registryKey: "tim.month-closing" } as const;
+void GRID_SCREEN;
 
 export default async function TimMonthClosingPage() {
   await requireMenuAccess("/tim/month-closing");

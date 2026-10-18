@@ -22,8 +22,8 @@ export default async function TimWorkCodesPage() {
       title="근무코드 관리"
       description="근무코드, 조직 기본 근무, 개인 예외 근무조를 함께 관리합니다."
     >
-      <div className="space-y-4 p-4">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="business-workspace space-y-6">
+        <div className="space-y-6">
           <ScheduleGeneratorManager />
           <DepartmentScheduleAssignmentManager />
           <EmployeeScheduleExceptionManager />

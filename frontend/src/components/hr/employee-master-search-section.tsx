@@ -33,13 +33,7 @@ export function EmployeeMasterSearchSection(props: Props) {
     appliedFilters.active && `계정 ${appliedFilters.active === "Y" ? "활성" : "비활성"}`,
     appliedFilters.employmentStatuses.length > 0 && `재직상태 ${appliedFilters.employmentStatuses.map(value => props.statusOptions.find(option => option.value === value)?.label ?? value).join(", ")}`,
   ].filter(Boolean);
-  return <ManagerSearchSection title="사원 검색" onQuery={props.onQuery} queryDisabled={queryDisabled}>
-    <SearchFieldGrid className="xl:grid-cols-4">
-      <SearchTextField value={filters.employeeNo} onChange={props.onEmployeeNoChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.employeeNo} />
-      <SearchTextField value={filters.name} onChange={props.onNameChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.employeeName} />
-      <SearchTextField value={filters.department} onChange={props.onDepartmentChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.departmentName} />
-      <MultiSelectFilter options={props.statusOptions} values={filters.employmentStatuses} onChange={props.onEmploymentStatusesChange} summaryPrefix="재직상태" searchPlaceholder="재직상태 검색" />
-    </SearchFieldGrid>
+  return <ManagerSearchSection onQuery={props.onQuery} queryDisabled={queryDisabled} queryButtonClassName="h-9" className="business-search" footer={<>
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <Button variant="ghost" size="sm" aria-expanded={expanded} aria-controls="employee-advanced-search" onClick={() => setExpanded(!expanded)}><SlidersHorizontal className="h-3.5 w-3.5" />상세 검색</Button>
       <Button variant="ghost" size="sm" onClick={props.onReset} disabled={queryDisabled}><RotateCcw className="h-3.5 w-3.5" />조건 초기화</Button>
@@ -50,5 +44,12 @@ export function EmployeeMasterSearchSection(props: Props) {
       <div className="space-y-1 text-xs text-muted-foreground"><p>입사일 이전</p><CustomDatePicker value={filters.hireDateTo} onChange={props.onHireDateToChange} holidays={props.holidayDateKeys} placeholder={SEARCH_PLACEHOLDERS.hireDateTo} className="w-full" /></div>
       <label className="space-y-1 text-xs text-muted-foreground">계정 사용 여부<select value={filters.active} onChange={(e) => props.onActiveChange(e.target.value as ActiveFilter)} onKeyDown={props.onEnter} aria-label="계정 사용 여부" className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground"><option value="">전체</option><option value="Y">활성</option><option value="N">비활성</option></select></label>
     </div>}
+    </>}>
+    <SearchFieldGrid className="xl:grid-cols-4">
+      <label className="space-y-1 text-xs text-muted-foreground">사번<SearchTextField value={filters.employeeNo} onChange={props.onEmployeeNoChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.employeeNo} /></label>
+      <label className="space-y-1 text-xs text-muted-foreground">이름<SearchTextField value={filters.name} onChange={props.onNameChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.employeeName} /></label>
+      <label className="space-y-1 text-xs text-muted-foreground">부서<SearchTextField value={filters.department} onChange={props.onDepartmentChange} onKeyDown={props.onEnter} placeholder={SEARCH_PLACEHOLDERS.departmentName} /></label>
+      <div className="space-y-1 text-xs text-muted-foreground"><p>재직상태</p><MultiSelectFilter options={props.statusOptions} values={filters.employmentStatuses} onChange={props.onEmploymentStatusesChange} summaryPrefix="재직상태" searchPlaceholder="재직상태 검색" /></div>
+    </SearchFieldGrid>
   </ManagerSearchSection>;
 }

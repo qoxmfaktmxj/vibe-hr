@@ -19,9 +19,14 @@ type GridToolbarActionsProps = {
 };
 
 export function GridToolbarActions({ actions, saveAction }: GridToolbarActionsProps) {
+  const orderedActions = [...actions];
+  if (saveAction) {
+    const downloadIndex = orderedActions.findIndex((action) => action.key === "download");
+    orderedActions.splice(downloadIndex < 0 ? orderedActions.length : downloadIndex, 0, { ...saveAction, variant: saveAction.variant ?? "save" });
+  }
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {actions.map((action) => {
+      {orderedActions.map((action) => {
         const Icon = action.icon;
         return (
           <Button
@@ -36,20 +41,6 @@ export function GridToolbarActions({ actions, saveAction }: GridToolbarActionsPr
           </Button>
         );
       })}
-      {saveAction ? (
-        <>
-          <div className="mx-1 h-6 w-px bg-muted" />
-          <Button
-            size="sm"
-            variant={saveAction.variant ?? "save"}
-            onClick={saveAction.onClick}
-            disabled={saveAction.disabled}
-          >
-            {saveAction.icon ? <saveAction.icon className="h-3.5 w-3.5" /> : null}
-            {saveAction.label}
-          </Button>
-        </>
-      ) : null}
     </div>
   );
 }

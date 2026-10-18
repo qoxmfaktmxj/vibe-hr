@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import {
   ReadonlyGridManager,
+  LocalReadonlyGrid,
   createReadonlyGridRows,
   type ReadonlyGridRow,
 } from "@/components/grid/readonly-grid-manager";
@@ -292,7 +293,7 @@ export function PayVoucherManager() {
   }
 
   return (
-    <div className="space-y-4 px-4 py-4">
+    <div className="business-workspace space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>급여 전표 생성</CardTitle>
@@ -319,6 +320,7 @@ export function PayVoucherManager() {
       </Card>
 
       <ReadonlyGridManager<VoucherRow>
+        embedded inset gridHeight={320}
         title="급여 전표 목록"
         searchFields={null}
         rowData={voucherRows}
@@ -370,43 +372,14 @@ export function PayVoucherManager() {
                 ) : null}
               </div>
 
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">라인</th>
-                      <th className="px-3 py-2 text-left">계정</th>
-                      <th className="px-3 py-2 text-left">코스트센터</th>
-                      <th className="px-3 py-2 text-right">차변</th>
-                      <th className="px-3 py-2 text-right">대변</th>
-                      <th className="px-3 py-2 text-left">요약</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {voucherDetail.lines.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">
-                          라인 데이터가 없습니다.
-                        </td>
-                      </tr>
-                    ) : (
-                      voucherDetail.lines.map((line) => (
-                        <tr key={line.id} className="border-t">
-                          <td className="px-3 py-2">{line.line_no}</td>
-                          <td className="px-3 py-2">
-                            {line.gl_account_code}
-                            {line.gl_account_name ? ` (${line.gl_account_name})` : ""}
-                          </td>
-                          <td className="px-3 py-2">{line.cost_center_code ?? "-"}</td>
-                          <td className="px-3 py-2 text-right">{formatAmount(line.debit_amount)}</td>
-                          <td className="px-3 py-2 text-right">{formatAmount(line.credit_amount)}</td>
-                          <td className="px-3 py-2">{line.summary ?? "-"}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <LocalReadonlyGrid title="전표 라인" items={voucherDetail.lines} rowId={row => row.id} columns={[
+                  { field: "line_no", headerName: "라인", width: 80 },
+                  { field: "gl_account_code", headerName: "계정", minWidth: 200, valueFormatter: p => `${p.value ?? ""}${p.data?.gl_account_name ? ` (${p.data.gl_account_name})` : ""}` },
+                  { field: "cost_center_code", headerName: "코스트센터", minWidth: 150 },
+                  { field: "debit_amount", headerName: "차변", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatAmount(p.value) },
+                  { field: "credit_amount", headerName: "대변", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatAmount(p.value) },
+                  { field: "summary", headerName: "요약", minWidth: 180, flex: 1 },
+                ]} emptyText="조회된 상세 내역이 없습니다." />
 
               <div className="flex flex-wrap gap-2">
                 <Button

@@ -2,13 +2,15 @@
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 4.75rem;
+  min-height: 3.5rem;
+  flex-shrink: 0;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  border-radius: 1rem;
-  padding: 0.55rem 0.35rem 0.6rem;
+  gap: 0.25rem;
+  border-radius: 4px;
+  padding: 0.375rem 0.25rem;
+  background: transparent;
   color: var(--vibe-rail-muted);
   transition:
     background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -17,42 +19,26 @@
     box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.railItem::before {
-  position: absolute;
-  top: 0.5rem;
-  bottom: 0.5rem;
-  left: 0.18rem;
-  width: 0.22rem;
-  border-radius: 999px;
-  background: var(--primary);
-  content: "";
-  opacity: 0;
-  transform: scaleY(0.6);
-  transition:
-    opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 .railItem:hover,
 .railItem:focus-visible {
   background: var(--vibe-rail-hover);
   color: #fff;
 }
 
-.railItemActive {
-  background: var(--vibe-rail-active);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+.railItemActive,
+.railItemActive:hover,
+.railItemActive:focus-visible {
+  background: transparent;
+  color: color-mix(in srgb, var(--primary) 55%, white);
 }
 
-.railItemActive::before {
-  opacity: 1;
-  transform: scaleY(1);
+.railItemActive .railLabel {
+  font-weight: 700;
 }
 
 .railItemMobile {
-  min-width: 4.75rem;
-  min-height: auto;
+  min-width: 4.25rem;
+  min-height: 3.5rem;
   width: auto;
   padding: 0.5rem 0.5rem 0.55rem;
 }
@@ -64,15 +50,16 @@
 }
 
 .railLabel {
-  max-width: 4.25rem;
+  max-width: 100%;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.15;
   letter-spacing: -0.02em;
   text-align: center;
-  white-space: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   word-break: keep-all;
-  overflow-wrap: anywhere;
 }
 
 .railItemMobile .railLabel {
@@ -82,13 +69,17 @@
 .railButton {
   appearance: none;
   border: 0;
-  background: none;
   cursor: pointer;
 }
 
 .railButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.menuLeafActive {
+  color: color-mix(in srgb, var(--primary) 65%, var(--vibe-nav-text-strong));
+  font-weight: 700;
 }
 
 .menuGroupBody {
@@ -110,9 +101,9 @@
 }
 
 .menuGroupBodyInner {
-  margin-left: 1rem;
+  margin-left: 0.75rem;
   border-left: 1px solid var(--border);
-  padding-left: 0.75rem;
+  padding-left: 0.5rem;
   min-height: 0;
   overflow: hidden;
 }
@@ -147,34 +138,19 @@
   height: 100%;
 }
 
-.panelToggle {
-  width: 1.5rem;
-  min-width: 1.5rem;
-  border-right: 1px solid var(--border);
-  background: var(--vibe-sidebar-bg);
-  color: var(--vibe-nav-text-muted);
-  transition:
-    background-color 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    color 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.sidebarScroll {
+  scrollbar-width: none;
 }
 
-.panelToggle:hover {
-  background: color-mix(in srgb, var(--vibe-sidebar-bg) 84%, var(--primary));
-  color: var(--vibe-nav-text-strong);
-}
-
-.panelToggle:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 72%, white);
-}
-
-.panelToggleIcon {
-  margin-top: 1rem;
+.sidebarScroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .railFooter {
   margin-top: auto;
-  padding: 0.5rem 0.5rem 0.75rem;
+  padding: 0.25rem 0.25rem 0.5rem;
 }
 
 .profileTrigger {
@@ -188,10 +164,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .railItem,
-  .railItem::before,
   .menuGroupBody,
-  .desktopContextPanel,
-  .panelToggle {
+  .desktopContextPanel {
     transition-duration: 1ms;
   }
 }

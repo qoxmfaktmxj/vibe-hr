@@ -17,6 +17,23 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 
 class HrControllerTest {
     @Test
+    void historyBatchRetainsHrRoleGateAndRejectsUnauthorizedActorBeforeWriting() {
+        HrApplicationService service = mock(HrApplicationService.class);
+        HrAuthorization authorization = mock(HrAuthorization.class);
+        HrController controller = new HrController(service, authorization);
+        var auth = new TestingAuthenticationToken("17", "token");
+        var batch = new HrRequests.BasicRecordBatch();
+        when(authorization.requireAnyRole(auth, "hr_manager", "admin")).thenReturn(17);
+        Map<String, Object> result = Map.of("items", List.of());
+        when(service.batchBasicRecords(23, batch)).thenReturn(result);
+        assertThat(controller.batchRecords(auth, 23, batch)).isSameAs(result);
+        verify(service).batchBasicRecords(23, batch);
+        when(authorization.requireAnyRole(auth, "hr_manager", "admin")).thenThrow(ApiException.forbidden("Forbidden."));
+        assertThrows(ApiException.class, () -> controller.batchRecords(auth, 24, batch));
+        org.mockito.Mockito.verify(service, org.mockito.Mockito.never()).batchBasicRecords(24, batch);
+    }
+
+    @Test
     void employeeGridRetainsTheLegacyRoleAndMenuQueryGate() {
         HrApplicationService service = mock(HrApplicationService.class);
         HrAuthorization authorization = mock(HrAuthorization.class);

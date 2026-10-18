@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import { Copy, Download, Plus, Save, Search, Upload } from "lucide-react";
+import { Download, Search } from "lucide-react";
 
 import { GridChangeSummaryBadges } from "@/components/grid/grid-change-summary-badges";
 import { GridPaginationControls } from "@/components/grid/grid-pagination-controls";
@@ -32,6 +32,7 @@ export type ReadonlyGridRow = {
 
 type ReadonlyGridManagerProps<Row extends ReadonlyGridRow> = {
   title: string;
+  hideSearchTitle?: boolean;
   searchFields: ReactNode;
   rowData: Row[];
   columnDefs: ColDef<Row>[];
@@ -71,8 +72,24 @@ export function createReadonlyGridRows<T extends { id: number | string }>(
   }));
 }
 
+export function LocalReadonlyGrid<T extends object>({ title, items, columns, rowId, onRowClick, onQuery, queryLabel = "조회", loading = false, disabled = false, gridHeight = 300, emptyText }: {
+  title: string; items: T[]; columns: ColDef<T & ReadonlyGridRow>[];
+  rowId: (item: T, index: number) => number | string;
+  onRowClick?: (row: T & ReadonlyGridRow) => void;
+  onQuery?: () => void; queryLabel?: string; loading?: boolean; disabled?: boolean; gridHeight?: number; emptyText?: string;
+}) {
+  const [requestedPage, setPage] = useState(1);
+  const page = Math.min(requestedPage, Math.max(1, Math.ceil(items.length / 50)));
+  const rows = useMemo(() => createReadonlyGridRows(items.map((item, index) => ({ ...item, id: rowId(item, index) }))), [items, rowId]);
+  return <ReadonlyGridManager<T & ReadonlyGridRow> title={title} searchFields={null} embedded inset
+    rowData={rows.slice((page - 1) * 50, page * 50)} columnDefs={columns} totalCount={items.length} page={page} pageSize={50} onPageChange={setPage}
+    onQuery={() => { setPage(1); onQuery?.(); }} queryDisabled={disabled || loading} loading={loading} gridHeight={gridHeight} emptyText={emptyText}
+    onRowClick={onRowClick} actions={onQuery ? [{ key: "query", label: queryLabel, icon: Search, onClick: onQuery, disabled: disabled || loading }] : []} />;
+}
+
 export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
   title,
+  hideSearchTitle = false,
   searchFields,
   rowData,
   columnDefs,
@@ -147,72 +164,17 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
     gridRef.current?.api?.redrawRows();
   }, [selectedRowId]);
 
-  const toolbarActions = useMemo<GridToolbarAction[]>(
-    () => [
-      {
-        key: "query",
-        label: "조회",
-        icon: Search,
-        onClick: onQuery,
-        disabled: queryDisabled,
-      },
-      {
-        key: "create",
-        label: "입력",
-        icon: Plus,
-        onClick: () => undefined,
-        disabled: true,
-      },
-      {
-        key: "copy",
-        label: "복사",
-        icon: Copy,
-        onClick: () => undefined,
-        disabled: true,
-      },
-      {
-        key: "template",
-        label: "템플릿 다운로드",
-        icon: Download,
-        onClick: () => undefined,
-        disabled: true,
-      },
-      {
-        key: "upload",
-        label: "업로드",
-        icon: Upload,
-        onClick: () => undefined,
-        disabled: true,
-      },
-      {
-        key: "download",
-        label: "다운로드",
-        icon: Download,
-        onClick: onDownload ?? (() => undefined),
-        disabled: !onDownload,
-      },
-    ],
-    [onDownload, onQuery, queryDisabled],
-  );
-
-  const saveAction = useMemo<GridToolbarAction>(
-    () => ({
-      key: "save",
-      label: "저장",
-      icon: Save,
-      onClick: () => undefined,
-      disabled: true,
-      variant: "save",
-    }),
-    [],
-  );
+  const toolbarActions = useMemo<GridToolbarAction[]>(() => [
+    ...(embedded && searchFields === null ? [{ key: "query", label: "조회", icon: Search, onClick: onQuery, disabled: queryDisabled }] : []),
+    ...(onDownload ? [{ key: "download", label: "다운로드", icon: Download, onClick: onDownload, disabled: loading }] : []),
+  ], [embedded, loading, onDownload, onQuery, queryDisabled, searchFields]);
 
   return (
     <ManagerPageShell className={embedded ? "h-auto min-w-0 p-0 md:p-0" : undefined}>
       {beforeGrid}
       {!(embedded && searchFields === null) && (
       <ManagerSearchSection
-        title={title}
+        title={hideSearchTitle ? undefined : title}
         onQuery={onQuery}
         queryLabel={queryLabel}
         queryDisabled={queryDisabled}
@@ -241,7 +203,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             <GridChangeSummaryBadges summary={gridSummary} />
           </>
         }
-        headerRight={<GridToolbarActions actions={actions ?? toolbarActions} saveAction={actions ? undefined : saveAction} />}
+        headerRight={<GridToolbarActions actions={actions ?? toolbarActions} />}
         contentClassName={inset ? "flex min-h-0 flex-1 flex-col" : undefined}
       >
         {feedback}
@@ -256,6 +218,7 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
             ref={gridRef}
             theme="legacy"
             rowData={rowData}
+            getRowId={params => String(params.data.id)}
             columnDefs={columnDefs}
             rowSelection={onSelectionChange ? {
               mode: "multiRow",
@@ -282,6 +245,9 @@ export function ReadonlyGridManager<Row extends ReadonlyGridRow>({
               if (event.data && onRowClick) {
                 onRowClick(event.data);
               }
+            }}
+            onCellKeyDown={(event) => {
+              if (event.data && (event.event as KeyboardEvent | undefined)?.key === "Enter") onRowClick?.(event.data);
             }}
           />
         </div>

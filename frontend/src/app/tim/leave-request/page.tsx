@@ -2,6 +2,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { LeaveRequestManager } from "@/components/tim/leave-request-manager";
 import { requireMenuAccess } from "@/lib/guard";
 
+const GRID_SCREEN = { engine: "ag-grid", profile: "standard-v2", registryKey: "tim.leave-request" } as const;
+void GRID_SCREEN;
+
 export default async function Page() {
   await requireMenuAccess("/tim/leave-request");
 

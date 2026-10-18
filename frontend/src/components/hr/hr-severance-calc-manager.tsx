@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import {
   ReadonlyGridManager,
+  LocalReadonlyGrid,
   createReadonlyGridRows,
   type ReadonlyGridRow,
 } from "@/components/grid/readonly-grid-manager";
@@ -263,8 +264,9 @@ export function HrSeveranceCalcManager() {
   const isEditable = calcDetail?.calc.status === "draft" || calcDetail?.calc.status === "reviewed";
 
   return (
-    <div className="space-y-4 px-4 py-4">
+    <div className="business-workspace space-y-4">
       <ReadonlyGridManager<SeveranceCalcRow>
+        embedded inset gridHeight={320}
         title="퇴직금 산정 목록"
         searchFields={null}
         rowData={calcRows}
@@ -340,40 +342,13 @@ export function HrSeveranceCalcManager() {
                 </div>
               ) : null}
 
-              <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">항목코드</th>
-                      <th className="px-3 py-2 text-left">항목명</th>
-                      <th className="px-3 py-2 text-left">산입구분</th>
-                      <th className="px-3 py-2 text-right">원금액</th>
-                      <th className="px-3 py-2 text-right">산입금액</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {calcDetail.wage_details.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
-                          산정 근거 내역이 없습니다.
-                        </td>
-                      </tr>
-                    ) : (
-                      calcDetail.wage_details.map((detail) => (
-                        <tr key={detail.item_code} className="border-t">
-                          <td className="px-3 py-2">{detail.item_code}</td>
-                          <td className="px-3 py-2">{detail.item_name ?? "-"}</td>
-                          <td className="px-3 py-2">
-                            {INCLUDE_TYPE_LABELS[detail.include_type] ?? detail.include_type}
-                          </td>
-                          <td className="px-3 py-2 text-right">{formatAmount(detail.raw_amount)}</td>
-                          <td className="px-3 py-2 text-right">{formatAmount(detail.included_amount)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <LocalReadonlyGrid title="임금 산입 근거" items={calcDetail.wage_details} rowId={(row, index) => `${row.item_code}:${index}`} columns={[
+                  { field: "item_code", headerName: "항목코드", minWidth: 130 },
+                  { field: "item_name", headerName: "항목명", minWidth: 180, flex: 1 },
+                  { field: "include_type", headerName: "산입구분", valueFormatter: p => INCLUDE_TYPE_LABELS[p.value] ?? p.value },
+                  { field: "raw_amount", headerName: "원금액", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatAmount(p.value) },
+                  { field: "included_amount", headerName: "산입금액", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatAmount(p.value) },
+                ]} emptyText="조회된 상세 내역이 없습니다." />
 
               <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
                 <div className="space-y-1">

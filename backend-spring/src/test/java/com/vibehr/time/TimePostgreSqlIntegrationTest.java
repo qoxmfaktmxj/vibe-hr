@@ -446,6 +446,25 @@ class TimePostgreSqlIntegrationTest {
         assertAnnualLeave(2026, 2, 0);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"UTC", "Asia/Seoul"})
+    void attendanceGridReadsStoredUtcInstantsInEitherJvmZone(String zone) {
+        TimeZone previous = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(zone));
+            LocalDate date = LocalDate.of(2026, 8, 3);
+            Instant in = Instant.parse("2026-08-03T00:00:00Z");
+            Instant out = Instant.parse("2026-08-03T09:00:00Z");
+            insertAttendance(date, in, out);
+            assertThat(jdbc.queryForObject("select check_in_at::text from tim_attendance_daily where employee_id=?", String.class, EMPLOYEE_ID)).startsWith("2026-08-03 00:00:00");
+            TimAttendanceDailyItem item = service.attendanceDaily(date, date, EMPLOYEE_ID, null, 1, 50).items().getFirst();
+            assertThat(item.checkInAt()).isEqualTo(in);
+            assertThat(item.checkOutAt()).isEqualTo(out);
+        } finally {
+            TimeZone.setDefault(previous);
+        }
+    }
+
     @Test
     void aLaterPunchConflictRollsBackEveryAttendanceLinkAndAnnualCharge() {
         insertAnnualLeave(2026, 5, 0);
@@ -921,4 +940,30 @@ class TimePostgreSqlIntegrationTest {
             return current.get();
         }
     }
+    @Test
+    void scheduleAssignmentAndExceptionBatchesRollbackAsAUnitWithoutGeneratingSchedules() {
+        int patternId = 900099;
+        jdbc.update("insert into tim_schedule_patterns(id,code,name,is_active,created_at,updated_at) values (?,'GRID-BATCH','Grid batch',true,now(),now())", patternId);
+        LocalDate start = LocalDate.of(2026, 8, 1);
+        try {
+            var department = new TimDepartmentScheduleAssignmentUpsertRequest(null, DEPARTMENT_ID, patternId, start, null, 100, true);
+            var invalidDepartment = new TimDepartmentScheduleAssignmentUpsertRequest(null, DEPARTMENT_ID, patternId, start, start.minusDays(1), 200, true);
+            assertThatThrownBy(() -> service.saveDepartmentAssignments(new TimDepartmentScheduleAssignmentBatchRequest(List.of(department, invalidDepartment), List.of()))).isInstanceOf(ApiException.class);
+            assertThat(jdbc.queryForObject("select count(*) from tim_department_schedule_assignments where pattern_id=?", Integer.class, patternId)).isZero();
+            var departments = service.saveDepartmentAssignments(new TimDepartmentScheduleAssignmentBatchRequest(List.of(department, new TimDepartmentScheduleAssignmentUpsertRequest(null, DEPARTMENT_ID, patternId, start.plusMonths(1), null, 200, true)), List.of()));
+            assertThat(departments.insertedCount()).isEqualTo(2);
+            var employee = new TimEmployeeScheduleExceptionUpsertRequest(null, EMPLOYEE_ID, patternId, start, null, "Original", 1000, true);
+            var invalidEmployee = new TimEmployeeScheduleExceptionUpsertRequest(null, EMPLOYEE_ID, patternId, start, start.minusDays(1), "Invalid", 1000, true);
+            assertThatThrownBy(() -> service.saveEmployeeExceptions(new TimEmployeeScheduleExceptionBatchRequest(List.of(employee, invalidEmployee), List.of()))).isInstanceOf(ApiException.class);
+            assertThat(jdbc.queryForObject("select count(*) from tim_employee_schedule_exceptions where pattern_id=?", Integer.class, patternId)).isZero();
+            var employees = service.saveEmployeeExceptions(new TimEmployeeScheduleExceptionBatchRequest(List.of(employee, new TimEmployeeScheduleExceptionUpsertRequest(null, EMPLOYEE_ID, patternId, start.plusMonths(1), null, "Second", 1000, true)), List.of()));
+            assertThat(employees.insertedCount()).isEqualTo(2);
+            assertThat(jdbc.queryForObject("select count(*) from tim_employee_daily_schedules where employee_id=?", Integer.class, EMPLOYEE_ID)).isZero();
+        } finally {
+            jdbc.update("delete from tim_department_schedule_assignments where pattern_id=?", patternId);
+            jdbc.update("delete from tim_employee_schedule_exceptions where pattern_id=?", patternId);
+            jdbc.update("delete from tim_schedule_patterns where id=?", patternId);
+        }
+    }
+
 }

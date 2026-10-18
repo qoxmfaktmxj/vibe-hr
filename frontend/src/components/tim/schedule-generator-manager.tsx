@@ -6,13 +6,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
+import { getKoreaDateKey } from "@/lib/business-date";
 import type { TimScheduleGenerateRequest, TimScheduleGenerateResponse } from "@/types/tim";
 
 export function ScheduleGeneratorManager() {
   const { can, loading: menuActionLoading } = useMenuActions("/tim/work-codes");
-  const today = new Date();
-  const first = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-  const last = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const [year, month] = getKoreaDateKey().split("-").map(Number);
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+  const first = `${monthKey}-01`;
+  const last = `${monthKey}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`;
 
   const [target, setTarget] = useState<"all" | "department" | "employee">("all");
   const [departmentId, setDepartmentId] = useState("");

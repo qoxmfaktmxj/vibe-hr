@@ -330,25 +330,38 @@
 }
 
 /* ============================================================ */
-/* Dark mode global polish (legacy utility class fallback)       */
+/* Shared scrollbar appearance                                  */
 /* ============================================================ */
+:root {
+  --vibe-scrollbar: #aab4bf;
+  --vibe-scrollbar-hover: #7d8998;
+}
+
 .dark {
-  scrollbar-color: #334155 #0b1220;
+  --vibe-scrollbar: #526177;
+  --vibe-scrollbar-hover: #718198;
 }
-.dark ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--vibe-scrollbar) transparent;
 }
-.dark ::-webkit-scrollbar-track {
-  background: #0b1220;
+
+@supports selector(::-webkit-scrollbar) {
+  * { scrollbar-width: auto; scrollbar-color: auto; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: var(--vibe-scrollbar); border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--vibe-scrollbar-hover); }
+  *::-webkit-scrollbar-corner { background: transparent; }
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 9999px;
-  border: 2px solid #0b1220;
+
+.vibe-workspace {
+  --radius: 0.5rem;
 }
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+
+.vibe-workspace .ag-root-wrapper {
+  border-radius: 6px;
 }
 
 /* ============================================================ */
@@ -592,6 +605,20 @@ body {
   --vibe-shadow-card: none;
 }
 .employee-workspace { height: 100%; gap: 0; }
+.business-workspace { padding: 24px; }
+.business-workspace > [data-slot="card"] { border-radius: 6px; box-shadow: none; }
+.business-heading { margin-bottom: 20px; }
+.business-heading h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.business-heading p { margin-top: 4px; font-size: 13px; color: var(--vibe-nav-text-muted); }
+.business-workspace .business-search { border: 0; border-radius: 0; box-shadow: none; }
+.business-workspace .business-search > [data-slot="card-content"] { padding: 0 0 16px; }
+.business-workspace .business-search > [data-slot="card-header"] { padding: 0 0 12px; }
+.business-workspace button[data-slot="button"] { min-height: 36px; }
+.business-workspace input[placeholder="페이지"] { height: 36px; }
+.business-workspace .employee-grid > div:first-child { padding-inline: 0; }
+.business-workspace .employee-grid > div:last-child > .flex { padding-inline: 0; }
+.business-workspace .employee-grid > div:last-child > p { padding-inline: 0; }
+@media (max-width: 767px) { .business-workspace { padding: 16px; } }
 .employee-workspace > [data-slot="card"] { border-radius: 0; border: 0; box-shadow: none; }
 .employee-workspace .employee-grid { border-radius: 0; border: 0; box-shadow: none; }
 .employee-workspace .employee-filter-extra { animation: employee-reveal 160ms ease-out; }

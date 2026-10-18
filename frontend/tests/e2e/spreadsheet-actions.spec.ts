@@ -321,9 +321,10 @@ async function verifyImport(page: Page, screen: Screen, mobile = false) {
     await expect(statusCells(page).filter({ hasText: /^수정$/ })).toHaveCount(screen.updated ?? 0);
     await expect(page.locator('.ag-row[row-id="2"] [col-id="_status"]')).toHaveText("");
     expect(writes).toEqual([]);
-    await expect(page.getByRole("button", { name: "저장", exact: true })).toBeEnabled();
+    const saveScope = screen.name === "work schedules" ? page.getByRole("region", { name: "근무코드 목록", exact: true }) : page;
+    await expect(saveScope.getByRole("button", { name: "저장", exact: true })).toBeEnabled();
     if (screen.name === "holidays") await capture(page, `imported-file-${mobile ? "mobile" : "desktop"}.png`);
-    await page.getByRole("button", { name: "저장", exact: true }).click();
+    await saveScope.getByRole("button", { name: "저장", exact: true }).click();
     await expect.poll(() => writes.length).toBe(1);
     expect(writes).toEqual([{ items: screen.save, delete_ids: [] }]);
     await expect(statusCells(page)).toHaveText(Array(2 + screen.added).fill(""));

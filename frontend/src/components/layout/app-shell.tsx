@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { requestWorkspaceNavigation } from "@/lib/grid/use-unsaved-navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
 import { SessionCountdown } from "@/components/layout/session-countdown";
@@ -152,6 +153,7 @@ function getFallbackLabel(path: string): string {
 
 export function AppShell({ title, description, children }: AppShellProps) {
   const router = useRouter();
+  const navigate = useCallback((path: string) => requestWorkspaceNavigation(() => router.push(path)), [router]);
   const pathname = usePathname();
   const { user } = useAuth();
   const { menus } = useMenu();
@@ -175,6 +177,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
   );
 
   const pageTitle = title === "VIBE-HR" ? resolveLabel(pathname) : title;
+  const headingInContent = ["/hr/employee", "/hr/basic", "/hri/tasks/approvals"].includes(pathname);
   const sectionLabel = useMemo(
     () => menus.find((menu) => buildMenuLabelIndex([menu]).has(pathname))?.name,
     [menus, pathname],
@@ -249,26 +252,29 @@ export function AppShell({ title, description, children }: AppShellProps) {
 
   function closeTab(path: string) {
     const next = openTabs.filter((tab) => tab.path !== path);
-    setTabState((previous) => ({ ...previous, tabs: next }));
-
     if (pathname === path) {
-      const fallbackPath = next[next.length - 1]?.path ?? "/dashboard";
-      router.push(fallbackPath);
-    }
+      requestWorkspaceNavigation(() => {
+        setTabState((previous) => ({ ...previous, tabs: next }));
+        router.push(next[next.length - 1]?.path ?? "/dashboard");
+      });
+    } else setTabState((previous) => ({ ...previous, tabs: next }));
   }
 
   function closeAllTabs() {
-    setTabState((previous) => ({ ...previous, tabs: [], suppressNextAutoAdd: true }));
-    router.push("/dashboard");
     setContextMenu(null);
+    requestWorkspaceNavigation(() => {
+      setTabState((previous) => ({ ...previous, tabs: [], suppressNextAutoAdd: true }));
+      router.push("/dashboard");
+    });
   }
 
   function closeLeftTabs(targetPath: string) {
     const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
     if (targetIndex <= 0) return;
     const next = openTabs.slice(targetIndex);
-    setTabState((previous) => ({ ...previous, tabs: next }));
-    if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") router.push(targetPath);
+    const apply = () => { setTabState((previous) => ({ ...previous, tabs: next })); };
+    if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") requestWorkspaceNavigation(() => { apply(); router.push(targetPath); });
+    else apply();
     setContextMenu(null);
     contextMenuAnchorRef.current?.focus();
   }
@@ -277,8 +283,9 @@ export function AppShell({ title, description, children }: AppShellProps) {
     const targetIndex = openTabs.findIndex((tab) => tab.path === targetPath);
     if (targetIndex < 0 || targetIndex >= openTabs.length - 1) return;
     const next = openTabs.slice(0, targetIndex + 1);
-    setTabState((previous) => ({ ...previous, tabs: next }));
-    if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") router.push(targetPath);
+    const apply = () => { setTabState((previous) => ({ ...previous, tabs: next })); };
+    if (!next.some((tab) => tab.path === pathname) && pathname !== "/dashboard") requestWorkspaceNavigation(() => { apply(); router.push(targetPath); });
+    else apply();
     setContextMenu(null);
     contextMenuAnchorRef.current?.focus();
   }
@@ -332,11 +339,11 @@ export function AppShell({ title, description, children }: AppShellProps) {
                     aria-hidden="true"
                   />
                 </Link>
-                <h1 className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)] sm:text-lg">
+                {headingInContent ? <span className="truncate text-sm text-[color:var(--vibe-nav-text)]">{pageTitle}</span> : <h1 className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)] sm:text-lg">
                   {pageTitle}
-                </h1>
+                </h1>}
               </div>
-              {description ? (
+              {description && !headingInContent ? (
                 <p className="mt-0.5 hidden truncate text-xs text-[color:var(--vibe-nav-text-muted)] md:block">{description}</p>
               ) : null}
             </div>
@@ -360,7 +367,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
                   ? "bg-card text-[color:var(--vibe-nav-text-strong)]"
                   : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
               }`}
-              onClick={() => router.push("/dashboard")}
+              onClick={() => navigate("/dashboard")}
             >
               <Home className="h-4 w-4" aria-hidden="true" />
               홈
@@ -380,7 +387,7 @@ export function AppShell({ title, description, children }: AppShellProps) {
                   <button
                     type="button"
                     className="min-h-11 max-w-40 truncate px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
-                    onClick={() => router.push(tab.path)}
+                    onClick={() => navigate(tab.path)}
                     onContextMenu={(event) => {
                       event.preventDefault();
                       contextMenuAnchorRef.current = event.currentTarget;

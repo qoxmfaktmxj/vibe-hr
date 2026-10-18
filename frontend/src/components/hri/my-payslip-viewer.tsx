@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Receipt } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Download } from "lucide-react";
 import { toast } from "sonner";
+import useSWR from "swr";
+import { fetcher } from "@/lib/fetcher";
 
+import { LocalReadonlyGrid } from "@/components/grid/readonly-grid-manager";
 import { ManagerGridSection, ManagerPageShell } from "@/components/grid/manager-layout";
 import { Button } from "@/components/ui/button";
 
@@ -55,26 +58,10 @@ function parseYearMonth(ym: string): string {
 // ── Component ──
 
 export function MyPayslipViewer() {
-  const [payslips, setPayslips] = useState<PayslipSummary[]>([]);
+  const { data, error, isLoading: loading, mutate } = useSWR<{ items: PayslipSummary[]; total_count: number }>("/api/pay/my/payslips", fetcher, { revalidateOnFocus: false });
+  const payslips = data?.items ?? [];
   const [detail, setDetail] = useState<PayslipDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
-
-  useEffect(() => {
-    async function fetchPayslips() {
-      try {
-        const res = await fetch("/api/pay/my/payslips", { cache: "no-store" });
-        if (!res.ok) throw new Error("급여 목록 조회 실패");
-        const data = (await res.json()) as { items: PayslipSummary[]; total_count: number };
-        setPayslips(data.items);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "조회 실패");
-      } finally {
-        setLoading(false);
-      }
-    }
-    void fetchPayslips();
-  }, []);
 
   async function openDetail(runId: number) {
     setDetailLoading(true);
@@ -219,85 +206,15 @@ export function MyPayslipViewer() {
     );
   }
 
-  // ── List View ──
-  return (
-    <ManagerPageShell>
-      <ManagerGridSection
-        headerLeft={
-          <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">내 급여 이력</span>
-            <span className="text-xs text-muted-foreground">({payslips.length}건)</span>
-          </div>
-        }
-        contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-2"
-      >
-        {loading || detailLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">불러오는 중...</p>
-          </div>
-        ) : payslips.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Receipt className="mb-3 h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">조회 가능한 급여 내역이 없습니다.</p>
-          </div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">급여월</th>
-                  <th className="py-2.5 text-left font-medium text-muted-foreground">구분</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지급합계</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">공제합계</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">실수령액</th>
-                  <th className="py-2.5 text-center font-medium text-muted-foreground">상태</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지급일</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payslips.map((ps) => (
-                  <tr
-                    key={ps.run_employee_id}
-                    className="cursor-pointer border-b border-border transition-colors hover:bg-muted/50"
-                    onClick={() => void openDetail(ps.run_id)}
-                  >
-                    <td className="py-3 pl-4 font-medium text-foreground">
-                      {parseYearMonth(ps.year_month)}
-                    </td>
-                    <td className="py-3 text-muted-foreground">{ps.run_name ?? "-"}</td>
-                    <td className="py-3 pr-4 text-right tabular-nums text-green-700">
-                      {formatCurrency(ps.gross_pay)}
-                    </td>
-                    <td className="py-3 pr-4 text-right tabular-nums text-red-600">
-                      {formatCurrency(ps.total_deductions)}
-                    </td>
-                    <td className="py-3 pr-4 text-right tabular-nums font-semibold text-blue-700">
-                      {formatCurrency(ps.net_pay)}
-                    </td>
-                    <td className="py-3 text-center">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          ps.run_status === "paid"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {ps.run_status === "paid" ? "지급완료" : "확정"}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 text-right text-xs text-muted-foreground">
-                      {ps.paid_at ? new Date(ps.paid_at).toLocaleDateString("ko-KR") : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </ManagerGridSection>
-    </ManagerPageShell>
-  );
+  return <div className="business-workspace">{error && <p role="alert" className="mb-3 text-sm text-destructive">급여 목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}<LocalReadonlyGrid title="내 급여 이력" items={payslips} rowId={row => row.run_employee_id} loading={loading || detailLoading} disabled={detailLoading} onQuery={() => void mutate()} gridHeight={420} emptyText="조회 가능한 급여 내역이 없습니다." onRowClick={row => { if (!detailLoading) void openDetail(row.run_id); }} columns={[
+    { field: "year_month", headerName: "급여월", minWidth: 150, valueFormatter: p => parseYearMonth(p.value) },
+    { field: "run_name", headerName: "구분", minWidth: 160, flex: 1 },
+    { field: "gross_pay", headerName: "지급합계", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatCurrency(p.value) },
+    { field: "total_deductions", headerName: "공제합계", minWidth: 150, cellClass: "text-right", valueFormatter: p => formatCurrency(p.value) },
+    { field: "net_pay", headerName: "실수령액", minWidth: 150, cellClass: "text-right font-semibold", valueFormatter: p => formatCurrency(p.value) },
+    { field: "run_status", headerName: "상태", valueFormatter: p => p.value === "paid" ? "지급완료" : "확정" },
+    { field: "paid_at", headerName: "지급일", minWidth: 140, valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString("ko-KR") : "-" },
+  ]} /><p className="mt-3 text-xs text-muted-foreground">월별 내역을 클릭하거나 Enter를 누르면 명세서를 확인할 수 있습니다.</p></div>;
 }
 
 // ── Summary Card ──

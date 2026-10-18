@@ -2,6 +2,9 @@ import { HriApprovalTemplateManager } from "@/components/hri/hri-approval-templa
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 
+const GRID_SCREEN = { engine: "ag-grid", profile: "standard-v2", registryKey: "hri.approval-templates" } as const;
+void GRID_SCREEN;
+
 export default async function HriAdminApprovalLinesPage() {
   await requireMenuAccess("/hri/admin/approval-lines");
 

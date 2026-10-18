@@ -85,7 +85,8 @@ test("month-close routes retain the shell, menu, tabs and home navigation", asyn
     await expect(tabs.getByRole("button", { name: label, exact: true })).toBeVisible();
     await expect(page.getByRole("main")).toContainText("근태 월마감");
     await capture(page, `${path.split("/").at(-1)}-shell-korean.png`);
-    await page.getByRole("row").filter({ hasText: `${new Date().getFullYear()}년 1월` }).getByRole("button", { name: "마감", exact: true }).click();
+    await expect(page.getByRole("grid")).toContainText(`${new Date().getFullYear()}년 1월`);
+    await page.locator('.ag-row[row-id="1"]').getByRole("button", { name: "마감", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await expect(dialog.getByPlaceholder("마감 사유 또는 메모")).toBeVisible();
@@ -277,7 +278,8 @@ test("pending leave cancellation requires in-app confirmation and sends one requ
   page.on("dialog", (dialog) => { nativeDialogs.push(dialog.message()); void dialog.dismiss(); });
   await signIn(page);
   await page.goto("/tim/leave-request");
-  const pending = page.getByRole("row").filter({ hasText: "대기 중인 합성 휴가" });
+  const pending = page.locator('.ag-row[row-id="201"]');
+  await expect(pending.locator('[col-id="reason"]')).toHaveText("대기 중인 합성 휴가");
   await expect(page.getByRole("row").filter({ hasText: "승인된 합성 휴가" }).getByRole("button", { name: "취소", exact: true })).toHaveCount(0);
   await expect(page.getByRole("row").filter({ hasText: "취소된 합성 휴가" }).getByRole("button", { name: "취소", exact: true })).toHaveCount(0);
   await pending.getByRole("button", { name: "취소", exact: true }).click();
@@ -313,7 +315,7 @@ test("pending leave cancellation requires in-app confirmation and sends one requ
     releaseCancel();
   }
   await expect(confirmation).toBeHidden();
-  await expect(pending).toContainText("cancelled");
+  await expect(pending.locator('[col-id="request_status"]')).toHaveText("취소");
   await expect(pending.getByRole("button", { name: "취소", exact: true })).toHaveCount(0);
   expect(await (await request.get("http://127.0.0.1:3101/__leave-cancellations")).json()).toEqual([
     { id: 201, method: "POST", body: { reason: "사용자 취소" } },
@@ -778,12 +780,45 @@ test("sidebar group and panel collapse hide links from keyboard navigation", asy
   await expect(companyLink).not.toBeFocused();
   await group.click();
   await expect(companyLink).toBeInViewport();
-  await page.getByRole("button", { name: "세부 메뉴 접기", exact: true }).click();
+  const rail = page.getByRole("navigation", { name: "업무 영역", exact: true });
+  const domain = rail.getByRole("button", { name: "고객관리", exact: true });
+  const closePanel = page.getByRole("button", { name: "세부 메뉴 닫기", exact: true });
+  await expect(domain).toHaveAttribute("aria-expanded", "true");
+  await expect(rail.getByRole("button", { name: "세부 메뉴 닫기", exact: true })).toHaveCount(0);
+  await closePanel.click();
+  await expect(domain).toHaveAttribute("aria-expanded", "false");
+  await expect(domain).toBeFocused();
   await expect(companyLink).not.toBeInViewport();
   await page.keyboard.press("Tab");
   await expect(companyLink).not.toBeFocused();
-  await page.getByRole("button", { name: "세부 메뉴 펼치기", exact: true }).click();
+  await domain.focus();
+  await page.keyboard.press("Enter");
+  await expect(domain).toHaveAttribute("aria-expanded", "true");
+  await expect(group).toHaveAttribute("aria-expanded", "true");
   await expect(companyLink).toBeInViewport();
+  await page.mouse.move(1000, 900);
+  await page.screenshot({ path: test.info().outputPath("sidebar-selection-open.png") });
+  await closePanel.click();
+  await page.screenshot({ path: test.info().outputPath("sidebar-selection-closed.png") });
+});
+
+test("compact sidebar scrolls without a scrollbar and keeps the last domain reachable", async ({ page, request }) => {
+  await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "sidebar-domains" } });
+  await page.setViewportSize({ width: 1440, height: 240 });
+  await signIn(page);
+  const rail = page.getByRole("navigation", { name: "업무 영역", exact: true });
+  const lastDomain = rail.getByRole("button", { name: "다른 업무", exact: true });
+  const scroller = lastDomain.locator("..");
+  await expect.poll(() => scroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  expect(await scroller.evaluate((element) => getComputedStyle(element).scrollbarWidth)).toBe("none");
+  await scroller.evaluate((element) => { element.scrollTop = 0; });
+  await scroller.hover();
+  await page.mouse.wheel(0, 240);
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await lastDomain.focus();
+  await expect(lastDomain).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await expect(lastDomain).toHaveAttribute("aria-expanded", "true");
 });
 
 test("tab context dismissal respects outside clicks and sequential keyboard focus", async ({ page }) => {
@@ -1178,6 +1213,11 @@ for (const mobile of [false, true]) {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "sidebar-domains" } });
     await signIn(page);
+    const renewal = page.getByRole("button", { name: /로그인 시간 연장/ });
+    await expect(renewal).toBeEnabled();
+    const quickMoveHeight = await page.getByRole("button", { name: "빠른 이동", exact: true }).evaluate((element) => element.getBoundingClientRect().height);
+    expect(quickMoveHeight).toBeGreaterThan(0);
+    expect(await renewal.evaluate((element) => element.getBoundingClientRect().height)).toBe(quickMoveHeight);
     if (mobile) await page.getByRole("button", { name: "메뉴 열기", exact: true }).click();
     const rail = page.getByRole("navigation", { name: "업무 영역", exact: true });
     await expect(rail.getByRole("link", { name: "대시보드", exact: true })).toHaveCount(0);
@@ -1188,8 +1228,15 @@ for (const mobile of [false, true]) {
     await expect(expand.locator("..").getByText("업무 영역", { exact: true })).toBeVisible();
     await expand.click();
     await expect(page.getByRole("button", { name: "기본 관리", exact: true })).toHaveAttribute("aria-expanded", "true");
+    if (mobile) {
+      await expect(page.getByRole("button", { name: "세부 메뉴 닫기", exact: true })).toHaveCount(0);
+    } else {
+      await page.getByRole("button", { name: "세부 메뉴 닫기", exact: true }).click();
+      await expect(rail.getByRole("button", { name: "고객관리", exact: true })).toBeFocused();
+    }
     await rail.getByRole("button", { name: "다른 업무", exact: true }).click();
     await expect(expand).toBeVisible();
+    if (!mobile) await expect(rail.getByRole("button", { name: "다른 업무", exact: true })).toHaveAttribute("aria-expanded", "true");
     await expand.click();
     await collapse.click();
     await expect(page.getByRole("button", { name: "다른 그룹", exact: true })).toHaveAttribute("aria-expanded", "false");

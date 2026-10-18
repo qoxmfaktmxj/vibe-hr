@@ -35,8 +35,9 @@ export function ManagerPageShell({
 }
 
 type ManagerSearchSectionProps = {
-  title: string;
+  title?: string;
   children: ReactNode;
+  footer?: ReactNode;
   onQuery: () => void;
   queryLabel?: string;
   queryDisabled?: boolean;
@@ -47,6 +48,7 @@ type ManagerSearchSectionProps = {
 export function ManagerSearchSection({
   title,
   children,
+  footer,
   onQuery,
   queryLabel = "조회",
   queryDisabled = false,
@@ -54,10 +56,10 @@ export function ManagerSearchSection({
   className,
 }: ManagerSearchSectionProps) {
   return (
-    <Card className={cn("gap-0 py-0", className)}>
-      <CardHeader className="px-3 pb-0 pt-4 md:px-6 md:pt-3">
+    <Card className={cn("gap-0 rounded-md py-0", className)}>
+      {title && <CardHeader className="px-3 pb-0 pt-4 md:px-6 md:pt-3">
         <CardTitle className="text-xl font-semibold text-foreground">{title}</CardTitle>
-      </CardHeader>
+      </CardHeader>}
       <CardContent className="px-4 pb-4 md:px-6 md:pb-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div className="flex-1">{children}</div>
@@ -74,6 +76,7 @@ export function ManagerSearchSection({
             </Button>
           </div>
         </div>
+        {footer}
       </CardContent>
     </Card>
   );
@@ -99,7 +102,7 @@ export function ManagerGridSection({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col rounded-xl border border-border/80 bg-card shadow-[var(--vibe-shadow-card)]",
+        "flex min-h-0 flex-1 flex-col rounded-md border border-border/80 bg-card shadow-[var(--vibe-shadow-card)]",
         className,
       )}
     >

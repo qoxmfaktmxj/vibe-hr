@@ -1,0 +1,944 @@
+{
+  "date": "2026-10-18",
+  "source": "Real application state captures using isolated synthetic data and responses",
+  "runtime": "Canvas state transitions and cursor animation; no live business API calls in the gallery",
+  "playback": "Only the viewed scene; paused when hidden, offscreen or reduced motion is enabled",
+  "bytes": 2179158,
+  "clips": [
+    {
+      "id": "01",
+      "route": "/hr/employee",
+      "theme": "light",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/01/00.webp",
+          "label": "조회 조건 입력",
+          "pointer": {
+            "x": 0.12916666666666668,
+            "y": 0.16303030303030303
+          },
+          "action": "type",
+          "sha256": "5abf6d2cfaed84d8c1cabd0743dfd07e8ae351584939533584a1bf057632f27b",
+          "bytes": 37486
+        },
+        {
+          "image": "/images/product/motion/01/01.webp",
+          "label": "조회 결과 확인",
+          "pointer": {
+            "x": 0.9575757575757575,
+            "y": 0.16787878787878788
+          },
+          "action": "click",
+          "sha256": "16a9cbc71a200eabb240ca1f4211bd7f82460cc06f0497fafc0dd79d5b4da779",
+          "bytes": 34620
+        },
+        {
+          "image": "/images/product/motion/01/02.webp",
+          "label": "값 수정",
+          "pointer": {
+            "x": 0.3037878787878788,
+            "y": 0.48848484848484847
+          },
+          "action": "type",
+          "sha256": "70b99b94d41bde109546ff0c89ae4b01545fa165180fa69cbae1ac21b2576b74",
+          "bytes": 35134
+        },
+        {
+          "image": "/images/product/motion/01/03.webp",
+          "label": "저장 전 변경 확인",
+          "pointer": {
+            "x": 0.3037878787878788,
+            "y": 0.48848484848484847
+          },
+          "action": "inspect",
+          "sha256": "233575ed692aed14ff49a2c20303b5bb316c7150927db81fa516ecbf44fe6189",
+          "bytes": 36482
+        },
+        {
+          "image": "/images/product/motion/01/04.webp",
+          "label": "저장 완료",
+          "pointer": {
+            "x": 0.863470643939394,
+            "y": 0.30363636363636365
+          },
+          "action": "click",
+          "sha256": "c2a1aa41176b41668c36a122846303ac3a1271b0a70ff51d6dfb33c81349a5e7",
+          "bytes": 36584
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/employees/batch",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "route": "/hr/basic",
+      "theme": "light",
+      "tone": "gray",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/02/00.webp",
+          "label": "구성원 정보 조회",
+          "pointer": {
+            "x": 0.8636363636363636,
+            "y": 0.16424242424242425
+          },
+          "action": "inspect",
+          "sha256": "12c4c5f95d424b4af08269a489d731b7482aad1864d07849d0b9bfc38ed90874",
+          "bytes": 29440
+        },
+        {
+          "image": "/images/product/motion/02/01.webp",
+          "label": "직무 수정",
+          "pointer": {
+            "x": 0.6246212121212121,
+            "y": 0.6296969696969696
+          },
+          "action": "type",
+          "sha256": "2d1047d653aa1758eb02b91a1594c3e55b2b68a7c0d3d510a15858a371a25354",
+          "bytes": 34244
+        },
+        {
+          "image": "/images/product/motion/02/02.webp",
+          "label": "변경 내용 확인",
+          "pointer": {
+            "x": 0.9439334753787879,
+            "y": 0.3290909090909091
+          },
+          "action": "inspect",
+          "sha256": "2d1047d653aa1758eb02b91a1594c3e55b2b68a7c0d3d510a15858a371a25354",
+          "bytes": 34244
+        },
+        {
+          "image": "/images/product/motion/02/03.webp",
+          "label": "저장 완료",
+          "pointer": {
+            "x": 0.9439334753787879,
+            "y": 0.3290909090909091
+          },
+          "action": "click",
+          "sha256": "fca6400d8b533bd8e4c21111eefb3285377c2928f615b5363e9cd243efb2ccbd",
+          "bytes": 30412
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/hr/basic/1/profile",
+          "method": "PUT",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "route": "/hr/basic",
+      "theme": "light",
+      "tone": "green",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/03/00.webp",
+          "label": "학력 이력 조회",
+          "pointer": {
+            "x": 0.9575757575757575,
+            "y": 0.38727272727272727
+          },
+          "action": "click",
+          "sha256": "9e43dd9fe7ccd4f5a22c44477c291260d4601ec573548717497e9617d934d2e3",
+          "bytes": 28710
+        },
+        {
+          "image": "/images/product/motion/03/01.webp",
+          "label": "값 수정",
+          "pointer": {
+            "x": 0.4893939393939394,
+            "y": 0.5927272727272728
+          },
+          "action": "type",
+          "sha256": "dec8de33a9a5789ad07a80a3b4416e99909fafcca3a0ed71e82289e47f5c5959",
+          "bytes": 29652
+        },
+        {
+          "image": "/images/product/motion/03/02.webp",
+          "label": "저장 전 변경 확인",
+          "pointer": {
+            "x": 0.4893939393939394,
+            "y": 0.5927272727272728
+          },
+          "action": "inspect",
+          "sha256": "74221f7ee71dfc3f8139513c6ddb917a17a842873ec2f087ab5146aaf031c993",
+          "bytes": 30998
+        },
+        {
+          "image": "/images/product/motion/03/03.webp",
+          "label": "저장 완료",
+          "pointer": {
+            "x": 0.9190814393939394,
+            "y": 0.48545454545454547
+          },
+          "action": "click",
+          "sha256": "b6343f1d4ce8c841ebe4aea372bc258ba8a879f3db322b4dd0038b6017693405",
+          "bytes": 31646
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/hr/basic/1/records/batch",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "route": "/hri/tasks/approvals",
+      "theme": "dark",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/04/00.webp",
+          "label": "대기 문서 조회",
+          "pointer": {
+            "x": 0.40181107954545453,
+            "y": 0.14484848484848484
+          },
+          "action": "click",
+          "sha256": "66778e1406c38554648a9ddb8f9e19b466ed63a508a053c9e218d8e1169e61c9",
+          "bytes": 21992
+        },
+        {
+          "image": "/images/product/motion/04/01.webp",
+          "label": "문서 내용 확인",
+          "pointer": {
+            "x": 0.13712121212121212,
+            "y": 0.47515151515151516
+          },
+          "action": "click",
+          "sha256": "6c17224bbc61336233a5b2620238e7ac6c99e8c60142526e5385e13a2fbba400",
+          "bytes": 34202
+        },
+        {
+          "image": "/images/product/motion/04/02.webp",
+          "label": "승인 전 확인",
+          "pointer": {
+            "x": 0.9371863162878787,
+            "y": 0.7836363636363637
+          },
+          "action": "click",
+          "sha256": "efbeea834efd5edc93585adcbde71aefeedc190919431de3692b196aede56b08",
+          "bytes": 29166
+        },
+        {
+          "image": "/images/product/motion/04/03.webp",
+          "label": "승인 처리 완료",
+          "pointer": {
+            "x": 0.5977923768939394,
+            "y": 0.6127272727272727
+          },
+          "action": "click",
+          "sha256": "b5e7529cb6015a3c4bccd3b3a8350cb712c83a761f91704046ecf7633cac8c08",
+          "bytes": 33798
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/hri/requests/103/approve",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "route": "/org/chart",
+      "theme": "light",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/05/00.webp",
+          "label": "조직 구조 확인",
+          "pointer": {
+            "x": 0.8227805397727272,
+            "y": 0.2593939393939394
+          },
+          "action": "click",
+          "sha256": "9ee06b4f861ca4f6b7afd186dde0fe200bc284837fb78556375e501dd61020f5",
+          "bytes": 23548
+        },
+        {
+          "image": "/images/product/motion/05/01.webp",
+          "label": "하위 조직 펼치기",
+          "pointer": {
+            "x": 0.7531782670454545,
+            "y": 0.2593939393939394
+          },
+          "action": "click",
+          "sha256": "0b6cdd3eef9c7c97342ffe17bf6b51633df93381632a00814d21dadf75a5150e",
+          "bytes": 39010
+        },
+        {
+          "image": "/images/product/motion/05/02.webp",
+          "label": "조직 검색",
+          "pointer": {
+            "x": 0.38872514204545455,
+            "y": 0.2593939393939394
+          },
+          "action": "type",
+          "sha256": "fa227bb628b5e5a72d2721b330d41e3b967e08749d0104876334d4478aaed04f",
+          "bytes": 27708
+        },
+        {
+          "image": "/images/product/motion/05/03.webp",
+          "label": "조직 관계 확인",
+          "pointer": {
+            "x": 0.38872514204545455,
+            "y": 0.2593939393939394
+          },
+          "action": "inspect",
+          "sha256": "fa227bb628b5e5a72d2721b330d41e3b967e08749d0104876334d4478aaed04f",
+          "bytes": 27708
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "06",
+      "route": "/tim/work-codes",
+      "theme": "light",
+      "tone": "skyblue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/06/00.webp",
+          "label": "조직 배정 조회",
+          "pointer": {
+            "x": 0.9575757575757575,
+            "y": 0.10909090909090909
+          },
+          "action": "click",
+          "sha256": "968f38919f424fda3e38ab384df7dfb370c2ca76b07fd3e9d637ccbab9b28934",
+          "bytes": 27006
+        },
+        {
+          "image": "/images/product/motion/06/01.webp",
+          "label": "값 수정",
+          "pointer": {
+            "x": 0.753030303030303,
+            "y": 0.38727272727272727
+          },
+          "action": "type",
+          "sha256": "c1a30a3ab96f6130e69bd04d648ac7b7d3fe21f9c5d15fe9275f73aec25b54c3",
+          "bytes": 25926
+        },
+        {
+          "image": "/images/product/motion/06/02.webp",
+          "label": "저장 전 변경 확인",
+          "pointer": {
+            "x": 0.753030303030303,
+            "y": 0.38727272727272727
+          },
+          "action": "inspect",
+          "sha256": "7a77ddc24d13e474592daaa63a55c2d95f1ca263bd374cbfab803662ef0c182d",
+          "bytes": 26528
+        },
+        {
+          "image": "/images/product/motion/06/03.webp",
+          "label": "배정 저장 완료",
+          "pointer": {
+            "x": 0.9190814393939394,
+            "y": 0.28484848484848485
+          },
+          "action": "click",
+          "sha256": "c629f5ead89b448563942d908906f8d79228838b70e70c76ada155da73968591",
+          "bytes": 25480
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/tim/schedules/departments",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "07",
+      "route": "/tim/status",
+      "theme": "dark",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/07/00.webp",
+          "label": "조회 기간 선택",
+          "pointer": {
+            "x": 0.14337121212121212,
+            "y": 0.1006060606060606
+          },
+          "action": "inspect",
+          "sha256": "5e1db5dbd52d78906724e5129cf0cfe82b5b07f7afafddf0e2f5793509ae4909",
+          "bytes": 53742
+        },
+        {
+          "image": "/images/product/motion/07/01.webp",
+          "label": "근태 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.10787878787878788
+          },
+          "action": "click",
+          "sha256": "fade5c079047727dd3648e23fa4fd4c4a874424d0aebf809d64ad37f81e46cba",
+          "bytes": 53732
+        },
+        {
+          "image": "/images/product/motion/07/02.webp",
+          "label": "대상자 선택",
+          "pointer": {
+            "x": 0.15606060606060607,
+            "y": 0.4296969696969697
+          },
+          "action": "click",
+          "sha256": "60a70f203231c49f0821dc2f85f15349554129d49a2b7086ba0eec3751a0df86",
+          "bytes": 54682
+        },
+        {
+          "image": "/images/product/motion/07/03.webp",
+          "label": "근태 상태 확인",
+          "pointer": {
+            "x": 0.8515151515151516,
+            "y": 0.4296969696969697
+          },
+          "action": "inspect",
+          "sha256": "60a70f203231c49f0821dc2f85f15349554129d49a2b7086ba0eec3751a0df86",
+          "bytes": 54682
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "08",
+      "route": "/tim/month-closing",
+      "theme": "light",
+      "tone": "gray",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/08/00.webp",
+          "label": "월별 마감 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.13454545454545455
+          },
+          "action": "click",
+          "sha256": "0efaabde328ef6859c5dfded1ecb44174dc518a8dfdde5710fc983e1f890e28f",
+          "bytes": 41728
+        },
+        {
+          "image": "/images/product/motion/08/01.webp",
+          "label": "마감 전 확인",
+          "pointer": {
+            "x": 0.9106060606060606,
+            "y": 0.4072727272727273
+          },
+          "action": "click",
+          "sha256": "db04b787f4fcabd007679f1bdccdb932aa1ac2d07d80d00b89d86b98b2868c56",
+          "bytes": 35484
+        },
+        {
+          "image": "/images/product/motion/08/02.webp",
+          "label": "처리 메모",
+          "pointer": {
+            "x": 0.3939393939393939,
+            "y": 0.5096969696969696
+          },
+          "action": "type",
+          "sha256": "c280052244d5a24e750b83e410cb7f2fb70ae1e0969fb47e83893d1c8efa36af",
+          "bytes": 35730
+        },
+        {
+          "image": "/images/product/motion/08/03.webp",
+          "label": "월마감 완료",
+          "pointer": {
+            "x": 0.6082563920454546,
+            "y": 0.5860606060606061
+          },
+          "action": "click",
+          "sha256": "36e309ffd2674fa2cc43ce2bd60a4af3e4b1ff959b56d06706b08e3bf161624a",
+          "bytes": 42204
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/tim/month-close",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "route": "/hri/my-payslip",
+      "theme": "light",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/10/00.webp",
+          "label": "월별 급여 조회",
+          "pointer": {
+            "x": 0.9370442708333333,
+            "y": 0.08848484848484849
+          },
+          "action": "click",
+          "sha256": "5744764db673d0ccfca806a24b0c04f284ef71beb3a4fdebccd97a24eb3d0fcf",
+          "bytes": 16072
+        },
+        {
+          "image": "/images/product/motion/10/01.webp",
+          "label": "급여 명세서 선택",
+          "pointer": {
+            "x": 0.1143939393939394,
+            "y": 0.21272727272727274
+          },
+          "action": "click",
+          "sha256": "62729c1849d625ee21a67f4e9195465f97e29db8ac1fbd985ae479bfe6190161",
+          "bytes": 24782
+        },
+        {
+          "image": "/images/product/motion/10/02.webp",
+          "label": "수당 확인",
+          "pointer": {
+            "x": 0.5,
+            "y": 0.2290909090909091
+          },
+          "action": "inspect",
+          "sha256": "62729c1849d625ee21a67f4e9195465f97e29db8ac1fbd985ae479bfe6190161",
+          "bytes": 24782
+        },
+        {
+          "image": "/images/product/motion/10/03.webp",
+          "label": "공제 확인",
+          "pointer": {
+            "x": 0.5,
+            "y": 0.4266666666666667
+          },
+          "action": "inspect",
+          "sha256": "62729c1849d625ee21a67f4e9195465f97e29db8ac1fbd985ae479bfe6190161",
+          "bytes": 24782
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "11",
+      "route": "/payroll/runs",
+      "theme": "dark",
+      "tone": "gray",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/11/00.webp",
+          "label": "급여 실행 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.12727272727272726
+          },
+          "action": "click",
+          "sha256": "147b0721fc41686d88a0a3a3ddd0be195886c2a800fc23b27709a4451d639961",
+          "bytes": 41096
+        },
+        {
+          "image": "/images/product/motion/11/01.webp",
+          "label": "실행 대상자 확인",
+          "pointer": {
+            "x": 0.8704545454545455,
+            "y": 0.32666666666666666
+          },
+          "action": "click",
+          "sha256": "90f25b18376caa41b01d8beda4376184c416c70ac8ad09a162b7a75c89c5f2e3",
+          "bytes": 48502
+        },
+        {
+          "image": "/images/product/motion/11/02.webp",
+          "label": "대상자 선택",
+          "pointer": {
+            "x": 0.17727272727272728,
+            "y": 0.7787878787878788
+          },
+          "action": "click",
+          "sha256": "9fd60926a6ae35c5b65fdc5fa8ce33f5d59a9914ff2f8df20787947b53bd610a",
+          "bytes": 48546
+        },
+        {
+          "image": "/images/product/motion/11/03.webp",
+          "label": "지급 집계 확인",
+          "pointer": {
+            "x": 0.45,
+            "y": 0.7787878787878788
+          },
+          "action": "inspect",
+          "sha256": "9fd60926a6ae35c5b65fdc5fa8ce33f5d59a9914ff2f8df20787947b53bd610a",
+          "bytes": 48546
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "12",
+      "route": "/payroll/vouchers",
+      "theme": "light",
+      "tone": "gray",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/12/00.webp",
+          "label": "급여 전표 조회",
+          "pointer": {
+            "x": 0.862494081439394,
+            "y": 0.29454545454545455
+          },
+          "action": "click",
+          "sha256": "e33fdadada29f097b00f06eaf73821863f3cab7c1fabd8229d6029123ba9f775",
+          "bytes": 31298
+        },
+        {
+          "image": "/images/product/motion/12/01.webp",
+          "label": "상세 내역 선택",
+          "pointer": {
+            "x": 0.09924242424242424,
+            "y": 0.41878787878787876
+          },
+          "action": "click",
+          "sha256": "44a881810bd94848ec8c49f001b8eb745311a1c848a438a76f453f263a407fe6",
+          "bytes": 24346
+        },
+        {
+          "image": "/images/product/motion/12/02.webp",
+          "label": "차변과 대변 대조",
+          "pointer": {
+            "x": 0.19814157196969698,
+            "y": 0.56
+          },
+          "action": "inspect",
+          "sha256": "44a881810bd94848ec8c49f001b8eb745311a1c848a438a76f453f263a407fe6",
+          "bytes": 24346
+        },
+        {
+          "image": "/images/product/motion/12/03.webp",
+          "label": "산출 근거 확인",
+          "pointer": {
+            "x": 0.8333333333333334,
+            "y": 0.7545454545454545
+          },
+          "action": "inspect",
+          "sha256": "44a881810bd94848ec8c49f001b8eb745311a1c848a438a76f453f263a407fe6",
+          "bytes": 24346
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "13",
+      "route": "/hr/severance/calcs",
+      "theme": "light",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/13/00.webp",
+          "label": "퇴직금 산정 조회",
+          "pointer": {
+            "x": 0.862494081439394,
+            "y": 0.08848484848484849
+          },
+          "action": "click",
+          "sha256": "e93f45a5b3577c8c701063e4a18594bb35b5d220430e0dfabbed4705f8d137eb",
+          "bytes": 39386
+        },
+        {
+          "image": "/images/product/motion/13/01.webp",
+          "label": "상세 내역 선택",
+          "pointer": {
+            "x": 0.0803030303030303,
+            "y": 0.21272727272727274
+          },
+          "action": "click",
+          "sha256": "58d5b935b02ba69bf0114c3c9532980071d97d4c589875e41357df84cbc95c26",
+          "bytes": 42788
+        },
+        {
+          "image": "/images/product/motion/13/02.webp",
+          "label": "임금 산입 근거 확인",
+          "pointer": {
+            "x": 0.20938091856060606,
+            "y": 0.7260606060606061
+          },
+          "action": "inspect",
+          "sha256": "58d5b935b02ba69bf0114c3c9532980071d97d4c589875e41357df84cbc95c26",
+          "bytes": 42788
+        },
+        {
+          "image": "/images/product/motion/13/03.webp",
+          "label": "산출 근거 확인",
+          "pointer": {
+            "x": 0.8666666666666667,
+            "y": 0.8793939393939394
+          },
+          "action": "inspect",
+          "sha256": "58d5b935b02ba69bf0114c3c9532980071d97d4c589875e41357df84cbc95c26",
+          "bytes": 42788
+        }
+      ],
+      "writes": []
+    },
+    {
+      "id": "14",
+      "route": "/wel/requests",
+      "theme": "light",
+      "tone": "green",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/14/00.webp",
+          "label": "복리후생 신청 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.10303030303030303
+          },
+          "action": "click",
+          "sha256": "d9b0cca74ad9ef50dfe29cb03fe1c611ceca84e8e152315d32079c6af10719a9",
+          "bytes": 29900
+        },
+        {
+          "image": "/images/product/motion/14/01.webp",
+          "label": "신청 대상 선택",
+          "pointer": {
+            "x": 0.09924242424242424,
+            "y": 0.5230303030303031
+          },
+          "action": "click",
+          "sha256": "5b178ea47dece24c9ae226c99200476352bdcf57dbfb2a528a0c024982f86f45",
+          "bytes": 30570
+        },
+        {
+          "image": "/images/product/motion/14/02.webp",
+          "label": "승인 금액 확인",
+          "pointer": {
+            "x": 0.8077947443181818,
+            "y": 0.19757575757575757
+          },
+          "action": "click",
+          "sha256": "4a93d3415a2494149d05d6a3d25417a33f82cf4e7abfd2c46fc18768067836fb",
+          "bytes": 24506
+        },
+        {
+          "image": "/images/product/motion/14/03.webp",
+          "label": "승인 처리 완료",
+          "pointer": {
+            "x": 0.6082563920454546,
+            "y": 0.6224242424242424
+          },
+          "action": "click",
+          "sha256": "e1b6c55fe6cd763fb246c701e10fa87206205892ba1e494d96ae6d4004a79bd1",
+          "bytes": 30750
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/wel/requests/1/approve",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "15",
+      "route": "/tra/applications",
+      "theme": "dark",
+      "tone": "skyblue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/15/00.webp",
+          "label": "교육 신청 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.10303030303030303
+          },
+          "action": "click",
+          "sha256": "282a530c02087ebcc4da81deee69e3f65e15eed2a237b6b9558b013357b6bf72",
+          "bytes": 28392
+        },
+        {
+          "image": "/images/product/motion/15/01.webp",
+          "label": "승인 대상 선택",
+          "pointer": {
+            "x": 0.05454545454545454,
+            "y": 0.29454545454545455
+          },
+          "action": "click",
+          "sha256": "5888e8261e37a901ef98c70f6eef24fdbd5947ddecb9bbb8f77ecd767af5aa58",
+          "bytes": 29498
+        },
+        {
+          "image": "/images/product/motion/15/02.webp",
+          "label": "승인 전 확인",
+          "pointer": {
+            "x": 0.8808297821969697,
+            "y": 0.19272727272727272
+          },
+          "action": "click",
+          "sha256": "57183877d6c8cae16e3329f701ffb0b212816ca901310d3244567cc1902d3d7b",
+          "bytes": 26878
+        },
+        {
+          "image": "/images/product/motion/15/03.webp",
+          "label": "교육 승인 완료",
+          "pointer": {
+            "x": 0.6082563920454546,
+            "y": 0.556969696969697
+          },
+          "action": "click",
+          "sha256": "3aaafe367ee513be66d3c93a6f78c11d027b0601955a42cf07a95d37b2581893",
+          "bytes": 29178
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/tra/applications/101/approve",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "16",
+      "route": "/pap/targets",
+      "theme": "light",
+      "tone": "gray",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/16/00.webp",
+          "label": "평가 대상 조회",
+          "pointer": {
+            "x": 0.9386363636363636,
+            "y": 0.10303030303030303
+          },
+          "action": "click",
+          "sha256": "cb8ff5903123eac806ac5c61011224707b239928910f65454abe7bb05ea1d6f0",
+          "bytes": 26452
+        },
+        {
+          "image": "/images/product/motion/16/01.webp",
+          "label": "값 수정",
+          "pointer": {
+            "x": 0.7689393939393939,
+            "y": 0.30242424242424243
+          },
+          "action": "type",
+          "sha256": "8c190173d0060788f4269c1139c31723cecf4584631c2db1e85e8c8952c1e8d6",
+          "bytes": 27622
+        },
+        {
+          "image": "/images/product/motion/16/02.webp",
+          "label": "저장 전 변경 확인",
+          "pointer": {
+            "x": 0.7689393939393939,
+            "y": 0.30242424242424243
+          },
+          "action": "inspect",
+          "sha256": "887dc98bfca66a0ab154d930ad22dfbc98efed09b37a31078f75c3d6f718755f",
+          "bytes": 28308
+        },
+        {
+          "image": "/images/product/motion/16/03.webp",
+          "label": "평가 저장 완료",
+          "pointer": {
+            "x": 0.937801846590909,
+            "y": 0.19757575757575757
+          },
+          "action": "click",
+          "sha256": "c5e78f8db1f0417fa93838d1d3cb915fadab6c5bd5993d37d90d01515ca38dc8",
+          "bytes": 27642
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/pap/targets/batch",
+          "method": "POST",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    },
+    {
+      "id": "17",
+      "route": "/settings/permissions",
+      "theme": "dark",
+      "tone": "blue",
+      "synthetic": true,
+      "steps": [
+        {
+          "image": "/images/product/motion/17/00.webp",
+          "label": "메뉴 검색",
+          "pointer": {
+            "x": 0.18257575757575759,
+            "y": 0.1406060606060606
+          },
+          "action": "type",
+          "sha256": "cc97690d24f8f42a47cbbb848e0f2c5ca652f09a290636239870a6b9a849f8e5",
+          "bytes": 35110
+        },
+        {
+          "image": "/images/product/motion/17/01.webp",
+          "label": "역할 권한 수정",
+          "pointer": {
+            "x": 0.6949100378787879,
+            "y": 0.5042424242424243
+          },
+          "action": "click",
+          "sha256": "2cd5ea3e3191fec6744366b014529791e5e0db7db3b6965f7a9aa588e7eb81dd",
+          "bytes": 36750
+        },
+        {
+          "image": "/images/product/motion/17/02.webp",
+          "label": "변경 권한 확인",
+          "pointer": {
+            "x": 0.9206676136363636,
+            "y": 0.38666666666666666
+          },
+          "action": "inspect",
+          "sha256": "2cd5ea3e3191fec6744366b014529791e5e0db7db3b6965f7a9aa588e7eb81dd",
+          "bytes": 36750
+        },
+        {
+          "image": "/images/product/motion/17/03.webp",
+          "label": "권한 저장 완료",
+          "pointer": {
+            "x": 0.9206676136363636,
+            "y": 0.38666666666666666
+          },
+          "action": "click",
+          "sha256": "348fd0fc9e89ec777d74a8a6b219612d3b32632c08daee4589773b5fa76dbadd",
+          "bytes": 37950
+        }
+      ],
+      "writes": [
+        {
+          "path": "/api/menus/admin/roles/permissions",
+          "method": "PUT",
+          "environment": "isolated synthetic fixture"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { requestWorkspaceNavigation } from "@/lib/grid/use-unsaved-navigation";
 import { Search, Star } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useMenu } from "@/components/auth/menu-provider";
@@ -37,7 +38,7 @@ export function WorkspaceNavigator({ tabs }: { tabs: { path: string; label: stri
   const results = destinations.filter((item) => (!onlyTabs || tabs.some((tab) => tab.path === item.path)) && `${item.label} ${item.group}`.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => Number(pins.includes(b.path)) - Number(pins.includes(a.path)));
   function pin(path: string) { const next = pins.includes(path) ? pins.filter((item) => item !== path) : [...pins, path]; setPins(next); try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* Session pins remain available. */ } }
-  function navigate(path: string) { setOpen(false); setQuery(""); router.push(path); }
+  function navigate(path: string) { setOpen(false); requestWorkspaceNavigation(() => { setQuery(""); router.push(path); }); }
   return <Dialog open={open} onOpenChange={setOpen}>
     <DialogTrigger asChild><Button variant="outline" size="sm" aria-label="빠른 이동"><Search className="h-4 w-4" /><span className="hidden md:inline">빠른 이동</span><kbd className="hidden text-xs text-muted-foreground lg:inline">Ctrl K</kbd></Button></DialogTrigger>
     <DialogContent><DialogHeader><DialogTitle>빠른 이동</DialogTitle><DialogDescription>메뉴와 열린 탭을 검색하고 자주 쓰는 메뉴를 고정하세요.</DialogDescription></DialogHeader>

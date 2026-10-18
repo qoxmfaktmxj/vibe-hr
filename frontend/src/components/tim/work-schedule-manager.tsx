@@ -27,6 +27,7 @@ import {
 import { buildGridRowClassRules, getGridRowClass, getGridStatusCellClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useUnsavedNavigation } from "@/lib/grid/use-unsaved-navigation";
 import { useMenuActions } from "@/lib/menu/use-menu-actions";
 import { downloadSpreadsheet, pickSpreadsheetFile, readSpreadsheet } from "@/lib/spreadsheet/workbook";
 import { WORK_SCHEDULE_COLUMNS, validateWorkScheduleImport } from "@/lib/spreadsheet/time-payroll-code-schemas";
@@ -135,6 +136,9 @@ export function WorkScheduleManager() {
   const gridApiRef = useRef<GridApi<WorkScheduleRow> | null>(null);
   const tempIdRef = useRef(-1);
   const rowsRef = useRef<WorkScheduleRow[]>([]);
+  const navigationDirty = useCallback(() => { gridApiRef.current?.stopEditing(); return rowsRef.current.some(row => row._status !== "clean"); }, []);
+  const navigationBlocked = useCallback(() => saving, [saving]);
+  const navigationGuard = useUnsavedNavigation(navigationDirty, navigationBlocked);
   const pageSize = 100;
 
   const issueTempId = () => {
@@ -604,7 +608,8 @@ export function WorkScheduleManager() {
   }
 
   return (
-    <ManagerPageShell>
+    <section aria-label="근무코드 목록"><ManagerPageShell className="h-auto">
+      {navigationGuard.dialog}
       <ManagerSearchSection
         title="근무코드관리"
         onQuery={handleQueryRequest}
@@ -678,7 +683,7 @@ export function WorkScheduleManager() {
           }
         }}
       />
-    </ManagerPageShell>
+    </ManagerPageShell></section>
   );
 }
 

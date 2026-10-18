@@ -71,6 +71,14 @@ Before merge:
 
 ## 5) Legacy rule
 
+`hr.basic` history tabs use the already-loaded single-employee detail response and local50-row pagination. This is an explicit aggregate-detail exception to list API pagination. Save covers all changed rows of the active employee/category. Query,page,employee and category changes use the shared dirty confirmation before discarding drafts;all other common grid status and toolbar rules apply.
+
+The form-type and approval-template catalogs, department schedule assignments and employee schedule exceptions retain their existing whole-catalog batch APIs and use local 50-row pagination in `BatchGridManager`. These configuration catalogs are an explicit client-pagination exception; do not advertise them as server-paged. The active editor saves all changed catalog rows, including nested template steps, in one batch. Before a reload or page change discards drafts, use the standard confirmation.
+
+Payslip history and the wage/voucher detail arrays use `LocalReadonlyGrid` with local 50-row pagination. Month closing shows the fixed 12 months of the selected year. These are read-only aggregate/catalog exceptions. Leave requests use their existing server `page`/`limit` API. Read-only toolbars expose only supported query/download actions and never render inactive create/copy/upload/save placeholders.
+
+New screens can register their shared `BatchGridManager` or `ReadonlyGridManager` renderer as `componentFile`; the page metadata still belongs to the business route. Embedded schedule grids share the `/tim/work-codes` route registration. Avoid fake per-screen imports solely to satisfy the textual validator.
+
 - Existing legacy AG Grid screens may remain temporarily.
 - Any modified legacy AG Grid screen must be migrated to standard-v2 in the same task.
 - New AG Grid screens must start with standard-v2.

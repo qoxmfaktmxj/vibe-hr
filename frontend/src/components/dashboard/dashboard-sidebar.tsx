@@ -2,8 +2,6 @@
 
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Minus,
   Plus,
   PanelLeft,
@@ -68,10 +66,10 @@ function MenuLeafItem({ node, isActive }: { node: MenuNode; isActive: boolean })
       ref={ref}
       href={node.path}
       onClick={() => setCenterTargetPath(node.path)}
-      className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+      className={`flex min-h-10 items-center gap-2 rounded-sm px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
         isActive
-          ? "bg-primary/12 text-primary shadow-[inset_3px_0_0_var(--primary)]"
-          : "text-[color:var(--vibe-nav-text)] hover:bg-accent/70 hover:text-[color:var(--vibe-nav-text-strong)]"
+          ? styles.menuLeafActive
+          : "font-medium text-[color:var(--vibe-nav-text)] hover:bg-accent/70 hover:text-[color:var(--vibe-nav-text-strong)]"
       }`}
       aria-current={isActive ? "page" : undefined}
     >
@@ -216,12 +214,12 @@ function MenuGroupItem({
         onClick={() => onToggle(node.code)}
         aria-expanded={isOpen}
         aria-controls={childrenId}
-        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
+        className={`flex min-h-10 w-full items-center gap-2 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
           active
             ? "text-[color:var(--vibe-nav-text-strong)]"
             : "text-[color:var(--vibe-nav-text)] hover:bg-accent hover:text-[color:var(--vibe-nav-text-strong)]"
         }`}
-        style={{ paddingLeft: `${16 + depth * 12}px` }}
+        style={{ paddingLeft: `${12 + depth * 12}px` }}
       >
         {renderIcon(node.icon, "h-4 w-4")}
         <span className="flex-1 text-left">{node.name}</span>
@@ -264,15 +262,19 @@ function DomainRailItem({
   active,
   onSelect,
   compact = false,
+  panelId,
+  expanded,
 }: {
   node: MenuNode;
   active: boolean;
   onSelect: () => void;
   compact?: boolean;
+  panelId?: string;
+  expanded?: boolean;
 }) {
   const content = (
     <>
-      <span className={styles.railIcon}>{renderIcon(node.icon, "h-5 w-5")}</span>
+      <span className={styles.railIcon}>{renderIcon(node.icon, "h-4.5 w-4.5")}</span>
       <span className={styles.railLabel}>{node.name}</span>
     </>
   );
@@ -292,7 +294,9 @@ function DomainRailItem({
         className={className}
         aria-current={active ? "page" : undefined}
         aria-label={node.name}
-        title={node.name}
+        aria-controls={panelId}
+        aria-expanded={expanded}
+        title={expanded === false ? `${node.name} 세부 메뉴 열기` : node.name}
       >
         {content}
       </Link>
@@ -306,7 +310,9 @@ function DomainRailItem({
     className={className}
     aria-pressed={active}
     aria-label={node.name}
-    title={node.name}
+    aria-controls={panelId}
+    aria-expanded={expanded}
+    title={expanded === false ? `${node.name} 세부 메뉴 열기` : node.name}
   >
     {content}
   </button>
@@ -325,6 +331,8 @@ export function DashboardSidebar() {
   const profileReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const openingMobileProfileRef = useRef(false);
   const [contextPanelCollapsed, setContextPanelCollapsed] = useState(false);
+  const contextPanelId = useId();
+  const domainRailRef = useRef<HTMLElement>(null);
   const routeDomainCode = navigationMenus.find((node) => hasActiveDescendant(node, pathname))?.code;
   const [domainSelection, setDomainSelection] = useState({ pathname, menus: navigationMenus, code: routeDomainCode ?? null });
   if (domainSelection.pathname !== pathname || domainSelection.menus !== navigationMenus) {
@@ -431,7 +439,7 @@ export function DashboardSidebar() {
   const sidebarContent = (
     <>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/80 px-4 py-4">
+        <div className="flex min-h-17 items-center gap-2 border-b border-border/80 px-3 py-2">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-[color:var(--vibe-nav-text-muted)]">업무 영역</p>
             <p className="truncate text-base font-bold tracking-[-0.02em] text-[color:var(--vibe-nav-text-strong)]">
@@ -443,7 +451,7 @@ export function DashboardSidebar() {
               type="button"
               size="icon"
               variant="outline"
-              className="h-9 w-9 shrink-0"
+              className="h-8 w-8 shrink-0 rounded-sm shadow-none"
               onClick={toggleContextGroups}
               title={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
               aria-label={menuExpanded ? "메뉴 전체 접기" : "메뉴 전체 펼치기"}
@@ -451,12 +459,27 @@ export function DashboardSidebar() {
               {menuExpanded ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
             </Button>
           )}
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="hidden h-8 w-8 shrink-0 rounded-sm lg:inline-flex"
+            onClick={() => {
+              domainRailRef.current?.querySelector<HTMLElement>('[aria-expanded="true"]')?.focus();
+              setContextPanelCollapsed(true);
+            }}
+            title="세부 메뉴 닫기"
+            aria-label="세부 메뉴 닫기"
+            aria-controls={contextPanelId}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </Button>
         </div>
 
         <nav
           ref={restoreMenuScroll}
           onScroll={handleMenuScroll}
-          className="mt-2 min-h-0 flex-1 space-y-1 overflow-y-auto px-3"
+          className={cn(styles.sidebarScroll, "mt-2 min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2")}
         >
           {contextNodes.map((node) =>
             node.children.length > 0 ? (
@@ -497,10 +520,10 @@ export function DashboardSidebar() {
   );
 
   const domainRail = (
-    <nav className="vibe-rail flex shrink-0" style={{ width: "4.75rem" }} aria-label="업무 영역">
+    <nav ref={domainRailRef} className="vibe-rail flex shrink-0" style={{ width: "4.5rem" }} aria-label="업무 영역">
       <Link
         href="/dashboard"
-        className="mx-auto mt-3 flex h-10 w-10 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        className="mx-auto mt-2 flex h-10 w-10 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         aria-label="VIBE-HR 대시보드"
         title="VIBE-HR 대시보드"
       >
@@ -513,12 +536,14 @@ export function DashboardSidebar() {
           aria-hidden="true"
         />
       </Link>
-      <div className="mt-5 flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto overflow-x-visible px-2 pb-3">
+      <div className={cn(styles.sidebarScroll, "mt-1 flex min-h-0 flex-1 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden px-1 pb-2")}>
         {navigationMenus.map((node) => (
           <DomainRailItem
             key={node.code}
             node={node}
             active={activeDomain?.code === node.code}
+            panelId={contextPanelId}
+            expanded={activeDomain?.code === node.code && !contextPanelCollapsed}
             onSelect={() => {
               setDomainSelection((previous) => ({ ...previous, code: node.code }));
               setContextPanelCollapsed(false);
@@ -548,7 +573,7 @@ export function DashboardSidebar() {
   );
 
   const mobileDomainRail = (
-    <nav className="vibe-rail vibe-rail--mobile flex shrink-0 items-start gap-1 overflow-x-auto p-2" aria-label="업무 영역">
+    <nav className={cn(styles.sidebarScroll, "vibe-rail vibe-rail--mobile flex shrink-0 items-start gap-1 overflow-x-auto p-2")} aria-label="업무 영역">
       {navigationMenus.map((node) => (
         <DomainRailItem
           key={node.code}
@@ -577,7 +602,7 @@ export function DashboardSidebar() {
           onCloseAutoFocus={(event) => {
             if (openingMobileProfileRef.current) event.preventDefault();
           }}
-          className="fixed inset-0 z-[60] lg:hidden left-0 top-0 right-auto h-[100dvh] w-[min(21rem,calc(100vw-2.5rem))] translate-x-0 translate-y-0 rounded-r-3xl rounded-l-none border-r border-border bg-[var(--vibe-sidebar-bg)] p-0 shadow-[var(--vibe-shadow-floating)]"
+          className="fixed inset-0 z-[60] lg:hidden left-0 top-0 right-auto h-[100dvh] w-[min(21rem,calc(100vw-2.5rem))] translate-x-0 translate-y-0 rounded-r-md rounded-l-none border-r border-border bg-[var(--vibe-sidebar-bg)] p-0 shadow-[var(--vibe-shadow-floating)] [--radius:0.5rem]"
         >
           <div className="flex h-full min-h-0 flex-col">
             <DialogTitle className="sr-only">업무 영역 메뉴</DialogTitle>
@@ -608,23 +633,8 @@ export function DashboardSidebar() {
 
       <div className="hidden shrink-0 lg:flex">
         {domainRail}
-        <button
-          type="button"
-          className={cn(
-            styles.panelToggle,
-            "flex items-start justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
-          )}
-          onClick={() => setContextPanelCollapsed((prev) => !prev)}
-          title={contextPanelCollapsed ? "세부 메뉴 펼치기" : "세부 메뉴 접기"}
-          aria-label={contextPanelCollapsed ? "세부 메뉴 펼치기" : "세부 메뉴 접기"}
-        >
-          {contextPanelCollapsed ? (
-            <ChevronRight className={cn(styles.panelToggleIcon, "h-4 w-4")} aria-hidden="true" />
-          ) : (
-            <ChevronLeft className={cn(styles.panelToggleIcon, "h-4 w-4")} aria-hidden="true" />
-          )}
-        </button>
         <aside
+          id={contextPanelId}
           className={cn(
             "flex w-[13rem] flex-col border-r border-border bg-[var(--vibe-sidebar-bg)]",
             styles.desktopContextPanel,

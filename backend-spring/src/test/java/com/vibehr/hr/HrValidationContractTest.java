@@ -85,4 +85,28 @@ class HrValidationContractTest {
         org.assertj.core.api.Assertions.assertThat(captor.getAllValues().get(1).has("position_title")).isTrue();
         org.assertj.core.api.Assertions.assertThat(captor.getAllValues().get(1).positionTitle).isNull();
     }
+
+    @Test
+    void historyBatchDeserializesSnakeCaseAndTracksExplicitFieldClearing() throws Exception {
+        org.mockito.Mockito.when(service.batchBasicRecords(eq(9), any())).thenReturn(Map.of("items", java.util.List.of()));
+        mvc.perform(post("/api/v1/hr/basic/9/records/batch").contentType(MediaType.APPLICATION_JSON).content("""
+                {"category":"education","items":[{"id":12,"title":"학교","record_date":"2026-10-18","note":null}],"delete_ids":[13]}
+                """))
+                .andExpect(status().isOk());
+        ArgumentCaptor<HrRequests.BasicRecordBatch> captor = ArgumentCaptor.forClass(HrRequests.BasicRecordBatch.class);
+        verify(service).batchBasicRecords(eq(9), captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().deleteIds).containsExactly(13);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().items.getFirst().recordDate).isEqualTo(java.time.LocalDate.of(2026, 10, 18));
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().items.getFirst().has("note")).isTrue();
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().items.getFirst().has("organization")).isFalse();
+    }
+
+    @Test
+    void historyBatchRejectsInvalidIdsBeforeCallingService() throws Exception {
+        mvc.perform(post("/api/v1/hr/basic/9/records/batch").contentType(MediaType.APPLICATION_JSON).content("""
+                {"category":"education","items":[{"id":-1,"title":"학교"}],"delete_ids":[]}
+                """))
+                .andExpect(status().isUnprocessableContent());
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
 }

@@ -139,7 +139,7 @@ test("retirement page 2 keeps the selected employee through writes and selects a
   const fixture = await installRoutes(page);
   await page.goto("/hr/retire/approvals");
   await expectSelected(page, 1);
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).first().click();
   await fixture.pageTwoRequested;
   try {
     await expect(page.getByText("직원1 (TEST-001)", { exact: true })).toBeVisible();
@@ -154,9 +154,9 @@ test("retirement page 2 keeps the selected employee through writes and selects a
   await expect(page.getByRole("button", { name: "메모 저장", exact: true })).toBeEnabled();
   await expectSelected(page, 52);
   expect(fixture.writes).toEqual([{ method: "PUT", path: "/api/hr/retire/cases/52/items/1052", body: { is_checked: false, note: "직원52 반납 확인" } }]);
-  await page.getByRole("button", { name: "이전", exact: true }).click();
+  await page.getByRole("button", { name: "이전", exact: true }).first().click();
   await expectSelected(page, 1);
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).first().click();
   await expectSelected(page, 51);
   await page.getByLabel("퇴직 대상자", { exact: true }).selectOption("61");
   await page.getByPlaceholder("사유(선택)", { exact: true }).fill("신규 퇴직 요청");
@@ -169,7 +169,7 @@ test("retirement page 2 keeps the selected employee through writes and selects a
   }
   await expect(page.getByRole("button", { name: "퇴직 건 생성", exact: true })).toBeEnabled();
   await expectSelected(page, 61);
-  await expect(page.getByRole("button", { name: "이전", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "이전", exact: true }).first()).toBeDisabled();
   expect(fixture.writes[1]).toMatchObject({ method: "POST", path: "/api/hr/retire/cases", body: { employee_id: 61, reason: "신규 퇴직 요청" } });
   await page.getByRole("grid").screenshot({ path: test.info().outputPath("retirement-selected-grid.png") });
   await page.screenshot({ path: test.info().outputPath("retirement-selected-created.png"), fullPage: true });
@@ -183,7 +183,7 @@ test("severance page 2 keeps the selected employee through adjustment and recalc
   const fixture = await installRoutes(page);
   await page.goto("/hr/severance/calcs");
   await expectSelected(page, 1);
-  await page.getByRole("button", { name: "다음", exact: true }).click();
+  await page.getByRole("button", { name: "다음", exact: true }).first().click();
   await fixture.pageTwoRequested;
   try {
     await expect(page.getByText("직원1 (TEST-001)", { exact: true })).toBeVisible();
@@ -211,9 +211,9 @@ test("severance page 2 keeps the selected employee through adjustment and recalc
   await expect(page.getByRole("button", { name: "재산정", exact: true })).toBeDisabled();
   await expectSelected(page, 52);
   expect(fixture.writes[2]).toEqual({ method: "POST", path: "/api/hr/severance/calcs/52/confirm", body: null });
-  await page.getByRole("grid").screenshot({ path: test.info().outputPath("severance-selected-grid.png") });
+  await page.getByRole("grid").first().screenshot({ path: test.info().outputPath("severance-selected-grid.png") });
   await page.screenshot({ path: test.info().outputPath("severance-selected-page-2.png"), fullPage: true });
-  await page.getByRole("button", { name: "이전", exact: true }).click();
+  await page.getByRole("button", { name: "이전", exact: true }).first().click();
   await expectSelected(page, 1);
   fixture.calcs.splice(0);
   await page.getByRole("button", { name: "조회", exact: true }).first().click();

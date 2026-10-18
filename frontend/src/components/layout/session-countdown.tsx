@@ -155,7 +155,7 @@ export function SessionCountdown() {
       type="button"
       onClick={() => { void handleClick(); }}
       disabled={refreshing || (!ready && !sessionError)}
-      className={`flex min-h-11 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${pillCls}`}
+      className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60 ${pillCls}`}
       title={sessionError || warning || "로그인 시간 연장"}
       aria-label={sessionError ? "로그인 시간 다시 확인" : ready ? `로그인 시간 연장. 남은 시간 ${fmt(remainingSec)}` : "로그인 시간 확인 중"}
     >

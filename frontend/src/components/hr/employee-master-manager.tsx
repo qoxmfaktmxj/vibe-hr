@@ -55,6 +55,7 @@ import { HOLIDAY_DATE_KEYS } from "@/lib/holiday-data";
 import { reconcileUpdatedStatus, toggleDeletedStatus } from "@/lib/grid/grid-status-mutations";
 import { buildGridRowClassRules, getGridRowClass, summarizeGridStatuses } from "@/lib/grid/grid-status";
 import { useGridPagination } from "@/lib/grid/use-grid-pagination";
+import { useUnsavedNavigation } from "@/lib/grid/use-unsaved-navigation";
 import { CheckListFilter } from "@/components/grid/check-list-filter";
 import { EmployeeAnalysis } from "@/components/hr/employee-analysis";
 import { ContextMenu } from "radix-ui";
@@ -367,6 +368,9 @@ export function EmployeeMasterManager() {
     return summarizeGridStatuses(rows, (row) => row._status);
   }, [rows]);
   const hasDirtyRows = useMemo(() => rows.some((row) => row._status !== "clean"), [rows]);
+  const navigationDirty = useCallback(() => { gridApiRef.current?.stopEditing(); return rowsRef.current.some(row => row._status !== "clean"); }, []);
+  const navigationBlocked = useCallback(() => saving, [saving]);
+  const navigationGuard = useUnsavedNavigation(navigationDirty, navigationBlocked);
   const changedCount = rows.filter((row) => row._status !== "clean").length;
   const selectedItems = rows.filter((row) => selectedIds.includes(row.id));
   const detailRow = rows.find((row) => row.id === detailId);
@@ -823,7 +827,9 @@ export function EmployeeMasterManager() {
   }
 
   return (
-    <ManagerPageShell className="employee-workspace" containerRef={containerRef}>
+    <ManagerPageShell className="employee-workspace business-workspace" containerRef={containerRef}>
+      <div className="business-heading"><h1>사원관리</h1><p>구성원의 정보를 조회하고 변경 내용을 모아 저장합니다.</p></div>
+      {navigationGuard.dialog}
       {/* ManagerSearchSection is rendered through EmployeeMasterSearchSection to keep standard-v2 composition. */}
       <EmployeeMasterSearchSection
         filters={searchFilters}
@@ -867,17 +873,6 @@ export function EmployeeMasterManager() {
         )}
         headerRight={(
           <>
-            <Button variant="outline" size="sm" disabled={saving || loading} onClick={openAnalysis}>분석</Button>
-            {can("save") && <><Button variant="outline" size="sm" disabled={saving || loading || historyCount.undo === 0} onClick={() => restoreEdit("undo")}>실행 취소</Button><Button variant="outline" size="sm" disabled={saving || loading || historyCount.redo === 0} onClick={() => restoreEdit("redo")}>다시 실행</Button></>}
-            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 className="h-3.5 w-3.5" />열 보기</Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={hiddenColumns.length === 0} onSelect={() => { gridApiRef.current?.setColumnsVisible(hiddenColumns, true); setHiddenColumns([]); }}>전체 표시</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {[["login_id", "로그인 ID"], ["email", "이메일"], ["is_active", "계정 활성"], ["password", "비밀번호 입력"], ["position_title", "직책"], ["hire_date", "입사일"]].map(([field, label]) => <DropdownMenuCheckboxItem key={field} checked={!hiddenColumns.includes(field)} onCheckedChange={(visible) => { gridApiRef.current?.setColumnsVisible([field], visible); setHiddenColumns((previous) => visible ? previous.filter((item) => item !== field) : [...previous, field]); }}>{label}</DropdownMenuCheckboxItem>)}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {can("save") && selectedItems.length > 0 && <><Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status !== "deleted")} onClick={() => setDeleteTargets(selectedItems.filter((row) => row._status !== "deleted").map((row) => row.id))}><Trash2 className="h-3.5 w-3.5" />선택 삭제</Button>
-              <Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status === "deleted")} onClick={() => selectedItems.filter((row) => row._status === "deleted").forEach((row) => toggleDeleteById(row.id, false))}><Undo2 className="h-3.5 w-3.5" />삭제 취소</Button></>}
             <GridToolbarActions actions={filteredToolbarActions} saveAction={filteredToolbarSaveAction} />
             <input
               ref={uploadInputRef}
@@ -897,6 +892,19 @@ export function EmployeeMasterManager() {
 
       {saveFeedback && (saveFeedback.tone === "error" || !hasDirtyRows) && <p role="status" className={`employee-feedback px-6 pb-2 text-sm ${saveFeedback.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}>{saveFeedback.text}</p>}
 
+      <div className="flex flex-wrap items-center justify-end gap-1.5 px-6 pb-2">
+            <Button variant="outline" size="sm" disabled={saving || loading} onClick={openAnalysis}>분석</Button>
+            {can("save") && <><Button variant="outline" size="sm" disabled={saving || loading || historyCount.undo === 0} onClick={() => restoreEdit("undo")}>실행 취소</Button><Button variant="outline" size="sm" disabled={saving || loading || historyCount.redo === 0} onClick={() => restoreEdit("redo")}>다시 실행</Button></>}
+            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 className="h-3.5 w-3.5" />열 보기</Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={hiddenColumns.length === 0} onSelect={() => { gridApiRef.current?.setColumnsVisible(hiddenColumns, true); setHiddenColumns([]); }}>전체 표시</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {[["login_id", "로그인 ID"], ["email", "이메일"], ["is_active", "계정 활성"], ["password", "비밀번호 입력"], ["position_title", "직책"], ["hire_date", "입사일"]].map(([field, label]) => <DropdownMenuCheckboxItem key={field} checked={!hiddenColumns.includes(field)} onCheckedChange={(visible) => { gridApiRef.current?.setColumnsVisible([field], visible); setHiddenColumns((previous) => visible ? previous.filter((item) => item !== field) : [...previous, field]); }}>{label}</DropdownMenuCheckboxItem>)}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {can("save") && selectedItems.length > 0 && <><Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status !== "deleted")} onClick={() => setDeleteTargets(selectedItems.filter((row) => row._status !== "deleted").map((row) => row.id))}><Trash2 className="h-3.5 w-3.5" />선택 삭제</Button>
+              <Button size="sm" variant="outline" disabled={saving || menuActionLoading || !selectedItems.some((row) => row._status === "deleted")} onClick={() => selectedItems.filter((row) => row._status === "deleted").forEach((row) => toggleDeleteById(row.id, false))}><Undo2 className="h-3.5 w-3.5" />삭제 취소</Button></>}
+      </div>
       <p className="px-6 pb-2 text-xs text-muted-foreground">드래그로 선택, 더블클릭으로 수정, Ctrl+C/V로 복사와 붙여넣기. 선택 모서리를 끌면 자동 채우기, Ctrl+Z로 실행 취소. 신규 행은 입력 버튼으로 추가하세요.</p>
       {rangePaste.message && <p role="status" className="px-6 pb-2 text-sm">{rangePaste.message}</p>}
       <ContextMenu.Root><ContextMenu.Trigger asChild>

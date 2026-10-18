@@ -135,6 +135,20 @@ final class HrRequests {
         @JsonSetter("category") public void category(String field) { supplied("category"); category = field; }
     }
 
+    static final class BasicRecordBatchItem extends BasicRecordUpdate {
+        @Positive Integer id;
+        @JsonSetter("id") public void id(Integer field) { id = field; }
+    }
+
+    static final class BasicRecordBatch extends Tracked {
+        @NotNull String category;
+        @NotNull @Size(max = 500) List<@NotNull @Valid BasicRecordBatchItem> items = new ArrayList<>();
+        @NotNull @Size(max = 500) List<@NotNull @Positive Integer> deleteIds = new ArrayList<>();
+        @JsonSetter("category") public void category(String field) { supplied("category"); category = field; }
+        @JsonSetter("items") public void items(List<BasicRecordBatchItem> field) { supplied("items"); items = field; }
+        @JsonSetter("delete_ids") public void deleteIds(List<Integer> field) { supplied("delete_ids"); deleteIds = field; }
+    }
+
     static class FinalistUpdate extends Tracked {
         @Pattern(regexp = "^(if|manual)$") String sourceType;
         @Size(max = 100) String externalKey;

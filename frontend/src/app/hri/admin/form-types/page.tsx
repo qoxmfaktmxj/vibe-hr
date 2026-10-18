@@ -2,6 +2,9 @@ import { HriFormTypeManager } from "@/components/hri/hri-form-type-manager";
 import { AppShell } from "@/components/layout/app-shell";
 import { requireMenuAccess } from "@/lib/guard";
 
+const GRID_SCREEN = { engine: "ag-grid", profile: "standard-v2", registryKey: "hri.form-types" } as const;
+void GRID_SCREEN;
+
 export default async function HriAdminFormTypesPage() {
   await requireMenuAccess("/hri/admin/form-types");
 

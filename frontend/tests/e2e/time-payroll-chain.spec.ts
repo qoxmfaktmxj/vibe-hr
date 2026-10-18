@@ -224,7 +224,8 @@ test("isolated month-close dialogs contain valid description markup", async ({ p
     if (message.type() === "error" && /cannot (?:be|contain)|hydration/i.test(message.text())) markupErrors.push(message.text());
   });
   await page.goto("/tim/month-closing");
-  const row = page.getByRole("row").filter({ hasText: "2026년 10월" });
+  await expect(page.getByRole("grid")).toContainText("2026년 10월");
+  const row = page.locator('.ag-row[row-id="10"]');
   await row.getByRole("button", { name: "재오픈", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

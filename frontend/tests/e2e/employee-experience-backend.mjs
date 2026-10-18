@@ -4,10 +4,14 @@ import { createServer } from "node:http";
 // Synthetic data for local UI tests only. No database, real identity, or production
 // authentication guarantees are exercised. Credentials and tokens are never logged.
 const scenarios = new Set([
-  "default", "production-repairs", "login-401", "login-429", "login-503", "enter-cds-failure",
+  "default", "landing-capture", "grid-rollout", "hr-basic", "production-repairs", "login-401", "login-429", "login-503", "enter-cds-failure",
   "profile-failure", "empty-profile", "member", "account-switch", "sidebar-domains", "hri-tasks", "retire-layout", "checklist-layout", "employee-ux", "employee-ux-no-save", "employee-ux-preview", "training-applications", "retirement-selection", "appraisal-targets", "file-actions",
 ]);
 let scenario = "default";
+let basicRows = [];
+const basicWrites = [];
+let basicProfile = {};
+
 let accountSwitched = false;
 const impersonationLogins = [];
 const ownLeaveRequests = [];
@@ -73,6 +77,10 @@ createServer(async (request, response) => {
     const input = JSON.parse(body || "null");
     if (!scenarios.has(input?.scenario)) return json(response, 400, { detail: "Unknown synthetic scenario." });
     scenario = input.scenario;
+    basicWrites.length = 0;
+    basicRows = [{ id: 101, category: "education", title: "학력 A", note: "기존 비고", record_date: "2020-02-01", created_at: "2026-01-01" }, { id: 102, category: "education", title: "학력 B", note: "", record_date: "2022-02-01", created_at: "2026-01-01" }];
+    basicProfile = { full_name: "김서준", hire_date: "2021-01-02", job_role: "인사 운영", gender: "", resident_no_masked: "", blood_type: "", marital_status: "", mbti: "", probation_end_date: "", retire_date: "", job_family: "", grade: "" };
+
     accountSwitched = false;
     impersonationLogins.length = 0;
     leaveCancellations.length = 0;
@@ -219,6 +227,10 @@ createServer(async (request, response) => {
       is_active: true, allow_draft: false, allow_withdraw: true, requires_receive: false, default_priority: 1,
     }], total_count: 1 });
     if (route === "GET /api/v1/hri/requests/my") return json(response, 200, { items: hriRequests, total_count: hriRequests.length, page: 1, limit: 50 });
+    if (request.method === "GET" && /^\/api\/v1\/hri\/requests\/[12]0[123]$/.test(url.pathname)) {
+      const id = Number(url.pathname.split("/").at(-1));
+      return json(response, 200, { request: { id, request_no: `DOC-${id}`, title: `테스트 신청 ${id % 100}`, form_code: "LEAVE_REQUEST", status_code: completedTasks.has(id) ? "COMPLETED" : "APPROVAL_IN_PROGRESS", submitted_at: "2026-10-18T00:00:00Z", current_actor_name: "테스트 결재자", steps: [{ id: 1, step_order: 1, step_type: "APPROVAL", actor_name: "테스트 결재자", action_status: "WAITING", acted_at: null, comment: null }], detail_data: { leave_type_code: "연차", start_date: "2026-10-21", end_date: "2026-10-22", applied_minutes: 960, reason: `신청 ${id} 상세 사유` } } });
+    }
     if (route === "GET /api/v1/hri/requests/401") return json(response, 200, {
       request: { ...hriRequests.find((item) => item.id === 401), form_code: "GENERIC_REQUEST", steps: [], detail_data: hriRequests[0]?.content_json ?? {} },
     });
@@ -265,6 +277,31 @@ createServer(async (request, response) => {
       return json(response, 200, { items, total_count: items.length, page: 1, limit: 50 });
     }
   }
+  if (scenario === "hr-basic") {
+    if (route === "GET /__basic-writes") return json(response, 200, basicWrites);
+    if (route === "GET /api/v1/employees") {
+      const items = [1, 2].map(id => ({ ...employee, id, employee_no: `EMP-00${id}`, display_name: id === 1 ? basicProfile.full_name : "이하은" }));
+      const keyword = url.searchParams.get("name") || url.searchParams.get("employee_no") || "";
+      const employees = items.filter(item => !keyword || item.display_name.includes(keyword) || item.employee_no.includes(keyword));
+      return json(response, 200, { employees, total_count: employees.length, page: 1, limit: 8 });
+    }
+    const basic = url.pathname.match(/^\/api\/v1\/hr\/basic\/(\d+)(\/profile|\/records\/batch)?$/);
+    if (basic && request.method === "GET") return json(response, 200, {
+      profile: { ...basicProfile, employee_id: Number(basic[1]), employee_no: `EMP-00${basic[1]}`, full_name: basic[1] === "1" ? basicProfile.full_name : "이하은", department_name: "인사팀", position_title: "팀장" },
+      appointments: [], rewards_penalties: [], contacts: [], educations: basicRows.filter(row => row.category === "education"), careers: [], certificates: [], military: [], evaluations: [],
+    });
+    if (basic && ["POST", "PUT"].includes(request.method)) {
+      let raw = ""; for await (const chunk of request) raw += chunk;
+      const input = JSON.parse(raw); basicWrites.push({ path: url.pathname, ...input });
+      if (basic[2] === "/profile") { basicProfile = { ...basicProfile, ...input }; return json(response, 200, basicProfile); }
+      if (basic[2] === "/records/batch") {
+        if (input.items.some(row => row.title === "저장 실패")) return json(response, 409, { detail: "이력 저장에 실패했습니다. 입력 내용을 확인해 주세요." });
+        basicRows = basicRows.filter(row => !input.delete_ids.includes(row.id));
+        for (const row of input.items) { const saved = { ...row, id: row.id ?? Math.max(200, ...basicRows.map(item => item.id)) + 1, category: input.category, created_at: "2026-10-18" }; const index = basicRows.findIndex(item => item.id === saved.id); if (index >= 0) basicRows[index] = saved; else basicRows.push(saved); }
+        return json(response, 200, { items: basicRows.filter(row => row.category === input.category), inserted_count: input.items.filter(row => !row.id).length, updated_count: input.items.filter(row => row.id).length, deleted_count: input.delete_ids.length });
+      }
+    }
+  }
   request.resume();
   switch (route) {
     case "GET /api/v1/tim/attendance-daily":
@@ -286,6 +323,9 @@ createServer(async (request, response) => {
     case "GET /api/v1/auth/me":
       return json(response, 200, scenario === "member" ? { ...user, roles: ["employee"] } : user);
     case "GET /api/v1/menus/tree":
+      if (scenario === "landing-capture") return json(response, 200, { menus: [...menus,
+        ...["/org/chart", "/settings/permissions"].map((path, index) => ({ id: 300 + index, code: path.slice(1).replaceAll("/", "."), name: ["조직도관리", "권한 관리"][index], path, icon: "Building2", sort_order: 3 + index, children: [] })),
+      ] });
       if (scenario === "production-repairs") return json(response, 200, { menus: [...menus,
         { id: 120, code: "hr.basic", name: "인사기본", path: "/hr/basic", icon: "Users", sort_order: 3, children: [] },
         { id: 121, code: "tim.month-close", name: "근태 월마감", path: "/tim/month-close", icon: "Calendar", sort_order: 4, children: [] },
@@ -296,6 +336,9 @@ createServer(async (request, response) => {
       ] });
       if (scenario === "appraisal-targets") return json(response, 200, { menus: [...menus,
         { id: 90, code: "pap.targets", name: "평가 대상자 관리", path: "/pap/targets", icon: "Users", sort_order: 3, children: [] },
+      ] });
+      if (scenario === "grid-rollout") return json(response, 200, { menus: [...menus,
+        ...["/hri/admin/form-types", "/hri/admin/approval-lines", "/tim/work-codes", "/hri/my-payslip", "/hr/severance/calcs", "/payroll/vouchers", "/tim/leave-request", "/tim/month-close", "/tim/month-closing", "/wel/requests"].map((path, index) => ({ id: 200 + index, code: path.slice(1).replaceAll("/", "."), name: ["신청서 코드", "결재선 템플릿", "근무코드 관리", "내 급여조회", "퇴직금 산정", "급여 전표", "휴가 신청", "근태 월마감", "근태 월마감 별칭", "복리후생 신청 현황"][index], path, icon: "FileText", sort_order: 3 + index, children: [] })),
       ] });
       if (scenario === "file-actions") return json(response, 200, { menus: [...menus,
         ...[
@@ -321,6 +364,7 @@ createServer(async (request, response) => {
         { id: 50, code: "hr.retire.approvals", name: "퇴직승인관리", path: "/hr/retire/approvals", icon: "FileText", sort_order: 3, children: [] },
         { id: 52, code: "hr.severance.calcs", name: "퇴직금산정", path: "/hr/severance/calcs", icon: "FileText", sort_order: 4, children: [] },
       ] });
+      if (scenario === "hr-basic") return json(response, 200, { menus: [...menus, { id: 55, code: "hr.basic", name: "인사기본", path: "/hr/basic", icon: "Users", sort_order: 5, children: [] }] });
       if (scenario === "hri-tasks") return json(response, 200, { menus: [...menus,
         { id: 32, code: "hri.requests.mine", name: "내 신청서", path: "/hri/requests/mine", icon: "FileText", sort_order: 9, children: [] },
         ...["approvals", "receives"].map((kind, index) => ({ id: 30 + index, code: `hri.tasks.${kind}`, name: index ? "수신함" : "결재함", path: `/hri/tasks/${kind}`, icon: "FileText", sort_order: 10 + index, children: [] })),

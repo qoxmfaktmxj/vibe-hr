@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarOff, Lock, LockOpen, RefreshCw } from "lucide-react";
+import { CalendarOff, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 
-import { ManagerGridSection, ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { ManagerPageShell, ManagerSearchSection } from "@/components/grid/manager-layout";
+import { LocalReadonlyGrid } from "@/components/grid/readonly-grid-manager";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,7 +124,7 @@ export function TimMonthCloseManager() {
   const closedCount = items.filter((it) => it.close_status === "closed").length;
 
   return (
-    <ManagerPageShell>
+    <ManagerPageShell className="business-workspace h-auto">
       <ManagerSearchSection
         title="근태 월마감"
         onQuery={handleQuery}
@@ -145,162 +146,21 @@ export function TimMonthCloseManager() {
         </div>
       </ManagerSearchSection>
 
-      <ManagerGridSection
-        headerLeft={
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-foreground">{appliedYear}년</span>
-            <span className="text-xs text-muted-foreground">
-              마감 완료: <span className="font-semibold text-green-600">{closedCount}</span>개월 /
-              미마감: <span className="font-semibold text-muted-foreground">{12 - closedCount}</span>개월
-            </span>
-          </div>
-        }
-        headerRight={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setLoading(true); void fetchData(appliedYear); }}
-            disabled={loading}
-          >
-            <RefreshCw className="mr-1 h-3.5 w-3.5" />
-            새로고침
-          </Button>
-        }
-        contentClassName="px-3 pb-4 pt-2 md:px-6 md:pt-2"
-      >
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">불러오는 중...</p>
-          </div>
-        ) : (
-          <div className="overflow-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">월</th>
-                  <th className="py-2.5 text-center font-medium text-muted-foreground">상태</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">인원수</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">출근</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">결근</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">지각</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">휴가</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">연장(h)</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">야간(h)</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">휴일(h)</th>
-                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">마감자 / 일시</th>
-                  <th className="py-2.5 pl-4 text-left font-medium text-muted-foreground">메모</th>
-                  <th className="py-2.5 pr-4 text-right font-medium text-muted-foreground">처리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grid.map((item, idx) => {
-                  const month = idx + 1;
-                  const isClosed = item?.close_status === "closed";
-                  const isFuture =
-                    appliedYear > new Date().getFullYear() ||
-                    (appliedYear === new Date().getFullYear() && month > new Date().getMonth() + 1);
-
-                  return (
-                    <tr
-                      key={month}
-                      className={`border-b border-border transition-colors hover:bg-muted/50 ${
-                        isClosed ? "bg-green-50/40" : ""
-                      }`}
-                    >
-                      <td className="py-3 pl-4 font-medium text-foreground">
-                        {appliedYear}년 {MONTH_NAMES[idx]}
-                      </td>
-                      <td className="py-3 text-center">
-                        {isClosed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                            <Lock className="h-3 w-3" />
-                            마감완료
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                            <LockOpen className="h-3 w-3" />
-                            미마감
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
-                        {item ? item.employee_count.toLocaleString() : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">
-                        {item ? item.present_days.toLocaleString() : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-red-600">
-                        {item ? (item.absent_days > 0 ? item.absent_days.toLocaleString() : "-") : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-amber-600">
-                        {item ? (item.late_days > 0 ? item.late_days.toLocaleString() : "-") : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-blue-600">
-                        {item ? (item.leave_days > 0 ? item.leave_days.toLocaleString() : "-") : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-violet-600">
-                        {item ? (item.total_overtime_minutes > 0 ? (item.total_overtime_minutes / 60).toFixed(1) : "-") : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-indigo-600">
-                        {item ? (item.total_night_minutes > 0 ? (item.total_night_minutes / 60).toFixed(1) : "-") : "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right tabular-nums text-orange-600">
-                        {item ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) > 0
-                          ? ((item.total_holiday_work_minutes + item.total_holiday_overtime_minutes + item.total_holiday_night_minutes) / 60).toFixed(1) : "-") : "-"}
-                      </td>
-                      <td className="py-3 pl-4 text-xs text-muted-foreground">
-                        {isClosed && item ? (
-                          <>
-                            <span className="font-medium text-foreground">
-                              {item.closed_by_name ?? `ID:${String(item.closed_by)}`}
-                            </span>
-                            {item.closed_at && (
-                              <span className="ml-1 text-muted-foreground">
-                                {new Date(item.closed_at).toLocaleDateString("ko-KR")}
-                              </span>
-                            )}
-                          </>
-                        ) : "-"}
-                      </td>
-                      <td className="max-w-[160px] truncate py-3 pl-4 text-xs text-muted-foreground">
-                        {item?.note ?? "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-right">
-                        {isClosed ? (
-                          can("save") ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                              disabled={acting || menuActionLoading}
-                              onClick={() => requestReopen(month)}
-                            >
-                              <LockOpen className="mr-1 h-3 w-3" />
-                              재오픈
-                            </Button>
-                          ) : null
-                        ) : can("save") ? (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-7 bg-green-600 text-xs text-white hover:bg-green-700"
-                            disabled={acting || menuActionLoading || isFuture}
-                            title={isFuture ? "미래 월은 마감할 수 없습니다" : undefined}
-                            onClick={() => requestClose(month)}
-                          >
-                            <CalendarOff className="mr-1 h-3 w-3" />
-                            마감
-                          </Button>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </ManagerGridSection>
+      <p className="text-xs text-muted-foreground">{appliedYear}년 / 마감 완료 {closedCount}개월 / 미마감 {12 - closedCount}개월</p>
+      <LocalReadonlyGrid title="월별 마감 현황" items={grid.map((item, index) => ({ ...item, id: index + 1, year: appliedYear, month: index + 1 }))} rowId={row => row.month} loading={loading} disabled={acting || menuActionLoading} gridHeight={460} queryLabel="새로고침" onQuery={() => { setLoading(true); void fetchData(appliedYear); }} columns={[
+        { field: "month", headerName: "월", minWidth: 130, pinned: "left", valueFormatter: p => `${appliedYear}년 ${MONTH_NAMES[Number(p.value) - 1]}` },
+        { field: "close_status", headerName: "상태", width: 110, valueFormatter: p => p.value === "closed" ? "마감완료" : "미마감" },
+        ...([['employee_count','인원수'],['present_days','출근'],['absent_days','결근'],['late_days','지각'],['leave_days','휴가']] as const).map(([field, headerName]) => ({ field, headerName, width: 100, cellClass: "text-right", valueFormatter: (p: { value: unknown }) => p.value == null ? "-" : Number(p.value).toLocaleString() })),
+        ...([['total_overtime_minutes','연장(h)'],['total_night_minutes','야간(h)'],['total_holiday_work_minutes','휴일(h)']] as const).map(([field, headerName]) => ({ field, headerName, width: 110, cellClass: "text-right", valueFormatter: (p: { value: unknown }) => p.value == null ? "-" : (Number(p.value) / 60).toFixed(1) })),
+        { field: "closed_by_name", headerName: "마감자", minWidth: 120 },
+        { field: "closed_at", headerName: "마감일시", minWidth: 180, valueFormatter: p => p.value ? new Date(p.value).toLocaleString("ko-KR") : "-" },
+        { field: "note", headerName: "메모", minWidth: 170 },
+        { colId: "actions", headerName: "처리", width: 115, pinned: "right", sortable: false, filter: false, cellRenderer: ({ data: row }: { data?: { month: number; close_status?: string } }) => {
+          if (!row || !can("save")) return null;
+          const future = appliedYear > new Date().getFullYear() || (appliedYear === new Date().getFullYear() && row.month > new Date().getMonth() + 1);
+          return row.close_status === "closed" ? <Button variant="outline" size="sm" className="!h-7 !min-h-7" disabled={acting || menuActionLoading} onClick={() => requestReopen(row.month)}><LockOpen className="h-3 w-3" />재오픈</Button> : <Button size="sm" className="!h-7 !min-h-7" disabled={acting || menuActionLoading || future} title={future ? "미래 월은 마감할 수 없습니다" : undefined} onClick={() => requestClose(row.month)}><CalendarOff className="h-3 w-3" />마감</Button>;
+        } },
+      ]} />
 
       {/* 마감 확인 */}
       <ConfirmDialog

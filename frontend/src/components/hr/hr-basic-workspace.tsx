@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR, { mutate } from "swr";
 
@@ -13,6 +13,7 @@ import type { HrBasicDetailResponse } from "@/types/hr-employee-profile";
 export function HrBasicWorkspace() {
   const searchParams = useSearchParams();
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeItem | null>(null);
+  const leaveRef = useRef<(proceed: () => void) => void>(proceed => proceed());
   const requestedEmployeeNo = searchParams.get("employeeNo")?.trim() ?? "";
 
   const { data: employeeData } = useSWR<EmployeeListResponse>("/api/employees?page=1&limit=8", fetcher, {
@@ -43,48 +44,31 @@ export function HrBasicWorkspace() {
   const resolvedEmployeeId = resolvedEmployee?.id ?? null;
 
   const detailKey = resolvedEmployeeId ? `/api/hr/basic/${resolvedEmployeeId}` : null;
-  const { data: detail } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
+  const { data: detail, error, isLoading } = useSWR<HrBasicDetailResponse>(detailKey, fetcher, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
     dedupingInterval: 20_000,
   });
 
   return (
-    <>
+    <div className="business-workspace">
+      <div className="business-heading"><h1>인사기본</h1><p>구성원의 기본 정보와 인사 이력을 확인하고 관리합니다.</p></div>
       <HrEmployeeHeader
-        selectedEmployee={resolvedEmployee}
-        onSelectEmployee={setSelectedEmployee}
+        selectedEmployee={resolvedEmployee && detail ? { ...resolvedEmployee, display_name: detail.profile.full_name ?? resolvedEmployee.display_name, hire_date: detail.profile.hire_date ?? "", department_name: detail.profile.department_name ?? resolvedEmployee.department_name, position_title: detail.profile.position_title ?? resolvedEmployee.position_title } : resolvedEmployee}
+        onSelectEmployee={employee => { if (employee.id !== resolvedEmployeeId) leaveRef.current(() => setSelectedEmployee(employee)); }}
       />
-      <HrBasicTabs
+      {error && <p role="alert" className="my-4 text-sm text-destructive">인사 정보를 불러오지 못했습니다. <button type="button" className="underline" onClick={() => { if (detailKey) void mutate(detailKey); }}>다시 시도</button></p>}
+      {isLoading && <p role="status" className="py-6 text-sm text-muted-foreground">인사 정보를 불러오는 중입니다.</p>}
+      {detail && resolvedEmployeeId && <HrBasicTabs
+        key={resolvedEmployeeId}
+        leaveRef={leaveRef}
         employeeId={resolvedEmployeeId}
         onReload={async () => {
           if (!detailKey) return;
           await mutate(detailKey);
         }}
-        detail={
-          detail ??
-          (resolvedEmployee
-            ? {
-                profile: {
-                  employee_id: resolvedEmployee.id,
-                  employee_no: resolvedEmployee.employee_no,
-                  full_name: resolvedEmployee.display_name,
-                  hire_date: resolvedEmployee.hire_date,
-                  department_name: resolvedEmployee.department_name,
-                  position_title: resolvedEmployee.position_title,
-                },
-                appointments: [],
-                rewards_penalties: [],
-                contacts: [],
-                educations: [],
-                careers: [],
-                certificates: [],
-                military: [],
-                evaluations: [],
-              }
-            : null)
-        }
-      />
-    </>
+        detail={detail}
+      />}
+    </div>
   );
 }

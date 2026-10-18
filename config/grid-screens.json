@@ -1,6 +1,81 @@
 {
   "version": "standard-v1",
   "screens": {
+    "tim.month-closing": {
+      "path": "/tim/month-closing",
+      "pageFile": "frontend/src/app/tim/month-closing/page.tsx",
+      "componentFile": "frontend/src/components/grid/readonly-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "workflow",
+      "toolbar": [
+        "query"
+      ],
+      "ownerModule": "TIM"
+    },
+    "tim.leave-request": {
+      "path": "/tim/leave-request",
+      "pageFile": "frontend/src/app/tim/leave-request/page.tsx",
+      "componentFile": "frontend/src/components/grid/readonly-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "workflow",
+      "toolbar": [
+        "query"
+      ],
+      "ownerModule": "TIM"
+    },
+    "hri.my-payslip": {
+      "path": "/hri/my-payslip",
+      "pageFile": "frontend/src/app/hri/my-payslip/page.tsx",
+      "componentFile": "frontend/src/components/grid/readonly-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "readonly",
+      "toolbar": [
+        "query"
+      ],
+      "ownerModule": "HRI"
+    },
+    "hri.approval-templates": {
+      "path": "/hri/admin/approval-lines",
+      "pageFile": "frontend/src/app/hri/admin/approval-lines/page.tsx",
+      "componentFile": "frontend/src/components/grid/batch-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "crud",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "save"
+      ],
+      "ownerModule": "HRI"
+    },
+    "hri.form-types": {
+      "path": "/hri/admin/form-types",
+      "pageFile": "frontend/src/app/hri/admin/form-types/page.tsx",
+      "componentFile": "frontend/src/components/grid/batch-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "crud",
+      "toolbar": [
+        "query",
+        "create",
+        "copy",
+        "save"
+      ],
+      "ownerModule": "HRI"
+    },
+    "hr.basic": {
+      "path": "/hr/basic",
+      "pageFile": "frontend/src/app/hr/basic/page.tsx",
+      "componentFile": "frontend/src/components/hr/hr-basic-tabs.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "toolbar": ["query", "create", "save"],
+      "ownerModule": "HR"
+    },
     "hr.admin.careers": {
       "path": "/hr/admin/careers",
       "pageFile": "frontend/src/app/hr/admin/careers/page.tsx",
@@ -866,9 +941,10 @@
     "tim.month-close": {
       "path": "/tim/month-close",
       "pageFile": "frontend/src/app/tim/month-close/page.tsx",
-      "componentFile": "frontend/src/components/tim/tim-month-close-manager.tsx",
-      "engine": "custom",
-      "profile": "standard-v1",
+      "componentFile": "frontend/src/components/grid/readonly-grid-manager.tsx",
+      "engine": "ag-grid",
+      "profile": "standard-v2",
+      "variant": "workflow",
       "toolbar": [
         "query"
       ],

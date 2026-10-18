@@ -1,0 +1,141 @@
+.landing {
+  --ink: #202a38;
+  --muted-ink: #606975;
+  --blue: #315fce;
+  position: relative;
+  min-height: 100dvh;
+  background: #fff;
+  color: var(--ink);
+  color-scheme: light;
+  font-family: var(--font-sans), sans-serif;
+  font-feature-settings: "ss01";
+  scrollbar-color: #a9b0bc transparent;
+}
+.landing ::selection { background: #cddcfa; color: #192d53; }
+.landing button, .landing a, .landing select { -webkit-tap-highlight-color: transparent; }
+.landing button { cursor: pointer; }
+.landing button:disabled { cursor: default; opacity: .35; }
+.landing :is(button, a, select, canvas):focus-visible { outline: 2px solid var(--blue); outline-offset: 5px; }
+.header { height: 64px; padding: 0 32px; display: flex; align-items: center; gap: 28px; }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 21px; letter-spacing: -.03em; font-weight: 750; }
+.tagline { font-size: 15px; color: var(--muted-ink); font-weight: 500; letter-spacing: -.02em; line-height: 1.5; }
+.tagline span { color: var(--blue); font-weight: 600; }
+.login { margin-left: auto; display: flex; align-items: center; justify-content: center; gap: 22px; min-height: 36px; padding: 0 18px; background: var(--ink); color: #fff; border-radius: 4px; font-size: 13px; font-weight: 600; }
+.login:hover { background: var(--blue); }
+.explore { scroll-margin-top: 16px; }
+.viewBar { display: flex; align-items: center; justify-content: space-between; min-height: 42px; margin: 0 32px; }
+.viewBar p { color: var(--muted-ink); font-size: 12px; }
+.viewBar button { display: flex; align-items: center; gap: 7px; padding: 8px 0 8px 16px; color: #404b5b; font-size: 12px; }
+.viewBar button:hover { color: var(--blue); }
+.viewActions { display: flex; align-items: center; gap: 12px; }
+.motionMedia { position: relative; width: 100%; aspect-ratio: 1.6; }
+.motionMedia > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.motionCanvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; opacity: 0; }
+.motionCanvas[data-ready="true"] { opacity: 1; }
+.motionLoading, .motionError { display: none; position: absolute; bottom: 12px; left: 12px; padding: 6px 10px; background: #fff; color: var(--ink); font-size: 12px; }
+.motionCanvas[data-motion-loading="true"] ~ .motionLoading, .motionCanvas[data-motion-failed="true"] ~ .motionError { display: block; }
+.detailMedia > .motionMedia { height: min(70dvh, calc(94vw / 1.6)); }
+.stage { position: relative; background: #fff; overflow: hidden; }
+.canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.canvas[data-dragging="true"] { cursor: grabbing; }
+.canvas:focus-visible { outline-offset: -4px !important; }
+.controlBar { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 32px; padding: 16px 0; }
+.current { display: flex; align-items: center; gap: 25px; }
+.current > span { white-space: nowrap; font-size: 26px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.current small { font-size: 13px; color: var(--muted-ink); }
+.current strong { display: block; font-size: 16px; font-weight: 650; }
+.current p { color: var(--muted-ink); font-size: 12px; margin-top: 5px; }
+.actions { display: flex; align-items: center; gap: 7px; }
+.actions > button, .dialogFooter button { display: flex; align-items: center; justify-content: center; gap: 12px; width: 36px; height: 36px; border: 1px solid #d4d6d9; border-radius: 4px; }
+.actions > button:hover:not(:disabled), .dialogFooter button:hover:not(:disabled) { background: #e9edf4; }
+.actions .open { width: auto; padding: 0 14px; margin-left: 6px; font-size: 12px; }
+.jump select { background: transparent; color: var(--ink); border: 0; font-size: 12px; height: 36px; max-width: 170px; margin-left: 12px; padding: 0 8px; cursor: pointer; }
+.footer { padding: 16px 32px; color: var(--muted-ink); font-size: 10px; }
+.landing[data-mode="space"] { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; }
+.landing[data-mode="space"] .header { flex: 0 0 64px; }
+.landing[data-mode="space"] .explore { position: relative; flex: 1; min-height: 0; }
+.landing[data-mode="space"] .stage { position: absolute; inset: 0; }
+.landing[data-mode="space"] .viewBar { position: absolute; z-index: 1; top: 12px; left: 32px; right: 32px; margin: 0; pointer-events: none; }
+.landing[data-mode="space"] .viewBar p { padding: 6px 0; background: #fff; }
+.landing[data-mode="space"] .viewBar button { pointer-events: auto; background: #fff; }
+.landing[data-mode="space"] .controlBar { position: absolute; z-index: 1; bottom: 34px; left: 32px; right: 32px; margin: 0; padding: 8px 0; pointer-events: none; }
+.landing[data-mode="space"] .current, .landing[data-mode="space"] .actions { pointer-events: auto; background: #fff; padding: 6px 0; }
+.landing[data-mode="space"] .footer { position: absolute; bottom: 12px; left: 32px; padding: 0; background: #fff; }
+.fallback { margin: 12px 4%; font-size: 13px; color: var(--muted-ink); }
+.sceneList { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 50px 28px; margin: 16px 4% 42px; padding: 0; }
+.sceneList > li:nth-child(9) { grid-column: 1 / -1; width: min(100%, 1000px); justify-self: center; }
+.sceneButton { display: block; width: 100%; text-align: left; }
+.poster { position: relative; overflow: hidden; background: #fff; }
+.poster > img { display: block; width: 100%; height: auto; aspect-ratio: 1.6; object-fit: contain; }
+.poster > img, .poster > .motionMedia { transition: transform .3s ease-out; }
+.poster > span { position: absolute; right: 14px; bottom: 14px; display: grid; place-items: center; width: 34px; height: 34px; color: var(--ink); background: #fff; border-radius: 4px; }
+.sceneButton:hover .poster > img, .sceneButton:hover .poster > .motionMedia { transform: scale(1.015); }
+.sceneCaption { display: flex; align-items: baseline; gap: 13px; padding-top: 16px; }
+.sceneCaption h2 { font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
+.sceneCaption > span { font-size: 12px; color: var(--muted-ink); font-variant-numeric: tabular-nums; }
+.sceneCaption > span:last-child { margin-left: auto; }
+.sceneButton > p { margin-top: 6px; padding-left: 28px; font-size: 13px; color: var(--muted-ink); }
+.dialog { position: fixed; inset: 0; margin: auto; width: min(94vw, 1500px); max-width: none; max-height: 94dvh; padding: 0; border: 0; border-radius: 6px; background: #fff; color: var(--ink); box-shadow: 0 25px 100px #0a11284d; overflow: auto; }
+.dialog::backdrop { background: #141d2cd9; }
+.dialogInner { min-width: 0; }
+.dialogHeader { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; gap: 20px; position: sticky; top: 0; z-index: 2; background: #fff; }
+.dialogHeader > div { display: flex; align-items: center; gap: 22px; }
+.dialogHeader span { color: var(--muted-ink); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dialogHeader h2 { font-size: 19px; font-weight: 650; }
+.dialogHeader button { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 4px; }
+.dialogHeader button:hover { background: #e9edf4; }
+.detailMedia { position: relative; width: 100%; background: #fff; }
+.detailMedia > img { display: block; width: 100%; height: auto; max-height: 70dvh; object-fit: contain; }
+.dialogFooter { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px 22px; gap: 24px; }
+.dialogFooter p { color: #3f4a5a; font-size: 13px; line-height: 1.7; max-width: 75ch; }
+.dialogFooter small { display: block; margin-top: 5px; color: var(--muted-ink); font-size: 11px; }
+.dialogFooter > div { display: flex; gap: 8px; }
+.water { position: relative; width: 100%; height: min(62dvh, 720px); overflow: hidden; }
+.water > img { object-fit: cover; }
+.waterCanvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .3s; }
+.waterCanvas[data-ready="true"] { opacity: 1; }
+.waterToggle { position: absolute; left: 24px; bottom: 22px; display: flex; align-items: center; gap: 9px; padding: 10px 14px; background: #fff; border-radius: 4px; font-size: 13px; }
+.waterStatus { position: absolute; right: 20px; bottom: 25px; background: #fff; padding: 8px; font-size: 12px; }
+.skip, .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.skip:focus { width: auto; height: auto; clip: auto; z-index: 10; top: 12px; left: 12px; background: #fff; padding: 12px; }
+@media (max-width: 899px) {
+  .current p { max-width: 36ch; }
+}
+@media (max-width: 650px) {
+  .header { height: auto; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 12px 5%; }
+  .brand { font-size: 19px; }
+  .tagline { grid-column: 1 / -1; grid-row: 2; font-size: 13px; }
+  .login { grid-column: 2; grid-row: 1; gap: 14px; padding: 0 13px; min-height: 44px; }
+  .viewBar { margin: 0 5%; }
+  .viewBar p { font-size: 11px; }
+  .sceneList { grid-template-columns: 1fr; margin: 12px 5% 30px; gap: 32px; }
+  .sceneList > li:nth-child(9) { width: 100%; }
+  .sceneCaption { padding-top: 13px; }
+  .sceneCaption h2 { font-size: 17px; }
+  .sceneButton > p { font-size: 12px; line-height: 1.6; }
+  .controlBar { margin: 0 5%; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+  .current { gap: 17px; }
+  .current strong { font-size: 14px; }
+  .actions { width: 100%; }
+  .jump select { margin-left: 0; }
+  .footer { padding: 18px 5%; }
+  .dialog { width: 96vw; max-height: 94dvh; }
+  .dialogHeader { padding: 10px 14px; }
+  .dialogHeader > div { gap: 13px; }
+  .dialogHeader h2 { font-size: 16px; }
+  .dialogHeader button, .dialogFooter button { width: 44px; height: 44px; }
+  .dialogHeader span { font-size: 11px; }
+  .detailMedia { overflow: auto; }
+  .detailMedia > img { width: 1000px; max-width: none; height: 625px; max-height: none; }
+  .detailMedia > .motionMedia { width: 1000px; height: 625px; max-width: none; }
+  .dialogFooter { display: block; padding: 14px; }
+  .dialogFooter > div { justify-content: flex-end; margin-top: 12px; }
+  .dialogFooter p { font-size: 12px; }
+  .water { height: 46dvh; }
+  .waterToggle { left: 12px; bottom: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing *, .landing *::before, .landing *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  .waterToggle { display: none; }
+  .sceneButton:hover .poster > img, .sceneButton:hover .poster > .motionMedia { transform: none; }
+}

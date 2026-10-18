@@ -563,6 +563,63 @@ class HrPostgreSqlSchemaIntegrationTest {
         return service.cancelRetireCase(caseId, cancel, 17);
     }
 
+    @ParameterizedTest
+    @CsvSource({"appointment", "education", "evaluation", "contact_points", "careers", "licenses", "military", "reward_punish"})
+    void basicHistoryBatchSavesOneCategoryAndPreservesOtherRecords(String category) {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        HrRequests.BasicRecordBatch create = new HrRequests.BasicRecordBatch();
+        create.category = category;
+        HrRequests.BasicRecordBatchItem first = new HrRequests.BasicRecordBatchItem();
+        first.title("First"); first.note("Before"); first.recordDate(LocalDate.of(2026, 1, 1));
+        HrRequests.BasicRecordBatchItem second = new HrRequests.BasicRecordBatchItem(); second.title("Second");
+        create.items = List.of(first, second);
+        Map<String, Object> created = service.batchBasicRecords(employeeId, create);
+        assertThat(created.get("inserted_count")).isEqualTo(2);
+        @SuppressWarnings("unchecked") List<Map<String, Object>> items = (List<Map<String, Object>>) created.get("items");
+        int firstId = ((Number) items.stream().filter(row -> "First".equals(row.get("title"))).findFirst().orElseThrow().get("id")).intValue();
+        int secondId = ((Number) items.stream().filter(row -> "Second".equals(row.get("title"))).findFirst().orElseThrow().get("id")).intValue();
+        HrRequests.BasicRecordBatch update = new HrRequests.BasicRecordBatch(); update.category = category;
+        HrRequests.BasicRecordBatchItem edited = new HrRequests.BasicRecordBatchItem(); edited.id = firstId; edited.title("Edited"); edited.note(null);
+        update.items = List.of(edited); update.deleteIds = List.of(secondId);
+        Map<String, Object> result = service.batchBasicRecords(employeeId, update);
+        assertThat(result.get("updated_count")).isEqualTo(1); assertThat(result.get("deleted_count")).isEqualTo(1);
+        @SuppressWarnings("unchecked") List<Map<String, Object>> saved = (List<Map<String, Object>>) result.get("items");
+        assertThat(saved).hasSize(1); assertThat(saved.getFirst().get("title")).isEqualTo("Edited"); assertThat(saved.getFirst().get("note")).isNull();
+    }
+
+    @Test
+    void basicHistoryBatchRollsBackEarlierWritesAndRejectsWrongCategory() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        HrRequests.BasicRecordCreate original = new HrRequests.BasicRecordCreate(); original.category = "education"; original.title("Original");
+        int id = ((Number) service.createBasicRecord(employeeId, original).get("id")).intValue();
+        HrRequests.BasicRecordBatch batch = new HrRequests.BasicRecordBatch(); batch.category = "education";
+        HrRequests.BasicRecordBatchItem update = new HrRequests.BasicRecordBatchItem(); update.id = id; update.title("Must roll back");
+        HrRequests.BasicRecordBatchItem invalid = new HrRequests.BasicRecordBatchItem(); invalid.title("X".repeat(2000));
+        batch.items = List.of(update, invalid);
+        assertThat(catchThrowableOfType(() -> service.batchBasicRecords(employeeId, batch), RuntimeException.class)).isNotNull();
+        assertThat(jdbc.queryForObject("select title from hr_employee_info_records where id=?", String.class, id)).isEqualTo("Original");
+        assertThat(jdbc.queryForObject("select count(*) from hr_employee_info_records where employee_id=?", Integer.class, employeeId)).isEqualTo(1);
+        batch.category = "appointment"; batch.items = List.of(update);
+        assertThat(catchThrowableOfType(() -> service.batchBasicRecords(employeeId, batch), ApiException.class).status().value()).isEqualTo(404);
+        batch.category = "education"; batch.deleteIds = List.of(id);
+        assertThat(catchThrowableOfType(() -> service.batchBasicRecords(employeeId, batch), ApiException.class).status().value()).isEqualTo(400);
+        assertThat(jdbc.queryForObject("select title from hr_employee_info_records where id=?", String.class, id)).isEqualTo("Original");
+    }
+
+    @Test
+    void basicProfileSaveClearsExplicitOptionalValuesAndPreservesOmittedFields() {
+        int employeeId = insertEmployee(17, "EMP-000017", LocalDate.of(2025, 1, 1));
+        HrRequests.BasicProfileUpdate initial = new HrRequests.BasicProfileUpdate();
+        initial.mbti("ISTJ"); initial.grade("G1"); initial.gender("F"); initial.retireDate(LocalDate.of(2027, 1, 1));
+        service.updateBasicProfile(employeeId, initial);
+        HrRequests.BasicProfileUpdate cleared = new HrRequests.BasicProfileUpdate();
+        cleared.mbti(null); cleared.grade(null); cleared.retireDate(null);
+        Map<String, Object> profile = service.updateBasicProfile(employeeId, cleared);
+        assertThat(profile.get("mbti")).isNull(); assertThat(profile.get("grade")).isNull(); assertThat(profile.get("retire_date")).isNull();
+        assertThat(profile.get("gender")).isEqualTo("F");
+        assertThat(jdbc.queryForObject("select hire_date from hr_employees where id=?", LocalDate.class, employeeId)).isEqualTo(LocalDate.of(2025, 1, 1));
+    }
+
     private int insertEmployee(int userId, String employeeNo, LocalDate hireDate) {
         return jdbc.queryForObject("insert into hr_employees(user_id,employee_no,department_id,position_title,hire_date,employment_status,created_at,updated_at) values (?,?,3,'인사담당',?,'active',now(),now()) returning id", Integer.class, userId, employeeNo, hireDate);
     }

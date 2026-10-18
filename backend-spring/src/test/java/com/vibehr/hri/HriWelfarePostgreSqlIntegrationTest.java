@@ -503,4 +503,36 @@ class HriWelfarePostgreSqlIntegrationTest {
             create index ix_wel_benefit_requests_request_no on wel_benefit_requests(request_no);
             create index ix_wel_benefit_requests_status_code on wel_benefit_requests(status_code);
             """;
+    @Test
+    void formTypeBatchRollsBackEarlierEditsAndPersistsMultipleRowsTogether() {
+        String original = jdbc.queryForObject("select form_name_ko from hri_form_types where id=11", String.class);
+        String code = jdbc.queryForObject("select form_code from hri_form_types where id=11", String.class);
+        var edited = new HriFormTypeBatchItem(11, code, "Changed before failure", null, "HRI", true, true, true, false, 50);
+        var duplicate = new HriFormTypeBatchItem(null, code, "Duplicate", null, "HRI", true, true, true, false, 50);
+        assertThatThrownBy(() -> hri.saveFormTypes(new HriFormTypeBatchRequest(List.of(edited, duplicate), List.of()), 1)).isInstanceOf(RuntimeException.class);
+        assertThat(jdbc.queryForObject("select form_name_ko from hri_form_types where id=11", String.class)).isEqualTo(original);
+        var first = new HriFormTypeBatchItem(null, "GRID_A", "Grid A", null, "HRI", true, true, true, false, 50);
+        var second = new HriFormTypeBatchItem(null, "GRID_B", "Grid B", null, "HRI", true, true, true, false, 60);
+        var result = hri.saveFormTypes(new HriFormTypeBatchRequest(List.of(first, second), List.of()), 1);
+        assertThat(result.insertedCount()).isEqualTo(2);
+        assertThat(result.items().stream().filter(row -> row.formCode().startsWith("GRID_")).toList()).hasSize(2);
+    }
+
+    @Test
+    void approvalTemplateBatchKeepsParentAndStepsAtomicAcrossTemplates() {
+        String original = jdbc.queryForObject("select template_name from hri_approval_line_templates where id=21", String.class);
+        var step = new HriApprovalTemplateStepBatchItem(null, 1, "APPROVAL", "USER_FIXED", null, 2, true, "APPROVE");
+        var edited = new HriApprovalTemplateBatchItem(21, "WEL_APPROVAL", "Changed before failure", "GLOBAL", null, true, true, 100, List.of(step));
+        var invalid = new HriApprovalTemplateBatchItem(null, "GRID_BAD", "Invalid", "GLOBAL", "wrong-scope", false, true, 90, List.of(step));
+        assertThatThrownBy(() -> hri.saveApprovalTemplates(new HriApprovalTemplateBatchRequest(List.of(edited, invalid), List.of()))).isInstanceOf(ApiException.class);
+        assertThat(jdbc.queryForObject("select template_name from hri_approval_line_templates where id=21", String.class)).isEqualTo(original);
+        assertThat(jdbc.queryForObject("select count(*) from hri_approval_line_steps where template_id=21", Integer.class)).isEqualTo(1);
+        var first = new HriApprovalTemplateBatchItem(null, "GRID_T1", "Grid template 1", "GLOBAL", null, false, true, 90, List.of(step));
+        var secondStep = new HriApprovalTemplateStepBatchItem(null, 2, "RECEIVE", "USER_FIXED", null, 2, false, "RECEIVE");
+        var second = new HriApprovalTemplateBatchItem(null, "GRID_T2", "Grid template 2", "GLOBAL", null, false, true, 80, List.of(step, secondStep));
+        var saved = hri.saveApprovalTemplates(new HriApprovalTemplateBatchRequest(List.of(first, second), List.of()));
+        assertThat(saved.insertedCount()).isEqualTo(2);
+        assertThat(saved.items().stream().filter(row -> row.templateCode().equals("GRID_T2")).findFirst().orElseThrow().steps()).hasSize(2);
+    }
+
 }

@@ -51,28 +51,28 @@ export function HrEmployeeHeader({ selectedEmployee: selected, onSelectEmployee 
   const filtered = keyword === debouncedQuery ? results ?? [] : [];
 
   return (
-    <Card className="mx-4 mt-4 border border-border bg-card/70 shadow-sm lg:mx-8">
-      <CardContent className="p-3 lg:p-4">
-        <div className="flex items-center gap-3">
+    <Card className="mb-4 rounded-none border-0 bg-transparent py-0 shadow-none">
+      <CardContent className="px-0 py-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Avatar className="h-10 w-10 border border-border bg-card">
             <AvatarFallback className="bg-card text-foreground"><UserCircle2 className="h-5 w-5" /></AvatarFallback>
           </Avatar>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="truncate text-base font-bold text-foreground">{selected?.display_name ?? "-"}</span>
+              <span className="truncate text-xl font-bold text-foreground">{selected?.display_name ?? "-"}</span>
               <Badge variant="outline">{selected?.department_name ?? "-"}</Badge>
               <Badge variant="secondary">{selected?.position_title ?? "-"}</Badge>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              사번 {selected?.employee_no ?? "-"} · 입사일 {selected?.hire_date ?? "-"} · 근속 {tenureText(selected?.hire_date)}
+              사번 {selected?.employee_no ?? "-"} / 입사일 {selected?.hire_date ?? "-"} / 근속 {tenureText(selected?.hire_date)}
             </p>
           </div>
 
-          <div className="relative w-[220px] max-w-[45vw]">
+          <div className="relative w-full sm:w-[220px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="사번/이름 검색" className="h-9 pl-8" />
+              <Input aria-label="사번/이름 검색" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="사번/이름 검색" className="h-9 pl-8" />
             </div>
             {query ? (
               <div className="absolute left-0 right-0 z-20 mt-1 max-h-32 overflow-auto rounded-md border bg-card shadow-lg">
@@ -94,7 +94,7 @@ export function HrEmployeeHeader({ selectedEmployee: selected, onSelectEmployee 
             ) : null}
           </div>
 
-          <button type="button" className="rounded-md border bg-card p-2 hover:bg-accent" onClick={() => setExpanded((v) => !v)}>
+          <button type="button" aria-label={expanded ? "구성원 요약 접기" : "구성원 요약 펼치기"} aria-expanded={expanded} className="rounded-md border bg-card p-2 hover:bg-accent" onClick={() => setExpanded((v) => !v)}>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         </div>

@@ -85,7 +85,7 @@ export function MenuProvider({
     }
   }, [loadMenus]);
 
-  const shouldRefresh = pathname !== "/login" && pathname !== "/unauthorized" && menus.length === 0 && !hasTriedRefresh;
+  const shouldRefresh = pathname !== "/" && pathname !== "/login" && pathname !== "/unauthorized" && menus.length === 0 && !hasTriedRefresh;
   const isLoading = isRefreshing || shouldRefresh;
   useEffect(() => {
     if (!shouldRefresh) return;

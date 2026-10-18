@@ -159,7 +159,7 @@ for (const kind of ["approvals", "receives"] as const) {
     // A pre-existing consumer keeps its default toolbar and has no new row checkboxes.
     await page.goto("/tim/status");
     await expect(page.getByRole("grid")).toBeVisible();
-    await expect(page.getByRole("button", { name: "업로드", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "업로드", exact: true })).toHaveCount(0);
     await expect(page.locator('.ag-header input[type="checkbox"]')).toHaveCount(0);
   });
 }

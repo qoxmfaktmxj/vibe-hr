@@ -147,10 +147,7 @@ export async function proxy(request: NextRequest) {
   const isPublicPath = PUBLIC_PATHS.has(pathname);
 
   if (pathname === "/") {
-    if (hasAuthToken) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.next();
   }
 
   if (!hasAuthToken && !isPublicPath && !pathname.startsWith("/api")) {

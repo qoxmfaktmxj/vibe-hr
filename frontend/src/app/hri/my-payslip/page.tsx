@@ -2,6 +2,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { MyPayslipViewer } from "@/components/hri/my-payslip-viewer";
 import { requireMenuAccess } from "@/lib/guard";
 
+const GRID_SCREEN = { engine: "ag-grid", profile: "standard-v2", registryKey: "hri.my-payslip" } as const;
+void GRID_SCREEN;
+
 export default async function MyPayslipPage() {
   await requireMenuAccess("/hri/my-payslip");
 

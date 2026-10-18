@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 class HrRouteContractTest {
     @Test
-    void exposesExactlyTheSevenEmployeeAndThirtySixHrCanonicalRoutes() {
+    void exposesExactlyTheEmployeeAndHrCanonicalRoutes() {
         Set<String> expected = Set.of(
                 "GET /api/v1/employees", "GET /api/v1/employees/departments", "POST /api/v1/employees", "POST /api/v1/employees/batch", "GET /api/v1/employees/me", "PUT /api/v1/employees/{employee_id}", "DELETE /api/v1/employees/{employee_id}",
-                "GET /api/v1/hr/basic/admin-records", "GET /api/v1/hr/basic/{employee_id}", "PUT /api/v1/hr/basic/{employee_id}/profile", "POST /api/v1/hr/basic/{employee_id}/records", "PUT /api/v1/hr/basic/{employee_id}/records/{record_id}", "DELETE /api/v1/hr/basic/{employee_id}/records/{record_id}",
+                "GET /api/v1/hr/basic/admin-records", "GET /api/v1/hr/basic/{employee_id}", "PUT /api/v1/hr/basic/{employee_id}/profile", "POST /api/v1/hr/basic/{employee_id}/records", "POST /api/v1/hr/basic/{employee_id}/records/batch", "PUT /api/v1/hr/basic/{employee_id}/records/{record_id}", "DELETE /api/v1/hr/basic/{employee_id}/records/{record_id}",
                 "GET /api/v1/hr/recruit/finalists", "POST /api/v1/hr/recruit/finalists", "PUT /api/v1/hr/recruit/finalists/{finalist_id}", "DELETE /api/v1/hr/recruit/finalists", "POST /api/v1/hr/recruit/finalists/if-sync", "POST /api/v1/hr/recruit/finalists/generate-employee-no", "POST /api/v1/hr/recruit/finalists/create-employees",
                 "GET /api/v1/hr/appointment-codes", "POST /api/v1/hr/appointment-codes", "PUT /api/v1/hr/appointment-codes/{code_id}", "DELETE /api/v1/hr/appointment-codes/{code_id}",
                 "GET /api/v1/hr/appointments/records", "POST /api/v1/hr/appointments/records", "PUT /api/v1/hr/appointments/records/{item_id}", "DELETE /api/v1/hr/appointments/records/{item_id}", "POST /api/v1/hr/appointments/orders/{order_id}/confirm",
@@ -38,7 +38,7 @@ class HrRouteContractTest {
             }
         }
         assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
-        assertThat(actual).hasSize(43);
+        assertThat(actual).hasSize(44);
     }
 
     private void add(Set<String> routes, String verb, String prefix, String[] paths) {

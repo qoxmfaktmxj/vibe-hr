@@ -164,7 +164,7 @@ export function WelBenefitRequestOverview() {
         cellRenderer: (params: { value: string }) => {
           const label = STATUS_LABELS[params.value] ?? params.value;
           const cls = STATUS_COLORS[params.value] ?? "";
-          return `<span class="${cls}">${label}</span>`;
+          return <span className={cls}>{label}</span>;
         },
       },
       {

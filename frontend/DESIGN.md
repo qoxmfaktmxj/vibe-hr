@@ -27,7 +27,19 @@ The login, navigation and account surfaces use the existing VIBE monogram, Cobal
 | Navigation | `components/dashboard/dashboard-sidebar.tsx` | Labeled domains, contextual groups, persisted menu/scroll context and accessible mobile drawer |
 | Profile | `components/dashboard/employee-profile-dialog.tsx` | Current employee identity, basic/account facts, loading, error retry, empty state and readonly guidance |
 
+## Compact navigation foundation (2026-10-18)
+
+- Desktop retains the domain rail and context menu. The rail is 72px wide, domain items are 56px tall, and the context menu remains 208px wide. A 32px close button lives in the context header; there is no toggle row in the rail or separate toggle strip. Clicking a domain, including the selected one, reopens the context menu with its group state retained. Closing returns focus to the selected domain, which exposes the panel's expanded state and controls relationship.
+- Domain and leaf selection use bold theme-colored text and matching icons without selection backgrounds, side indicators or enclosing borders. The rail uses a lighter theme tint and context links mix the theme with the strong foreground for readability. Keyboard focus indicators remain visible. Menu corners are 4px, domain icons are 18px, and labels stay on one line with their full accessible name retained.
+- Sidebar scrolling remains available through wheel, touch and keyboard focus while its scrollbars are hidden. Other scroll areas use a transparent track and 6px scrollbar in WebKit/Blink, with the standard thin fallback in other engines.
+- The authenticated workspace uses an 8px base radius. Shared search and grid containers and AG Grid wrappers use 6px corners. The mobile menu carries the same radius foundation. Existing login scene and assets retain their design.
+- The user approved employee management, approval detail and HR basic on 2026-10-18. Their common design is now implemented in the three application screens. `output/common-design-20261018/preview.html` remains the original proposal for comparison.
+
 ## Interaction rules
+
+- Editable management lists use explicit batch save: create/edit/delete choices remain local drafts until Save. Employee management retains its existing atomic batch. HR basic now saves each history category as one atomic batch. Remaining migration targets are tracked in `../docs/design/2026-10-18-grid-save-contract.md`.
+- Read-only grids expose relevant lookup and business actions without an inactive Save placeholder. Approval, submission, cancellation, closing and reopening remain named business actions with their existing confirmation and authorization boundaries.
+- The header renewal control follows the 32px height of the small Quick Move button and the shared 6px corner radius. Its session state and expiry behavior are unchanged.
 
 - Disabled tab actions reflect whether tabs exist in that direction. Closing the active page from another tab also selects a retained page. Desktop tabs use right-click or Shift+F10 for management; the visible management button is retained below the desktop breakpoint for touch access.
 - Menu and profile dialogs return focus to their actual entry control. Mobile menu closes before opening a profile and when crossing into the desktop layout.
@@ -60,7 +72,37 @@ The separate `playwright.scene.config.ts` exercises rendered title and water dif
 
 ## HRI inbox presentation
 
-The approval and receive inboxes use the same inset grid padding, rounded border, 34px rows and standard search controls as company management. Search is separate from processing: opinions are edited in the confirmation dialog, and selection-based approval/receive completion plus single-document rejection live in the toolbar. Result feedback remains inside the grid card rather than adding a separate page-level card. Other read-only grid consumers retain their existing presentation defaults.
+The approval inbox places the existing selectable grid beside the selected document, preserving exports and explicit bulk confirmation. Clicking a row or pressing Enter opens its detail; narrow screens switch between list and detail. Per-document approval/rejection remain named actions and use the existing confirmation flow. Detail loading or errors disable those actions. Processing feedback stays visible even when the mobile list is hidden. The receive inbox retains its existing layout and feedback position. Both use 34px rows;other read-only grid consumers retain their existing presentation defaults.
+
+## Confirmed business screen foundation (2026-10-18)
+
+The three screens use 24px desktop content padding, 16px on mobile, one 22px content heading and 36px body controls. Header controls retain 32px. Search labels remain visible;secondary employee grid utilities are separate from create/copy/template/upload/save/download. Save precedes download in the shared toolbar.
+
+HR basic presents grouped information sections and the existing employee selector. Optional profile fields can be cleared by explicit save;required name and hire date stay validated. The eight history tabs share the standard grid with local add/edit/delete status and restore behavior. One employee/category is the save boundary. Local pagination shows 50 rows from the already-loaded employee detail,with unsaved confirmation before discarding edits for query/page/tab/employee changes. Menu links,work tabs and Quick Move use the shared unsaved-navigation confirmation;reload/closing uses the browser unload warning. No browser-history interception is added.
+
+The history endpoint is `POST /api/hr/basic/{employeeId}/records/batch`,forwarded to Spring under `/api/v1`. It keeps the existing HR role gate,locks the employee,checks record ownership/category and duplicate IDs,then commits the entire batch in one transaction. A failed save preserves client drafts. No schema change or new dependency is required.
+
+## Remaining table rollout (2026-10-18)
+
+All eleven targets from the native-table inventory now use the common grid. The last nine consist of four editable catalogs and five read-only/workflow areas. Seven document, pivot or permission-matrix exceptions and the one inactive legacy table remain intact.
+
+Form types, approval templates, department assignments and employee schedule exceptions share `BatchGridManager`. Template steps belong to the same row draft and save atomically with their parent. Deletes remain reversible until Save. The multi-editor work-code page aggregates navigation checks across every mounted editor. Department and personal assignment panels have full-width tables; personal employee entry uses real name/number search candidates.
+
+Read-only grids use stable row IDs and only supported actions. Remove nonfunctional create/copy/template/upload/save placeholders. Payslip history, wage-basis and voucher details use the shared read-only renderer; the payslip document and tax summary remain native tables. Leave history uses server pagination and named cancellation; month closing keeps its 12-month structure and separate close/reopen confirmations.
+
+The existing catalog APIs are loaded as a whole and paginated locally in 50-row views. This is documented in GRID_SCREEN_STANDARD, not a claim of server paging. Source and runtime validation evidence are linked from the rollout report. The internal validation gate is complete and the user subsequently approved the public landing implementation.
+
+## Public product gallery (2026-10-18)
+
+The `/` route presents the product before login. This surface uses a white canvas `#ffffff`, Ink `#202a38`, Cobalt `#315fce` and the existing Pretendard font and VIBE monogram. Its palette stays stable across saved application theme preferences; the product exhibits retain their own light/dark theme choices. The internal application foundation remains separate.
+
+The approved spatial composition is eight product views on each side and the original water scene at the far end. Profile and document frames are smaller, the organization frame wider, and the water frame larger. The slogan sits beside the brand in a 64px desktop header with the login CTA. The canvas fills the entire remaining viewport; instructions, scene controls and the synthetic-data note sit over it. There is no separate hero block, shaded room geometry, fog or duplicate gallery branding. The narrow mobile header wraps the slogan below the brand, and the static list scrolls normally. Wheel navigation follows the left side, water and return along the right side. Primary-pointer dragging changes the bounded view, while a short click enlarges the chosen product screen. Keyboard equivalents, focus restoration and explicit view controls remain available.
+
+Mobile uses the complete list and plays one visible product demonstration. Reduced motion uses static posters without requesting motion assets. WebGL failure or context loss falls back to the list. Sixteen product scenes use actual synthetic UI state captures with animated cursor, state transitions and outcome captions; a single shared Canvas player drives the selected 3D texture or enlarged/list view. Overview stays static, opening details pauses the background and offscreen/hidden views stop advancing. Captured readonly and workflow exceptions keep their real query/detail/confirmation actions instead of adding a fictitious Save.
+
+Opening the enlarged water exhibit automatically starts the existing renderer, without changing login scene sources or posters. Reduced-motion users retain the static poster without loading the renderer. Stop and resume remain available. Camera motion stops when settled except for the selected demonstration's texture updates. View changes and unmount cancel loads and release decoded frames and renderer resources. See `../docs/design/2026-10-18-product-scene-motion.md` for scene-level flows and playback ownership.
+
+See `../docs/design/2026-10-18-landing-implementation.md` for source boundaries, media provenance, verification and the distinction between static product images and live spatial motion.
 
 ## AG Grid visual reference
 

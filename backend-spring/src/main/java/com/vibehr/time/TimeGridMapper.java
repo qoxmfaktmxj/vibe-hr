@@ -13,7 +13,7 @@ interface TimeGridMapper {
             <script>
             select a.id, a.employee_id as employeeId, e.employee_no as employeeNo, u.display_name as employeeName,
                    e.department_id as departmentId, d.name as departmentName, a.work_date as workDate,
-                   a.check_in_at as checkInAt, a.check_out_at as checkOutAt, a.attendance_status as attendanceStatus,
+                   a.check_in_at at time zone 'UTC' as checkInAt, a.check_out_at at time zone 'UTC' as checkOutAt, a.attendance_status as attendanceStatus,
                    a.actual_minutes as actualMinutes, a.regular_minutes as regularMinutes, a.overtime_minutes as overtimeMinutes,
                    a.night_minutes as nightMinutes, a.holiday_work_minutes as holidayWorkMinutes,
                    a.holiday_overtime_minutes as holidayOvertimeMinutes, a.holiday_night_minutes as holidayNightMinutes,

@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { fetcher } from "@/lib/fetcher";
 import type { HriTaskItem, HriTaskListResponse } from "@/types/hri";
+import { HriTaskDetail } from "@/components/hri/hri-task-detail";
 
 type TaskRow = HriTaskItem & ReadonlyGridRow;
 type Action = "approve" | "reject" | "receive-complete" | "receive-reject";
@@ -27,6 +28,8 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
   const [page, setPage] = useState(1);
   const [comment, setComment] = useState("");
   const [selected, setSelected] = useState<TaskRow[]>([]);
+  const [detailId, setDetailId] = useState<string | number | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
   const [pending, setPending] = useState<{ action: Action; rows: TaskRow[]; comment: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -46,6 +49,7 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
   const eligible = useCallback((row: TaskRow) => row.step_type === (approval ? "APPROVAL" : "RECEIVE")
     && row.status_code === (approval ? "APPROVAL_IN_PROGRESS" : "RECEIVE_IN_PROGRESS"), [approval]);
   const selectedRows = selected.filter((row) => rows.some((current) => current.id === row.id) && eligible(row));
+  const detailRow = rows.find(row => row.id === detailId) ?? rows[0] ?? null;
 
   function prepare(action: Action, targets: TaskRow[]) {
     if (acting.current || locked || targets.length === 0) return;
@@ -104,23 +108,30 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
 
   const columns: ColDef<TaskRow>[] = [
     { field: "request_no", headerName: "문서번호", width: 160 },
-    { field: "form_name", headerName: "신청서 유형", minWidth: 150, flex: 1 },
     { field: "title", headerName: "제목", minWidth: 220, flex: 2 },
+    { field: "form_name", headerName: "신청서 유형", minWidth: 150, flex: 1 },
     { field: "status_code", headerName: "상태", width: 130, valueFormatter: ({ value }) => STATUS_LABELS[value] ?? value },
     { field: "step_type", headerName: "현재 단계", width: 110, valueFormatter: ({ value }) => STEP_LABELS[value] ?? value },
     { field: "step_order", headerName: "차수", width: 80 },
     { field: "requested_at", headerName: "요청일", width: 120, valueFormatter: ({ value }) => String(value ?? "").slice(0, 10) },
   ];
 
-  return <>
+  return <div className={approval ? "business-workspace" : undefined}>
+    {approval && <div className="business-heading"><h1>결재함</h1><p>대기 문서를 선택해 신청 내용과 결재 진행을 확인합니다.</p></div>}
+    {approval && error && <p role="alert" className="mb-4 text-sm text-destructive">목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}
+    {approval && result && <div role="status" className="mb-4 text-sm"><p>{result.summary}</p>{result.failures.length > 0 && <ul className="text-destructive">{result.failures.map(message => <li key={message}>{message}</li>)}</ul>}</div>}
+    <div className={approval ? "grid min-w-0 gap-5 xl:grid-cols-[minmax(400px,0.9fr)_minmax(0,1.1fr)]" : undefined}>
+    <div className={approval && showDetail ? "hidden min-w-0 xl:block" : "min-w-0"}>
     <ReadonlyGridManager<TaskRow>
       title={title}
+      hideSearchTitle={approval}
+      embedded={approval}
       inset gridHeight={420}
       headerNote={selectedRows.length > 0 ? <span className="text-xs text-primary">선택 {selectedRows.length}건</span> : null}
-      searchFields={<SearchFieldGrid className="xl:grid-cols-4"><SearchTextField className="md:col-span-2" value={keyword} onChange={setKeyword} placeholder="문서번호, 제목, 신청서명 (현재 페이지)"
+      searchFields={<SearchFieldGrid className={approval ? "md:grid-cols-1 xl:grid-cols-1" : "xl:grid-cols-4"}><SearchTextField className={approval ? undefined : "md:col-span-2"} value={keyword} onChange={setKeyword} placeholder={approval ? "현재 페이지 문서 검색" : "문서번호, 제목, 신청서명 (현재 페이지)"}
         onKeyDown={(event) => { if (event.key === "Enter" && !locked) { setSelected([]); setAppliedKeyword(keyword); void mutate(); } }} />
       </SearchFieldGrid>}
-      feedback={<>{error && <p role="alert" className="px-3 pb-3 text-sm text-destructive md:px-6">목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}
+      feedback={!approval && <>{error && <p role="alert" className="px-3 pb-3 text-sm text-destructive md:px-6">목록을 불러오지 못했습니다. 조회를 눌러 다시 시도해 주세요.</p>}
         {result && <div role="status" className="px-3 pb-3 text-xs md:px-6"><p>{result.summary}</p>{result.failures.length > 0 && <ul className="text-destructive">{result.failures.map((message) => <li key={message}>{message}</li>)}</ul>}</div>}</>}
       rowData={rows} columnDefs={columns} totalCount={data?.total_count ?? 0} page={page} pageSize={pageSize}
       onPageChange={(next) => { if (!locked) { setSelected([]); setPage(next); } }}
@@ -128,6 +139,8 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       queryDisabled={locked || isValidating} loading={isLoading}
       onSelectionChange={setSelected} isRowSelectable={eligible}
       onReady={(api) => { gridApi.current = api; }}
+      onRowClick={approval ? (row) => { if (!locked) { setDetailId(row.id); setShowDetail(true); } } : undefined}
+      selectedRowId={approval ? detailRow?.id : undefined}
       actions={[
         { key: "approve", label: `선택 ${primaryLabel}`, icon: Check, onClick: () => prepare(primaryAction, selectedRows), disabled: locked || !selectedRows.length },
         { key: "reject", label: "반려", icon: X, onClick: () => prepare(rejectAction, selectedRows), disabled: locked || selectedRows.length !== 1 },
@@ -135,6 +148,9 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       ]}
       emptyText={`${title} 대기 문서가 없습니다.`}
     />
+    </div>
+    {approval && <div className={showDetail ? "min-w-0" : "hidden min-w-0 xl:block"}><HriTaskDetail focusOnOpen={showDetail} key={detailRow?.id ?? "empty"} requestId={detailRow?.request_id ?? null} disabled={locked || !detailRow || !eligible(detailRow)} onApprove={() => { if (detailRow) prepare(primaryAction, [detailRow]); }} onReject={() => { if (detailRow) prepare(rejectAction, [detailRow]); }} onBack={() => setShowDetail(false)} /></div>}
+    </div>
     <ConfirmDialog open={pending !== null} onOpenChange={(open) => { if (!open && !acting.current) setPending(null); }}
       title={`${pending?.action === rejectAction ? "반려" : primaryLabel} ${pending?.rows.length ?? 0}건을 처리할까요?`}
       description="각 문서는 개별 처리됩니다. 일부 문서가 실패해도 다른 문서의 처리 결과는 유지됩니다."
@@ -148,7 +164,7 @@ export function HriTaskBoard({ kind }: { kind: "approvals" | "receives" }) {
       </label>
       </div>
     </ConfirmDialog>
-  </>;
+  </div>;
 }
 
 // standard-v2: AgGridReact ManagerPageShell ManagerSearchSection ManagerGridSection GridToolbarActions
