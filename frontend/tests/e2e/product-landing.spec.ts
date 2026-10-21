@@ -119,6 +119,99 @@ test("3D list toggle and responsive mode switch release the canvas", async ({ pa
   await expect(page.getByTestId("product-gallery")).toHaveCount(0);
 });
 
+test("gallery uses a colored arrow and a compact keyboard focus cue without a canvas border", async ({ page }) => {
+  await page.goto("/");
+  const canvas = page.getByTestId("product-gallery");
+  await expect(canvas).toHaveAttribute("data-ready", "true");
+  await canvas.click({ position: { x: 600, y: 45 } });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await canvas.evaluate(el => getComputedStyle(el).outlineStyle)).toBe("none");
+  expect(await canvas.evaluate(el => getComputedStyle(el).cursor)).toContain("gallery-cursor.svg");
+  const instructions = page.locator("#gallery-instructions");
+  expect(await instructions.evaluate(el => getComputedStyle(el).outlineStyle)).toBe("none");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(canvas).toBeFocused();
+  expect(await canvas.evaluate(el => getComputedStyle(el).outlineStyle)).toBe("none");
+  expect(await instructions.evaluate(el => getComputedStyle(el).outlineStyle)).toBe("solid");
+  await screenshot(page, "compact-keyboard-focus");
+});
+
+test("drag eases after release and settles, while buffered wheel input remains bounded", async ({ page }) => {
+  await page.goto("/");
+  const canvas = page.getByTestId("product-gallery");
+  const jump = page.getByLabel("장면 바로 이동", { exact: true });
+  await expect(canvas).toHaveAttribute("data-ready", "true");
+  for (let i = 0; i < 8; i++) await canvas.dispatchEvent("wheel", { deltaY: 10 });
+  await expect(jump).toHaveValue("0");
+  await page.waitForTimeout(1200);
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 130, box.y + box.height / 2 + 35, { steps: 4 });
+  expect(await canvas.evaluate(el => getComputedStyle(el).cursor)).toContain("gallery-cursor.svg");
+  await page.mouse.up();
+  const released = await canvas.getAttribute("data-look");
+  await expect.poll(() => canvas.getAttribute("data-look")).not.toBe(released);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect.poll(async () => {
+    const values = await canvas.evaluate(el => ({ actual: el.dataset.look!, target: el.dataset.lookTarget! }));
+    return values.actual === values.target;
+  }).toBe(true);
+  const settled = await canvas.getAttribute("data-view");
+  await page.waitForTimeout(250);
+  expect(await canvas.getAttribute("data-view")).toBe(settled);
+  await screenshot(page, "damped-drag-settled");
+  await page.getByRole("button", { name: "전체 공간 보기", exact: true }).click();
+  await expect.poll(() => canvas.getAttribute("data-look")).toBe("0.00000,0.00000");
+  await canvas.dispatchEvent("wheel", { deltaY: -120 });
+  await page.waitForTimeout(600);
+  await expect(jump).toHaveValue("");
+  await canvas.dispatchEvent("wheel", { deltaX: 120, deltaY: 0 });
+  await expect(jump).toHaveValue("0");
+  await canvas.dispatchEvent("wheel", { deltaY: 120, ctrlKey: true });
+  await page.waitForTimeout(650);
+  await expect(jump).toHaveValue("0");
+});
+
+test("selected frame outline follows perspective with four corners and leaves input available", async ({ page }) => {
+  await page.goto("/");
+  const canvas = page.getByTestId("product-gallery");
+  const outline = page.getByTestId("gallery-selection");
+  await expect(canvas).toHaveAttribute("data-ready", "true");
+  await expect(outline).toBeHidden();
+  await page.getByLabel("장면 바로 이동", { exact: true }).selectOption("0");
+  await expect(outline).toBeVisible();
+  await expect(outline.locator("rect")).toHaveCount(4);
+  expect(await outline.evaluate(el => getComputedStyle(el).pointerEvents)).toBe("none");
+  await page.waitForTimeout(1200);
+  const points = await outline.locator("polygon").getAttribute("points");
+  const box = (await canvas.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 65, box.y + box.height / 2 + 20, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => outline.locator("polygon").getAttribute("points")).not.toBe(points);
+  const errors = await outline.evaluate(el => {
+    const vertices = el.querySelector("polygon")!.getAttribute("points")!.split(" ").map(point => point.split(",").map(Number));
+    return Array.from(el.querySelectorAll("rect")).map((handle, index) => Math.max(Math.abs(Number(handle.getAttribute("x")) + 3.5 - vertices[index][0]), Math.abs(Number(handle.getAttribute("y")) + 3.5 - vertices[index][1])));
+  });
+  expect(errors.every(error => error < .01)).toBe(true);
+  await screenshot(page, "selected-frame-outline");
+  await page.getByRole("button", { name: "전체 공간 보기", exact: true }).click();
+  await expect(outline).toBeHidden();
+  await page.getByLabel("장면 바로 이동", { exact: true }).selectOption("8");
+  await expect(outline).toBeVisible();
+  await page.waitForTimeout(1500);
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(page.getByRole("dialog")).toContainText("사람이 중심이 되는 공간");
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect.poll(async () => (await outline.boundingBox())!.width).toBe(900);
+  await page.setViewportSize({ width: 390, height: 900 });
+  await expect(outline).toHaveCount(0);
+});
+
 test("every room frame can be reached and clicked, with bounded navigation", async ({ page }) => {
   await page.goto("/");
   const canvas = page.getByTestId("product-gallery");

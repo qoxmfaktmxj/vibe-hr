@@ -104,6 +104,10 @@ Opening the enlarged water exhibit automatically starts the existing renderer, w
 
 The water frame now previews a silent12-second loop of the existing scene and VIBE-HR liquid title, including an automatic cursor sweep and recovery. The same single-player ownership applies in space and list modes; the full water renderer loads only on enlargement. The enlarged scene uses the original liquid-title implementation with a centered composition, real pointer input and static accessible lettering as fallback. Its original login implementation is unchanged. See `../docs/design/2026-10-18-water-brand-preview.md` for media regeneration and verification.
 
+Gallery mouse input uses a label-free cobalt arrow throughout pointer drag. The canvas has no outer focus outline; keyboard focus is indicated on its short instruction text. Wheel deltas are briefly buffered, and position plus look angles follow their targets with time-based damping. Scene-to-scene travel includes a small retreat and return. Transient input stays outside React state, and settled views stop rendering unless the selected demonstration needs an updated texture.
+
+The selected product frame has a thin cobalt outline and four small white corner squares. An SVG overlay projects the actual3D frame corners into CSS pixels after each camera render, so the outline follows perspective and resize. It has no pointer events and no accessibility focus; the existing frame click remains responsible for enlargement. Overview and the mobile list omit this spatial selection treatment.
+
 See `../docs/design/2026-10-18-landing-implementation.md` for source boundaries, media provenance, verification and the distinction between static product images and live spatial motion.
 
 ## AG Grid visual reference

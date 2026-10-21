@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { createGalleryWorld } from "./gallery-world";
+import styles from "./landing.module.css";
 
 type Props = {
   active: number;
@@ -16,19 +17,38 @@ type Props = {
 
 export function GalleryCanvas({ active, resetKey, paused, motionEnabled, onNavigate, onOpen, onFailure, className }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const outlineRef = useRef<SVGSVGElement>(null);
   const worldRef = useRef<ReturnType<typeof createGalleryWorld> | null>(null);
+  const cancelWheelRef = useRef(() => {});
   const propsRef = useRef({ active, paused, motionEnabled, onNavigate, onOpen, onFailure });
   useEffect(() => { propsRef.current = { active, paused, motionEnabled, onNavigate, onOpen, onFailure }; });
   useEffect(() => {
     const canvas = canvasRef.current!;
+    const outline = outlineRef.current!;
+    const polygon = outline.querySelector("polygon")!;
+    const handles = outline.querySelectorAll("rect");
+    let lastOutline = "";
     let disposed = false;
     let gesture: { id: number; x: number; y: number; distance: number } | null = null;
     let wheel = 0;
     let lastWheel = 0;
     let lastStep = 0;
+    let wheelTimer = 0;
+    const cancelWheel = () => { window.clearTimeout(wheelTimer); wheelTimer = 0; wheel = 0; };
+    cancelWheelRef.current = cancelWheel;
     void import("./gallery-world").then(({ createGalleryWorld }) => {
       if (disposed) return;
-      const world = createGalleryWorld(canvas, () => propsRef.current.onFailure());
+      const world = createGalleryWorld(canvas, () => propsRef.current.onFailure(), points => {
+        const signature = points?.map(point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ") ?? "";
+        if (signature === lastOutline) return;
+        lastOutline = signature;
+        outline.style.visibility = points ? "visible" : "hidden";
+        polygon.setAttribute("points", signature);
+        points?.forEach((point, index) => {
+          handles[index].setAttribute("x", String(point.x - 3.5));
+          handles[index].setAttribute("y", String(point.y - 3.5));
+        });
+      });
       worldRef.current = world;
       world.select(propsRef.current.active);
       world.pause(propsRef.current.paused);
@@ -36,6 +56,8 @@ export function GalleryCanvas({ active, resetKey, paused, motionEnabled, onNavig
     }).catch(() => { if (!disposed) propsRef.current.onFailure(); });
     const down = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary) return;
+      cancelWheel();
+      canvas.dataset.pointerFocus = "true";
       canvas.focus({ preventScroll: true });
       gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, distance: 0 };
       canvas.setPointerCapture(event.pointerId);
@@ -61,16 +83,22 @@ export function GalleryCanvas({ active, resetKey, paused, motionEnabled, onNavig
     };
     const scroll = (event: WheelEvent) => {
       if (event.ctrlKey || propsRef.current.paused) return;
-      if ((propsRef.current.active < 0 && event.deltaY < 0) || (propsRef.current.active === 16 && event.deltaY > 0)) return;
+      const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      if ((propsRef.current.active < 0 && delta < 0) || (propsRef.current.active === 16 && delta > 0)) return;
       event.preventDefault();
       const now = performance.now();
       if (now - lastWheel > 180) wheel = 0;
       lastWheel = now;
-      if (now - lastStep < 500) return;
-      wheel += event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1);
-      if (Math.abs(wheel) >= 55) {
-        propsRef.current.onNavigate(Math.sign(wheel));
-        lastStep = now; wheel = 0;
+      if (Math.sign(wheel) !== Math.sign(delta)) wheel = 0;
+      wheel = Math.max(-240, Math.min(240, wheel + delta * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? canvas.clientHeight : 1)));
+      if (Math.abs(wheel) >= 45 && !wheelTimer) {
+        wheelTimer = window.setTimeout(() => {
+          const direction = Math.sign(wheel);
+          cancelWheel();
+          if (propsRef.current.paused || !direction) return;
+          propsRef.current.onNavigate(direction);
+          lastStep = performance.now();
+        }, Math.max(35, 550 - (now - lastStep)));
       }
     };
     canvas.addEventListener("pointerdown", down);
@@ -81,6 +109,7 @@ export function GalleryCanvas({ active, resetKey, paused, motionEnabled, onNavig
     canvas.addEventListener("wheel", scroll, { passive: false });
     return () => {
       disposed = true;
+      cancelWheel();
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", finish);
@@ -92,13 +121,16 @@ export function GalleryCanvas({ active, resetKey, paused, motionEnabled, onNavig
     };
   }, []);
   useEffect(() => worldRef.current?.select(active), [active, resetKey]);
+  useEffect(() => cancelWheelRef.current(), [active, resetKey, paused]);
   useEffect(() => worldRef.current?.pause(paused), [paused]);
   useEffect(() => worldRef.current?.setMotionEnabled(motionEnabled), [motionEnabled]);
 
-  return <canvas ref={canvasRef} className={className} tabIndex={0} role="region" aria-label="제품 화면 3D 공간" aria-describedby="gallery-instructions" data-testid="product-gallery" data-ready="false" onKeyDown={event => {
+  return <><canvas ref={canvasRef} className={className} tabIndex={0} role="region" aria-label="제품 화면 3D 공간" aria-describedby="gallery-instructions" data-testid="product-gallery" data-ready="false" data-pointer-focus="false" onBlur={event => { event.currentTarget.dataset.pointerFocus = "false"; }} onKeyDown={event => {
+    event.currentTarget.dataset.pointerFocus = "false";
+    cancelWheelRef.current();
     if (["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Enter", " "].includes(event.key)) event.preventDefault();
     if (["ArrowRight", "ArrowDown"].includes(event.key)) onNavigate(1);
     if (["ArrowLeft", "ArrowUp"].includes(event.key)) onNavigate(-1);
     if (event.key === "Enter" || event.key === " ") onOpen(Math.max(0, active));
-  }} />;
+  }} /><svg ref={outlineRef} className={styles.selectionOutline} aria-hidden="true" focusable="false" data-testid="gallery-selection"><polygon />{[0, 1, 2, 3].map(index => <rect key={index} width="7" height="7" />)}</svg></>;
 }

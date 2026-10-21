@@ -3,7 +3,7 @@ import { PRODUCT_SCENES } from "./scenes";
 import { createMotionPlayer } from "./motion-player";
 
 // This module is imported only after desktop/motion capability checks.
-export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => void) {
+export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => void, onOutline: (points: Array<{ x: number; y: number }> | null) => void) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -11,6 +11,8 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
   scene.background = new THREE.Color("#ffffff");
   const camera = new THREE.PerspectiveCamera(56, 1, .1, 100);
   camera.position.set(0, .2, 17);
+  camera.rotation.order = "YXZ";
+  const position = camera.position.clone();
   const targetPosition = camera.position.clone();
   const targetLook = new THREE.Vector3(0, 0, -12);
   const look = targetLook.clone();
@@ -25,6 +27,7 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
   let lastTime = 0;
   let yaw = 0;
   let pitch = 0;
+  let targetYaw = 0, targetPitch = 0, transition = 1;
   let dirty = true;
   let selected = -1;
   let motionEnabled = true, visible = true;
@@ -92,6 +95,18 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
     canvas.dataset.motionFailed = String(state.failed);
   }, getComputedStyle(canvas).fontFamily);
   const projected = new THREE.Vector3();
+  const corner = new THREE.Vector3();
+  function updateOutline() {
+    if (selected < 0) { onOutline(null); return; }
+    const frame = frames[selected];
+    const { width, height } = (frame.geometry as THREE.PlaneGeometry).parameters;
+    frame.updateWorldMatrix(true, false);
+    const points = [[-1, 1], [1, 1], [1, -1], [-1, -1]].map(([x, y]) => {
+      corner.set(x * width / 2, y * height / 2, 0).applyMatrix4(frame.matrixWorld).project(camera);
+      return { x: (corner.x + 1) * canvas.clientWidth / 2, y: (1 - corner.y) * canvas.clientHeight / 2, z: corner.z };
+    });
+    onOutline(points.some(point => point.z < -1 || point.z > 1) ? null : points);
+  }
   function syncMotion() {
     let inView = false;
     if (selected >= 0) {
@@ -126,17 +141,27 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
     if (disposed || paused || document.hidden || !visible) return;
     const delta = lastTime ? Math.min((now - lastTime) / 1000, .05) : 1 / 60;
     lastTime = now;
-    const amount = 1 - Math.exp(-7 * delta);
-    camera.position.lerp(targetPosition, amount);
+    const amount = 1 - Math.exp(-3.8 * delta);
+    position.lerp(targetPosition, amount);
     look.lerp(targetLook, amount);
+    yaw += (targetYaw - yaw) * amount;
+    pitch += (targetPitch - pitch) * amount;
+    if (Math.abs(targetYaw - yaw) < .00005) yaw = targetYaw;
+    if (Math.abs(targetPitch - pitch) < .00005) pitch = targetPitch;
+    transition = Math.min(1, transition + delta / 1.05);
+    camera.position.copy(position);
     camera.lookAt(look);
-    camera.rotateY(yaw);
-    camera.rotateX(pitch);
+    camera.rotation.y += yaw;
+    camera.rotation.x += pitch;
+    camera.translateZ(.55 * Math.sin(Math.PI * transition) ** 2);
     syncMotion();
     renderer.render(scene, camera);
+    updateOutline();
     canvas.dataset.ready = "true";
     canvas.dataset.view = `${camera.position.x.toFixed(3)},${camera.position.z.toFixed(3)},${yaw.toFixed(3)},${pitch.toFixed(3)}`;
-    dirty = camera.position.distanceToSquared(targetPosition) > .00001 || look.distanceToSquared(targetLook) > .00001;
+    canvas.dataset.look = `${yaw.toFixed(5)},${pitch.toFixed(5)}`;
+    canvas.dataset.lookTarget = `${targetYaw.toFixed(5)},${targetPitch.toFixed(5)}`;
+    dirty = position.distanceToSquared(targetPosition) > .00001 || look.distanceToSquared(targetLook) > .00001 || yaw !== targetYaw || pitch !== targetPitch || transition < 1;
     if (dirty) raf = requestAnimationFrame(tick);
   }
   function invalidate() {
@@ -151,7 +176,7 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
     camera.updateProjectionMatrix();
     if (selected < 0) {
       targetPosition.set(0, .2, overviewDepth());
-      if (canvas.dataset.ready !== "true") camera.position.copy(targetPosition);
+      if (canvas.dataset.ready !== "true") { position.copy(targetPosition); camera.position.copy(position); }
     }
     invalidate();
   };
@@ -175,6 +200,7 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
 
   return {
     select(index: number) {
+      transition = selected >= 0 && index >= 0 && selected !== index ? 0 : 1;
       if (selected >= 0) {
         const material = frames[selected].material as THREE.MeshBasicMaterial;
         material.map = posters[selected] ?? null;
@@ -182,8 +208,9 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
       }
       motion.setPlaying(false);
       selected = index;
+      if (index < 0) onOutline(null);
       motion.setScene(index >= 0 ? PRODUCT_SCENES[index].id : null);
-      yaw = 0; pitch = 0;
+      targetYaw = 0; targetPitch = 0;
       if (index < 0) {
         targetPosition.set(0, .2, overviewDepth());
         targetLook.set(0, 0, -12);
@@ -196,8 +223,8 @@ export function createGalleryWorld(canvas: HTMLCanvasElement, onFailure: () => v
       invalidate();
     },
     turn(dx: number, dy: number) {
-      yaw = THREE.MathUtils.clamp(yaw + dx * .0025, -.65, .65);
-      pitch = THREE.MathUtils.clamp(pitch + dy * .0025, -.3, .3);
+      targetYaw = THREE.MathUtils.clamp(targetYaw + dx * .0032, -.65, .65);
+      targetPitch = THREE.MathUtils.clamp(targetPitch + dy * .0032, -.35, .35);
       invalidate();
     },
     pick(x: number, y: number) {
