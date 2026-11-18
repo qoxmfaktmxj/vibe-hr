@@ -11,7 +11,7 @@
 
 ## 프로젝트 개요
 
-Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝트입니다. 단순 CRUD 중심이 아니라, 기존 EHR 흐름을 Next.js + Spring Boot + PostgreSQL 구조로 재구성하면서 실제 운영 시나리오에 가까운 메뉴, 권한, 시드 데이터, 승인 흐름, 급여 계산 흐름을 단계적으로 붙이고 있습니다.
+Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝트입니다. 기존 EHR 흐름을 Next.js, Rust, PostgreSQL로 구현하고 실제 운영 시나리오에 가까운 메뉴, 권한, 시드 데이터, 승인 흐름, 급여 계산 흐름을 단계적으로 붙이고 있습니다.
 
 현재 기준으로 프로젝트의 핵심 목표는 아래와 같습니다.
 
@@ -21,19 +21,16 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ## 현재 아키텍처 및 전환 상태
 
-- 백엔드 코드베이스는 Java 21 + Spring Boot 4.1.0 단일 런타임으로 전환되었습니다.
-- 일반적인 쓰기와 엔티티 생명주기는 JPA가 담당하고, 조인·보고서·성능상 명시적 SQL이 필요한 복잡한 읽기 projection만 MyBatis를 사용합니다.
-- Flyway V1-V5가 스키마와 필수 참조 데이터의 유일한 작성 경로이며, Next.js BFF는 Spring API만 대상으로 합니다.
-- Python 런타임과 소스는 은퇴되었습니다. 이전 기술명은 보존된 전환 증적에서만 확인할 수 있으며 실행 지침이 아닙니다.
+프론트엔드는 Next.js와 React, AG Grid를 사용합니다. BFF가 쿠키와 프록시를 담당하고 Rust 백엔드가 인증, 업무 권한, 트랜잭션, PostgreSQL 접근을 담당합니다. axum과 Tokio가 HTTP 요청을 처리하고, SQLx는 PostgreSQL에서 명시적인 쿼리를 실행합니다.
 
-코드베이스 전환은 완료되었지만, 프로덕션 트래픽 전환과 운영 데이터베이스 컷오버는 아직 별도의 운영자 작업입니다. 실행 전에는 반드시 [컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)을 따르십시오.
+기존 스키마와 필수 참조 데이터는 Flyway V1부터 V7까지의 SQL로 관리합니다. Spring 코드는 비교 테스트의 기준으로 보존합니다. 운영 트래픽 전환은 별도 승인 대상입니다.
 
-- [Spring 백엔드 실행 및 검증 안내](backend-spring/README.md)
-- [Spring Boot Java 전환 계획](docs/SPRING_BOOT_JAVA_MIGRATION_PLAN.md)
-- [Java/Spring 학습 가이드](backend-spring/docs/java-spring-learning-guide.md)
-- [Spring 컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)
+- [아키텍처와 도메인 책임](docs/ARCHITECTURE.md)
+- [Spring 기준 범위와 Rust 검증 방법](docs/rust-migration/inventory.md)
+- [기존 구현과 확인된 동작 차이](docs/rust-migration/business-differences.md)
+- [채용 인터페이스 저장 순서 수정](docs/rust-migration/hr-differences.md)
 
-## 현재 구현 범위
+## 초기 구현 범위 (2026년 3월)
 
 ### 현재 사용 가능한 영역
 
@@ -64,7 +61,7 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 - 교육 본체
 - 메뉴 액션 권한 UI 완성
 
-현재 작업 진척도는 [docs/VIBE_HR_PROGRESS_TODO_2026-03-14.md](docs/VIBE_HR_PROGRESS_TODO_2026-03-14.md)를 기준 문서로 삼습니다.
+이 절은 [2026년 3월 기능 검토](docs/VIBE_HR_PROGRESS_TODO_2026-03-14.md)의 기록입니다. 백엔드 전환 결과는 [작업 기록](docs/TASK_LEDGER.md)에서 확인합니다.
 
 ## 기술 스택
 
@@ -86,14 +83,10 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ### Backend
 
-- Spring Boot 4.1.0
-- Java 21
-- Spring MVC / Spring Security
-- 일반 쓰기는 JPA / 복잡한 읽기 projection은 MyBatis
-- Flyway
-- Gradle
-
-Spring Boot가 유일한 백엔드 런타임이며, Flyway가 스키마와 필수 참조 데이터의 유일한 작성 경로입니다.
+- Rust 2024 edition, Cargo
+- axum, Tokio, Serde
+- SQLx, PostgreSQL
+- Flyway SQL 마이그레이션과 카탈로그 검증
 
 ### Database / Infra
 
@@ -104,7 +97,8 @@ Spring Boot가 유일한 백엔드 런타임이며, Flyway가 스키마와 필�
 
 - ESLint
 - Vitest
-- JUnit 5
+- Cargo 테스트, Clippy, rustfmt
+- Spring 비교용 JUnit 5와 Testcontainers
 - Playwright E2E (`npm run test:e2e:hr`)
 - Grid 전용 검증 스크립트 `npm run validate:grid`
 
@@ -112,12 +106,13 @@ Spring Boot가 유일한 백엔드 런타임이며, Flyway가 스키마와 필�
 
 ```text
 frontend/   Next.js App Router, 화면, API proxy, UI 컴포넌트
-backend-spring/ Spring Boot, JPA/MyBatis, Flyway, seed, 서비스 로직, 테스트
+backend-rust/   Rust API, 업무 로직, 데이터베이스 명령, 테스트
+backend-spring/ Spring 비교 구현, 참조 테스트, 버전별 Flyway SQL
 config/     Grid 화면 레지스트리 및 공통 설정
 docs/       구현 계획, 점검 문서, 운영 메모
 ```
 
-프로덕션 배포는 `docker-compose.deploy.yml`로 Spring 백엔드, Next.js 프론트엔드, 리버스 프록시를 함께 구성합니다.
+`docker-compose.deploy.yml`은 DB 사전 점검, Flyway 실행, 스키마 확인이 성공한 뒤 Rust 백엔드와 Next.js를 기동합니다. 외부 리버스 프록시는 별도로 구성합니다.
 
 ## UI 컬러 및 버튼 가이드
 
@@ -151,14 +146,42 @@ docs/       구현 계획, 점검 문서, 운영 메모
 
 ### 백엔드 실행
 
+PowerShell 7에서 로컬 테스트 DB 연결 정보와 서로 다른 256비트 서명 키를 설정합니다. 개발 셸에 설정한 BFF 서명 키는 프론트의 BFF 환경에서도 같은 값이어야 합니다. 이미 Flyway V1부터 V7까지 검증된 DB라면 마지막 `cargo run --locked`로 서비스를 시작할 수 있습니다.
+
 ```powershell
-cd backend-spring
-$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/vibe_hr"
+cd backend-rust
+$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://127.0.0.1:5432/vibe_hr"
 $env:SPRING_DATASOURCE_USERNAME = "postgres"
 $env:SPRING_DATASOURCE_PASSWORD = "<local-password>"
-$env:AUTH_TOKEN_SECRET = "<openssl-rand-hex-32-output>"
-$env:VIBEHR_BFF_ASSERTION_SECRET = "<different-openssl-rand-hex-32-output>"
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+$env:AUTH_TOKEN_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:VIBEHR_BFF_ASSERTION_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:VIBEHR_SCHEMA_OWNER = "flyway"
+```
+
+빈 로컬 데이터베이스를 준비한 뒤 아래 명령을 차례로 실행합니다. Flyway CLI와 PostgreSQL 드라이버가 필요합니다. SQL 파일과 매니페스트는 기존 경로를 사용합니다.
+
+```powershell
+cargo run --locked -- schema-preflight
+if ($LASTEXITCODE) { throw "Schema preflight failed" }
+$env:FLYWAY_URL = $env:SPRING_DATASOURCE_URL
+$env:FLYWAY_USER = $env:SPRING_DATASOURCE_USERNAME
+$env:FLYWAY_PASSWORD = $env:SPRING_DATASOURCE_PASSWORD
+flyway "-locations=filesystem:../backend-spring/src/main/resources/db/migration" "-cleanDisabled=true" "-baselineOnMigrate=false" migrate
+if ($LASTEXITCODE) { throw "Flyway migration failed" }
+cargo run --locked -- schema-verify ../backend-spring/src/main/resources/db/migration/schema-metadata-manifest.json
+if ($LASTEXITCODE) { throw "Schema verification failed" }
+cargo run --locked
+```
+
+기본 바인딩은 `127.0.0.1:8080`입니다. `/health`와 `/api/v1/health`, `/actuator/health/readiness`에서 응답을 확인할 수 있습니다.
+
+Docker Desktop에서 API를 확인하려면 저장소 루트에서 다음 명령을 실행합니다. 이 구성은 자체 PostgreSQL에 Flyway를 적용하고 카탈로그 검증이 통과하면 Rust 서버를 시작합니다. 앞에서 생성한 두 서명 키를 같은 셸에 설정해 둡니다.
+
+```powershell
+docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml up --build --wait backend
+$address = docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml port backend 8080
+$env:VIBEHR_BFF_BACKEND_URL = "http://$address"
+Invoke-RestMethod "$env:VIBEHR_BFF_BACKEND_URL/api/v1/health"
 ```
 
 ### 프론트엔드 실행
@@ -178,7 +201,7 @@ npm run dev
 
 ### 백엔드 기본값 예시
 
-Spring Boot는 로컬 백엔드 설정을 환경 변수에서 읽습니다. 전체 로컬 프로필과 검증 명령은 [백엔드 안내](backend-spring/README.md)를 확인하십시오.
+Rust 서버는 기존 운영 설정과 호환되는 PostgreSQL JDBC 환경 변수를 읽습니다. `SPRING_DATASOURCE_URL`이 설정되면 해당 URL과 사용자 이름, 암호를 사용합니다. 이 값이 없으면 SQLx 형식의 `DATABASE_URL`을 사용합니다.
 
 ```env
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/vibe_hr
@@ -195,12 +218,13 @@ CORS_ORIGINS=http://localhost:3000
 
 ```env
 VIBEHR_BFF_BACKEND_URL=http://127.0.0.1:8080
+VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER=x-vibehr-client-ip
 VIBEHR_BFF_ASSERTION_SECRET=<same-value-as-backend-VIBEHR_BFF_ASSERTION_SECRET>
 APP_ORIGIN=http://localhost:3000
 NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 ```
 
-외부 리버스 프록시는 BFF 로그인 요청이 Spring에 도달하기 전에 클라이언트가 보낸 `x-vibehr-client-ip` 헤더를 제거하고, 신뢰할 수 있는 단일 값으로 다시 주입해야 합니다.
+외부 리버스 프록시는 로그인 요청이 Next.js BFF에 도달하기 전에 클라이언트가 보낸 `x-vibehr-client-ip` 헤더를 제거하고, 신뢰할 수 있는 단일 값으로 다시 주입해야 합니다.
 
 ## 로그인 및 접속 경로
 
@@ -238,35 +262,16 @@ NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 
 ## 시드 데이터
 
-Spring fixture 시드는 자동 실행되지 않으며, 로컬에서만 명시적으로 실행합니다.
-
-수동 재시드는 아래처럼 수행할 수 있습니다.
+로컬 또는 dev 프로필의 루프백 데이터베이스에서만 실행합니다. 먼저 Flyway로 스키마와 필수 참조 데이터를 준비합니다. `seed dev dev`는 개발 관리자 두 명과 연결된 사원, 역할을 준비합니다.
 
 ```powershell
-cd backend-spring
+cd backend-rust
+$env:SPRING_PROFILES_ACTIVE = "local"
 $env:VIBEHR_ALLOW_FIXTURE_SEEDING = "true"
-.\gradlew.bat bootRun --args="--spring.profiles.active=local,dev-seed --vibehr.seed.confirmation=dev"
+cargo run --locked -- seed dev dev
 ```
 
-의도된 seed 범위는 아래와 같습니다.
-
-- `admin`, `admin-local` 계정 보장
-- 메뉴 / 권한 / 공통코드 초기화
-- 대량 한국어 더미 직원 데이터
-- 조직 / 근태 / 급여 / 복리후생 / 교육 / HRI 샘플 데이터
-- 현재월 / 전월 급여 Run
-- 복리후생 반영용 샘플 케이스
-- 채용 합격자 -> 발령 흐름용 샘플 데이터
-
-현재 운영 문서 기준 대표 샘플 케이스:
-
-- 6000명 기준 직원 / 근태 / 급여 / 복리후생 / 교육 / HRI 데이터
-- 현재월 복리후생 고정 샘플 5건
-- 급여 상세 확인용 수당 샘플
-- `HR-0001 MLA 130000`
-- `KR-0004 POS 150000`
-- `KR-0004 OTX 125000`
-- `KR-0008 NGT 70000`
+별도 테스트 사원이 필요하면 같은 환경에서 `cargo run --locked -- seed demo demo 10`을 실행합니다. 마지막 인수는 생성할 사원 수이며, 생략 시 기본값은 6000입니다.
 
 ## 테스트 방법
 
@@ -284,26 +289,14 @@ npm run build
 ### 백엔드 테스트
 
 ```powershell
-cd backend-spring
-.\gradlew.bat test
-
-# Docker Desktop가 실행 중이어야 합니다.
-$env:VIBEHR_RUN_CONTAINER_TESTS = "true"
-.\gradlew.bat integrationTest
-.\gradlew.bat migrationIntegrationTest
+cd backend-rust
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --release --locked
 ```
 
-현재 저장소에는 아래와 같은 백엔드 테스트가 포함되어 있습니다.
-
-- 인증 서비스 단위 테스트
-- bootstrap seed 단위 테스트
-- 공통코드 서비스 테스트
-- 사원 커맨드 서비스 테스트
-- HRI 승인 / 신청 라우트 테스트
-- 복리후생 projection 테스트
-- 조직 서비스 테스트
-- 급여 phase2 서비스 테스트
-- TIM 스케줄 서비스 테스트
+DB가 필요한 테스트는 격리 PostgreSQL에 fixture를 준비한 뒤 별도로 실행합니다. [테스트 전략](docs/TEST_STRATEGY.md)에 Rust 테스트, 기존 Spring 기준 테스트, 실제 BFF를 통과하는 브라우저 검증 조건을 정리했습니다.
 
 ### 브라우저 수동 테스트 권장 시나리오
 
@@ -329,30 +322,9 @@ $env:VIBEHR_RUN_CONTAINER_TESTS = "true"
 2. 현재월 / 전월 Run 존재 여부 확인
 3. 대상자 상세와 항목 상세 확인
 
-### 전환 완료 검증
+### 전환 검증
 
-저장소 루트에서 전환 정합성을 확인합니다.
-
-```powershell
-node scripts/spring-migration/spring-route-coverage.js --verify-complete
-node scripts/spring-migration/spring-schema-coverage.js
-node scripts/spring-migration/flyway-verify.js
-node scripts/spring-migration/bff-cutover-audit.js
-node scripts/spring-migration/verify-python-retirement.js
-node scripts/spring-migration/verify-delivery.js
-node --test scripts/spring-migration/*.test.js
-```
-
-전환 완료 시점의 검증 스냅샷은 다음과 같습니다. 이는 코드베이스 전환 검증 결과이며, 프로덕션 배포 또는 운영 데이터베이스 컷오버 완료를 뜻하지 않습니다.
-
-- 백엔드: 253개 테스트 통과 (단위 176개, 통합 59개, `migrationIntegrationTest` 18개)
-- 프론트엔드: 139개 테스트 통과
-- 전환 검증기: 30개 테스트 통과
-- API 경로: 290/290 확인
-- 스키마 참조 테이블: 105/105 매핑 확인
-- `.py` 파일과 활성 Python 호출: 각 0개
-
-실제 트래픽 전환 전에는 [컷오버 런북](docs/spring-migration/CUTOVER_RUNBOOK.md)의 Flyway adoption, `flyway-cutover`, 스모크 및 롤백 절차를 운영자가 수행해야 합니다.
+[현재 전환 목록](docs/rust-migration/inventory.md)은 Spring 컨트롤러의 실제 매핑과 실행 중인 서버가 제공한 OpenAPI를 기준으로 합니다. Rust 후보와 Spring 기준 서버를 동일한 fixture의 개별 PostgreSQL 복제본에 연결하고 HTTP 응답과 저장 상태를 비교합니다. 운영 검토에는 Spring을 종료한 상태의 실제 Next.js BFF 브라우저 결과와 [작업 기록](docs/TASK_LEDGER.md)의 미해결 항목도 함께 사용합니다.
 
 ## 참고 문서
 

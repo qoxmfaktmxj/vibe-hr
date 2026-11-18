@@ -142,7 +142,7 @@ test("합격자 -> 사원 생성 -> 발령 확정 -> 인사기본 반영", async
 
     await page.getByRole("button", { name: "발령", exact: true }).click();
     await expect(page.getByText("발령 이력")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("cell", { name: "입사발령" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("gridcell", { name: "입사발령", exact: true })).toBeVisible({ timeout: 20_000 });
   } finally {
     await cleanupHrE2eData(request, authenticated, finalistId, employeeId, employeeNo, fullName, email);
   }

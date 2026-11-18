@@ -118,7 +118,9 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     const otherTotals = JSON.parse(sql(`select json_build_object('overtime',coalesce(sum(a.overtime_minutes),0),'night',coalesce(sum(a.night_minutes),0),'holiday',coalesce(sum(a.holiday_work_minutes),0),'holiday_overtime',coalesce(sum(a.holiday_overtime_minutes),0),'holiday_night',coalesce(sum(a.holiday_night_minutes),0),'leave',coalesce(sum(case when r.leave_type='half_day' then 0.5 when a.attendance_status='leave' then 1 else 0 end),0)) from tim_attendance_daily a left join tim_leave_requests r on r.id=a.approved_leave_request_id where a.work_date between '2026-10-01' and '2026-10-31' and a.employee_id<>${employee.id}`));
     await page.goto("/tim/month-closing");
     const closeResponse = page.waitForResponse((result) => new URL(result.url()).pathname === "/api/tim/month-close" && result.request().method() === "POST");
-    await page.getByRole("row").filter({ hasText: "2026년 10월" }).getByRole("button", { name: "마감", exact: true }).click();
+    const octoberRow = page.locator('.ag-row[row-id="10"]');
+    await expect(octoberRow.getByRole("gridcell", { name: "2026년 10월", exact: true })).toBeVisible();
+    await octoberRow.getByRole("button", { name: "마감", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "마감", exact: true }).click();
     expect((await closeResponse).ok()).toBeTruthy();
     const closed = (await call(api, "get", "/api/tim/month-close?year=2026")).items.find((row: { month: number }) => row.month === 10);
@@ -176,6 +178,8 @@ test("isolated leave approval and time close reconcile through paid payroll", as
     expect(reviewed.total_deductions - calculated.total_deductions).toBe(10_000);
     expect(calculated.total_net - reviewed.total_net).toBe(10_000);
     await page.goto("/payroll/runs");
+    await page.getByPlaceholder("YYYY-MM", { exact: true }).first().fill("2026-10");
+    await page.getByRole("button", { name: "조회", exact: true }).first().click();
     await page.getByRole("row").filter({ hasText: runName }).click();
     const closeRun = page.waitForResponse((result) => new URL(result.url()).pathname === `/api/pay/runs/${run.id}/close` && result.request().method() === "POST");
     await page.getByRole("button", { name: "마감", exact: true }).click();
@@ -232,7 +236,9 @@ test("isolated month-close dialogs contain valid description markup", async ({ p
   await expect(dialog.locator("p p, p div")).toHaveCount(0);
   expect(markupErrors).toEqual([]);
   await dialog.getByRole("button", { name: "취소", exact: true }).click();
-  await page.getByRole("row").filter({ hasText: "2026년 9월" }).getByRole("button", { name: "마감", exact: true }).click();
+  const septemberRow = page.locator('.ag-row[row-id="9"]');
+  await expect(septemberRow.getByRole("gridcell", { name: "2026년 9월", exact: true })).toBeVisible();
+  await septemberRow.getByRole("button", { name: "마감", exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByPlaceholder("마감 사유 또는 메모")).toBeVisible();
   await expect(dialog.locator("p p, p div")).toHaveCount(0);

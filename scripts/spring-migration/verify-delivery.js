@@ -90,6 +90,7 @@ function verifyHostedUiGate(deploy, ui) {
 function verifyDelivery(argv = process.argv) {
   const compose = fs.readFileSync(path.join(repositoryRoot, "docker-compose.deploy.yml"), "utf8");
   const dockerfile = fs.readFileSync(path.join(repositoryRoot, "backend-spring", "Dockerfile"), "utf8");
+  const rustDockerfile = fs.readFileSync(path.join(repositoryRoot, "backend-rust", "Dockerfile"), "utf8");
   const frontendDockerfile = fs.readFileSync(path.join(repositoryRoot, "frontend", "Dockerfile"), "utf8");
   const smokeCompose = fs.readFileSync(path.join(repositoryRoot, "docker-compose.spring-smoke.yml"), "utf8");
   const smokeScript = fs.readFileSync(path.join(repositoryRoot, "scripts", "spring-migration", "smoke-spring-compose.ps1"), "utf8");
@@ -114,10 +115,14 @@ function verifyDelivery(argv = process.argv) {
   const legacyRollbackArtifact = path.join(repositoryRoot, `docker-compose.rollback-${"python"}.yml`);
   if (fs.existsSync(legacyRollbackArtifact)) failures.push("legacy non-Spring rollback compose remains in the candidate");
 
-  for (const required of ["context: ./backend-spring", "VIBEHR_BFF_BACKEND_URL: ${VIBEHR_BFF_BACKEND_URL:?VIBEHR_BFF_BACKEND_URL is required}", "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER: ${VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER:?VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER is required}", "host.docker.internal:host-gateway", "/actuator/health/readiness", "SPRING_PROFILES_ACTIVE"]) {
+  for (const required of ["context: ./backend-rust", "VIBEHR_BFF_BACKEND_URL: ${VIBEHR_BFF_BACKEND_URL:?VIBEHR_BFF_BACKEND_URL is required}", "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER: ${VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER:?VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER is required}", "host.docker.internal:host-gateway", "/actuator/health/readiness", "redgate/flyway:12.4.0", "schema-preflight", "schema-verify", "FLYWAY_BASELINE_ON_MIGRATE: \"false\"", "FLYWAY_CLEAN_DISABLED: \"true\"", "backend-spring/src/main/resources/db/migration:/migrations:ro"]) {
     if (!compose.includes(required)) failures.push(`deploy compose is missing ${required}`);
   }
   if (compose.includes("context: ./backend\n")) failures.push("default deploy compose still builds the Python backend");
+  if (compose.includes("context: ./backend-spring")) failures.push("default deployment still builds the Spring reference runtime");
+  for (const required of ["USER vibehr", "HEALTHCHECK", "curl", "fonts-nanum", "cargo build --release --locked", "/usr/local/bin/vibehr-backend"]) {
+    if (!rustDockerfile.includes(required)) failures.push(`Rust Dockerfile is missing ${required}`);
+  }
   for (const required of ["USER spring", "HEALTHCHECK", "curl", "fontconfig", "fonts-nanum", "application.jar:lib/*", "com.vibehr.VibeHrApplication"]) {
     if (!dockerfile.includes(required)) failures.push(`Spring Dockerfile is missing ${required}`);
   }
@@ -148,8 +153,8 @@ function verifyDelivery(argv = process.argv) {
   ]) {
     if (!smokeScript.includes(required)) failures.push(`smoke script is missing generated secret contract ${required}`);
   }
-  if (rootLayout.includes("FastAPI") || rootLayout.includes("SQLModel") || !rootLayout.includes("Next.js + Spring Boot + JPA")) {
-    failures.push("root layout does not declare the current Next.js, Spring Boot, and JPA stack");
+  if (rootLayout.includes("FastAPI") || rootLayout.includes("SQLModel") || !rootLayout.includes("Next.js + Rust + axum + SQLx")) {
+    failures.push("root layout does not declare the current Next.js and Rust stack");
   }
   for (const required of [
     "DEPLOY_KNOWN_HOSTS",
@@ -165,8 +170,14 @@ function verifyDelivery(argv = process.argv) {
     "candidate readiness check failed",
     "candidate OpenAPI check failed",
     "--add-host host.docker.internal:host-gateway",
-    "no running Spring backend release is available",
-    "a non-Spring release is not a rollback target",
+    "no running Rust or Spring release is available for rollback",
+    "for known_container in vibehr-backend-rust vibehr-backend-spring",
+    "ambiguous running backend; refusing promotion",
+    "for stage in preflight migrate verify-schema",
+    "group: vibehr-production-deploy",
+    "cancel-in-progress: false",
+    "run --rm --no-deps --pull never",
+    "scripts/ci/verify-rust.sh",
     "127.0.0.1:3000/login",
     "restore_operator_config",
     "on_exit",
@@ -205,12 +216,12 @@ function verifyDelivery(argv = process.argv) {
   if (deploySecretCheck.status !== 0) {
     failures.push(`production deploy secret validator failed: ${deploySecretCheck.stderr || deploySecretCheck.stdout}`);
   }
-  if (!deployWorkflow.includes("bash -c ': >\"/dev/tcp/$1/$2\"' bash \"${DEPLOY_HOST}\" \"${DEPLOY_PORT}\"")) {
+  if (!deployWorkflow.includes("bash -c \": >\\\"/dev/tcp/\\$1/\\$2\\\"\" bash \"${DEPLOY_HOST}\" \"${DEPLOY_PORT}\"")) {
     failures.push("deploy workflow does not pass TCP preflight host and port as positional bash arguments");
   }
   if (deployWorkflow.includes("StrictHostKeyChecking=no")) failures.push("deploy workflow disables SSH host key verification");
   if (deployWorkflow.includes("creating empty secret file")) failures.push("deploy workflow permits an empty secret file");
-  if (deployWorkflow.includes("up -d --no-build --remove-orphans --force-recreate || true")) failures.push("deploy workflow suppresses rollback compose failures");
+  if (/up -d [^\n]*--force-recreate[^\n]*\|\|\s*true/.test(deployWorkflow)) failures.push("deploy workflow suppresses rollback compose failures");
   if (deployWorkflow.includes("source ./.env.deploy")) failures.push("deploy workflow evaluates a dotenv file as shell code");
   for (const required of ["load_deploy_env", "IFS= read -r", "printf -v", "prohibited_substitution"]) {
     if (!dotenvLoader.includes(required)) failures.push(`deployment dotenv loader is missing ${required}`);
@@ -224,19 +235,23 @@ function verifyDelivery(argv = process.argv) {
   if (docsController.includes("cdn.jsdelivr.net")) failures.push("documentation controller still loads ReDoc from an external CDN");
   if (!docsController.includes("REDOC_CSP = CSP_BASE + \"script-src 'self';")) failures.push("ReDoc CSP permits unnecessary inline scripts");
 
-  const imageFlag = argv.indexOf("--image");
+  const rustImage = argv.includes("--rust-image");
+  const imageFlag = argv.indexOf(rustImage ? "--rust-image" : "--image");
   if (imageFlag >= 0) {
     const image = argv[imageFlag + 1];
     if (!image) failures.push("--image requires an image name");
     else {
       const inspect = childProcess.spawnSync("docker", ["image", "inspect", "--format", "{{.Config.User}}", image], { encoding: "utf8" });
-      if (inspect.status !== 0 || !inspect.stdout.trim() || inspect.stdout.trim() === "root") failures.push(`${image} does not run as a non-root user`);
+      if (inspect.status !== 0 || !inspect.stdout.trim() || /^(root|0)(:|$)/.test(inspect.stdout.trim())) failures.push(`${image} does not run as a non-root user`);
       const noPython = childProcess.spawnSync("docker", ["run", "--rm", "--entrypoint", "sh", image, "-c", "! command -v python && ! command -v python3"], { encoding: "utf8" });
       if (noPython.status !== 0) failures.push(`${image} contains a Python runtime`);
       const koreanFont = childProcess.spawnSync("docker", ["run", "--rm", "--entrypoint", "sh", image, "-c", "fc-match 'NanumGothic' | grep -qi nanum"], { encoding: "utf8" });
       if (koreanFont.status !== 0) failures.push(`${image} does not expose the NanumGothic Korean font for PDF generation`);
-      const layeredClasspath = childProcess.spawnSync("docker", ["run", "--rm", "--entrypoint", "sh", image, "-c", "test -f /application/application.jar && test -d /application/lib"], { encoding: "utf8" });
-      if (layeredClasspath.status !== 0) failures.push(`${image} is missing the layered application JAR or dependency directory`);
+      const runtimeCheck = rustImage
+        ? "test -x /usr/local/bin/vibehr-backend && ! command -v java"
+        : "test -f /application/application.jar && test -d /application/lib";
+      const runtime = childProcess.spawnSync("docker", ["run", "--rm", "--entrypoint", "sh", image, "-c", runtimeCheck], { encoding: "utf8" });
+      if (runtime.status !== 0) failures.push(`${image} failed its ${rustImage ? "Rust executable" : "Spring layered classpath"} runtime check`);
     }
   }
 
@@ -249,7 +264,7 @@ if (require.main === module) {
     process.stderr.write(`Delivery verification failed:\n- ${failures.join("\n- ")}\n`);
     process.exit(1);
   }
-  process.stdout.write("Delivery verification: Spring-only rollback, staged cutover runbook, safe dotenv loading, layered non-root image contract, no-Python image check, and Nanum Korean PDF font check passed.\n");
+  process.stdout.write("Delivery configuration verified for the Rust release and Spring rollback.\n");
 }
 
 module.exports = { verifyCutoverRunbook, verifyDelivery, verifyKoreanPdfFontWorkflow, verifyHostedUiGate };

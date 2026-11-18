@@ -1,18 +1,21 @@
 # Vibe-HR Governance
 
 Status: Active
-Scope: Spring-only runtime, frontend BFF, PostgreSQL, and documented operating controls.
+Scope: Rust runtime, Spring reference, frontend BFF, PostgreSQL, and documented operating controls.
 
 ## Risk Classes
 
 | Class | Scope | Requirement |
 | --- | --- | --- |
 | R0 | Documentation or non-executable local metadata | Focused review and static validation |
-| R1 | Isolated local frontend or Spring code change | Relevant tests and diff review |
+| R1 | Isolated local frontend or backend code change | Relevant tests and diff review |
 | R2 | Shared API contract, grid convention, CI, permission workflow, or shared configuration | Explicit approval before code changes |
 | R3 | Authentication, authorization, payroll semantics, Flyway/schema, reference data, deployment, secrets, or destructive data action | Explicit scoped approval and thorough verification |
 
-## Protected Spring Surfaces
+## Protected backend and delivery surfaces
+
+- `backend-rust/src/security/**`, `backend-rust/src/menu*`, `backend-rust/src/menu/**`, `backend-rust/src/payroll/**`, `backend-rust/src/db/**`, and `backend-rust/src/session_policy.rs`
+- `backend-rust/Dockerfile` and `scripts/ci/verify-rust.sh`
 
 - `backend-spring/src/main/java/com/vibehr/auth/**`
 - `backend-spring/src/main/java/com/vibehr/menu/**`
@@ -28,13 +31,13 @@ Scope: Spring-only runtime, frontend BFF, PostgreSQL, and documented operating c
 1. State the intended change, affected boundary, and risk class before editing.
 2. Obtain explicit approval before R2 or R3 implementation.
 3. Keep the change limited to the approved scope.
-4. Run the checks that prove the claim: Gradle tests for Spring work, grid validation before frontend lint/build, and browser checks for user-visible Korean text or interactive behavior.
+4. Run Cargo tests for Rust changes and Gradle tests for the Spring reference. Validate grid rules before frontend lint/build and exercise user-facing behavior in a browser.
 5. Record changed files, commands, results, approval, and remaining risks in `docs/TASK_LEDGER.md`.
 
 ## Non-Negotiable Controls
 
 - Flyway is the only schema and required-reference-data writer. Do not modify migration history manually.
-- Spring controllers do not own transaction boundaries; application services do.
+- Domain services own the transaction boundaries for business operations.
 - UI hiding does not replace backend authorization.
 - Secrets stay in environment configuration and never enter source, fixtures, logs, or ledger entries.
 - Historic implementation evidence is non-executable and must carry the immutable pre-cutover archive notice.

@@ -42,7 +42,17 @@ async function openProfile(page: Page) {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
-test.beforeEach(async ({ request }) => {
+let lastLoginAttempt = 0;
+test.beforeEach(async ({ request, page }) => {
+  // These independent browser contexts share one loopback client address. Pace
+  // them within the BFF's real 24-per-minute login budget.
+  const wait = lastLoginAttempt + 3_000 - Date.now();
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  page.on("request", (attempt) => {
+    if (attempt.method() === "POST" && new URL(attempt.url()).pathname === "/api/auth/login") {
+      lastLoginAttempt = Date.now();
+    }
+  });
   await request.post("http://127.0.0.1:3101/__scenario", { data: { scenario: "default" } });
 });
 

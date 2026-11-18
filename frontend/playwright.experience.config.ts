@@ -40,7 +40,9 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100",
+      command: process.env.PLAYWRIGHT_USE_PRODUCTION_BUILD === "1"
+        ? "node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100"
+        : "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100",
       url: `${frontendOrigin}/login`,
       env: runtimeEnv,
       reuseExistingServer: false,

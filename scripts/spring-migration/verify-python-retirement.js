@@ -8,6 +8,12 @@ const REPOSITORY_ROOT = path.resolve(__dirname, "..", "..");
 const CI_SUPPORT_PYTHON_FILES = new Set([
   "scripts/ci/require-ui-validation.py",
   "scripts/ci/test_require_ui_validation.py",
+  "scripts/ci/fixture-session.py",
+  "scripts/rust-migration/hr-parity.py",
+  "scripts/rust-migration/legacy-parity.py",
+  "scripts/rust-migration/payroll-parity.py",
+  "scripts/rust-migration/settings-parity.py",
+  "scripts/rust-migration/time-parity.py",
 ]);
 const CI_COMMAND_PATHS = new Set(["docs/UI_VALIDATION_CI.md", ".github/workflows/ui-validation.yml"]);
 const CI_TEST_COMMAND = "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v";
@@ -65,14 +71,14 @@ const IMMUTABLE_ARCHIVE_FILES = new Set([
   "docs/wave1-payroll-target-selection-design.md",
 ]);
 const IGNORED_DIRECTORIES = new Set([".git", ".next", "build", "node_modules", "target"]);
-const ACTIVE_ROOTS = [".claude", ".github", "scripts", "orchestration", "backend-spring", "frontend", "docs"];
+const ACTIVE_ROOTS = [".claude", ".github", "scripts", "orchestration", "backend-spring", "backend-rust", "frontend", "docs"];
 const ACTIVE_FILE_NAMES = new Set(["Dockerfile", ".env.deploy", ".env.deploy.secret.example"]);
 const ACTIVE_ROOT_DOCUMENT = /\.md$/i;
 const INVOCATION_PATTERNS = [
-  /(?:^|[|`>"'(\[])\s*(?:python|python3|py)(?:\.exe)?\s+(?:-m\s+[A-Za-z0-9_.-]+|[A-Za-z0-9_./\\-]+\.py)\b/im,
-  /(?:^|[|`>"'(\[])\s*(?:pytest|uvicorn)\b/im,
-  /(?:^|[|`>"'(\[])\s*alembic\s+(?:revision|upgrade|downgrade|current|history|stamp|check)\b/im,
-  /(?:^|[|`>"'(\[])\s*(?:pip|pip3)\s+(?:install|uninstall|freeze)\b/im,
+  /(?:^|[|&;`>"'(\[])\s*(?:python|python3|py)(?:\.exe)?\s+(?:-m\s+[A-Za-z0-9_.-]+|[A-Za-z0-9_./\\-]+\.py)\b/im,
+  /(?:^|[|&;`>"'(\[])\s*(?:pytest|uvicorn)\b/im,
+  /(?:^|[|&;`>"'(\[])\s*alembic\s+(?:revision|upgrade|downgrade|current|history|stamp|check)\b/im,
+  /(?:^|[|&;`>"'(\[])\s*(?:pip|pip3)\s+(?:install|uninstall|freeze)\b/im,
   /^\s*FROM\s+python(?::|\s|$)/im,
   /(?:apt(?:-get)?|apk)\s+(?:add|install)\b[^\n]*\bpython(?:3)?\b/im,
   /(?:^|\n)\s*(?:export\s+)?(?:PYTHON[A-Z0-9_]*|ALEMBIC[A-Z0-9_]*)\s*=/im,
@@ -128,6 +134,16 @@ function findActiveInvocations(repositoryRoot = REPOSITORY_ROOT) {
   const violations = [];
   for (const file of activeFiles(repositoryRoot)) {
     let contents = fs.readFileSync(file, "utf8");
+    const name = relative(repositoryRoot, file);
+    if (["scripts/ci/verify-rust.sh", "scripts/ci/rehearse-rust-promotion.sh", "docs/rust-migration/legacy-operations.md"].includes(name)) {
+      // Remove only the reviewed program name. A chained command on the same
+      // line and any unreviewed script/module invocation remain visible.
+      contents = contents.replace(/\bpython3? (scripts\/(?:ci|rust-migration)\/[a-z-]+\.py)(?=\s|$)/g,
+        (invocation, program) => CI_SUPPORT_PYTHON_FILES.has(program) ? "fixture-verification" : invocation);
+    }
+    if (name === "docs/audits/2026-10-17-leave-auto-reflection.md") {
+      contents = contents.replace("`python -m unittest discover -s scripts/ci -p test_*.py`", "historical CI unittest discovery");
+    }
     if (CI_COMMAND_PATHS.has(relative(repositoryRoot, file))) {
       contents = contents.split(/\r?\n/).filter((line) =>
         line.trim() !== CI_TEST_COMMAND && line.trim() !== `run: ${CI_TEST_COMMAND}`).join("\n");

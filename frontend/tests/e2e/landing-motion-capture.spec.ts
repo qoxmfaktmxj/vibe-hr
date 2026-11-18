@@ -33,7 +33,18 @@ for (const [id, path, scenario, mode, tone] of LANDING_SCENES) {
       const a = await locator.boundingBox(), b = await main.boundingBox();
       if (a && b) pointer = { x: Math.max(.03, Math.min(.97, (a.x + a.width / 2 - b.x) / b.width)), y: Math.max(.03, Math.min(.9, (a.y + a.height / 2 - b.y) / (b.width / 1.6))) };
     };
-    const click = async (locator: Locator) => { const label = await locator.innerText(); await point(locator); await locator.click(); if (label === "조회") await page.waitForLoadState("networkidle"); };
+    const click = async (locator: Locator, readPath?: string) => {
+      await point(locator);
+      if (readPath) {
+        await Promise.all([
+          page.waitForResponse((response) => new URL(response.url()).pathname === readPath
+            && response.request().method() === "GET" && response.ok()),
+          locator.click(),
+        ]);
+      } else {
+        await locator.click();
+      }
+    };
     const frame = async (label: string, action = "click") => {
       await page.waitForTimeout(180);
       const box = (await main.boundingBox())!;
@@ -59,7 +70,7 @@ for (const [id, path, scenario, mode, tone] of LANDING_SCENES) {
     if (id === "01") {
       const employeeNo = page.getByPlaceholder("사번", { exact: true });
       await employeeNo.fill("EMP-001");
-      await point(employeeNo); await frame("조회 조건 입력", "type"); await click(query);
+      await point(employeeNo); await frame("조회 조건 입력", "type"); await click(query, "/api/employees");
       await expect(page.locator(".ag-center-cols-container .ag-row")).toHaveCount(1); await frame("조회 결과 확인");
       await edit(page.locator('.ag-center-cols-container .ag-row[row-id="1"] [col-id="display_name"]'), "김서윤");
       await click(page.getByRole("button", { name: "변경 1건 저장", exact: true }));
@@ -72,12 +83,12 @@ for (const [id, path, scenario, mode, tone] of LANDING_SCENES) {
       await click(page.getByRole("button", { name: "기본정보 저장", exact: true }));
       await expect(page.getByRole("status").filter({ hasText: "기본정보가 저장되었습니다." })).toBeVisible(); await frame("저장 완료");
     } else if (id === "03") {
-      await click(query); await expect(page.getByRole("grid")).toContainText("학력 A"); await frame("학력 이력 조회");
+      await click(query, "/api/hr/basic/1"); await expect(page.getByRole("grid")).toContainText("학력 A"); await frame("학력 이력 조회");
       await edit(page.locator('.ag-center-cols-container .ag-row[row-id="101"] [col-id="title"]'), "대학 A 경영학과");
       await click(page.getByRole("button", { name: "변경 1건 저장", exact: true }));
       await expect(page.getByRole("status").filter({ hasText: "저장 완료:" })).toBeVisible(); await frame("저장 완료");
     } else if (id === "04") {
-      await click(query); await frame("대기 문서 조회");
+      await click(query, "/api/hri/tasks/my-approvals"); await frame("대기 문서 조회");
       await click(page.locator('.ag-cell[col-id="request_no"]').filter({ hasText: "DOC-103" }));
       await expect(page.getByRole("region", { name: "결재 문서 상세" })).toContainText("신청 103 상세 사유"); await frame("문서 내용 확인");
       await click(page.getByRole("button", { name: "문서 승인", exact: true })); await expect(page.getByRole("dialog")).toBeVisible(); await frame("승인 전 확인");
@@ -90,55 +101,57 @@ for (const [id, path, scenario, mode, tone] of LANDING_SCENES) {
       await expect(page.getByRole("heading", { name: "인사팀", exact: true })).toBeVisible(); await frame("조직 관계 확인", "inspect");
     } else if (id === "06") {
       const region = page.getByRole("region", { name: "조직 기본 근무패턴", exact: true }); await align(region);
-      const query = region.getByRole("button", { name: "조회", exact: true }); await click(query); await frame("조직 배정 조회");
+      const query = region.getByRole("button", { name: "조회", exact: true }); await click(query, "/api/tim/schedules/departments"); await frame("조직 배정 조회");
       await region.locator('.ag-body-horizontal-scroll-viewport').evaluate(el => { el.scrollLeft = el.scrollWidth; });
       await edit(region.locator('.ag-center-cols-container .ag-row[row-id="101"] [col-id="priority"]'), "200");
       await click(region.getByRole("button", { name: "변경 1건 저장", exact: true }));
       await expect(region.getByRole("button", { name: "저장", exact: true })).toBeDisabled(); await frame("배정 저장 완료");
     } else if (id === "07") {
       await point(main.locator('input[type="date"]').first()); await frame("조회 기간 선택", "inspect");
-      await click(query); await expect(page.getByRole("grid")).toContainText("김서윤"); await frame("근태 조회");
+      await click(query, "/api/tim/attendance-daily"); await expect(page.getByRole("grid")).toContainText("김서윤"); await frame("근태 조회");
       await click(page.locator('.ag-center-cols-container .ag-row[row-id="4"] [col-id="employee_name"]')); await frame("대상자 선택");
       await point(page.locator('.ag-center-cols-container .ag-row[row-id="4"] [col-id="attendance_status"]')); await frame("근태 상태 확인", "inspect");
     } else if (id === "08") {
-      await click(query); await frame("월별 마감 조회");
+      await click(query, "/api/tim/month-close"); await frame("월별 마감 조회");
       const close = page.locator('.ag-pinned-right-cols-container .ag-row[row-id="1"]').getByRole("button", { name: "마감", exact: true });
       await click(close); await expect(page.getByRole("dialog")).toBeVisible(); await frame("마감 전 확인");
       await page.getByPlaceholder("마감 사유 또는 메모").fill("월별 집계 확인 완료"); await point(page.getByPlaceholder("마감 사유 또는 메모")); await frame("처리 메모", "type");
       await click(page.getByRole("dialog").getByRole("button", { name: "마감", exact: true }));
       await expect(page.locator('.ag-center-cols-container .ag-row[row-id="1"]')).toContainText("마감완료"); await frame("월마감 완료");
     } else if (id === "10") {
-      await click(query); await frame("월별 급여 조회");
+      await click(query, "/api/pay/my/payslips"); await frame("월별 급여 조회");
       await click(page.locator('.ag-cell[col-id="year_month"]').first());
       await expect(page.getByText("기본급", { exact: true })).toBeVisible(); await frame("급여 명세서 선택");
       await point(page.getByRole("heading", { name: "수당 내역", exact: true })); await frame("수당 확인", "inspect");
       await point(page.getByRole("heading", { name: "공제 내역", exact: true })); await frame("공제 확인", "inspect");
     } else if (id === "11") {
-      await click(query); await frame("급여 실행 조회");
+      await click(query, "/api/pay/runs"); await frame("급여 실행 조회");
       await click(page.locator('.ag-cell[col-id="run_name"]').first()); await expect(page.getByRole("grid").nth(1)).toContainText("김서윤"); await frame("실행 대상자 확인");
       await click(page.locator('.ag-cell[col-id="employee_name"]').first()); await frame("대상자 선택");
       await point(page.locator('.ag-cell[col-id="net_pay"]').first()); await frame("지급 집계 확인", "inspect");
     } else if (id === "12" || id === "13") {
-      await click(query); await frame(id === "12" ? "급여 전표 조회" : "퇴직금 산정 조회");
+      await click(query, id === "12" ? "/api/pay/vouchers" : "/api/hr/severance/calcs"); await frame(id === "12" ? "급여 전표 조회" : "퇴직금 산정 조회");
       await click(page.locator(`.ag-cell[col-id="${id === "12" ? "voucher_no" : "employee_no"}"]`).first());
       await expect(page.getByRole("grid").last()).toContainText(id === "12" ? "미지급금" : "전액산입");
       await align(page.getByText(id === "12" ? "전표 상세" : "퇴직금 산정 상세", { exact: true })); await frame("상세 내역 선택");
       await point(page.getByText(id === "12" ? "전표 라인" : "임금 산입 근거", { exact: true })); await frame(id === "12" ? "차변과 대변 대조" : "임금 산입 근거 확인", "inspect");
       await point(page.getByRole("grid").last().locator('.ag-cell').last()); await frame("산출 근거 확인", "inspect");
     } else if (id === "14") {
-      await click(query); await frame("복리후생 신청 조회");
+      await click(query, "/api/wel/requests");
+      await expect(page.getByRole("grid").getByText("WEL-001", { exact: true })).toBeVisible();
+      await frame("복리후생 신청 조회");
       await click(page.locator('.ag-cell[col-id="request_no"]').first()); await frame("신청 대상 선택");
       await click(page.getByRole("button", { name: "승인", exact: true })); await expect(page.getByRole("dialog")).toBeVisible(); await frame("승인 금액 확인");
       await click(page.getByRole("dialog").getByRole("button", { name: "승인", exact: true }));
       await expect(page.locator('.ag-cell[col-id="status_code"]')).toContainText("승인"); await frame("승인 처리 완료");
     } else if (id === "15") {
-      await click(query); await frame("교육 신청 조회");
+      await click(query, "/api/tra/applications-detail"); await frame("교육 신청 조회");
       const checkbox = page.locator('.ag-row[row-id="101"] input[type="checkbox"]'); await point(checkbox); await checkbox.check(); await frame("승인 대상 선택");
       await click(page.getByRole("button", { name: "승인", exact: true })); await expect(page.getByRole("dialog", { name: "교육 신청 승인", exact: true })).toBeVisible(); await frame("승인 전 확인");
       await click(page.getByRole("dialog").getByRole("button", { name: "승인", exact: true }));
       await expect(page.locator('.ag-row[row-id="101"] [col-id="status"]')).toHaveText("승인"); await frame("교육 승인 완료");
     } else if (id === "16") {
-      await click(query); await frame("평가 대상 조회");
+      await click(query, "/api/pap/targets"); await frame("평가 대상 조회");
       await edit(page.locator('.ag-center-cols-container .ag-row[row-id="1"] [col-id="evaluator_note"]'), "목표 달성 근거 확인");
       await click(page.getByRole("button", { name: /저장/ }).first());
       await expect(page.getByText(/저장 완료 \(신규 0, 수정 1, 삭제 0\)/)).toBeVisible(); await frame("평가 저장 완료");

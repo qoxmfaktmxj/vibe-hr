@@ -1,7 +1,7 @@
 # Vibe-HR Test Strategy
 
 Status: Active
-Backend test runtime: Gradle / JUnit 5 / Spring Boot Test / Testcontainers PostgreSQL
+Backend checks use Cargo, rustfmt, Clippy, axum, SQLx and disposable PostgreSQL. Gradle, JUnit and the Spring reference supply the baseline for migration checks.
 
 ## Required Checks
 
@@ -30,7 +30,7 @@ The two smoke flows cover navigation, not every feature. Add or select focused t
 
 Run `npm run validate:grid` before lint when an AG Grid screen or shared grid module changes. Run browser and build commands sequentially: the dev server and build share Next artifacts. Tests use isolated synthetic services and do not certify production authentication. These local commands do not weaken existing CI or protected-change gates.
 
-For explicit full QA, inventory every spec rather than equating the hosted99 cases with the whole repository. Separate configurations cover checklist and retirement layouts and GPU rendering. The default configuration contains additional Spring-backed and mocked-response workflows, including the real finalist-to-employee/appointment case and lifecycle screen checks. Run those against a disposable loopback backend with development fixtures and BFF cookie login; set `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` and the fixture's distinct temporary `AUTH_TOKEN_SECRET`/`VIBEHR_BFF_ASSERTION_SECRET`. This configuration owns its Next server, refuses to reuse a listening frontend and explicitly pins its BFF target to the loopback API URL. Do not invoke every default-config spec together, because synthetic-only specs require their own fixture server/configuration. Use per-run JSON reports and distinct output paths so a later run or restarted worker cannot erase earlier failures. A lifecycle grid check proves page/API health, not every possible business write.
+For explicit full QA, inventory every spec rather than equating the hosted99 cases with the whole repository. Separate configurations cover checklist and retirement layouts and GPU rendering. The default configuration contains additional real-backend and mocked-response workflows, including the real finalist-to-employee/appointment case and lifecycle screen checks. Run those against a disposable loopback backend with development fixtures and BFF cookie login; set `PLAYWRIGHT_BASE_URL`, `PLAYWRIGHT_API_URL` and the fixture's distinct temporary `AUTH_TOKEN_SECRET`/`VIBEHR_BFF_ASSERTION_SECRET`. This configuration owns its Next server, refuses to reuse a listening frontend and explicitly pins its BFF target to the loopback API URL. Do not invoke every default-config spec together, because synthetic-only specs require their own fixture server/configuration. Use per-run JSON reports and distinct output paths so a later run or restarted worker cannot erase earlier failures. A lifecycle grid check proves page/API health, not every possible business write.
 
 Keep all existing cases and assertions. On an intermittent failure, preserve the failing evidence, identify the missing synchronization or product defect, and rerun the affected case before claiming a clean final suite. A version upgrade that changes lint analysis is a failed gate to investigate; do not disable rules or force an unsupported analyzer version to obtain a green result.
 
@@ -45,7 +45,29 @@ Daily deployments use the exact-SHA GitHub-hosted UI gate in
 on the production host. Missing/failed remote UI evidence blocks deployment;
 it does not waive testing. Backend and runtime checks below remain applicable.
 
-### Spring Backend
+### Rust backend
+
+Run the application checks in `backend-rust`:
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo build --locked --release
+```
+
+The default Cargo run excludes tests marked `#[ignore]`. Execute the DB-backed cases with their named disposable databases and fixture URL environment variables. For example, the organization router suite uses `VIBEHR_ORGANIZATION_TEST_URL` pointing to `organization_test` with the dev administrators and a demo employee. The e-learning rollback test uses `VIBEHR_TRAINING_TEST_URL` pointing to a separate Flyway-migrated `training_test`. Run from `backend-rust`:
+
+```powershell
+cargo test --locked --lib organization::postgres_test -- --ignored
+cargo test --locked --lib training::postgres_test -- --ignored
+```
+
+Compare live application responses using independent PostgreSQL copies of the same fixture. Verify the token identity, HTTP status, media type, response fields, business amounts and resulting records. Concurrency-sensitive suites exercise real locks and repeat calls. Match the process timezone of the reference and the candidate for JDBC-style timestamp projections. Use a separate Spring-stopped run to verify the Next.js BFF and browser flows against Rust. Keep run evidence and any outstanding external service gates in the task ledger.
+
+The [migration inventory](rust-migration/inventory.md) describes the endpoint fixtures and exact database comparison. The [HR insert correction](rust-migration/hr-differences.md) and [other observed differences](rust-migration/business-differences.md) identify upstream defects that need explicit checks on both systems.
+
+### Spring comparison baseline
 
 ```powershell
 cd backend-spring
@@ -87,20 +109,22 @@ production build. Only the audit configuration's duplicate two smoke cases are
 omitted from that extra invocation. The Deploy workflow verifies the standalone
 same-SHA result instead of repeating the browser suites and frontend fast checks.
 
-### Runtime Smoke Check
+### Runtime smoke check
+
+With the local migrated DB and backend environment described in the [repository README](../README.md), run:
 
 ```powershell
-cd backend-spring
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+cd backend-rust
+cargo run --locked
 ```
 
-Verify `/health` and the affected `/api/v1/**` route. Use `/openapi.json` or `/docs` when contract output needs inspection.
+Verify readiness, DB health and the affected business endpoint. Run `node scripts/rust-migration/openapi-contract.mjs verify http://127.0.0.1:8080` from the repository root to check the published OpenAPI against the reviewed reference. Browser QA must use the same disposable API target and the paired BFF secrets.
 
 ## Test Design
 
 - Unit tests cover calculations, validation, DTO mapping, authorization decisions, and state transitions.
 - Controller tests cover status codes, snake_case payloads, error shape, and authentication/authorization outcomes.
-- Tagged integration tests cover PostgreSQL mappings, MyBatis SQL, Flyway, locking, repeat-call behavior, and concurrency-sensitive workflows.
+- PostgreSQL-backed tests cover SQLx queries, Flyway, locking, repeat-call behavior and concurrency-sensitive workflows.
 - Frontend BFF tests cover request forwarding, response mapping, and backend-target configuration.
 - Browser tests cover the highest-risk end-to-end workflow and AG Grid interactions.
 

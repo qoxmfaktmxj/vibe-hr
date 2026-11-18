@@ -102,7 +102,15 @@ jobs:
         if: steps.classify.outputs.backend_changed == 'true'
         shell: bash
         run: |
-          echo "::notice::Spring backend changes detected. Recommended validation: Gradle tests, route/schema coverage, and Flyway snapshot verification. Docs: docs/TEST_STRATEGY.md"
+          echo "::notice::Backend changes detected. Verify Rust unit and integration suites, Spring compatibility, route coverage and Flyway state. See docs/TEST_STRATEGY.md."
+
+      - name: Verify Rust backend and isolated PostgreSQL contracts
+        if: steps.classify.outputs.backend_changed == 'true' || steps.classify.outputs.deploy_changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install --yes --no-install-recommends poppler-utils postgresql-client
+          bash scripts/ci/verify-rust.sh
 
       - name: Verify Spring route and OpenAPI build contracts
         shell: bash

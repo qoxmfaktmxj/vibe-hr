@@ -1,0 +1,60 @@
+// Run with the Spring build so the inventory sees its actual MVC annotations and dependencies.
+allprojects {
+    plugins.withId('java') {
+        tasks.register('rustMigrationInventory') { task ->
+            task.dependsOn('classes')
+            task.doLast {
+                def source = project.sourceSets.main
+                def urls = source.runtimeClasspath.files.collect { it.toURI().toURL() } as URL[]
+                def loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader())
+                def thread = Thread.currentThread()
+                def previous = thread.contextClassLoader
+                try {
+                    thread.contextClassLoader = loader
+                    def annotations = loader.loadClass('org.springframework.core.annotation.AnnotatedElementUtils')
+                    def controller = loader.loadClass('org.springframework.stereotype.Controller')
+                    def routing = loader.loadClass('org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping')
+                    def handlerMapping = routing.getDeclaredConstructor().newInstance()
+                    def findMapping = routing.getDeclaredMethod('getMappingForMethod', java.lang.reflect.Method, Class)
+                    findMapping.accessible = true
+                    def rows = []
+                    source.output.classesDirs.files.findAll { it.isDirectory() }.each { root ->
+                        project.fileTree(root).matching { include 'com/vibehr/**/*.class' }.files.each { file ->
+                            def relative = root.toPath().relativize(file.toPath()).toString()
+                            def className = relative.replace(File.separatorChar, '.' as char) - '.class'
+                            def type = Class.forName(className, false, loader)
+                            if (!annotations.hasAnnotation(type, controller)) return
+                            type.declaredMethods.findAll { !it.synthetic }.each { method ->
+                                def mapping = findMapping.invoke(handlerMapping, method, type)
+                                if (mapping == null) return
+                                def verbs = mapping.methodsCondition.methods
+                                if (verbs.empty) throw new GradleException("Review unrestricted HTTP method: ${type.name}.${method.name}")
+                                mapping.patternValues.each { path ->
+                                    verbs.each { verb ->
+                                        rows.add([type.packageName.tokenize('.')[2], verb.name(), path,
+                                                  type.simpleName, method.name].join('\t'))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (rows.empty) throw new GradleException('No application controller methods found')
+                    def keys = rows.collect { it.split('\t')[1..2] }
+                    if (keys.toSet().size() != keys.size()) throw new GradleException('Review duplicate verb/path mappings')
+                    def inventory = project.file('../docs/rust-migration/spring-handlers.tsv')
+                    def report = 'domain\tmethod\tpath\tcontroller\thandler\n' + rows.sort().join('\n') + '\n'
+                    if (project.hasProperty('writeRustBaseline')) {
+                        inventory.parentFile.mkdirs()
+                        inventory.setText(report, 'UTF-8')
+                    } else if (!inventory.exists() || inventory.getText('UTF-8').replace('\r\n', '\n') != report) {
+                        throw new GradleException('Spring handlers differ from the reviewed Rust migration baseline')
+                    }
+                    logger.lifecycle("Spring controller inventory: ${rows.size()} mapped operations")
+                } finally {
+                    thread.contextClassLoader = previous
+                    loader.close()
+                }
+            }
+        }
+    }
+}

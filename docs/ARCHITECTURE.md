@@ -1,63 +1,57 @@
 # Vibe-HR Architecture
 
-Status: Active
-Runtime: Spring Boot 4.1 / Java 21 / PostgreSQL
+Runtime in this checkout: a Rust application with axum, Tokio, Serde, SQLx and PostgreSQL. Production rollout is a separate operator decision.
 
-## System Shape
-
-```text
-Browser
-  -> Next.js 16 App Router and BFF
-  -> Spring Boot 4.1 application
-  -> PostgreSQL
-```
-
-The Next.js BFF owns browser-facing session forwarding and route proxying. The Spring application owns all API behavior, authorization, transactions, persistence, migrations, fixture gates, health endpoints, and OpenAPI output.
-
-## Repository Boundaries
+## Request and data flow
 
 ```text
-frontend/        Next.js screens, BFF routes, shared UI, browser tests
-backend-spring/  Spring Boot application, Gradle build, Java tests, Flyway migrations
-config/          Grid registry and shared configuration
-docs/            Active policies, runbooks, and immutable migration evidence
+Browser (React, AG Grid)
+  -> Next.js App Router and BFF
+  -> Rust HTTP server (axum on Tokio)
+     -> authenticate principal and validate requests
+     -> domain authorization and business transactions
+     -> SQLx -> PostgreSQL
+
+Rust schema-preflight -> Flyway migrate -> Rust schema-verify -> backend startup
 ```
 
-Frontend changes stay in `frontend/**`; backend changes stay in `backend-spring/**` unless the task explicitly changes the BFF-to-API contract.
+The Next.js BFF owns browser cookies, backend targeting, proxy forwarding and social provider callbacks. The Rust process owns the API contract, authorization and business decisions. A privileged action must pass its backend enforcement even when requested directly without an originating screen.
 
-## Spring Backend
+## Repository boundaries
 
-The application is a package-by-feature modular monolith below `backend-spring/src/main/java/com/vibehr`:
+| Location | Responsibility |
+| --- | --- |
+| `frontend/` | Next.js screens, BFF routes, shared UI and browser tests |
+| `backend-rust/src/` | HTTP entry point, domain services, SQLx queries, database commands and typed request/response contracts |
+| `backend-rust/resources/` | OpenAPI and same-origin documentation assets |
+| `backend-spring/` | Java reference implementation and comparison tests; the canonical Flyway SQL files remain under `src/main/resources/db/migration` |
+| `config/` | Grid registry and shared configuration |
+| `scripts/rust-migration/`, `docs/rust-migration/` | Reproducible parity checks, reference inventory and reviewed behavior differences |
 
-- `auth`, `menu`, and `platform/security` own authentication and authorization boundaries.
-- Domain packages such as `organization`, `hr`, `time`, `payroll`, `hri`, `welfare`, `training`, `appraisal`, and `management` own controllers, application services, and persistence.
-- `platform/config`, `platform/error`, `platform/health`, and `platform/openapi` own cross-cutting runtime behavior.
-- `migration` owns Flyway adoption and schema-manifest verification; `seed` owns explicitly gated local or demo fixtures.
+## Domain and transaction ownership
 
-Controllers define HTTP contracts. Application services own transactions and state transitions. JPA is the default for aggregate lifecycle operations; MyBatis is reserved for named, explicit SQL where projection complexity or PostgreSQL execution characteristics require it. A write use case has one authoritative persistence path.
+The runtime is a package-by-feature modular monolith. `security` handles authentication, current account resolution, BFF assertions, nonce consumption, replay cleanup and login throttling. `menu` owns grants and action permissions. `input`, `platform` and `documentation` handle common HTTP behavior. `db` contains explicit database verification, setup and fixture commands.
 
-## Database Ownership
+`organization`, `hr`, `time`, `payroll`, `hri`, `welfare`, `training`, `appraisal` and `management` implement the respective business rules. Common codes, dashboard and session policy have their own handlers. Each write use case owns its SQL transaction, required row or advisory locks and audit writes. The same transaction covers coupled state changes such as leave approval and attendance generation. Preserve the documented post-commit boundary for dependent work such as generating a severance draft after retirement confirmation.
 
-PostgreSQL is the only datastore. Hibernate validates mappings with `ddl-auto=validate`; it never creates schema at runtime. Flyway versioned SQL under `backend-spring/src/main/resources/db/migration` is the schema and required-reference-data owner. Local/demo data is permitted only through the explicit fixture gate and never starts automatically in production.
+## Database ownership
 
-Schema, seed, payroll, authentication, and authorization changes are R3. They require explicit approval, focused Gradle coverage, and task-ledger evidence.
+Flyway owns schema changes and required reference data. The reviewed chain is V1 through V7. The deployment configuration runs the Rust preflight, the Flyway migrator and catalog verification in sequence before starting the backend. The verification reads the versioned catalog manifest and checks the expected additions. The development and demo seed commands require their own opt-in and local database. Preserve stored records and issued-history checksums when changing application runtime.
 
-## API And Security Contract
+## API and security contract
 
-The Spring application preserves the frontend-facing `/api/v1/**` contract, snake_case JSON, and `{ "detail": ... }` error shape. Contract changes must name the affected BFF routes and Java controllers together.
+The Rust backend preserves `/api/v1/**`, snake_case JSON, the `detail` error envelope, and the existing BFF authentication/cookie contract. Authenticated requests validate the token and active user. Domain handlers enforce role, menu, action and record ownership rules as applicable. Login and social exchange validate the BFF assertion, request binding and replay state. Use distinct JWT and BFF signing secrets supplied through the environment.
 
-Spring Security enforces the bearer-token, active-user, role, menu, and action-permission boundaries. UI visibility is not an authorization control. Sensitive endpoints require server-side enforcement and regression tests for both allowed and denied cases.
-
-Public operational endpoints are `/health`, `/api/v1/health`, and Actuator health probes. Compatibility documentation is served from `/openapi.json`, `/docs`, and `/redoc`.
+Operational surfaces include `/health`, `/api/v1/health` and Actuator-compatible probes. Public documentation includes `/openapi.json`, `/docs`, `/docs/oauth2-redirect`, and `/redoc`. See the [inventory](rust-migration/inventory.md) and [observed differences](rust-migration/business-differences.md) for the distinction between a published route and a verified business outcome.
 
 ## Change Rules
 
 - Preserve AG Grid metadata, toolbar order, and `config/grid-screens.json` registration for any grid screen.
-- Treat changes that cross `frontend/**` and `backend-spring/**` as API-contract work.
+- Treat changes that cross `frontend/**` and `backend-rust/**` as API-contract work.
 - Keep migrations forward-only and reviewable; do not manually alter Flyway history.
-- Use Java unit tests for domain behavior and tagged Testcontainers tests for PostgreSQL-dependent behavior.
+- Use Rust tests for domain behavior, real PostgreSQL for database semantics and the Spring reference when checking migration parity.
 - Record commands, outcomes, and remaining risks in `docs/TASK_LEDGER.md`.
 
 ## Employee grid query extension
 
-The employee list at GET /api/v1/employees now accepts optional repeated positions and employment_statuses parameters and an inclusive ISO-date hire_date_to parameter. Existing employee_no, name, department, employment_status, active, page, limit and all parameters retain their behavior. The employee screen and its all-row spreadsheet download share the frontend query builder. HrController preserves the employee reader/menu query gate; HrApplicationService and HrGridMapper apply the same bound filters to rows and total_count. No database migration or authentication-policy change is involved. Deploy frontend and backend together to activate the new search controls.
+The employee list at GET /api/v1/employees now accepts optional repeated positions and employment_statuses parameters and an inclusive ISO-date hire_date_to parameter. Existing employee_no, name, department, employment_status, active, page, limit and all parameters retain their behavior. The employee screen and its all-row spreadsheet download share the frontend query builder. The employee reader and menu-query gates cover both the screen and its download. Apply the same bound filters to rows and total_count.

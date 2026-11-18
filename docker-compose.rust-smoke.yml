@@ -1,0 +1,66 @@
+x-rust: &rust
+  image: vibehr-backend-rust:smoke
+  pull_policy: never
+x-database: &database
+  DATABASE_URL: postgres://vibehr:vibehr@postgres:5432/vibehr_smoke
+  VIBEHR_SCHEMA_OWNER: flyway
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vibehr_smoke
+      POSTGRES_USER: vibehr
+      POSTGRES_PASSWORD: vibehr
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibehr -d vibehr_smoke"]
+      interval: 3s
+      timeout: 3s
+      retries: 25
+  preflight:
+    <<: *rust
+    build: ./backend-rust
+    command: ["schema-preflight"]
+    healthcheck:
+      disable: true
+    environment: *database
+    depends_on:
+      postgres:
+        condition: service_healthy
+  migrate:
+    image: redgate/flyway:12.4.0
+    command: ["migrate"]
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/vibehr_smoke
+      FLYWAY_USER: vibehr
+      FLYWAY_PASSWORD: vibehr
+      FLYWAY_LOCATIONS: filesystem:/migrations
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+    volumes:
+      - ./backend-spring/src/main/resources/db/migration:/migrations:ro
+    depends_on:
+      preflight:
+        condition: service_completed_successfully
+  verify-schema:
+    <<: *rust
+    command: ["schema-verify", "/migrations/schema-metadata-manifest.json"]
+    environment: *database
+    healthcheck:
+      disable: true
+    volumes:
+      - ./backend-spring/src/main/resources/db/migration:/migrations:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  backend:
+    <<: *rust
+    environment:
+      <<: *database
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?requires ephemeral test secret}
+      VIBEHR_BFF_ASSERTION_SECRET: ${VIBEHR_BFF_ASSERTION_SECRET:?requires distinct ephemeral test secret}
+    depends_on:
+      verify-schema:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1::8080"

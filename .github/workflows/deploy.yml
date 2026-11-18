@@ -203,9 +203,19 @@ jobs:
           set -euo pipefail
           pwsh -File scripts/spring-migration/smoke-spring-compose.ps1
 
+      - name: Verify Rust runtime and PostgreSQL behavior against Spring
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install --yes --no-install-recommends poppler-utils postgresql-client
+          bash scripts/ci/verify-rust.sh
+
   deploy:
     needs: [test, ui]
     runs-on: ubuntu-latest
+    concurrency:
+      group: vibehr-production-deploy
+      cancel-in-progress: false
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || vars.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || vars.DEPLOY_USER }}
@@ -230,7 +240,8 @@ jobs:
           [[ -z "${DEPLOY_HOST}" ]] && missing+=("DEPLOY_HOST (Secret or Variable)")
           [[ -z "${DEPLOY_USER}" ]] && missing+=("DEPLOY_USER (Secret or Variable)")
           [[ -z "${DEPLOY_SSH_KEY}" ]] && missing+=("DEPLOY_SSH_KEY (Secret)")
-          if [[ ! "${DEPLOY_PORT}" =~ ^[0-9]+$ ]] || (( 10#${DEPLOY_PORT} < 1 || 10#${DEPLOY_PORT} > 65535 )); then
+          port_value=${DEPLOY_PORT:-}
+          if [[ ! "$port_value" =~ ^[0-9]+$ ]] || (( 10#$port_value < 1 || 10#$port_value > 65535 )); then
             missing+=("DEPLOY_PORT (must be an integer from 1 to 65535)")
           fi
           if [[ ${#missing[@]} -gt 0 ]]; then
@@ -243,16 +254,17 @@ jobs:
         run: |
           set -euo pipefail
           revision="${GITHUB_SHA}"
-          backend_image="vibehr-backend-spring:release-${revision}"
+          backend_image="vibehr-backend-rust:release-${revision}"
           frontend_image="vibehr-frontend:release-${revision}"
-          docker build --label "org.opencontainers.image.revision=${revision}" --tag "${backend_image}" backend-spring
+          docker build --label "org.opencontainers.image.revision=${revision}" --tag "${backend_image}" backend-rust
           docker build --file frontend/Dockerfile --label "org.opencontainers.image.revision=${revision}" --tag "${frontend_image}" .
           archive="${RUNNER_TEMP}/vibehr-release-${revision}.tar.gz"
-          docker save "${backend_image}" "${frontend_image}" | gzip --stdout > "${archive}"
+          docker pull redgate/flyway:12.4.0
+          docker save "${backend_image}" "${frontend_image}" redgate/flyway:12.4.0 | gzip --stdout > "${archive}"
           test -s "${archive}"
           echo "RELEASE_ARCHIVE=${archive}" >> "${GITHUB_ENV}"
 
-      - name: Secure SSH preflight and staged Spring deployment
+      - name: Secure SSH preflight and staged Rust deployment
         shell: bash
         run: |
           set -euo pipefail
@@ -307,7 +319,7 @@ jobs:
             -P "${DEPLOY_PORT}"
           )
           deploy_phase="checking TCP reachability from the hosted runner"
-          timeout 10 bash -c ': >"/dev/tcp/$1/$2"' bash "${DEPLOY_HOST}" "${DEPLOY_PORT}" || {
+          timeout 10 bash -c ": >\"/dev/tcp/\$1/\$2\"" bash "${DEPLOY_HOST}" "${DEPLOY_PORT}" || {
             echo "::error::Cannot reach ${DEPLOY_HOST}:${DEPLOY_PORT} from the GitHub runner."
             exit 1
           }
@@ -316,10 +328,11 @@ jobs:
 
           release_archive="/tmp/vibehr-release-${GITHUB_SHA}.tar.gz"
           deploy_phase="transferring the hosted release archive"
-          scp "${scp_options[@]}" "${RELEASE_ARCHIVE}" "${DEPLOY_USER}@${DEPLOY_HOST}:${release_archive}"
+          scp "${scp_options[@]}" "${RELEASE_ARCHIVE:?Missing hosted release archive}" "${DEPLOY_USER}@${DEPLOY_HOST}:${release_archive}"
 
           deploy_phase="running remote staged image validation and promotion"
-          ssh "${ssh_options[@]}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash -s -- ${GITHUB_SHA} ${release_archive}" <<'REMOTE'
+          printf -v launch_command 'bash -s -- %q %q' "$GITHUB_SHA" "$release_archive"
+          ssh "${ssh_options[@]}" -o "RemoteCommand=$launch_command" "${DEPLOY_USER}@${DEPLOY_HOST}" <<'REMOTE'
           set -Eeuo pipefail
           repository=/root/.openclaw/workspace/vibe-hr
           cd "$repository"
@@ -360,8 +373,12 @@ jobs:
           }
           rollback_release() {
             local recovery_backend="$rollback_backend"
+            local recovery_container="$previous_backend_container"
+            local recovery_compose="$backup_dir/previous.compose.yml"
             if [[ "${schema_changed:-false}" == "true" ]]; then
               recovery_backend="$backend_release"
+              recovery_container=vibehr-backend-rust
+              recovery_compose=docker-compose.deploy.yml
               echo "[deploy] schema changed; retaining the candidate-validated backend with the previous frontend" >&2
             fi
             echo "[deploy] recovering backend=${recovery_backend} frontend=${rollback_frontend}; evidence=${backup_dir}" >&2
@@ -370,10 +387,11 @@ jobs:
           services:
             backend:
               image: ${recovery_backend}
+              container_name: ${recovery_container}
             frontend:
               image: ${rollback_frontend}
           EOF
-            if ! docker compose -f docker-compose.deploy.yml -f "$backup_dir/rollback.override.yml" up -d --no-build --remove-orphans --force-recreate; then
+            if ! docker compose --project-directory "$repository" -f "$recovery_compose" -f "$backup_dir/rollback.override.yml" up -d --no-build --remove-orphans --force-recreate --no-deps backend frontend; then
               echo "[deploy] rollback compose failed" >&2
               return 1
             fi
@@ -394,7 +412,7 @@ jobs:
             echo "[deploy] $*" >&2
             if [[ "${rollback_ready:-false}" == "true" && "${promotion_started:-false}" == "true" ]]; then
               if ! rollback_release; then
-                echo "::error::Spring rollback recovery failed" >&2
+                echo "::error::Backend rollback recovery failed" >&2
               fi
             else
               restore_operator_config
@@ -431,10 +449,25 @@ jobs:
           cp .env.deploy "$backup_dir/.env.deploy"
           cp .env.deploy.secret "$backup_dir/.env.deploy.secret"
           previous_frontend=$(docker inspect --format '{{.Image}}' vibehr-frontend 2>/dev/null) || fail "no running frontend release is available for automatic rollback"
-          previous_backend=$(docker inspect --format '{{.Image}}' vibehr-backend-spring 2>/dev/null) || fail "no running Spring backend release is available; a non-Spring release is not a rollback target"
+          previous_backend_container=
+          for known_container in vibehr-backend-rust vibehr-backend-spring; do
+            if [[ "$(docker inspect --format '{{.State.Running}}' "$known_container" 2>/dev/null || true)" == true ]]; then
+              [[ -z "$previous_backend_container" ]] || fail "ambiguous running backend; refusing promotion"
+              previous_backend_container="$known_container"
+            fi
+          done
+          [[ -n "$previous_backend_container" ]] || fail "no running Rust or Spring release is available for rollback"
+          previous_backend=$(docker inspect --format '{{.Image}}' "$previous_backend_container") || fail "previous backend identity unavailable"
+          previous_entrypoint=$(docker image inspect --format '{{json .Config.Entrypoint}}' "$previous_backend") || fail "previous backend entrypoint unavailable"
+          case "$previous_backend_container/$previous_entrypoint" in
+            'vibehr-backend-rust/["vibehr-backend"]'|'vibehr-backend-rust/["/usr/local/bin/vibehr-backend"]') ;;
+            'vibehr-backend-spring/["java","-cp","application.jar:lib/*","com.vibehr.VibeHrApplication"]') ;;
+            *) fail "unexpected previous backend runtime; refusing promotion" ;;
+          esac
           previous_backend_sha=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$previous_backend") || fail "previous backend revision is unavailable"
           [[ "$previous_backend_sha" =~ ^[0-9a-f]{40}$ ]] || fail "previous backend revision is invalid; refusing migration"
           git cat-file -e "${previous_backend_sha}^{commit}" || fail "previous backend commit is unavailable; refusing migration"
+          git show "${previous_backend_sha}:docker-compose.deploy.yml" > "$backup_dir/previous.compose.yml" || fail "previous release compose is unavailable"
           schema_changed=false
           if git diff --quiet "$previous_backend_sha" "$expected_sha" -- backend-spring/src/main/resources/db/migration; then
             :
@@ -443,9 +476,9 @@ jobs:
             [[ "$inventory_status" -eq 1 ]] || fail "migration inventory comparison failed"
             schema_changed=true
           fi
-          rollback_backend="vibehr-backend-spring:rollback-${timestamp}"
+          rollback_backend="vibehr-backend:rollback-${timestamp}"
           rollback_frontend="vibehr-frontend:rollback-${timestamp}"
-          docker image tag "$previous_backend" "$rollback_backend" || fail "unable to retain the previous Spring backend image"
+          docker image tag "$previous_backend" "$rollback_backend" || fail "unable to retain the previous backend image"
           docker image tag "$previous_frontend" "$rollback_frontend" || fail "unable to retain the previous frontend image"
           rollback_ready=true
 
@@ -467,18 +500,22 @@ jobs:
           require_env VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER
           [[ "$VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER" == "x-vibehr-client-ip" ]] || fail "VIBEHR_BFF_TRUSTED_CLIENT_IP_HEADER must be x-vibehr-client-ip and set only by the sanitizing reverse proxy"
           require_canonical_app_origin
-          [[ "$VIBEHR_BFF_BACKEND_URL" == "http://backend:8080" ]] || fail "VIBEHR_BFF_BACKEND_URL must remain the Docker-internal Spring URL"
+          [[ "$VIBEHR_BFF_BACKEND_URL" == "http://backend:8080" ]] || fail "VIBEHR_BFF_BACKEND_URL must remain the Docker-internal backend URL"
+          [[ "${VIBEHR_SCHEMA_OWNER:-}" == flyway ]] || fail "Flyway schema ownership is required"
           [[ "${VIBEHR_ALLOW_FIXTURE_SEEDING:-false}" != "true" ]] || fail "fixture seeding is forbidden on a deployment target"
           docker compose -f docker-compose.deploy.yml config -q || fail "deployment compose configuration is invalid"
 
-          backend_release="vibehr-backend-spring:release-${expected_sha}"
+          backend_release="vibehr-backend-rust:release-${expected_sha}"
           frontend_release="vibehr-frontend:release-${expected_sha}"
           docker load --input "$release_archive" || fail "unable to load hosted release images"
           [[ "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$backend_release")" == "$expected_sha" ]] || fail "backend image revision does not match tested SHA"
           [[ "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$frontend_release")" == "$expected_sha" ]] || fail "frontend image revision does not match tested SHA"
+          export VIBEHR_BACKEND_IMAGE="$backend_release"
+          for stage in preflight migrate verify-schema; do
+            docker compose -f docker-compose.deploy.yml run --rm --no-deps --pull never "$stage" || fail "database gate failed during $stage"
+          done
           docker run --detach --rm --name "$candidate_name" \
             --env-file .env.deploy --env-file .env.deploy.secret \
-            -e SPRING_PROFILES_ACTIVE=flyway-cutover \
             -e VIBEHR_SCHEMA_OWNER=flyway \
             --add-host host.docker.internal:host-gateway \
             -p "127.0.0.1:${candidate_port}:8080" \
@@ -495,7 +532,7 @@ jobs:
               image: ${frontend_release}
           EOF
           promotion_started=true
-          docker compose -f docker-compose.deploy.yml -f "$backup_dir/release.override.yml" up -d --no-build --remove-orphans --force-recreate || fail "promotion compose failed"
+          docker compose -f docker-compose.deploy.yml -f "$backup_dir/release.override.yml" up -d --no-build --remove-orphans --force-recreate --no-deps backend frontend || fail "promotion compose failed"
           wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness || fail "promotion readiness check failed"
           wait_for_candidate http://127.0.0.1:8080/openapi.json || fail "promotion OpenAPI check failed"
           wait_for_candidate http://127.0.0.1:3000/login || fail "promotion frontend check failed"

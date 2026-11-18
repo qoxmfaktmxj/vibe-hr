@@ -13,14 +13,16 @@ const remote = workflow.split("<<'REMOTE'\n")[1]?.split(/\r?\n          REMOTE/)
 assert.ok(remote, "deployment must retain its remote shell");
 const recovery = remote.slice(remote.indexOf("rollback_release() {"), remote.indexOf("require_env() {"));
 
-function runFixture({ promoted = true, changed = true, composeFailure = false, readinessFailure = false, unknownRevision = false } = {}) {
+function runFixture({ promoted = true, changed = true, previousContainer = "vibehr-backend-spring", composeFailure = false, readinessFailure = false, unknownRevision = false } = {}) {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "vibehr-deploy-recovery-"));
   try {
     let input = `set -euo pipefail
 backup_dir="$PWD"
+repository="$PWD"
 rollback_backend=previous-backend
 rollback_frontend=previous-frontend
 previous_backend=previous-image
+previous_backend_container=${previousContainer}
 backend_release=tested-new-backend
 rollback_ready=true
 promotion_started=${promoted}
@@ -68,6 +70,7 @@ test("partial promotion after schema migration recovers the tested backend with 
   const result = runFixture();
   assert.equal(result.status, 1);
   assert.match(result.override, /image: tested-new-backend/);
+  assert.match(result.override, /container_name: vibehr-backend-rust/);
   assert.match(result.override, /image: previous-frontend/);
   assert.equal((result.actions.match(/^probe /gm) || []).length, 3);
 });
@@ -76,7 +79,18 @@ test("unchanged migration inventory permits the previous backend and frontend", 
   const result = runFixture({ changed: false });
   assert.equal(result.status, 1);
   assert.match(result.override, /image: previous-backend/);
+  assert.match(result.override, /container_name: vibehr-backend-spring/);
+  assert.match(result.actions, /previous\.compose\.yml/);
   assert.match(result.override, /image: previous-frontend/);
+  assert.equal((result.actions.match(/^probe /gm) || []).length, 3);
+});
+
+test("a subsequent Rust release recovers its previous Rust image without reapplying migrations", () => {
+  const result = runFixture({ changed: false, previousContainer: "vibehr-backend-rust" });
+  assert.equal(result.status, 1);
+  assert.match(result.override, /container_name: vibehr-backend-rust/);
+  assert.match(result.override, /image: previous-backend/);
+  assert.match(result.actions, /--no-deps backend frontend/);
   assert.equal((result.actions.match(/^probe /gm) || []).length, 3);
 });
 

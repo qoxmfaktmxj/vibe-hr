@@ -28,3 +28,13 @@ test("does not classify a retired backend path and rejects malformed CLI", () =>
   assert.equal(patternMatches("backend-spring/src/main/java/com/vibehr/menu/MenuController.java", "backend-spring/src/main/java/com/vibehr/menu/**"), true);
   assert.equal(patternMatches("backend-spring\\src\\test\\java\\com\\vibehr\\auth\\HrAuthorizationTest.java", "backend-spring/src/test/java/com/vibehr/**/*AuthorizationTest.java"), true);
 });
+
+test("classifies the live Rust runtime and schema and delivery gates", () => {
+  const result = classify(["backend-rust/src/security/token.rs", "backend-rust/src/menu.rs",
+    "backend-rust/src/hr/severance.rs", "backend-rust/src/db/schema.rs", "backend-rust/Dockerfile"]);
+  for (const signal of ["auth_changed", "permission_changed", "payroll_changed", "flyway_changed", "deploy_changed"]) {
+    assert.ok(result.hits[signal].length > 0, signal);
+  }
+  assert.equal(result.backend_changed, true);
+  assert.equal(result.r3_changed, true);
+});

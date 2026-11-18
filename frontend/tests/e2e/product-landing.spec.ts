@@ -142,7 +142,12 @@ test("drag eases after release and settles, while buffered wheel input remains b
   const canvas = page.getByTestId("product-gallery");
   const jump = page.getByLabel("장면 바로 이동", { exact: true });
   await expect(canvas).toHaveAttribute("data-ready", "true");
-  for (let i = 0; i < 8; i++) await canvas.dispatchEvent("wheel", { deltaY: 10 });
+  // Deliver one wheel gesture without a browser-protocol round trip between its ticks.
+  await canvas.evaluate((element) => {
+    for (let i = 0; i < 8; i++) {
+      element.dispatchEvent(new WheelEvent("wheel", { deltaY: 10, bubbles: true, cancelable: true }));
+    }
+  });
   await expect(jump).toHaveValue("0");
   await page.waitForTimeout(1200);
   const box = (await canvas.boundingBox())!;

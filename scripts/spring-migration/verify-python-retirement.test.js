@@ -104,3 +104,14 @@ test("reviewed CI support does not allow extra Python files, changed commands or
     ".github/workflows/deploy.yml", ".github/workflows/ui-validation.yml", "docs/OTHER.md", "docs/UI_VALIDATION_CI.md", "scripts/ci/require-ui-validation.py",
   ]);
 });
+
+test("Rust verification may call only the reviewed fixture tools", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibehr-python-retirement-"));
+  write(root, "scripts/rust-migration/hr-parity.py", "import json\n");
+  write(root, "scripts/ci/verify-rust.sh", 'python3 scripts/rust-migration/hr-parity.py "$left" "$right"\n');
+  assert.deepEqual(verifyPythonRetirement(root).invocations, []);
+  write(root, "scripts/ci/verify-rust.sh", "python3 scripts/rust-migration/hr-parity.py && python3 -m unexpected\n");
+  assert.ok(verifyPythonRetirement(root).invocations.some(row => row.path === "scripts/ci/verify-rust.sh"));
+  write(root, "backend-rust/Dockerfile", "FROM python:3\n");
+  assert.ok(verifyPythonRetirement(root).invocations.some(row => row.path === "backend-rust/Dockerfile"));
+});

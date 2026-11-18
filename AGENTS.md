@@ -71,6 +71,7 @@ Before changes:
 - `frontend/src/components/grid/**`
 - `frontend/src/lib/grid/**`
 - `config/grid-screens.json`
+- `backend-rust/src/security/**`, `backend-rust/src/payroll/**`, `backend-rust/src/menu.rs`, `backend-rust/src/menu/**`, `backend-rust/src/db/**`, `backend-rust/Dockerfile`
 - `backend-spring/src/main/java/com/vibehr/auth/**`
 - `backend-spring/src/main/java/com/vibehr/payroll/**`
 - `backend-spring/src/main/java/com/vibehr/menu/**`
@@ -101,7 +102,7 @@ Before changes:
 
 <!-- OMX:AGENTS-MANUAL:START -->
 ### Project execution rules
-- Frontend work must stay inside `frontend/*` and backend work must stay inside `backend-spring/*` unless the task explicitly spans both layers.
+- Frontend work belongs in `frontend/*` and backend runtime work belongs in `backend-rust/*`. Keep the Spring comparison reference and Flyway assets in `backend-spring/*`. Cross-layer changes must identify the shared contract.
 - API contract changes must mention affected frontend screens and backend schemas together.
 - Shared UI or AG Grid changes must include at least one regression check on an existing screen.
 - Menu, action, and permission related work must be cross-checked against `docs/MENU_ACTION_PERMISSION_PLAN.md`.
@@ -116,7 +117,7 @@ Before changes:
 - AG Grid screens: run `npm run validate:grid` before lint/build.
 - Frontend changes: run `npm run lint` in `frontend` when applicable.
 - Small navigation/app-shell UI changes: use `npm run check:ui` once after final code edits (lint, unit tests, two static-background browser flows, one build including TypeScript). During editing, prefer affected tests and file-scoped lint. GPU rendering checks are for 3D/motion changes; select feature-specific tests for behavior outside the smoke flows. See `docs/TEST_STRATEGY.md` for full-suite and protected-change requirements. Do not repeat unchanged successful checks for documentation-only edits.
-- Backend changes: run the relevant Gradle test or Spring Boot startup verification from `backend-spring` when applicable.
+- Backend changes require Cargo formatting, strict Clippy, Rust tests and the relevant PostgreSQL and BFF workflows. Use `scripts/ci/verify-rust.sh` for backend migration parity and rollback checks. Keep Gradle coverage for the Spring reference.
 - When editing user-facing Korean text, preserve UTF-8 encoding and verify real browser rendering with a screenshot; treat CLI snapshot text as non-authoritative for Korean.
 - If validation cannot run, explicitly record why.
 <!-- OMX:AGENTS-MANUAL:END -->

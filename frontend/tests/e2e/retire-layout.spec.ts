@@ -35,6 +35,8 @@ for (const width of [1440, 390]) {
     expect(writes).toEqual([]);
     await page.goto("/tim/status");
     await expect(page.getByRole("grid")).toBeVisible();
-    await expect(page.getByRole("button", { name: "업로드", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "조회", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "다운로드", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "업로드", exact: true })).toHaveCount(0);
   });
 }

@@ -264,8 +264,11 @@ test.describe("퇴직·급여·근태·복리후생 workflow mutation contracts"
     const writes = await installTimRoutes(page);
     await page.goto("/tim/status");
     await expectGridRow(page, EMPLOYEE.employee_no);
-    await page.getByRole("button", { name: "정정", exact: true }).click();
-    await expect(page).toHaveURL(/\/tim\/correction\?attendance_id=901$/);
+    await Promise.all([
+      page.waitForURL(/\/tim\/correction\?attendance_id=901$/, { timeout: 20_000 }),
+      page.getByRole("button", { name: "정정", exact: true }).click(),
+    ]);
+    await expect(page.getByRole("heading", { name: "근태 정정", exact: true })).toBeVisible();
     expect(writes).toEqual([]);
   });
 

@@ -13,10 +13,24 @@ docs/spring-migration/flyway-reference-seed-manifest.json text eol=lf
 docs/spring-migration/flyway-required-reference-source.sql text eol=lf
 docs/spring-migration/flyway-seed-ownership-ledger.json text eol=lf
 docs/spring-migration/flyway-seed-ownership-ledger.md text eol=lf
+docs/spring-migration/spring-schema-coverage.json text eol=lf
+docs/spring-migration/spring-schema-coverage.md text eol=lf
+docs/spring-migration/spring-route-coverage.json text eol=lf
+docs/spring-migration/spring-route-coverage.md text eol=lf
 backend-spring/src/main/resources/db/migration/V1__alembic_head_baseline.sql text eol=lf
 backend-spring/src/main/resources/db/migration/V2__retire_alembic_version_marker.sql text eol=lf
 backend-spring/src/main/resources/db/migration/V3__required_reference_data.sql text eol=lf
 scripts/spring-migration/*.sh text eol=lf
+scripts/ci/*.sh text eol=lf
 backend-spring/gradlew text eol=lf
 # Preserve the upstream stylesheet bytes checked by the asset contract.
 frontend/src/styles/vendor/shadcn-3.8.5.css text eol=lf
+scripts/ci/verify-rust.sh text eol=lf
+scripts/ci/rehearse-rust-promotion.sh text eol=lf
+# Keep upstream licensing and documentation bundle bytes intact.
+backend-rust/resources/swagger-ui/** -text -whitespace
+backend-rust/resources/redoc/** -text -whitespace
+backend-rust/resources/*/SOURCE.txt text eol=lf whitespace
+backend-rust/src/**/*.rs text eol=lf
+backend-rust/tests/**/*.rs text eol=lf
+docs/rust-migration/spring-handlers.tsv text eol=lf
