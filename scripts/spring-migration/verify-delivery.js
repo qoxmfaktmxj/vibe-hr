@@ -60,6 +60,8 @@ function verifyHostedUiGate(deploy, ui) {
   const failures = [];
   const gateJob = deploy.split("\n  ui:\n")[1]?.split("\n  test:\n")[0] || "";
   const releaseJob = deploy.split("\n  deploy:\n")[1] || "";
+  const manualApproval = "    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.verified_sha == github.sha";
+  if (!releaseJob.split("\n").includes(manualApproval)) failures.push("production promotion requires manual confirmation of the restored main SHA");
   const dependencies = /needs:\s*\[([^\]]+)\]/.exec(releaseJob)?.[1].split(",").map((value) => value.trim()) || [];
   if (!dependencies.includes("test") || !dependencies.includes("ui")) failures.push("deploy must require both test and exact-SHA UI success");
   for (const required of [

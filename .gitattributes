@@ -26,6 +26,7 @@ backend-spring/gradlew text eol=lf
 # Preserve the upstream stylesheet bytes checked by the asset contract.
 frontend/src/styles/vendor/shadcn-3.8.5.css text eol=lf
 scripts/ci/verify-rust.sh text eol=lf
+scripts/rust-migration/verify-operator-backup.sh text eol=lf
 scripts/ci/rehearse-rust-promotion.sh text eol=lf
 # Keep upstream licensing and documentation bundle bytes intact.
 backend-rust/resources/swagger-ui/** -text -whitespace

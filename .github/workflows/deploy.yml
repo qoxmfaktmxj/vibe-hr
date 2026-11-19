@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      verified_sha:
+        description: '운영 백업 복원 검증을 통과한 main 커밋 SHA 40자리'
+        required: true
+        type: string
   schedule:
     - cron: '0 23 * * *' # 08:00 Asia/Seoul (UTC+9)
 
@@ -212,6 +217,7 @@ jobs:
 
   deploy:
     needs: [test, ui]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.verified_sha == github.sha
     runs-on: ubuntu-latest
     concurrency:
       group: vibehr-production-deploy

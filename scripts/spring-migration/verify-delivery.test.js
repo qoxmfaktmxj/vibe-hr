@@ -69,6 +69,8 @@ test("hosted UI gate keeps exact-SHA ownership and all distinct regression suite
   const ui = fs.readFileSync(path.join(root, ".github/workflows/ui-validation.yml"), "utf8");
   assert.deepEqual(verifyHostedUiGate(deploy, ui), []);
   for (const changed of [
+    deploy.replace("inputs.verified_sha == github.sha", "true"),
+    deploy.replace("github.event_name == 'workflow_dispatch'", "github.event_name == 'push'"),
     deploy.replace("needs: [test, ui]", "needs: [test]"),
     deploy.replace("actions: read", "actions: none"),
     deploy.replace(' --sha "$GITHUB_SHA"', ' --sha "main"'),

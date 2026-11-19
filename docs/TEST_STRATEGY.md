@@ -40,7 +40,7 @@ The time-to-payroll scenario additionally requires `VIBEHR_TIME_PAYROLL_CONTAINE
 
 ### Production-host UI isolation
 
-Daily deployments use the exact-SHA GitHub-hosted UI gate in
+Production releases use the exact-SHA GitHub-hosted UI gate in
 [`UI_VALIDATION_CI.md`](UI_VALIDATION_CI.md). Do not run browser suites or Next dev
 on the production host. Missing/failed remote UI evidence blocks deployment;
 it does not waive testing. Backend and runtime checks below remain applicable.

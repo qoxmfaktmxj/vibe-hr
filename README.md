@@ -21,6 +21,8 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ## 현재 아키텍처 및 전환 상태
 
+운영 전환은 [백업 복원부터 배포와 롤백까지](docs/rust-migration/production-cutover-ko.md)를 따릅니다. `main` 반영 시 검증이 시작되고, 운영자가 검증한 SHA로 수동 실행해야 서버가 전환됩니다.
+
 프론트엔드는 Next.js와 React, AG Grid를 사용합니다. BFF가 쿠키와 프록시를 담당하고 Rust 백엔드가 인증, 업무 권한, 트랜잭션, PostgreSQL 접근을 담당합니다. axum과 Tokio가 HTTP 요청을 처리하고, SQLx는 PostgreSQL에서 명시적인 쿼리를 실행합니다.
 
 기존 스키마와 필수 참조 데이터는 Flyway V1부터 V7까지의 SQL로 관리합니다. Spring 코드는 비교 테스트의 기준으로 보존합니다. 운영 트래픽 전환은 별도 승인 대상입니다.

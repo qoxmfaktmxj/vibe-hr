@@ -21,27 +21,18 @@ production credentials and SSH secrets are not supplied. Browser evidence is
 retained for 7 days. These fixtures do not certify real backend authorization or
 hardware GPU fidelity; relevant backend/migration checks remain required.
 
-## Daily 08:00 Asia/Seoul deployment
+## Automatic verification and operator promotion
 
-`deploy.yml` runs at 23:00 UTC every day, equivalent to 08:00 Asia/Seoul.
-GitHub Actions scheduled runs use the default branch's current commit. The same
-workflow also runs on main pushes and manual dispatch. Its deploy job requires
-both the same-SHA UI gate and Spring/test job to succeed. The UI gate has only
-contents/actions read permissions and validates the latest eligible standalone
-UI run for the exact SHA, its actual successful job, and the clean fixed checkout.
-It never reuses an older success when a newer attempt failed. A scheduled release
-with an unchanged SHA reuses that SHA's latest successful standalone UI result;
-missing, pending, failed, cancelled or skipped evidence blocks promotion.
-Release images
-are built on the hosted runner; strict SSH promotion checks the fixed commit,
-retains rollback images and verifies production health. A failed job does not
-promote a release. GitHub may delay a scheduled start beyond the nominal time.
+A push to main and the daily 08:00 Asia/Seoul schedule run the verification jobs.
+Production promotion requires a manual dispatch on main with the full Git SHA of
+the release verified against a restored production backup. The operator enters
+that SHA in the `verified_sha` input. The deploy job also requires the successful
+backend and exact-SHA UI jobs. A skipped deploy job means the live images have
+not been promoted.
 
-The former OpenClaw daily deployment automation is disabled. The production host
-does not dispatch workflows or run scheduled builds/browser tests. For a manual
-same-SHA redeploy, use the Deploy Vibe-HR workflow's Run workflow action on main;
-GitHub Actions retains the same gates. A passed UI job alone is not deployment
-success: check the whole Deploy workflow and live revision/health.
+The [operator guide](rust-migration/production-cutover-ko.md) covers private
+backup restoration, manual dispatch, health checks and rollback. The host does
+not start scheduled builds or browser tests.
 
 `scripts/ci/require-ui-validation.py` is the hosted Deploy UI gate and remains
 available for read-only manual host-side diagnostics. It does not run a browser.
