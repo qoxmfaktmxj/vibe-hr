@@ -812,3 +812,7 @@
 - The operator requested the Rust release and instructions on main, and reserved all production backup and rollout work for themselves. The production job now requires a manual dispatch on main and the complete SHA validated by the operator. Push and scheduled jobs perform verification.
 - The [operator runbook](rust-migration/production-cutover-ko.md) covers rollback image retention, private backup handling, isolated PostgreSQL recovery, Flyway and Rust gates, manual dispatch, production smoke and compatible rollback.
 - The new verifier passed on a synthetic PostgreSQL 16.13 plain base backup with its SHA-256 manifest, Flyway V1 to V7 and temporary Rust secrets. The custom-format dump of the same fixture was restored and correctly rejected on the known catalog difference. Both runs cleaned their isolated database volumes. Real production backup verification remains with the operator.
+## VH-R2-HOSTED-UI-RUNNER-20261119
+
+- User authorized repairing and pushing failed main validation. Hosted run 44425767519 selected Ubuntu 26.04 and Playwright rejected Chromium installation before browser tests could start. Backend test job 44425767625 passed, but its exact-SHA UI gate correctly failed.
+- Pin only the browser validation job to Ubuntu 24.04. The locked Playwright installation registry has Chromium and headless-shell downloads for ubuntu24.04-x64. Keep all UI assertions, release checks and manual-only production promotion.
