@@ -438,9 +438,14 @@ jobs:
           candidate_name="vibehr-backend-candidate-${timestamp}"
           candidate_port=$((19000 + RANDOM % 1000))
           candidate_url="http://127.0.0.1:${candidate_port}"
+          promotion_verified=false
           cleanup_candidate() { docker rm --force "$candidate_name" >/dev/null 2>&1 || true; }
           on_exit() {
             status=$?
+            if [[ "$status" -eq 0 && "$promotion_verified" != true ]]; then
+              echo "[deploy] remote script ended before verified promotion" >&2
+              status=1
+            fi
             cleanup_candidate
             cleanup_release_archive
             if [[ "$status" -ne 0 ]]; then
@@ -518,7 +523,8 @@ jobs:
           [[ "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$frontend_release")" == "$expected_sha" ]] || fail "frontend image revision does not match tested SHA"
           export VIBEHR_BACKEND_IMAGE="$backend_release"
           for stage in preflight migrate verify-schema; do
-            docker compose -f docker-compose.deploy.yml run --rm --no-deps --pull never "$stage" || fail "database gate failed during $stage"
+            # bash -s reads this script from SSH stdin; never let Compose consume it.
+            docker compose -f docker-compose.deploy.yml run --interactive=false -T --rm --no-deps --pull never "$stage" </dev/null || fail "database gate failed during $stage"
           done
           docker run --detach --rm --name "$candidate_name" \
             --env-file .env.deploy --env-file .env.deploy.secret \
@@ -542,6 +548,18 @@ jobs:
           wait_for_candidate http://127.0.0.1:8080/actuator/health/readiness || fail "promotion readiness check failed"
           wait_for_candidate http://127.0.0.1:8080/openapi.json || fail "promotion OpenAPI check failed"
           wait_for_candidate http://127.0.0.1:3000/login || fail "promotion frontend check failed"
+          for container in vibehr-backend-rust vibehr-frontend; do
+            [[ "$(docker inspect --format '{{.State.Running}}' "$container")" == true ]] || fail "promoted container is not running: $container"
+            running_image=$(docker inspect --format '{{.Image}}' "$container") || fail "promoted image unavailable: $container"
+            expected_image="$backend_release"
+            [[ "$container" != vibehr-frontend ]] || expected_image="$frontend_release"
+            expected_image_id=$(docker image inspect --format '{{.Id}}' "$expected_image") || fail "release image unavailable: $container"
+            [[ "$running_image" == "$expected_image_id" ]] || fail "promoted image identity mismatch: $container"
+            running_revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$running_image") || fail "promoted revision unavailable: $container"
+            [[ "$running_revision" == "$expected_sha" ]] || fail "promoted revision mismatch: $container"
+          done
           docker compose -f docker-compose.deploy.yml ps || fail "unable to inspect the promoted release"
           rm -rf "$backup_dir"
+          promotion_verified=true
+          echo "[deploy] verified promotion complete: $expected_sha"
           REMOTE
