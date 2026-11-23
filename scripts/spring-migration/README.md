@@ -2,6 +2,8 @@
 
 `endpoint-manifest.js` creates the Phase-0 FastAPI route registry for Spring migration planning. It preserves the source-decorator inventory, separately inventories framework and application operational routes, and derives canonical entries keyed by HTTP method plus normalized path.
 
+현행 실행 백엔드는 [Rust](../../backend-rust/README.md)다. 아래 Python 소스 스캐너는 이관 전 소스가 있는 감사용 체크아웃에서 사용한다. 현재 이관 검증은 [Rust 검증 스크립트](../ci/verify-rust.sh)를 따른다.
+
 ## Usage
 
 Run from the repository root:

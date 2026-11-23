@@ -1,6 +1,8 @@
-# Vibe-HR Spring Platform
+# Vibe-HR Spring 비교 백엔드
 
-This directory is the Spring Boot 4 / Java 21 target for the incremental Vibe-HR migration. It is a package-by-feature modular monolith: each future business capability owns its HTTP, application, persistence, and mapping code below `com.vibehr.<feature>`. The `platform` package contains cross-cutting HTTP, configuration, and health behavior; `auth` contains migration-compatible authentication primitives.
+이 디렉터리에는 Rust와 응답 및 DB 상태를 대조하는 Spring Boot 4 / Java 21 구현과 Flyway SQL이 있습니다. 일상 개발과 서버 실행은 [Rust 백엔드](../backend-rust/README.md)를 따릅니다. 아래 명령은 Spring 비교 환경에서 실행합니다.
+
+`com.vibehr.<feature>` 아래에 도메인별 HTTP 처리와 저장 로직이 있습니다. `platform`은 공통 HTTP 설정과 상태 확인을, `auth`는 인증을 담당합니다.
 
 ## Run and verify
 
@@ -69,7 +71,7 @@ $env:VIBEHR_RUN_CONTAINER_TESTS = "true"
 ./gradlew integrationTest
 ```
 
-`migrationIntegrationTest` exercises the active V1-V5 Flyway chain on disposable PostgreSQL 16, including the immutable 105-table V1 baseline, the current 106-table installation, and replay-store capacity behavior. It is the required schema cutover gate; run it after the integration check and follow [`docs/spring-migration/CUTOVER_RUNBOOK.md`](../docs/spring-migration/CUTOVER_RUNBOOK.md) for an adoption or production cutover. Do not use `clean`, modify migration history, or run Alembic alongside Flyway.
+`migrationIntegrationTest` exercises the versioned Flyway chain on disposable PostgreSQL 16, including the immutable 105-table V1 baseline, catalog verification and replay-store capacity behavior. It is the required schema cutover gate; run it after the integration check and follow [`docs/spring-migration/CUTOVER_RUNBOOK.md`](../docs/spring-migration/CUTOVER_RUNBOOK.md) for the Spring adoption procedure. For a Rust production rollout follow [the Rust cutover guide](../docs/rust-migration/production-cutover-ko.md). Do not use `clean`, modify migration history, or run Alembic alongside Flyway.
 
 ## Container image and smoke test
 

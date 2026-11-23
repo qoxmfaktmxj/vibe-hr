@@ -11,7 +11,7 @@
 4. UI 렌더링보다 **순수 로직 테스트**를 우선한다.
 
 ## 적용 범위(1차)
-- Backend: `app/services/*`의 순수 함수/비즈니스 규칙
+- Backend: `backend-rust/src/` 업무 모듈의 순수 함수/비즈니스 규칙
 - Frontend: `src/lib/*`의 포맷/정규화/매핑 로직
 
 ## 작업 체크리스트
@@ -30,8 +30,8 @@ npm run test
 
 ### Backend
 ```bash
-cd backend
-cd backend-spring && .\gradlew.bat test
+cd backend-rust
+cargo test --locked
 ```
 
 ## CI 게이트
@@ -39,7 +39,7 @@ cd backend-spring && .\gradlew.bat test
 - 즉, 테스트 실패 시 배포 자동 차단.
 
 ## 작성 규칙
-- 테스트 파일명: `test_*.py`, `*.test.ts`
+- Rust 단위 테스트는 도메인 모듈의 `#[cfg(test)]`, 통합 테스트는 `backend-rust/tests/`, 프론트엔드 단위 테스트는 `*.test.ts`에 작성
 - 테스트 이름은 행위 중심으로 작성
   - 예) `normalizeMenuIconName returns null for unknown icon`
 - 하드코딩 값은 "도메인 의미"가 보이게 작성

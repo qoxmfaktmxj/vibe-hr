@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
 
-beforeEach(() => vi.stubEnv("VIBEHR_BFF_BACKEND_URL", "http://spring-test:8080"));
+beforeEach(() => vi.stubEnv("VIBEHR_BFF_BACKEND_URL", "http://backend-test:8080"));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -41,7 +41,7 @@ it.each([200, 403, 422])("preserves the atomic submission payload and upstream %
 
   const response = await POST(request(JSON.stringify(payload)));
 
-  expect(fetchMock).toHaveBeenCalledExactlyOnceWith("http://spring-test:8080/api/v1/hri/requests/submit", {
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith("http://backend-test:8080/api/v1/hri/requests/submit", {
     method: "POST",
     headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
     cache: "no-store",

@@ -3,11 +3,11 @@ import { NextRequest } from "next/server";
 
 import { GET } from "@/app/api/org/chart/route";
 
-const SPRING_TEST_URL = "http://spring-test:8080";
+const BACKEND_TEST_URL = "http://backend-test:8080";
 
 describe("/api/org/chart BFF route", () => {
   beforeEach(() => {
-    vi.stubEnv("VIBEHR_BFF_BACKEND_URL", SPRING_TEST_URL);
+    vi.stubEnv("VIBEHR_BFF_BACKEND_URL", BACKEND_TEST_URL);
   });
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe("/api/org/chart BFF route", () => {
     const response = await GET(request);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://spring-test:8080/api/v1/org/chart",
+      "http://backend-test:8080/api/v1/org/chart",
       expect.objectContaining({
         method: "GET",
         headers: { Authorization: "Bearer token-123" },

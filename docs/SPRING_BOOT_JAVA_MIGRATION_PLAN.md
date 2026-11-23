@@ -1,10 +1,8 @@
-# Vibe-HR Spring Boot Java Runtime And Learning Guide
+# Spring 비교 구현 학습 가이드
 
-Status: Active
-Runtime: Spring Boot 4.1 / Java 21 / PostgreSQL
-Scope: The Spring application is the only operational backend.
+아래 구조와 Gradle 명령은 보존 중인 Java 비교 구현을 설명한다. 현재 실행 백엔드와 검증 방법은 [Rust 백엔드](../backend-rust/README.md), 운영 전환 절차는 [Rust 전환 가이드](rust-migration/production-cutover-ko.md)를 따른다.
 
-## Runtime Topology
+## Spring 비교 환경의 요청 흐름
 
 ```text
 Browser
@@ -90,7 +88,7 @@ The runtime smoke checks are `/health`, `/api/v1/health`, `/openapi.json`, and `
 
 ## Completion Gates
 
-Spring runtime work is complete only when the relevant items are true:
+Spring reference work is complete only when the relevant items are true:
 
 - The affected controller, DTO, application service, and persistence path have focused tests.
 - PostgreSQL-dependent behavior has tagged Testcontainers coverage when applicable.

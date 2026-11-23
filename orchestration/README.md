@@ -36,7 +36,7 @@ node orchestration/run_orchestrator.js \
 
 This generates outputs under `orchestration/runs/<task_id>_<timestamp>/`.
 
-`targets.backend` must use `backend-spring/**`. The orchestrator rejects retired `backend/**` targets before any agent job runs.
+실행 백엔드 작업은 `targets.backend`에 `backend-rust/**` 경로를 적는다. 오케스트레이터는 이전 `backend/**` 경로를 거부한다.
 
 ## OpenAI mode (optional)
 
@@ -57,29 +57,15 @@ node orchestration/run_orchestrator.js \
 
 Use this mode when your team has an auth-protected LLM gateway.
 
-Option A: login/password -> token -> LLM
-```bash
-node orchestration/run_orchestrator.js \
-  --task-file orchestration/tasks/tim-phase3-sample.json \
-  --mode internal-auth \
-  --base-url http://127.0.0.1:8080 \
-  --auth-path /api/v1/auth/login \
-  --llm-path /api/v1/llm/chat \
-  --login-id admin-local \
-  --password admin \
-  --token-field access_token \
-  --response-text-path choices.0.message.content
+Rust HR 서버의 `/api/v1/auth/login`은 BFF 서명을 요구하며 이 서버에는 LLM 채팅 라우트가 없다. 별도 게이트웨이에서 발급한 토큰과 URL을 같은 터미널에 설정한 후 저장소 루트에서 실행한다.
+
+```powershell
+$env:VIBE_LLM_URL = "https://your-gateway.example.com/api/v1/llm/chat"
+# VIBE_ACCESS_TOKEN은 게이트웨이에서 발급한 값을 세션 환경에 설정한다.
+node orchestration/run_orchestrator.js --task-file orchestration/tasks/tim-phase3-sample.json --mode internal-auth
 ```
 
-Option B: use existing token directly
-```bash
-node orchestration/run_orchestrator.js \
-  --task-file orchestration/tasks/tim-phase3-sample.json \
-  --mode internal-auth \
-  --llm-url https://your-gateway.example.com/api/v1/llm/chat \
-  --access-token "<your_token>" \
-  --response-text-path choices.0.message.content
-```
+게이트웨이가 자체 로그인 API를 제공하면 `--auth-url`로 지정할 수 있다.
 
 Notes:
 - `--auth-url` and `--llm-url` override base/path composition.

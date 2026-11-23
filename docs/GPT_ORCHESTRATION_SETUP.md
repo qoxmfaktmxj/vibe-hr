@@ -3,7 +3,7 @@
 Status: Active
 Canonical: `orchestration/README.md`
 
-`AGENTS.md` and `WORKFLOW.md` define the process. The Node orchestrator in `orchestration/` executes an explicit planner, frontend worker, Spring backend worker, QA worker, and reviewer workflow.
+`AGENTS.md` and `WORKFLOW.md` define the process. The Node orchestrator in `orchestration/` executes an explicit planner, frontend worker, Rust backend worker, QA worker, and reviewer workflow.
 
 ## Run Guide
 
@@ -23,19 +23,8 @@ node orchestration/run_orchestrator.js `
   --model gpt-5-mini
 ```
 
-Internal-auth mode defaults to the Spring service at port 8080:
+`internal-auth`는 팀의 인증된 LLM 게이트웨이가 있을 때 사용한다. Rust HR API는 `/api/v1/llm/chat`을 제공하지 않는다. 게이트웨이 URL과 인증 설정은 [실행 가이드](../orchestration/README.md)를 따른다.
 
-```powershell
-node orchestration/run_orchestrator.js `
-  --task-file orchestration/tasks/tim-phase3-sample.json `
-  --mode internal-auth `
-  --base-url http://127.0.0.1:8080 `
-  --auth-path /api/v1/auth/login `
-  --llm-path /api/v1/llm/chat `
-  --login-id admin-local `
-  --password admin
-```
+실행 백엔드 작업 범위는 `targets.backend`에 `backend-rust/**`로 지정한다. `run_orchestrator.js` rejects a retired `backend/**` target before it creates a run directory.
 
-`targets.backend` must contain only `backend-spring/**` paths. `run_orchestrator.js` rejects a retired `backend/**` target before it creates a run directory.
-
-Confirm Spring authentication behavior in `backend-spring/src/main/java/com/vibehr/auth/**` and `backend-spring/src/main/java/com/vibehr/platform/security/**`. Orchestration outputs are written under `orchestration/runs/<task_id>_<timestamp>/`.
+Rust 인증 계약은 `backend-rust/src/security/`와 BFF 호출 경로에서 확인한다. Orchestration outputs are written under `orchestration/runs/<task_id>_<timestamp>/`.

@@ -24,6 +24,7 @@ AG Grid 화면 작업 시에는 아래 순서를 **반드시 고정**:
 - 문서/코드 불일치를 허용하지 않는다. 신규 화면/API/테이블 추가 시 관련 MD를 같은 커밋(또는 직후 커밋)에서 갱신한다.
 - 사용자 노출 한글 문자열을 수정한 경우 UTF-8 인코딩 유지 여부와 실제 브라우저에서 한글 깨짐 여부를 반드시 확인한다.
 - 병합 전 검증 게이트를 통과한다.
+  - Rust 백엔드 변경은 `backend-rust`에서 Cargo 포맷, Clippy, 테스트를 수행한다. DB/권한/브라우저 검증은 [테스트 전략](TEST_STRATEGY.md)의 해당 절을 따른다.
   - Frontend: `npm run lint`, `npm run build`
   - AG Grid 포함 작업: `npm run validate:grid` 추가
 
@@ -58,6 +59,8 @@ AG Grid 화면 작업 시에는 아래 순서를 **반드시 고정**:
 - TIM: 스케줄 판정 우선순위(`개인예외 > 부서기본 > 회사기본`)와 연차 데이터 일관성을 유지한다.
 
 ## 5) 테스트 실행 기준 (조건부)
+
+아래 이전 시나리오 문서는 업무 기대값을 확인하는 자료다. 서버 실행과 검증 명령은 [Rust 백엔드](../backend-rust/README.md)와 [테스트 전략](TEST_STRATEGY.md)을 따른다.
 
 - 급여/보상 작업: `PAYROLL_TEST_GUIDE.md` 시나리오 수행
 - HRI 작업: `HRI_TEST_SCENARIO.md` 필수 시나리오(특히 5.1~5.7)와 무결성 SQL 수행

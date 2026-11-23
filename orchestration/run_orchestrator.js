@@ -67,7 +67,7 @@ async function callInternalAuth(systemPrompt, userPrompt, model, temperature, op
 }
 function mockResponse(agent, task, plannerOutput) {
   const sections = [`# ${agent} output (mock)`, "", `- task_id: ${task.task_id}`, `- title: ${task.title}`, ""];
-  if (agent === "planner") sections.push("## Frontend plan", "- Define page/component changes and AG Grid impact check.", "## Backend plan", "- Define Spring API/schema/service changes and transaction order checks.", "## QA plan", "- Build scenario list from workflow gates and regression scope.", "## Merge gates", "- validate:grid (if AG Grid in scope), Gradle tests, lint, build, and test scenarios.");
+  if (agent === "planner") sections.push("## Frontend plan", "- Define page/component changes and AG Grid impact check.", "## Backend plan", "- Define Rust API, SQLx transaction and domain test changes.", "## QA plan", "- Build scenario list from workflow gates and regression scope.", "## Merge gates", "- validate:grid (if AG Grid in scope), Cargo tests, lint, build, and test scenarios.");
   else if (["frontend", "backend"].includes(agent)) sections.push("## Inputs", "- Planner output received.", "", "## Proposed execution", "- Break work into 2-3 small commits.", "- Add validation steps before merge.");
   else sections.push("## Findings", "- No blocking issue in mock mode.", "", "## Go/No-Go", "- GO with required validation gates.");
   if (plannerOutput && agent !== "planner") sections.push("", "## Planner context excerpt", plannerOutput.slice(0, 900));

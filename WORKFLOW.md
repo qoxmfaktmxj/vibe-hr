@@ -19,7 +19,7 @@
 - Connect template download/upload/download actions
 
 ### Backend
-- Work only in `backend-spring/**`; organize Spring controller, application-service, and transaction flow
+- `backend-rust/src/`에서 axum 핸들러, 업무 권한, SQLx 트랜잭션을 확인한다. `backend-spring/`은 동작 대조와 버전별 Flyway SQL에 사용한다.
 - Keep save order fixed: `DELETE -> UPDATE -> INSERT`
 - Provide permission checks (menu + action)
 
@@ -41,7 +41,7 @@
 - [ ] `npm run validate:grid` passed
 - [ ] `npm run lint` passed
 - [ ] `npm run build` passed
-- [ ] Relevant `backend-spring` Gradle tests passed
+- [ ] Rust 변경 범위의 Cargo 포맷, Clippy, 테스트 통과. DB나 BFF 계약을 바꾼 경우 [테스트 전략](docs/TEST_STRATEGY.md)의 관련 검증 통과
 - [ ] Toolbar order and behaviors match the common guide
 - [ ] Save order is `DELETE -> UPDATE -> INSERT`
 - [ ] Docs updated

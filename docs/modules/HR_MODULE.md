@@ -9,7 +9,7 @@
 - 관리자/일반 사용자 권한 분리
 
 ## 주요 경로
-- Backend API: `backend/app/api/hr_basic.py`, `backend/app/api/employee.py`
+- Backend API: `backend-rust/src/hr/basic.rs`, `backend-rust/src/hr/employees.rs`
 - Frontend: `frontend/src/components/hr/*`, `frontend/src/app/hr/*`
 
 ## 데이터 모델 핵심

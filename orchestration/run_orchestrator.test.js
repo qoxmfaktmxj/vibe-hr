@@ -9,7 +9,7 @@ const { extractText, joinBaseAndPath, mockResponse, orchestrate, parseArgs, vali
 
 const task = { task_id: "T-1", title: "Test", goal: "Goal", context: "Context", constraints: [], targets: [], definition_of_done: [] };
 
-test("validates task and uses the Spring 8080 default", () => {
+test("validates task and uses the local port 8080 default", () => {
   validateTask(task);
   assert.throws(() => validateTask({}), /task_id/);
   assert.throws(() => validateTask({ ...task, targets: { backend: ["backend/app/api/auth.py"] } }), /retired backend targets/);

@@ -9,10 +9,10 @@
   - 세율/보험요율
   - 수당/공제항목
   - 항목그룹
-- 시드 기반 기본 데이터 자동 반영
+- Flyway가 필수 기준 데이터를 적용한다.
 
 ## 주요 경로
-- Backend API: `backend/app/api/pay_setup.py`
+- Backend API: `backend-rust/src/payroll/read.rs`, `backend-rust/src/payroll/batch.rs`
 - Frontend: `frontend/src/app/payroll/*`
 
 ## 데이터 모델 핵심
@@ -22,7 +22,7 @@
 - `pay_item_groups`, `pay_item_group_details`
 
 ## 변경 시 주의
-1. 급여 계산 엔진 도입 전에도 마스터코드의 backward compatibility 유지 필요
+1. 계산 엔진을 변경할 때 마스터코드의 backward compatibility 유지 필요
 2. 세율 데이터는 연도별 versioning 보장
 3. 과세/비과세 구분 변경 시 급여 산식 영향도 큼
 

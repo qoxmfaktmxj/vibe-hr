@@ -1,3 +1,12 @@
+## 2026-11-23 Rust 개발 문서와 로컬 실행 설정
+
+- 성공 기준은 README에서 Rust 실행, DB 준비, BFF 연결, 테스트 절차를 따라갈 수 있고 업무 모듈, Codex/Claude 작업 안내와 예시가 실제 저장소 경로를 가리키는 것이다.
+- 루트, 프론트엔드, Rust, Spring 비교용 README와 개발 지침을 정리했다. 인사, 조직, 근태, 급여, 결재 문서에서 Rust 소스를 연결했다. 로컬 Claude 실행 설정과 오케스트레이션 예시를 Cargo 기준으로 맞췄고, BFF 테스트 대상 포트를 8080으로 정리했다.
+- `npm --prefix frontend run test` 264개, `node --test orchestration/run_orchestrator.test.js` 3개 통과. `node scripts/spring-migration/bff-cutover-audit.js`로 라우트 160개와 공통 대상 프록시 144개를 확인했다.
+- `docker compose -p vibehr-doc-check -f docker-compose.rust-smoke.yml config --services`에서 5개 서비스를 확인했다. `node scripts/spring-migration/verify-delivery.js`로 Rust 릴리스와 Spring 롤백 구성을 검증했다. Windows 체크아웃의 검증용 셸 파일 2개는 기존 인덱스와 동일한 LF 바이트로 복원했다.
+- 변경 안내 문서의 상대 링크, Rust 경로, Claude 설정과 작업 예시 JSON을 확인했다. Rust 소스 변경은 없으며 Cargo 빌드, DB 마이그레이션, 운영 배포는 실행하지 않았다.
+- 푸시 대상에서 기존 로컬 조직 테스트 변경을 제외하고 잠금 파일로 다시 설치했다. 이 사본에서 프론트엔드 테스트 312개, 오케스트레이션 3개, 그리드 등록 검사, ESLint, BFF 라우트 검사와 배포 구성 검사가 통과했다. 결재 테스트의 모의 서버 주소와 배포 환경 파일의 주석도 현재 구성에 맞췄다.
+
 ## VH-R3-RUST-BACKEND-20261119
 
 - Local implementation and full verification completed. The user approved migration of all backend domains, verification against isolated PostgreSQL, and supporting CI and deployment configuration changes. Deployment to production requires a separate decision.

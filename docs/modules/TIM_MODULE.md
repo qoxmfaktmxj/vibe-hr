@@ -17,10 +17,10 @@
 
 ## 주요 경로
 - Backend API:
-  - `backend/app/api/tim_attendance_daily.py`
-  - `backend/app/api/tim_leave.py`
-  - `backend/app/api/tim_report.py`
-  - `backend/app/api/tim_schedule.py`
+  - `backend-rust/src/time/mod.rs`, `backend-rust/src/time/attendance.sql`
+  - `backend-rust/src/time/leave.rs`
+  - `backend-rust/src/time/reports.rs`
+  - `backend-rust/src/time/schedules.rs`
 - Frontend:
   - `frontend/src/app/tim/*`
   - `frontend/src/components/tim/*`

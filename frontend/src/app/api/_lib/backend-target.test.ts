@@ -5,7 +5,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-test("uses the explicit Spring BFF target", () => {
+test("uses the explicit BFF backend target", () => {
   vi.stubEnv("VIBEHR_BFF_BACKEND_URL", "http://backend:8080");
   expect(backendApiBaseUrl()).toBe("http://backend:8080");
 });

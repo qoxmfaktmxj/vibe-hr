@@ -45,13 +45,13 @@
 
 ## 주요 경로
 - Backend API:
-  - `backend/app/api/hri_form_type.py`
-  - `backend/app/api/hri_approval_template.py`
-  - `backend/app/api/hri_request.py`
+  - `backend-rust/src/hri/config.rs`
+  - `backend-rust/src/hri/mod.rs`
+  - `backend-rust/src/hri/workflow.rs`, `backend-rust/src/hri/detail.rs`
 - Frontend:
   - `frontend/src/app/hri/*`
   - `frontend/src/components/hri/*`
 
 ## 저장 순서 정책 (요청 반영)
 **TIM → CPN → HRI** 순으로 반영/점검한다.
-(현재 seed 호출 체인도 이 순서 유지)
+테스트에 필요한 결재 상태는 격리 DB에 준비한다.

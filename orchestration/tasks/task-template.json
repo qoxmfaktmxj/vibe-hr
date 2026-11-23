@@ -13,7 +13,7 @@
       "frontend/path/example.tsx"
     ],
     "backend": [
-      "backend-spring/src/main/java/com/vibehr/example/ExampleController.java"
+      "backend-rust/src/hr/employees.rs"
     ],
     "qa": [
       "test scenario to run"

@@ -1,6 +1,6 @@
-Status: Draft
+Status: 초기 진단 기록
 Owner: 석
-Canonical: Yes
+현재 개발 기준: [아키텍처](../ARCHITECTURE.md)
 Source of Truth: This file
 Last Verified: TBD
 Confidence: Medium
@@ -10,7 +10,9 @@ Confidence: Medium
 ## 목적
 Layer 1에서 수집한 프로젝트 진단 결과를 고정한다. 이 문서는 Vibe-HR에 대한 초기 하네스 설계의 출발점이며, Layer 2 Governance 설계의 입력 문서다.
 
-## 프로젝트 요약
+초기 하네스 진단 당시의 관찰 기록이다. 현재 런타임 구성과 검증 방법은 [아키텍처](../ARCHITECTURE.md)와 [테스트 전략](../TEST_STRATEGY.md)을 따른다.
+
+## 진단 당시 프로젝트 요약
 Vibe-HR은 한국형 EHR/HR 업무를 웹 기반으로 현대화하는 혼합형 레거시 전환 프로젝트다. [Observed][User-stated]
 
 기술적으로는 Next.js + Spring Boot + PostgreSQL 모노레포 구조를 사용하며, HR / ORG / TIM / PAYROLL / WEL / HRI / TRA 도메인을 단계적으로 재구성하고 있다. [Observed]

@@ -71,7 +71,7 @@
 - 표준 단일 CRUD / 조직 도메인 표준형 / 복합형 마스터-디테일의 3가지 패턴을 커버한다. [Derived]
 - 이후 다수의 AG Grid 화면에 확장 가능한 rollout 기준점이 된다. [Derived]
 
-## 8. Pilot 구현 결과
+## 8. Spring 비교 구현의 Pilot 검증 기록
 ### 완료된 것
 - backend 메뉴 액션 권한 helper 추가
 - `employee`, `organization(departments)`, `common_code` API에 `query`/`save` action gate 연결
@@ -84,7 +84,7 @@
 - frontend `validate:grid`: failed, but pilot 변경과 무관한 기존 baseline 이슈 확인 [Observed]
 
 ## 9. Rollout Checklist
-다음 화면에 액션 권한을 붙일 때 아래를 확인한다.
+Rust의 [메뉴 권한](../backend-rust/src/menu.rs)과 대상 도메인 핸들러에서 액션을 검사한다. 다음 화면에 액션 권한을 붙일 때 아래를 확인한다.
 - 메뉴 path / menu code가 실제 registry 및 route와 일치하는가
 - frontend에서 `useMenuActions(path)`를 사용하고 있는가
 - toolbar action key와 표준 action code(`query/create/copy/template_download/upload/save/download`) 매핑이 일치하는가

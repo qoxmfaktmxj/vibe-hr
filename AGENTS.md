@@ -1,93 +1,14 @@
-# oh-my-codex - Intelligent Multi-Agent Orchestration
+## 언어
+- 모든 응답은 한국어로 작성.
+- IT 용어는 필요하면 영문 병기 가능.
 
-You are running with oh-my-codex (OMX), a coordination layer for Codex CLI.
-This AGENTS.md is the top-level operating contract for the workspace.
-Role prompts under `prompts/*.md` are narrower execution surfaces. They must follow this file, not override it.
+## 작업 원칙
+- 필요한 범위만 수정하고, 요청과 무관한 정리는 하지 않는다.
+- 가정이 크거나 해석이 갈리면 먼저 드러내고 확인한다.
+- cleanup/refactor 성격 작업은 수정 전에 간단한 계획과 검증 기준을 먼저 잡는다.
+- 새 의존성은 명시 요청 없이는 추가하지 않는다.
 
-<guidance_schema_contract>
-Canonical guidance schema for this template is defined in `docs/guidance-schema.md`.
-
-Required schema sections and this template's mapping:
-- **Role & Intent**: title + opening paragraphs.
-- **Operating Principles**: `<operating_principles>`.
-- **Execution Protocol**: delegation/model routing/agent catalog/skills/team pipeline sections.
-- **Constraints & Safety**: keyword detection, cancellation, and state-management rules.
-- **Verification & Completion**: `<verification>` + continuation checks in `<execution_protocols>`.
-- **Recovery & Lifecycle Overlays**: runtime/team overlays are appended by marker-bounded runtime hooks.
-
-Keep runtime marker contracts stable and non-destructive when overlays are applied:
-- `<!-- OMX:RUNTIME:START --> ... <!-- OMX:RUNTIME:END -->`
-- `<!-- OMX:TEAM:WORKER:START --> ... <!-- OMX:TEAM:WORKER:END -->`
-</guidance_schema_contract>
-
-<operating_principles>
-- Solve the task directly when you can do so safely and well.
-- Delegate only when it materially improves quality, speed, or correctness.
-- Keep progress short, concrete, and useful.
-- Prefer evidence over assumption; verify before claiming completion.
-- Use the lightest path that preserves quality: direct action, MCP, then delegation.
-- Check official documentation before implementing with unfamiliar SDKs, frameworks, or APIs.
-<!-- OMX:GUIDANCE:OPERATING:START -->
-- Default to compact, information-dense responses; expand only when risk, ambiguity, or the user explicitly calls for detail.
-- Proceed automatically on clear, low-risk, reversible next steps; ask only for irreversible, side-effectful, or materially branching actions.
-- Treat newer user task updates as local overrides for the active task while preserving earlier non-conflicting instructions.
-- Persist with tool use when correctness depends on retrieval, inspection, execution, or verification; do not skip prerequisites just because the likely answer seems obvious.
-<!-- OMX:GUIDANCE:OPERATING:END -->
-</operating_principles>
-
-## Canonical source map
-This `AGENTS.md` is the primary execution surface for Codex/OMX in this repo. It is not the only policy document. Canonical detail lives in the docs below; avoid duplicating long policy text here.
-
-- Governance / approvals / risk classes: `docs/GOVERNANCE.md`
-- Architecture / domains / hotspots: `docs/ARCHITECTURE.md`
-- Testing / validation requirements: `docs/TEST_STRATEGY.md`
-- Execution loop / batch / failure handling: `docs/EXECUTION_PROTOCOL.md`
-- Quality score / readiness: `docs/QUALITY_SCORE.md`
-- Security / protected changes: `docs/SECURITY.md`
-- Observability / runtime signals: `docs/OBSERVABILITY.md`
-- Sub-agent structure: `docs/SUB_AGENTS.md`
-- Skill index / automation hints: `docs/SKILLS_INDEX.md`
-- Work evidence / task trace: `docs/TASK_LEDGER.md`
-- AG Grid standard: `docs/GRID_SCREEN_STANDARD.md`
-- Menu / action permission plan: `docs/MENU_ACTION_PERMISSION_PLAN.md`
-- Discovery / harness bootstrap context: `docs/harness/DISCOVERY_PACKET.md`
-
-## Execution summary
-Before changes:
-1. Read the relevant canonical docs.
-2. Determine risk class (`R0` / `R1` / `R2` / `R3`).
-3. If the work is `R2` or `R3`, stop and require explicit approval before changing code.
-4. Make the smallest viable change.
-5. Run required validation.
-6. Keep completion evidence consistent with `docs/TASK_LEDGER.md`.
-
-## Risk summary
-- `R0`: docs / low-risk non-executable changes
-- `R1`: local low-risk code changes with validation
-- `R2`: shared contracts / CI / permission flow / shared grid rules → approval required
-- `R3`: auth, payroll semantics, DB schema/migration, deploy/infra, secrets → explicit approval required
-
-## Sensitive paths (quick view)
-- `frontend/src/components/grid/**`
-- `frontend/src/lib/grid/**`
-- `config/grid-screens.json`
-- `backend-rust/src/security/**`, `backend-rust/src/payroll/**`, `backend-rust/src/menu.rs`, `backend-rust/src/menu/**`, `backend-rust/src/db/**`, `backend-rust/Dockerfile`
-- `backend-spring/src/main/java/com/vibehr/auth/**`
-- `backend-spring/src/main/java/com/vibehr/payroll/**`
-- `backend-spring/src/main/java/com/vibehr/menu/**`
-- `backend-spring/src/main/java/com/vibehr/platform/security/**`
-- `backend-spring/src/main/resources/db/migration/**`
-- `backend-spring/src/test/java/com/vibehr/auth/**`
-- `backend-spring/src/test/java/com/vibehr/payroll/**`
-- `backend-spring/src/test/java/com/vibehr/menu/**`
-- `.github/workflows/**`
-- `docker-compose.deploy.yml`
-- `backend-spring/Dockerfile`
-- `frontend/Dockerfile`
-
-## Working agreements
-
-### VIBE-HR mandatory AG Grid rules
+## AG Grid 필수 규칙
 - AG Grid 화면 수정 전 아래 순서를 반드시 읽을 것:
   1. `config/grid-screens.json`
   2. `docs/GRID_SCREEN_STANDARD.md`
@@ -100,292 +21,45 @@ Before changes:
   - `config/grid-screens.json` 등록/갱신
   - `npm run validate:grid`를 lint/build 전에 실행
 
-<!-- OMX:AGENTS-MANUAL:START -->
-### Project execution rules
-- Frontend work belongs in `frontend/*` and backend runtime work belongs in `backend-rust/*`. Keep the Spring comparison reference and Flyway assets in `backend-spring/*`. Cross-layer changes must identify the shared contract.
-- API contract changes must mention affected frontend screens and backend schemas together.
-- Shared UI or AG Grid changes must include at least one regression check on an existing screen.
-- Menu, action, and permission related work must be cross-checked against `docs/MENU_ACTION_PERMISSION_PLAN.md`.
-- Large refactors must be sliced by screen, endpoint, or domain unit. Avoid broad rewrites across unrelated modules.
+## 프로젝트 실행 규칙
+- 프론트엔드는 `frontend/*`, 실행 백엔드는 `backend-rust/*`에서 작업한다. `backend-spring/*`에는 비교용 Spring 구현과 Flyway SQL을 유지한다. 두 계층을 함께 바꾸면 공유 계약을 명시한다.
+- API 계약 변경 시 영향받는 frontend 화면과 backend schema/service를 함께 언급한다.
+- 공유 UI 또는 AG Grid 변경 시 기존 화면 최소 1개 이상 회귀 확인을 포함한다.
+- 메뉴/액션/권한 관련 변경은 `docs/MENU_ACTION_PERMISSION_PLAN.md`와 교차 확인한다.
+- 큰 리팩터링은 화면, endpoint, 도메인 단위로 잘라서 진행한다.
 
-### Planner-first workflow
-- Start broad work with architecture or planning prompts before executor prompts.
-- Use team execution only after scope, acceptance criteria, and affected files are identified.
-- Prefer one vertical slice at a time: screen + API + QA + docs.
+## 위험도
+- `R0`: 문서/비실행/저위험 변경
+- `R1`: 로컬 저위험 코드 변경. 검증 필수
+- `R2`: 공통 계약, CI, 권한 흐름, 공유 Grid 규칙 변경. 사전 승인 필요
+- `R3`: 인증/인가, 급여 의미, DB schema/migration, 배포/infra, secret. 명시 승인 필요
 
-### Verification rules
-- AG Grid screens: run `npm run validate:grid` before lint/build.
-- Frontend changes: run `npm run lint` in `frontend` when applicable.
-- Small navigation/app-shell UI changes: use `npm run check:ui` once after final code edits (lint, unit tests, two static-background browser flows, one build including TypeScript). During editing, prefer affected tests and file-scoped lint. GPU rendering checks are for 3D/motion changes; select feature-specific tests for behavior outside the smoke flows. See `docs/TEST_STRATEGY.md` for full-suite and protected-change requirements. Do not repeat unchanged successful checks for documentation-only edits.
-- Backend changes require Cargo formatting, strict Clippy, Rust tests and the relevant PostgreSQL and BFF workflows. Use `scripts/ci/verify-rust.sh` for backend migration parity and rollback checks. Keep Gradle coverage for the Spring reference.
-- When editing user-facing Korean text, preserve UTF-8 encoding and verify real browser rendering with a screenshot; treat CLI snapshot text as non-authoritative for Korean.
-- If validation cannot run, explicitly record why.
-<!-- OMX:AGENTS-MANUAL:END -->
+## 민감 경로
+- `frontend/src/components/grid/**`
+- `frontend/src/lib/grid/**`
+- `config/grid-screens.json`
+- `backend-rust/src/security/**`, `backend-rust/src/payroll/**`, `backend-rust/src/menu.rs`, `backend-rust/src/menu/**`, `backend-rust/src/db/**`, `backend-rust/Dockerfile`
+- `backend-spring/src/main/java/com/vibehr/auth/**`
+- `backend-spring/src/main/java/com/vibehr/payroll/**`
+- `backend-spring/src/main/java/com/vibehr/menu/**`
+- `backend-spring/src/main/java/com/vibehr/platform/security/**`
+- `backend-spring/src/main/resources/db/migration/**`
+- `backend-spring/src/test/java/com/vibehr/auth/**`
+- `backend-spring/src/test/java/com/vibehr/payroll/**`
+- `backend-spring/src/test/java/com/vibehr/menu/**`
+- `backend-spring/Dockerfile`
+- `.github/workflows/**`
+- `docker-compose.deploy.yml`
 
-- Write a cleanup plan before modifying code for cleanup/refactor/deslop work.
-- Lock existing behavior with regression tests before cleanup edits when behavior is not already protected.
-- Prefer deletion over addition.
-- Reuse existing utils and patterns before introducing new abstractions.
-- No new dependencies without explicit request.
-- Keep diffs small, reviewable, and reversible.
-- Run lint, typecheck, tests, and static analysis after changes.
-- Final reports must include changed files, simplifications made, and remaining risks.
+## 검증
+- AG Grid 화면: `npm run validate:grid`
+- Frontend 변경: 필요 시 `cd frontend && npm run lint`
+- Rust 백엔드를 변경하면 `backend-rust`에서 `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`를 실행한다. 변경과 관련된 PostgreSQL, BFF 동작도 검증한다.
+- 이관 전후 동작과 롤백은 `scripts/ci/verify-rust.sh`로 확인한다. Spring 비교 구현의 변경은 관련 Gradle 테스트로 검증한다.
+- 검증을 못 돌리면 이유를 최종 보고에 명시
 
----
-
-<delegation_rules>
-Default posture: work directly. Delegate only when the task is multi-file, specialist-heavy, highly parallel, or materially safer with a dedicated role.
-
-Use delegation for:
-- deep analysis, broad planning, focused review, specialist research, or large parallel work
-- non-trivial SDK/API/framework usage that benefits from `dependency-expert`
-- substantive implementation work that clearly benefits from `executor`
-
-Do not delegate trivial work or use delegation as a substitute for reading the code.
-For substantive code changes, `executor` is the default implementation role.
-Outside active `team`/`swarm` mode, use `executor` (or another standard role prompt) for implementation work; do not invoke `worker` or spawn Worker-labeled helpers in non-team mode.
-Reserve `worker` strictly for active `team`/`swarm` sessions and team-runtime bootstrap flows.
-</delegation_rules>
-
-<child_agent_protocol>
-When delegating:
-1. Choose the right role.
-2. Read `./.codex/prompts/{role}.md` first.
-3. Spawn the child with that prompt plus the concrete task.
-4. Keep the task bounded and verifiable.
-
-Rules:
-- Max 6 concurrent child agents.
-- Child prompts stay under AGENTS.md authority.
-- `worker` is a team-runtime surface, not a general-purpose child role.
-- Child agents should report recommended handoffs upward.
-- Child agents should finish their assigned role, not recursively orchestrate unless explicitly told to do so.
-</child_agent_protocol>
-
-<invocation_conventions>
-- `/prompts:name` — invoke a role prompt
-- `$name` — invoke a workflow skill
-- `/skills` — browse available skills
-</invocation_conventions>
-
-<model_routing>
-Match role to task shape:
-- Low complexity: `explore`, `style-reviewer`, `writer`
-- Standard: `executor`, `debugger`, `test-engineer`
-- High complexity: `architect`, `executor`, `critic`
-</model_routing>
-
----
-
-<agent_catalog>
-Key roles:
-- `explore` — fast codebase search and mapping
-- `planner` — work plans and sequencing
-- `architect` — read-only analysis, diagnosis, tradeoffs
-- `debugger` — root-cause analysis
-- `executor` — implementation and refactoring
-- `verifier` — completion evidence and validation
-
-Specialists remain available through `/prompts:*` when the task clearly benefits from them.
-</agent_catalog>
-
----
-
-<keyword_detection>
-When the user message contains a mapped keyword, activate the corresponding skill immediately.
-Do not ask for confirmation.
-
-Supported workflow triggers include: `ralph`, `autopilot`, `ultrawork`, `ultraqa`, `cleanup`/`refactor`/`deslop`, `analyze`, `plan this`, `deep interview`, `ouroboros`, `ralplan`, `team`/`swarm`, `ecomode`, `cancel`, `tdd`, `fix build`, `code review`, `security review`, and `web-clone`.
-The `deep-interview` skill is the Socratic deep interview workflow and includes the ouroboros trigger family.
-
-| Keyword(s) | Skill | Action |
-|-------------|-------|--------|
-| "ralph", "don't stop", "must complete", "keep going" | `$ralph` | Read `./.agents/skills/ralph/SKILL.md`, execute persistence loop |
-| "autopilot", "build me", "I want a" | `$autopilot` | Read `./.agents/skills/autopilot/SKILL.md`, execute autonomous pipeline |
-| "ultrawork", "ulw", "parallel" | `$ultrawork` | Read `./.agents/skills/ultrawork/SKILL.md`, execute parallel agents |
-| "ultraqa" | `$ultraqa` | Read `./.agents/skills/ultraqa/SKILL.md`, run QA cycling workflow |
-| "analyze", "investigate" | `$analyze` | Read `./.agents/skills/analyze/SKILL.md`, run deep analysis |
-| "plan this", "plan the", "let's plan" | `$plan` | Read `./.agents/skills/plan/SKILL.md`, start planning workflow |
-| "interview", "deep interview", "gather requirements", "interview me", "don't assume", "ouroboros" | `$deep-interview` | Read `./.agents/skills/deep-interview/SKILL.md`, run Ouroboros-inspired Socratic ambiguity-gated interview workflow |
-| "ralplan", "consensus plan" | `$ralplan` | Read `./.agents/skills/ralplan/SKILL.md`, start consensus planning with RALPLAN-DR structured deliberation (short by default, `--deliberate` for high-risk) |
-| "team", "swarm", "coordinated team", "coordinated swarm" | `$team` | Read `./.agents/skills/team/SKILL.md`, start team orchestration (swarm compatibility alias) |
-| "ecomode", "eco", "budget" | `$ecomode` | Read `./.agents/skills/ecomode/SKILL.md`, enable token-efficient mode |
-| "cancel", "stop", "abort" | `$cancel` | Read `./.agents/skills/cancel/SKILL.md`, cancel active modes |
-| "tdd", "test first" | `$tdd` | Read `./.agents/skills/tdd/SKILL.md`, start test-driven workflow |
-| "fix build", "type errors" | `$build-fix` | Read `./.agents/skills/build-fix/SKILL.md`, fix build errors |
-| "review code", "code review", "code-review" | `$code-review` | Read `./.agents/skills/code-review/SKILL.md`, run code review |
-| "security review" | `$security-review` | Read `./.agents/skills/security-review/SKILL.md`, run security audit |
-| "web-clone", "clone site", "clone website", "copy webpage" | `$web-clone` | Read `./.agents/skills/web-clone/SKILL.md`, start website cloning pipeline |
-| "vibe-validate", "validate all", "full check", "전체검증" | `$vibe-validate` | Read `./.codex/skills/vibe-validate/SKILL.md`, run full validation pipeline |
-| "vibe-payroll", "payroll change", "급여변경", "급여수정" | `$vibe-payroll` | Read `./.codex/skills/vibe-payroll/SKILL.md`, enforce R3 payroll safety |
-| "vibe-grid", "grid change", "그리드수정", "AG Grid" | `$vibe-grid` | Read `./.codex/skills/vibe-grid/SKILL.md`, enforce AG Grid standards |
-| "vibe-permission", "permission change", "권한변경", "메뉴권한" | `$vibe-permission` | Read `./.codex/skills/vibe-permission/SKILL.md`, enforce permission safety |
-
-Detection rules:
-- Keywords are case-insensitive and match anywhere in the user message.
-- Explicit `$name` invocations run left-to-right and override non-explicit keyword resolution.
-- If multiple non-explicit keywords match, use the most specific match.
-- If the user explicitly invokes `/prompts:<name>`, do not auto-activate keyword skills unless explicit `$name` tokens are also present.
-- The rest of the user message becomes the task description.
-
-Ralph / Ralplan execution gate:
-- Enforce **ralplan-first** when ralph is active and planning is not complete.
-- Planning is complete only after both `.omx/plans/prd-*.md` and `.omx/plans/test-spec-*.md` exist.
-- Until complete, do not begin implementation or execute implementation-focused tools.
-</keyword_detection>
-
----
-
-<skills>
-Skills are workflow commands.
-Core workflows include `autopilot`, `ralph`, `ultrawork`, `visual-verdict`, `web-clone`, `ecomode`, `team`, `swarm`, `ultraqa`, `plan`, `deep-interview` (Socratic deep interview, Ouroboros-inspired), and `ralplan`.
-Utilities include `cancel`, `note`, `doctor`, `help`, and `trace`.
-</skills>
-
----
-
-<team_compositions>
-Common team compositions remain available when explicit team orchestration is warranted, for example feature development, bug investigation, code review, and UX audit.
-</team_compositions>
-
----
-
-<team_pipeline>
-Team mode is the structured multi-agent surface.
-Canonical pipeline:
-`team-plan -> team-prd -> team-exec -> team-verify -> team-fix (loop)`
-
-Use it when durable staged coordination is worth the overhead. Otherwise, stay direct.
-Terminal states: `complete`, `failed`, `cancelled`.
-</team_pipeline>
-
----
-
-<team_model_resolution>
-Team/Swarm workers currently share one `agentType` and one launch-arg set.
-Model precedence:
-1. Explicit model in `OMX_TEAM_WORKER_LAUNCH_ARGS`
-2. Inherited leader `--model`
-3. Low-complexity default model from `OMX_SPARK_MODEL` (currently `gpt-5.4`)
-
-Normalize model flags to one canonical `--model <value>` entry.
-</team_model_resolution>
-
----
-
-<verification>
-Verify before claiming completion.
-
-Sizing guidance:
-- Small changes: lightweight verification
-- Standard changes: standard verification
-- Large or security/architectural changes: thorough verification
-
-<!-- OMX:GUIDANCE:VERIFYSEQ:START -->
-Verification loop: identify what proves the claim, run the verification, read the output, then report with evidence. If verification fails, continue iterating rather than reporting incomplete work. Default to concise evidence summaries in the final response, but never omit the proof needed to justify completion.
-
-- Run dependent tasks sequentially; verify prerequisites before starting downstream actions.
-- If a task update changes only the current branch of work, apply it locally and continue without reinterpreting unrelated standing instructions.
-- When correctness depends on retrieval, diagnostics, tests, or other tools, continue using them until the task is grounded and verified.
-<!-- OMX:GUIDANCE:VERIFYSEQ:END -->
-</verification>
-
-<execution_protocols>
-Broad Request Detection:
-A request is broad when it uses vague verbs without targets, names no specific file or function, touches 3+ areas, or is a single sentence without a clear deliverable. For broad work: explore first, then plan if needed.
-
-Parallelization:
-- Run independent tasks in parallel.
-- Run dependent tasks sequentially.
-- Use background execution for builds and tests when helpful.
-- Prefer Team mode only when its coordination value outweighs its overhead.
-- If correctness depends on retrieval, diagnostics, tests, or other tools, continue using them until the task is grounded and verified.
-
-Anti-slop workflow:
-- Cleanup/refactor/deslop requests route through `$ai-slop-cleaner` unless the user explicitly requests otherwise.
-- Lock behavior with tests first, then make one smell-focused pass at a time.
-- Prefer deletion, reuse, and boundary repair over new layers.
-- Keep writer/reviewer pass separation for cleanup plans and approvals.
-
-Visual iteration gate:
-- For visual tasks, run `$visual-verdict` every iteration before the next edit.
-- Persist verdict JSON in `.omx/state/{scope}/ralph-progress.json`.
-
-Continuation:
-Before concluding, confirm: no pending work, features working, tests passing, zero known errors, verification evidence collected. If not, continue.
-
-Ralph planning gate:
-If ralph is active, verify PRD + test spec artifacts exist before implementation work.
-</execution_protocols>
-
-<cancellation>
-Use the `cancel` skill to end execution modes.
-Cancel when work is done and verified, when the user says stop, or when a hard blocker prevents meaningful progress.
-Do not cancel while recoverable work remains.
-</cancellation>
-
----
-
-<state_management>
-OMX persists runtime state under `.omx/`:
-- `.omx/state/` — mode state
-- `.omx/notepad.md` — session notes
-- `.omx/project-memory.json` — cross-session memory
-- `.omx/plans/` — plans
-- `.omx/logs/` — logs
-
-Available MCP groups include state/memory tools, code-intel tools, and trace tools.
-
-Mode lifecycle requirements:
-- Write state on start.
-- Update state on phase or iteration change.
-- Mark inactive with `completed_at` on completion.
-- Clear state on cancel/abort cleanup.
-</state_management>
-
----
-
-## Setup
-
-Run `omx setup` to install all components. Run `omx doctor` to verify installation.
-
-<!-- OMX:MODELS:START -->
-## Model Capability Table
-
-Auto-generated by `omx setup` from the current `config.toml` plus OMX model overrides.
-
-| Role | Model | Reasoning Effort | Use Case |
-| --- | --- | --- | --- |
-| Frontier (leader) | `gpt-5.4` | high | Primary leader/orchestrator for planning, coordination, and frontier-class reasoning. |
-| All subagents | `gpt-5.4` | high | Unified model — Pro subscription, no cost/speed routing needed. |
-| `explore` | `gpt-5.4` | low | Fast codebase search and file/symbol mapping (fast-lane, fast) |
-| `analyst` | `gpt-5.4` | medium | Requirements clarity, acceptance criteria, hidden constraints (frontier-orchestrator, frontier) |
-| `planner` | `gpt-5.4` | medium | Task sequencing, execution plans, risk flags (frontier-orchestrator, frontier) |
-| `architect` | `gpt-5.4` | high | System design, boundaries, interfaces, long-horizon tradeoffs (frontier-orchestrator, frontier) |
-| `debugger` | `gpt-5.4` | high | Root-cause analysis, regression isolation, failure diagnosis (deep-worker, standard) |
-| `executor` | `gpt-5.4` | high | Code implementation, refactoring, feature work (deep-worker, standard) |
-| `team-executor` | `gpt-5.4` | medium | Supervised team execution for conservative delivery lanes (deep-worker, frontier) |
-| `verifier` | `gpt-5.4` | high | Completion evidence, claim validation, test adequacy (frontier-orchestrator, standard) |
-| `style-reviewer` | `gpt-5.4` | low | Formatting, naming, idioms, lint conventions (fast-lane, fast) |
-| `quality-reviewer` | `gpt-5.4` | medium | Logic defects, maintainability, anti-patterns (frontier-orchestrator, standard) |
-| `api-reviewer` | `gpt-5.4` | medium | API contracts, versioning, backward compatibility (frontier-orchestrator, standard) |
-| `security-reviewer` | `gpt-5.4` | medium | Vulnerabilities, trust boundaries, authn/authz (frontier-orchestrator, frontier) |
-| `performance-reviewer` | `gpt-5.4` | medium | Hotspots, complexity, memory/latency optimization (frontier-orchestrator, standard) |
-| `code-reviewer` | `gpt-5.4` | high | Comprehensive review across all concerns (frontier-orchestrator, frontier) |
-| `dependency-expert` | `gpt-5.4` | high | External SDK/API/package evaluation (frontier-orchestrator, standard) |
-| `test-engineer` | `gpt-5.4` | medium | Test strategy, coverage, flaky-test hardening (deep-worker, frontier) |
-| `quality-strategist` | `gpt-5.4` | medium | Quality strategy, release readiness, risk assessment (frontier-orchestrator, standard) |
-| `build-fixer` | `gpt-5.4` | high | Build/toolchain/type failures resolution (deep-worker, standard) |
-| `designer` | `gpt-5.4` | high | UX/UI architecture, interaction design (deep-worker, standard) |
-| `writer` | `gpt-5.4` | high | Documentation, migration notes, user guidance (fast-lane, standard) |
-| `qa-tester` | `gpt-5.4` | low | Interactive CLI/service runtime validation (deep-worker, standard) |
-| `git-master` | `gpt-5.4` | high | Commit strategy, history hygiene, rebasing (deep-worker, standard) |
-| `code-simplifier` | `gpt-5.4` | high | Simplifies recently modified code for clarity and consistency without changing behavior (deep-worker, frontier) |
-| `researcher` | `gpt-5.4` | high | External documentation and reference research (fast-lane, standard) |
-| `product-manager` | `gpt-5.4` | medium | Problem framing, personas/JTBD, PRDs (frontier-orchestrator, standard) |
-| `ux-researcher` | `gpt-5.4` | medium | Heuristic audits, usability, accessibility (frontier-orchestrator, standard) |
-| `information-architect` | `gpt-5.4` | low | Taxonomy, navigation, findability (frontier-orchestrator, standard) |
-| `product-analyst` | `gpt-5.4` | low | Product metrics, funnel analysis, experiments (frontier-orchestrator, standard) |
-| `critic` | `gpt-5.4` | high | Plan/design critical challenge and review (frontier-orchestrator, frontier) |
-| `vision` | `gpt-5.4` | low | Image/screenshot/diagram analysis (fast-lane, frontier) |
-<!-- OMX:MODELS:END -->
+## 최종 보고
+- 변경 파일
+- 검증 결과
+- 단순화한 내용
+- 남은 위험 또는 미실행 검증

@@ -255,19 +255,11 @@ run 생성 시 snapshot 저장 대상:
 ## 10) 작업 파일 범위
 
 ### Backend
-- `backend/app/models/entities.py`
-- `backend/app/schemas/pay_employee_profile_schema.py`
-- `backend/app/schemas/pay_variable_input_schema.py`
-- `backend/app/schemas/payroll_run_schema.py`
-- `backend/app/services/pay_employee_profile_service.py`
-- `backend/app/services/pay_variable_input_service.py`
-- `backend/app/services/pay_engine_service.py`
-- `backend/app/services/payroll_run_service.py`
-- `backend/app/api/pay_employee_profile.py`
-- `backend/app/api/pay_variable_input.py`
-- `backend/app/api/payroll_run.py`
-- `backend/app/main.py` (router include)
-- bootstrap/seed 최소 테스트 데이터
+
+- [급여 API와 메뉴 권한](../backend-rust/src/payroll/mod.rs)
+- [조회](../backend-rust/src/payroll/read.rs), [기초정보 일괄 저장](../backend-rust/src/payroll/batch.rs)
+- [급여 실행](../backend-rust/src/payroll/runs.rs), [계산](../backend-rust/src/payroll/calculation.rs), [스냅샷](../backend-rust/src/payroll/snapshots.rs)
+- [PostgreSQL 회귀 테스트](../backend-rust/src/payroll/postgres_test.rs)
 
 ### Frontend
 - `frontend/src/app/payroll/employee-profiles/page.tsx`

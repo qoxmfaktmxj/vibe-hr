@@ -98,8 +98,8 @@
 
 ## 7. 이행 순서
 ### Phase 1
-- 신규 테이블 SQLModel 추가
-- 마이그레이션 생성/적용
+- 신규 테이블의 Flyway SQL과 Rust 업무 모듈의 SQLx 매핑 설계
+- 격리된 PostgreSQL에서 마이그레이션 적용 및 카탈로그 검증
 
 ### Phase 2
 - 서비스/스키마/API 도메인 분리

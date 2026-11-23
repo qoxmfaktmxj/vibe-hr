@@ -1,13 +1,13 @@
 # Vibe-HR
 
-## AI 개발 시작 전 필독 순서
+Vibe-HR의 실행 백엔드는 Rust입니다. Next.js BFF가 브라우저 요청을 받아 axum API로 전달하고, Rust 업무 모듈이 권한을 확인한 뒤 SQLx로 PostgreSQL에 접근합니다.
 
-1. `docs/DEVELOPMENT_PRECHECK.md`
-2. `AGENTS.md`
-3. `config/grid-screens.json`
-4. `docs/GRID_SCREEN_STANDARD.md`
-5. `docs/MENU_ACTION_PERMISSION_PLAN.md`
-6. 작업 대상 화면의 `page.tsx`와 실제 컴포넌트 파일
+| 하려는 일 | 시작할 곳 |
+| --- | --- |
+| 로컬 API와 프론트엔드 실행 | [로컬 실행 방법](#로컬-실행-방법) |
+| Rust 코드와 테스트 찾기 | [Rust 백엔드](backend-rust/README.md), [테스트 전략](docs/TEST_STRATEGY.md) |
+| 개발 규칙 확인 | [작업 지침](AGENTS.md), [개발 전 확인 사항](docs/DEVELOPMENT_PRECHECK.md) |
+| Spring과 동작 비교, 운영 전환 | [이관 검증 기록](docs/rust-migration/verification.md), [전환 절차](docs/rust-migration/production-cutover-ko.md) |
 
 ## 프로젝트 개요
 
@@ -34,7 +34,7 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 
 ## 초기 구현 범위 (2026년 3월)
 
-### 현재 사용 가능한 영역
+### 2026년 3월에 확인한 기능
 
 - 로그인 화면과 ENTER_CD 선택형 로그인 UI
 - 대시보드
@@ -54,7 +54,7 @@ Vibe-HR은 한국어 업무 환경을 기본으로 하는 HR 현대화 프로젝
 - 급여 계산은 Run 대상자 snapshot, 발령/급여프로필 이벤트 판정, 소득세 bracket master, snapshot backfill 까지 들어왔지만 레거시 수준의 계산 엔진 분해는 미완료
 - 복리후생은 조회와 projection 중심이며 write workflow는 미완료
 
-### 아직 본체가 닫히지 않은 영역
+### 당시 남은 과제
 
 - TIM 월마감
 - 급여 계산 단계 분해 / 월마감 연계
@@ -148,6 +148,8 @@ docs/       구현 계획, 점검 문서, 운영 메모
 
 ### 백엔드 실행
 
+아래 Cargo 절차는 저장소 루트에서 시작합니다. Rust 2024 edition을 지원하는 툴체인이 필요하며, 저장소의 백엔드 빌드 이미지는 `rust:1.100-bookworm`입니다. Docker로 확인하려면 아래의 Compose 절차를 사용합니다.
+
 PowerShell 7에서 로컬 테스트 DB 연결 정보와 서로 다른 256비트 서명 키를 설정합니다. 개발 셸에 설정한 BFF 서명 키는 프론트의 BFF 환경에서도 같은 값이어야 합니다. 이미 Flyway V1부터 V7까지 검증된 DB라면 마지막 `cargo run --locked`로 서비스를 시작할 수 있습니다.
 
 ```powershell
@@ -177,10 +179,17 @@ cargo run --locked
 
 기본 바인딩은 `127.0.0.1:8080`입니다. `/health`와 `/api/v1/health`, `/actuator/health/readiness`에서 응답을 확인할 수 있습니다.
 
-Docker Desktop에서 API를 확인하려면 저장소 루트에서 다음 명령을 실행합니다. 이 구성은 자체 PostgreSQL에 Flyway를 적용하고 카탈로그 검증이 통과하면 Rust 서버를 시작합니다. 앞에서 생성한 두 서명 키를 같은 셸에 설정해 둡니다.
+### Docker로 API 실행
+
+호스트에 Cargo나 Flyway CLI가 없어도 Docker Desktop으로 확인할 수 있습니다. 저장소 루트에서 실행하면 전용 PostgreSQL에 Flyway를 적용하고 카탈로그 검증 후 Rust API를 시작합니다.
 
 ```powershell
-docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml up --build --wait backend
+$env:AUTH_TOKEN_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:VIBEHR_BFF_ASSERTION_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml build preflight
+if ($LASTEXITCODE) { throw "Rust image build failed" }
+docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml up --wait backend
+if ($LASTEXITCODE) { throw "Rust API startup failed" }
 $address = docker compose -p vibehr-dev -f docker-compose.rust-smoke.yml port backend 8080
 $env:VIBEHR_BFF_BACKEND_URL = "http://$address"
 Invoke-RestMethod "$env:VIBEHR_BFF_BACKEND_URL/api/v1/health"
@@ -188,9 +197,11 @@ Invoke-RestMethod "$env:VIBEHR_BFF_BACKEND_URL/api/v1/health"
 
 ### 프론트엔드 실행
 
+저장소 루트에서 별도 터미널을 열고 아래 환경 변수 절에 따라 `frontend/.env.local`을 준비합니다. Compose로 실행한 경우 `VIBEHR_BFF_BACKEND_URL`에는 `docker compose port`로 확인한 실제 주소를 사용합니다.
+
 ```powershell
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -228,6 +239,8 @@ NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 
 외부 리버스 프록시는 로그인 요청이 Next.js BFF에 도달하기 전에 클라이언트가 보낸 `x-vibehr-client-ip` 헤더를 제거하고, 신뢰할 수 있는 단일 값으로 다시 주입해야 합니다.
 
+로컬 로그인까지 확인할 때는 활성 법인과 개발 계정이 필요합니다. 새 로컬 DB라면 [시드 데이터](#시드-데이터)의 조건을 먼저 확인합니다.
+
 ## 로그인 및 접속 경로
 
 ### 로컬 접속
@@ -253,14 +266,14 @@ NEXT_PUBLIC_APP_ORIGIN=http://localhost:3000
 - `login_id`: `admin`
 - `password`: `admin`
 
-다만 현재 로그인은 `ENTER_CD` 검증을 통과해야 하므로, 활성 법인(`OrgCorporation`) 데이터가 있어야 정상 로그인됩니다. 즉, 계정만 있어도 법인 seed가 비어 있으면 로그인은 실패합니다.
+다만 현재 로그인은 `ENTER_CD` 검증을 통과해야 하므로, 활성 법인(`org_corporations`) 데이터가 있어야 정상 로그인됩니다. 즉, 계정만 있어도 법인 seed가 비어 있으면 로그인은 실패합니다.
 
 브라우저 로그인 문제 발생 시 아래를 먼저 확인합니다.
 
-1. `OrgCorporation`에 활성 법인이 존재하는지
+1. `org_corporations`에 활성 법인이 존재하는지
 2. `/api/v1/auth/enter-cds`가 비어 있지 않은지
 3. `admin` 또는 `admin-local` 계정이 존재하는지
-4. 프론트 proxy가 `404`를 내면 `frontend/.env.local`의 `VIBEHR_BFF_BACKEND_URL`이 `http://127.0.0.1:8080`인지
+4. 프론트 proxy가 `404`를 내면 `VIBEHR_BFF_BACKEND_URL`이 실행 중인 Rust API의 주소와 포트인지
 
 ## 시드 데이터
 

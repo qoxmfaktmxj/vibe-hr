@@ -9,7 +9,7 @@
 - 코드형 조직 분류 관리(유형/업로드)
 
 ## 주요 경로
-- Backend API: `backend/app/api/organization.py`
+- Backend API: `backend-rust/src/organization/mod.rs`, `backend-rust/src/organization/directory.rs`
 - Frontend: `frontend/src/app/org/*`
 
 ## 데이터 모델 핵심

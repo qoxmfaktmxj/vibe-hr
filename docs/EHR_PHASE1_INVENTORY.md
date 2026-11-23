@@ -32,7 +32,9 @@
 | TRA 교육 | `TTRA` / `P_TRA*` / `F_TRA*` | 26 | 6 | 2 | 필수교육/교육신청 |
 | SYS/SEC | `TSYS`,`TSEC` / `P_SYS*`,`P_SEC*` / `F_SYS*`,`F_SEC*` | 154 | 30 | 30 | 메뉴/권한/운영/배치 |
 
-## 3. 현재 Vibe-HR 구현량 스냅샷
+## 3. 2026-02-27 구현량 스냅샷
+
+당시 Python 소스의 집계다. 현재 Rust의 도메인 책임은 [아키텍처](ARCHITECTURE.md)를 따른다.
 
 ### 3.1 화면 라우트 (`frontend/src/app/**/page.tsx`)
 

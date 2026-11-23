@@ -7,7 +7,7 @@ const API_PREFIX = "/api/v1";
 export function backendApiBaseUrl(): string {
   const value = process.env.VIBEHR_BFF_BACKEND_URL;
   if (!value || value.trim() !== value || !ROOT_HTTP_URL.test(value)) {
-    throw new Error(`${TARGET_VARIABLE} must point to the Spring backend for BFF requests.`);
+    throw new Error(`${TARGET_VARIABLE} must point to the Rust backend for BFF requests.`);
   }
 
   let url: URL;

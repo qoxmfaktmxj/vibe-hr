@@ -14,11 +14,11 @@ This file is an execution entrypoint, not a source of truth. If any rule here co
 Vibe-HR is a Korean HR modernization monorepo.
 
 - Frontend: Next.js 16, React 19, TypeScript, AG Grid
-- Backend: Spring Boot 4, Java 21, JPA/MyBatis, Flyway, PostgreSQL
+- Backend: Rust 2024, axum, Tokio, SQLx, PostgreSQL. Spring은 비교 테스트와 Flyway SQL을 제공한다.
 - Domains: HR / ORG / TIM / PAYROLL / WEL / HRI / TRA
 
 ## Source of Truth Map
-- Runtime workflow / Codex-OMX execution surface: `AGENTS.md`
+- 작업 지침: `AGENTS.md`
 - Governance / approvals / risk classes: `docs/GOVERNANCE.md`
 - Architecture / domains / hotspots: `docs/ARCHITECTURE.md`
 - Testing / validation requirements: `docs/TEST_STRATEGY.md`
@@ -52,6 +52,7 @@ Treat the following as protected paths.
 - `frontend/src/components/grid/**`
 - `frontend/src/lib/grid/**`
 - `config/grid-screens.json`
+- Rust 인증, 메뉴, 급여, DB, 배포 경로는 [보호 대상 목록](docs/GOVERNANCE.md)을 따른다.
 - `backend-spring/src/main/java/com/vibehr/auth/**`
 - `backend-spring/src/main/java/com/vibehr/payroll/**`
 - `backend-spring/src/main/java/com/vibehr/menu/**`
@@ -72,11 +73,16 @@ npm run test
 npm run build
 ```
 
-### Backend
-```bash
-cd backend-spring
-.\gradlew.bat test
+### Rust 백엔드
+
+```powershell
+cd backend-rust
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
 ```
+
+DB fixture가 필요한 테스트, BFF 검증, Spring 비교 실행 조건은 [테스트 전략](docs/TEST_STRATEGY.md)을 따른다.
 
 ## AG Grid Rule
 If an AG Grid screen or shared grid module is changed:

@@ -17,7 +17,9 @@ Confidence: Medium
 - 2 = 사용 가능
 - 3 = 강함
 
-## 현재 점수
+## 2026-10-16 평가 점수
+
+당시의 평가 근거와 점수를 보존한다. Rust 전환 이후의 검증 범위는 [이관 검증 기록](rust-migration/verification.md)에서 확인한다.
 | 축 | 점수 | 근거 | 개선 우선순위 |
 |---|---:|---|---|
 | Test Confidence | 2 | `validate:grid`, lint/build, Gradle/JUnit/Testcontainers, browser/manual 검증 경로 존재 | 높음 |
