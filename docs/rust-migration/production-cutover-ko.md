@@ -161,6 +161,12 @@ cat "$EVIDENCE/verified-candidate.sha"
 
 ## 5. 전환 직후 확인
 
+Actions의 초록색 상태만으로 전환 완료를 판단하지 않는다. 배포 로그의
+`[deploy] verified promotion complete: <승인 SHA>`와 아래 두 실행 이미지의 SHA를 함께 확인한다.
+DB 검증까지만 로그가 있고 완료 문구가 없으면 운영 전환 미완료로 취급한다.
+SSH의 `bash -s`와 같은 표준입력을 사용하는 배포 명령은 반드시 비대화형으로 실행하고
+표준입력을 `/dev/null`로 분리해야 후속 전환 스크립트가 소비되지 않는다.
+
 ```bash
 for svc in vibehr-backend-rust vibehr-frontend; do
   id=$(docker inspect -f '{{.Image}}' "$svc")
